@@ -36,6 +36,53 @@ impl CoreManifest {
     pub fn new(provider: String, version: String, source_url: Option<String>, checksum: Option<serde_json::Value>, strategy_count: usize, imported_legacy: bool) -> Self {
         Self { schema_version: 1, provider, channel: None, version, source_url, checksum, strategy_count, imported_legacy }
     }
+
+    /// Persist the provider manifest using a recoverable temp/backup swap.
+    /// This mirrors zapret-ui's installation manifest semantics.
+    pub fn write_atomic(&self, root: &Path) -> Result<(), String> {
+        static MANIFEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        let _guard = MANIFEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        let path = root.join(".zapret-ui-core.json");
+        let backup = root.join(".zapret-ui-core.json.backup");
+        let temporary = root.join(format!(".zapret-ui-core.json.tmp-{}", std::process::id()));
+
+        if temporary.exists() {
+            fs::remove_file(&temporary)
+                .map_err(|e| format!("Cannot remove stale temporary core manifest: {e}"))?;
+        }
+        if backup.exists() {
+            if path.exists() {
+                fs::remove_file(&backup)
+                    .map_err(|e| format!("Cannot remove stale core manifest backup: {e}"))?;
+            } else {
+                fs::rename(&backup, &path)
+                    .map_err(|e| format!("Cannot recover core manifest before writing: {e}"))?;
+            }
+        }
+
+        let data = serde_json::to_vec_pretty(self)
+            .map_err(|e| format!("Cannot serialize core manifest: {e}"))?;
+        fs::write(&temporary, data)
+            .map_err(|e| format!("Cannot write temporary core manifest: {e}"))?;
+
+        if path.exists() {
+            fs::rename(&path, &backup)
+                .map_err(|e| format!("Cannot back up current core manifest: {e}"))?;
+        }
+        if let Err(error) = fs::rename(&temporary, &path) {
+            if backup.exists() {
+                let _ = fs::rename(&backup, &path);
+            }
+            let _ = fs::remove_file(&temporary);
+            return Err(format!("Cannot activate core manifest: {error}"));
+        }
+        if backup.exists() {
+            fs::remove_file(&backup)
+                .map_err(|e| format!("Cannot remove committed core manifest backup: {e}"))?;
+        }
+        Ok(())
+    }
+
     pub fn read(root: &Path) -> Result<Self, String> {
         let path = root.join(".zapret-ui-core.json");
         let data = fs::read(&path).map_err(|e| format!("Core manifest is missing or unreadable ({}): {e}", path.display()))?;
