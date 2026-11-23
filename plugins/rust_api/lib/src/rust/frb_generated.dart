@@ -7,6 +7,7 @@ import 'api/editor.dart';
 import 'api/hotkey.dart';
 import 'api/ipc.dart';
 import 'api/script.dart';
+import 'api/zapret.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'frb_generated.dart';
@@ -69,7 +70,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => -1884150778;
+  int get rustContentHash => 851820837;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -171,6 +172,30 @@ abstract class RustLibApi extends BaseApi {
   Future<String> crateApiScriptEvaluateScript({
     required String script,
     required String config,
+  });
+
+  Future<void> crateApiZapretFlowsealImportStrategy({
+    required String root,
+    required String name,
+    required String content,
+  });
+
+  Future<List<String>> crateApiZapretFlowsealListStrategies({
+    required String root,
+  });
+
+  Future<String> crateApiZapretFlowsealParseStrategy({
+    required String root,
+    required String strategy,
+    required String gameFilterMode,
+    required String gameFilterTcp,
+    required String gameFilterUdp,
+  });
+
+  Future<FlowsealStatus> crateApiZapretFlowsealStatus({required String root});
+
+  Future<String> crateApiZapretFlowsealValidateInstallation({
+    required String root,
   });
 
   Future<List<RustFoldRange>> crateApiEditorFoldsComputeAll({
@@ -1022,6 +1047,190 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<void> crateApiZapretFlowsealImportStrategy({
+    required String root,
+    required String name,
+    required String content,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(root, serializer);
+          sse_encode_String(name, serializer);
+          sse_encode_String(content, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 25,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiZapretFlowsealImportStrategyConstMeta,
+        argValues: [root, name, content],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiZapretFlowsealImportStrategyConstMeta =>
+      const TaskConstMeta(
+        debugName: "flowseal_import_strategy",
+        argNames: ["root", "name", "content"],
+      );
+
+  @override
+  Future<List<String>> crateApiZapretFlowsealListStrategies({
+    required String root,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(root, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 26,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_String,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiZapretFlowsealListStrategiesConstMeta,
+        argValues: [root],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiZapretFlowsealListStrategiesConstMeta =>
+      const TaskConstMeta(
+        debugName: "flowseal_list_strategies",
+        argNames: ["root"],
+      );
+
+  @override
+  Future<String> crateApiZapretFlowsealParseStrategy({
+    required String root,
+    required String strategy,
+    required String gameFilterMode,
+    required String gameFilterTcp,
+    required String gameFilterUdp,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(root, serializer);
+          sse_encode_String(strategy, serializer);
+          sse_encode_String(gameFilterMode, serializer);
+          sse_encode_String(gameFilterTcp, serializer);
+          sse_encode_String(gameFilterUdp, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 27,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiZapretFlowsealParseStrategyConstMeta,
+        argValues: [
+          root,
+          strategy,
+          gameFilterMode,
+          gameFilterTcp,
+          gameFilterUdp,
+        ],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiZapretFlowsealParseStrategyConstMeta =>
+      const TaskConstMeta(
+        debugName: "flowseal_parse_strategy",
+        argNames: [
+          "root",
+          "strategy",
+          "gameFilterMode",
+          "gameFilterTcp",
+          "gameFilterUdp",
+        ],
+      );
+
+  @override
+  Future<FlowsealStatus> crateApiZapretFlowsealStatus({required String root}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(root, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 28,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_flowseal_status,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiZapretFlowsealStatusConstMeta,
+        argValues: [root],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiZapretFlowsealStatusConstMeta =>
+      const TaskConstMeta(debugName: "flowseal_status", argNames: ["root"]);
+
+  @override
+  Future<String> crateApiZapretFlowsealValidateInstallation({
+    required String root,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(root, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 29,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiZapretFlowsealValidateInstallationConstMeta,
+        argValues: [root],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiZapretFlowsealValidateInstallationConstMeta =>
+      const TaskConstMeta(
+        debugName: "flowseal_validate_installation",
+        argNames: ["root"],
+      );
+
+  @override
   Future<List<RustFoldRange>> crateApiEditorFoldsComputeAll({
     required RopeBridge rope,
     required BigInt tabSize,
@@ -1038,7 +1247,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 25,
+            funcId: 30,
             port: port_,
           );
         },
@@ -1073,7 +1282,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_usize(targetOffset, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 26)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 31)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_opt_box_autoadd_usize,
@@ -1110,7 +1319,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_usize(firstVisible, serializer);
           sse_encode_usize(lastVisible, serializer);
           sse_encode_usize(tabSize, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 27)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 32)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_list_guide_block,
@@ -1141,7 +1350,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 28,
+              funcId: 33,
               port: port_,
             );
           },
@@ -1170,7 +1379,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 29,
+            funcId: 34,
             port: port_,
           );
         },
@@ -1200,7 +1409,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 30,
+            funcId: 35,
             port: port_,
           );
         },
@@ -1231,7 +1440,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 31,
+            funcId: 36,
             port: port_,
           );
         },
@@ -1412,6 +1621,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   EditorOpenErrorKind dco_decode_editor_open_error_kind(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return EditorOpenErrorKind.values[raw as int];
+  }
+
+  @protected
+  FlowsealStatus dco_decode_flowseal_status(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 3)
+      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    return FlowsealStatus(
+      installed: dco_decode_bool(arr[0]),
+      version: dco_decode_String(arr[1]),
+      executable: dco_decode_String(arr[2]),
+    );
   }
 
   @protected
@@ -1758,6 +1980,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var inner = sse_decode_i_32(deserializer);
     return EditorOpenErrorKind.values[inner];
+  }
+
+  @protected
+  FlowsealStatus sse_decode_flowseal_status(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_installed = sse_decode_bool(deserializer);
+    var var_version = sse_decode_String(deserializer);
+    var var_executable = sse_decode_String(deserializer);
+    return FlowsealStatus(
+      installed: var_installed,
+      version: var_version,
+      executable: var_executable,
+    );
   }
 
   @protected
@@ -2184,6 +2419,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_flowseal_status(
+    FlowsealStatus self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_bool(self.installed, serializer);
+    sse_encode_String(self.version, serializer);
+    sse_encode_String(self.executable, serializer);
   }
 
   @protected

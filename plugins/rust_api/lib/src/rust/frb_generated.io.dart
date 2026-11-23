@@ -7,6 +7,7 @@ import 'api/editor.dart';
 import 'api/hotkey.dart';
 import 'api/ipc.dart';
 import 'api/script.dart';
+import 'api/zapret.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:ffi' as ffi;
@@ -113,6 +114,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   EditorOpenErrorKind dco_decode_editor_open_error_kind(dynamic raw);
+
+  @protected
+  FlowsealStatus dco_decode_flowseal_status(dynamic raw);
 
   @protected
   GuideBlock dco_decode_guide_block(dynamic raw);
@@ -269,6 +273,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   EditorOpenErrorKind sse_decode_editor_open_error_kind(
     SseDeserializer deserializer,
   );
+
+  @protected
+  FlowsealStatus sse_decode_flowseal_status(SseDeserializer deserializer);
 
   @protected
   GuideBlock sse_decode_guide_block(SseDeserializer deserializer);
@@ -447,6 +454,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_editor_open_error_kind(
     EditorOpenErrorKind self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_flowseal_status(
+    FlowsealStatus self,
     SseSerializer serializer,
   );
 
