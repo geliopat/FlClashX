@@ -8,6 +8,8 @@ name = "rust_api"
 crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 flutter_rust_bridge = "=2.13.0"
 rquickjs = { version = "0.12", default-features = false }
 ropey = { version = "1.6.1", default-features = false, features = ["simd"] }
@@ -51,4 +53,5 @@ opt-level = 0
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(frb_expand)'] }
 
 [dev-dependencies]
+tempfile = "3"
 serde_json = "1"

@@ -5,7 +5,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::core::{CoreManifest, CorePaths, CoreProvider, GameFilterSettings};
+use crate::zapret::core::{CoreManifest, CorePaths, CoreProvider, GameFilterSettings};
 
 const IPSET_URL: &str = "https://raw.githubusercontent.com/Flowseal/zapret-discord-youtube/refs/heads/main/.service/ipset-service.txt";
 const STRATEGY_CATALOG_NAME: &str = "strategies.json";
@@ -155,10 +155,10 @@ impl FlowsealProvider {
         let lists = self.paths.lists_dir().to_string_lossy().to_string() + &suffix;
         let root = self.paths.root().to_string_lossy().to_string() + &suffix;
         let lists_path = self.paths.lists_dir();
-        let user_list = crate::ipset::USER_INCLUDE_FILE;
+        let user_list = crate::zapret::ipset::USER_INCLUDE_FILE;
         let arguments = if lists_path.join(user_list).is_file()
             && fs::read_to_string(lists_path.join("ipset-all.txt")).is_ok_and(|text| {
-                crate::ipset_mode(text.trim_start_matches('\u{feff}')) == "loaded"
+                crate::zapret::ipset_mode(text.trim_start_matches('\u{feff}')) == "loaded"
             }) {
             arguments
                 .split_whitespace()
@@ -886,7 +886,7 @@ mod tests {
         let lists = provider.paths.lists_dir();
         fs::create_dir_all(&lists).unwrap();
         fs::write(
-            lists.join(crate::ipset::USER_INCLUDE_FILE),
+            lists.join(crate::zapret::ipset::USER_INCLUDE_FILE),
             "192.0.2.1/32\n",
         )
         .unwrap();
@@ -903,7 +903,7 @@ mod tests {
                 },
             );
             assert_eq!(
-                resolved.matches(crate::ipset::USER_INCLUDE_FILE).count(),
+                resolved.matches(crate::zapret::ipset::USER_INCLUDE_FILE).count(),
                 expected
             );
         }
