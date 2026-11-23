@@ -1,0 +1,36 @@
+name: Zapret Rust checks
+
+on:
+  push:
+    branches:
+      - feature/zapret-ui-integration
+    paths:
+      - "plugins/rust_api/rust/**"
+      - ".github/workflows/zapret-rust-check.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "plugins/rust_api/rust/**"
+      - ".github/workflows/zapret-rust-check.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  rust:
+    name: Rust (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Check formatting
+        run: cargo fmt --manifest-path plugins/rust_api/rust/Cargo.toml -- --check
+      - name: Compile and run unit tests
+        run: cargo test --manifest-path plugins/rust_api/rust/Cargo.toml
