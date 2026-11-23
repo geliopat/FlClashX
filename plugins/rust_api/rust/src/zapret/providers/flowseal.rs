@@ -549,6 +549,12 @@ impl CoreProvider for FlowsealProvider {
         if name.eq_ignore_ascii_case("service") {
             return Err("strategy_import_error_reserved_name".to_string());
         }
+        // Names become files inside custom-strategies; reject path components.
+        if name.len() > 64 || name == "." || name == ".."
+            || !name.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, ' ' | '_' | '-' | '.'))
+        {
+            return Err("strategy_import_error_invalid_name".to_string());
+        }
         Self::extract_strategy_arguments(content, name)
             .map_err(|_| "strategy_import_error_parse".to_string())?;
 
@@ -691,6 +697,17 @@ mod tests {
             std::env::temp_dir().join(format!("zapret-provider-{}-{stamp}", std::process::id()));
         std::fs::create_dir_all(&p).expect("temp");
         p
+    }
+
+    #[test]
+    fn rejects_custom_strategy_names_that_escape_the_import_directory() {
+        let root = temp();
+        let provider = FlowsealProvider::new(&root);
+        let content = "@echo off\nwinws.exe --filter-tcp=80\n";
+        for name in ["../escape", "..\\escape", "C:\\escape", ".", "..", "bad/name"] {
+            assert!(provider.import_custom_strategy(name, content).is_err(), "accepted {name:?}");
+        }
+        assert!(!root.join("escape.bat").exists());
     }
 
     #[test]
