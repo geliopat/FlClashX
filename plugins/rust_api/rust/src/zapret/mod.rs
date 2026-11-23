@@ -3,8 +3,17 @@ pub mod ipset;
 pub mod providers;
 
 pub(crate) fn ipset_mode(content: &str) -> &'static str {
-    let mut lines = content.lines().map(str::trim).filter(|line| !line.is_empty()).peekable();
-    if lines.peek().is_none() { "any" }
-    else if lines.any(|line| line == "203.0.113.113/32") { "none" }
-    else { "loaded" }
+    let mut lines = content
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .peekable();
+
+    if lines.peek().is_none() {
+        "any"
+    } else if lines.any(|line| line == "203.0.113.113/32") {
+        "none"
+    } else {
+        "loaded"
+    }
 }
