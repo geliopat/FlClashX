@@ -15,7 +15,7 @@ on:
       - ".github/workflows/zapret-rust-check.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   rust:
@@ -34,3 +34,36 @@ jobs:
         run: cargo fmt --manifest-path plugins/rust_api/rust/Cargo.toml -- --check
       - name: Compile and run unit tests
         run: cargo test --manifest-path plugins/rust_api/rust/Cargo.toml
+
+  generate-bindings:
+    name: Generate Flutter Rust Bridge bindings
+    if: github.event_name == 'push'
+    needs: rust
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: feature/zapret-ui-integration
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.47.6'
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install project dependencies
+        run: flutter pub get
+      - name: Install Flutter Rust Bridge code generator
+        run: dart pub global activate flutter_rust_bridge_codegen 2.13.0
+      - name: Generate bindings
+        working-directory: plugins/rust_api
+        run: flutter_rust_bridge_codegen generate
+      - name: Commit generated bindings
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add plugins/rust_api/rust/src/frb_generated.rs plugins/rust_api/lib/src/rust
+          if git diff --cached --quiet; then
+            echo 'Generated bindings are already up to date.'
+          else
+            git commit -m 'Generate Flowseal Flutter Rust Bridge bindings'
+            git push origin HEAD:feature/zapret-ui-integration
+          fi
