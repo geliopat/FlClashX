@@ -51,5 +51,3 @@ opt-level = 0
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(frb_expand)'] }
-
-serde_json = "1"
