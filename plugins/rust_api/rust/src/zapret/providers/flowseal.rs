@@ -912,8 +912,8 @@ mod tests {
 
     #[test]
     fn attaches_the_user_ipset_to_each_upstream_ipset_only_in_list_mode() {
-        let root = tempfile::tempdir().unwrap();
-        let provider = FlowsealProvider::new(root.path());
+        let root = temp();
+        let provider = FlowsealProvider::new(&root);
         let lists = provider.paths.lists_dir();
         fs::create_dir_all(&lists).unwrap();
         fs::write(
@@ -940,5 +940,6 @@ mod tests {
                 expected
             );
         }
+        fs::remove_dir_all(root).unwrap();
     }
 }
