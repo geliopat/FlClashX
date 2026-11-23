@@ -60,7 +60,7 @@ jobs:
         run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add plugins/rust_api/rust/src/frb_generated.rs plugins/rust_api/lib/src/rust
+          git add plugins/rust_api/rust/src/frb_generated.rs plugins/rust_api/lib/src/rust plugins/rust_api/lib/rust_api.dart
           if git diff --cached --quiet; then
             echo 'Generated bindings are already up to date.'
           else
