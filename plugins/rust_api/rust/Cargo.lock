@@ -987,6 +987,7 @@ dependencies = [
 name = "rust_api"
 version = "0.1.0"
 dependencies = [
+ "serde",
  "dispatch2",
  "flutter_rust_bridge",
  "global-hotkey",
