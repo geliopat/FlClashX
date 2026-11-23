@@ -550,8 +550,12 @@ impl CoreProvider for FlowsealProvider {
             return Err("strategy_import_error_reserved_name".to_string());
         }
         // Names become files inside custom-strategies; reject path components.
-        if name.len() > 64 || name == "." || name == ".."
-            || !name.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, ' ' | '_' | '-' | '.'))
+        if name.len() > 64
+            || name == "."
+            || name == ".."
+            || !name
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, ' ' | '_' | '-' | '.'))
         {
             return Err("strategy_import_error_invalid_name".to_string());
         }
@@ -704,8 +708,18 @@ mod tests {
         let root = temp();
         let provider = FlowsealProvider::new(&root);
         let content = "@echo off\nwinws.exe --filter-tcp=80\n";
-        for name in ["../escape", "..\\escape", "C:\\escape", ".", "..", "bad/name"] {
-            assert!(provider.import_custom_strategy(name, content).is_err(), "accepted {name:?}");
+        for name in [
+            "../escape",
+            "..\\escape",
+            "C:\\escape",
+            ".",
+            "..",
+            "bad/name",
+        ] {
+            assert!(
+                provider.import_custom_strategy(name, content).is_err(),
+                "accepted {name:?}"
+            );
         }
         assert!(!root.join("escape.bat").exists());
     }
@@ -920,7 +934,9 @@ mod tests {
                 },
             );
             assert_eq!(
-                resolved.matches(crate::zapret::ipset::USER_INCLUDE_FILE).count(),
+                resolved
+                    .matches(crate::zapret::ipset::USER_INCLUDE_FILE)
+                    .count(),
                 expected
             );
         }

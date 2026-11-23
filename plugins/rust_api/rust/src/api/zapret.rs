@@ -46,11 +46,7 @@ pub fn flowseal_parse_strategy(
 }
 
 #[frb]
-pub fn flowseal_import_strategy(
-    root: String,
-    name: String,
-    content: String,
-) -> Result<(), String> {
+pub fn flowseal_import_strategy(root: String, name: String, content: String) -> Result<(), String> {
     provider(root).import_custom_strategy(&name, &content)
 }
 
