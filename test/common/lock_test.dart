@@ -42,6 +42,11 @@ void main() {
     },
   );
 
+  test('acquiring the existing owner lock is idempotent', () async {
+    expect(await singleInstanceLock.acquire(), isTrue);
+    expect(await singleInstanceLock.acquire(), isTrue);
+  });
+
   test('an unusable lock path is reported, not thrown', () async {
     SingleInstanceLock.resolvePath = () async =>
         join(home.path, 'missing-dir', 'FlClash.lock');

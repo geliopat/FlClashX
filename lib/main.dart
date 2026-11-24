@@ -16,6 +16,8 @@ import 'common/preferences_store.dart';
 import 'common/window.dart';
 import 'providers/providers.dart';
 
+const _flowsealElevatedLaunchArgument = '--flowseal-elevated';
+
 void main(List<String> args) {
   runZonedGuarded(
     () async {
@@ -43,7 +45,12 @@ void main(List<String> args) {
       try {
         await RustLib.init();
         final version = await system.init();
-        final container = await bootstrap.init(version);
+        final container = await bootstrap.init(
+          version,
+          waitForDataLock:
+              Platform.isWindows &&
+              args.contains(_flowsealElevatedLaunchArgument),
+        );
         await FlClashHttpOverrides.trustCoreRoots();
         HttpOverrides.global = FlClashHttpOverrides(container);
         request.attach(container.read);

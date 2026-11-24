@@ -37,13 +37,20 @@ class Bootstrap {
 
   BootDecision _bootDecision = const BootDecision();
 
-  Future<ProviderContainer> init(int version) async {
+  Future<ProviderContainer> init(
+    int version, {
+    bool waitForDataLock = false,
+  }) async {
     windowPort = window;
     trayPort = appTray;
     navigationPort = navigation;
     notificationPort = systemNotifications;
     final dynamicColor = await _initDynamicColor();
-    return _initData(version, dynamicColor);
+    return _initData(
+      version,
+      dynamicColor,
+      waitForDataLock: waitForDataLock,
+    );
   }
 
   Future<DynamicColorSeeds> _initDynamicColor() async {
@@ -72,13 +79,34 @@ class Bootstrap {
     );
   }
 
-  /// Runs before migration and the database: a copy started from another
-  /// install path gets past the platform's single-instance hand-off.
-  Future<void> _claimDataDirectory() async {
+  /// Runs before migration and the database. A UAC relaunch may arrive
+  /// before its unelevated parent releases the lock, so only that verified
+  /// Windows launch is allowed a short, bounded hand-off wait.
+  Future<void> _claimDataDirectory({required bool waitForOwnerExit}) async {
     if (!system.isDesktop || await singleInstanceLock.acquire()) {
       return;
     }
-    commonPrint.log('another instance owns the data directory, exiting');
+    if (waitForOwnerExit) {
+      const timeout = Duration(seconds: 15);
+      const interval = Duration(milliseconds: 100);
+      final stopwatch = Stopwatch()..start();
+      while (stopwatch.elapsed < timeout) {
+        await Future.delayed(interval);
+        if (await singleInstanceLock.acquire()) {
+          commonPrint.log(
+            'elevated Flowseal relaunch acquired the data directory lock',
+          );
+          return;
+        }
+      }
+      commonPrint.log(
+        'elevated Flowseal relaunch timed out waiting for the previous '
+        'FlClashX process to release the data directory lock',
+        logLevel: LogLevel.error,
+      );
+    } else {
+      commonPrint.log('another instance owns the data directory, exiting');
+    }
     exit(0);
   }
 
@@ -96,9 +124,10 @@ class Bootstrap {
 
   Future<ProviderContainer> _initData(
     int version,
-    DynamicColorSeeds dynamicColor,
-  ) async {
-    await _claimDataDirectory();
+    DynamicColorSeeds dynamicColor, {
+    required bool waitForDataLock,
+  }) async {
+    await _claimDataDirectory(waitForOwnerExit: waitForDataLock);
     await settleStableImport(
       import: importStableDataForPre,
       askRetry: askStableImportRetry,
