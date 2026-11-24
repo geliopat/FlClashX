@@ -1,4 +1,4 @@
-name: Zapret Windows checks
+name: Zapret Windows checks (paused)
 
 concurrency:
   group: zapret-windows-${{ github.ref }}
@@ -31,6 +31,7 @@ permissions:
 
 jobs:
   rust-windows:
+    if: false
     # Temporary pause requested by user; restore when compilation is authorized.
     if: false
     name: Rust (windows-2022)
@@ -48,6 +49,7 @@ jobs:
         run: cargo test --manifest-path plugins/rust_api/rust/Cargo.toml
 
   generate-bindings:
+    if: false
     # Temporary pause requested by user; restore when compilation is authorized.
     if: false
     name: Generate Flutter Rust Bridge bindings (Windows)
