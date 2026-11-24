@@ -444,7 +444,7 @@ fn unix_timestamp() -> u64 {
         .unwrap_or_default()
 }
 
-fn split_windows_arguments(input: &str) -> Result<Vec<String>, String> {
+pub(crate) fn split_windows_arguments(input: &str) -> Result<Vec<String>, String> {
     if input.chars().any(|character| character.is_control()) {
         return Err("Flowseal strategy arguments contain control characters".into());
     }
