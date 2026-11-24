@@ -90,7 +90,7 @@ jobs:
         run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add plugins/rust_api/rust/src plugins/rust_api/rust/Cargo.lock plugins/rust_api/lib/src/rust plugins/rust_api/lib/rust_api.dart lib/views/zapret.dart lib/views/tools.dart lib/views/views.dart
+          git add plugins/rust_api/rust/src plugins/rust_api/rust/Cargo.lock plugins/rust_api/lib/src/rust plugins/rust_api/lib/rust_api.dart lib/views/zapret.dart lib/views/tools.dart lib/views/views.dart lib/main.dart lib/bootstrap.dart lib/common/lock.dart test/common/lock_test.dart
           if (-not (git diff --cached --quiet)) {
             git commit -m "Generate and format Flowseal Flutter Rust Bridge bindings"
             git push origin HEAD:feature/zapret-ui-integration
