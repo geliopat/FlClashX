@@ -153,7 +153,7 @@ class _FlowsealViewState extends State<FlowsealView> {
     );
     if (file == null || !mounted) return;
     await _withBusy(() async {
-      if (file.size > 1024 * 1024) {
+      if ((file.lengthSync() ?? await file.length()) > 1024 * 1024) {
         throw Exception('Размер BAT-файла превышает 1 МБ.');
       }
       final content = utf8.decode(await file.readAsBytes());
@@ -454,7 +454,7 @@ class _FlowsealViewState extends State<FlowsealView> {
               const Text('BAT-стратегии в выбранном каталоге не найдены.')
             else
               DropdownButtonFormField<String>(
-                value: _selectedStrategy,
+                initialValue: _selectedStrategy,
                 isExpanded: true,
                 decoration: const InputDecoration(
                   labelText: 'Стратегия',
@@ -476,7 +476,7 @@ class _FlowsealViewState extends State<FlowsealView> {
               ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: _filterMode,
+              initialValue: _filterMode,
               decoration: const InputDecoration(
                 labelText: 'Игровой фильтр',
                 border: OutlineInputBorder(),
