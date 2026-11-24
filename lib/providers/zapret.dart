@@ -57,8 +57,12 @@ class ZapretController extends Notifier<ZapretState> {
   ZapretState build() {
     ref.onDispose(() => _poller?.cancel());
     if (Platform.isWindows) {
-      scheduleMicrotask(refresh);
-      _poller = Timer.periodic(_pollInterval, (_) => unawaited(refresh()));
+      scheduleMicrotask(() {
+        if (ref.mounted) unawaited(refresh());
+      });
+      _poller = Timer.periodic(_pollInterval, (_) {
+        if (ref.mounted) unawaited(refresh());
+      });
     }
     return const ZapretState();
   }
@@ -68,6 +72,7 @@ class ZapretController extends Notifier<ZapretState> {
     _refreshing = true;
     try {
       final response = await _client.zapretStatus();
+      if (!ref.mounted) return;
       state = state.copyWith(
         available: true,
         running: response.running,
@@ -77,6 +82,7 @@ class ZapretController extends Notifier<ZapretState> {
         clearError: true,
       );
     } on HelperException catch (error) {
+      if (!ref.mounted) return;
       state = state.copyWith(
         available: error.code != 'zapretUnsupported',
         running: false,
@@ -84,6 +90,7 @@ class ZapretController extends Notifier<ZapretState> {
         error: error.message,
       );
     } catch (error) {
+      if (!ref.mounted) return;
       state = state.copyWith(
         running: false,
         clearPid: true,
@@ -102,6 +109,7 @@ class ZapretController extends Notifier<ZapretState> {
       final response = enabled
           ? await _client.startZapret()
           : await _client.stopZapret();
+      if (!ref.mounted) return;
       state = state.copyWith(
         available: true,
         running: response.running,
@@ -110,10 +118,14 @@ class ZapretController extends Notifier<ZapretState> {
         cleanedProcesses: response.cleanedProcesses,
       );
     } catch (error) {
-      state = state.copyWith(error: _errorMessage(error));
+      if (ref.mounted) {
+        state = state.copyWith(error: _errorMessage(error));
+      }
       rethrow;
     } finally {
-      state = state.copyWith(busy: false);
+      if (ref.mounted) {
+        state = state.copyWith(busy: false);
+      }
     }
   }
 
@@ -125,6 +137,7 @@ class ZapretController extends Notifier<ZapretState> {
     try {
       await _requireHelper();
       final response = await _client.restartZapret();
+      if (!ref.mounted) return;
       state = state.copyWith(
         available: true,
         running: response.running,
