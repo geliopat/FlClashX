@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:fl_clash/common/common.dart';
@@ -359,6 +360,70 @@ class _FlowsealViewState extends State<FlowsealView> {
       );
       if (!mounted) return;
       setState(() => _userListEntries = entries);
+      await _restartAfterListChange();
+    });
+  }
+
+
+  Future<void> _exportSelectedUserList() async {
+    if (!_installed) return;
+    await _withBusy(() async {
+      final content = await flowsealExportUserList(
+        root: _root,
+        filename: _selectedUserList,
+      );
+      final baseName = p.basenameWithoutExtension(_selectedUserList);
+      await FilePicker.platform.saveFile(
+        dialogTitle: 'Экспорт пользовательского списка',
+        fileName: '$baseName.txt',
+        type: FileType.custom,
+        allowedExtensions: const ['txt'],
+        bytes: Uint8List.fromList(utf8.encode(content)),
+      );
+    });
+  }
+
+  Future<void> _exportUserListsBackup() async {
+    if (!_installed) return;
+    await _withBusy(() async {
+      final content = await flowsealExportUserListsBackup(root: _root);
+      await FilePicker.platform.saveFile(
+        dialogTitle: 'Создать резервную копию Flowseal',
+        fileName: 'flowseal-user-lists.json',
+        type: FileType.custom,
+        allowedExtensions: const ['json'],
+        bytes: Uint8List.fromList(utf8.encode(content)),
+      );
+    });
+  }
+
+  Future<void> _importUserListsBackup() async {
+    if (!_installed) return;
+    final file = await FilePicker.pickFile(
+      type: FileType.custom,
+      allowedExtensions: const ['json'],
+    );
+    if (file == null || !mounted) return;
+    await _withBusy(() async {
+      if ((file.lengthSync() ?? await file.length()) > 8 * 1024 * 1024) {
+        throw Exception('Размер резервной копии превышает 8 МиБ.');
+      }
+      final content = utf8.decode(await file.readAsBytes());
+      final backup = await flowsealImportUserListsBackup(
+        root: _root,
+        content: content,
+      );
+      final selected = switch (_selectedUserList) {
+        'list-general-user.txt' => backup.include,
+        'list-exclude-user.txt' => backup.exclude,
+        'ipset-exclude-user.txt' => backup.ips,
+        _ => const <String>[],
+      };
+      if (!mounted) return;
+      setState(() {
+        _userListEntries = selected;
+        _validation = 'Резервная копия восстановлена.';
+      });
       await _restartAfterListChange();
     });
   }
@@ -925,6 +990,21 @@ class _FlowsealViewState extends State<FlowsealView> {
                   onPressed: _busy ? null : _importUserList,
                   icon: const Icon(Icons.file_upload_outlined),
                   label: const Text('Импорт TXT'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : _exportSelectedUserList,
+                  icon: const Icon(Icons.file_download_outlined),
+                  label: const Text('Экспорт TXT'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : _exportUserListsBackup,
+                  icon: const Icon(Icons.backup_outlined),
+                  label: const Text('Бэкап'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : _importUserListsBackup,
+                  icon: const Icon(Icons.settings_backup_restore),
+                  label: const Text('Восстановить'),
                 ),
                 IconButton(
                   tooltip: 'Обновить список',

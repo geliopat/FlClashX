@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use std::{
     collections::HashSet,
     fs,
@@ -343,5 +344,187 @@ mod tests {
         #[cfg(windows)]
         std::os::windows::fs::symlink_file(&outside, root.0.join("lists/list-general-user.txt")).unwrap();
         assert!(read(&root.0, "list-general-user.txt").is_err());
+    }
+}
+
+
+#[derive(Serialize, Deserialize)]
+struct BackupData {
+    version: u32,
+    include: Vec<String>,
+    exclude: Vec<String>,
+    ips: Vec<String>,
+}
+
+pub struct BackupSnapshot {
+    pub include: Vec<String>,
+    pub exclude: Vec<String>,
+    pub ips: Vec<String>,
+}
+
+fn normalize_backup_entries(filename: &str, values: &[String]) -> Result<Vec<String>, String> {
+    if values.len() > MAX_LIST_ENTRIES {
+        return Err(format!("Backup exceeds {MAX_LIST_ENTRIES} entries per list"));
+    }
+    let mut seen = HashSet::new();
+    let mut result = Vec::new();
+    for value in values {
+        let value = value.trim();
+        if value.is_empty() || value.starts_with('#') {
+            continue;
+        }
+        let value = normalize_entry(filename, value)?;
+        if seen.insert(value.to_ascii_lowercase()) {
+            result.push(value);
+        }
+    }
+    Ok(result)
+}
+
+pub fn export_backup(root: &Path) -> Result<String, String> {
+    let backup = BackupData {
+        version: 1,
+        include: read(root, "list-general-user.txt")?,
+        exclude: read(root, "list-exclude-user.txt")?,
+        ips: read(root, "ipset-exclude-user.txt")?,
+    };
+    serde_json::to_string_pretty(&backup)
+        .map_err(|error| format!("Cannot serialize Flowseal backup: {error}"))
+}
+
+pub fn import_backup(root: &Path, content: &str) -> Result<BackupSnapshot, String> {
+    if content.len() > 8 * 1024 * 1024 {
+        return Err("Flowseal backup exceeds the 8 MiB size limit".into());
+    }
+    let backup: BackupData = serde_json::from_str(content.trim_start_matches('\u{feff}'))
+        .map_err(|error| format!("Invalid Flowseal backup file: {error}"))?;
+    if backup.version != 1 {
+        return Err(format!("Unsupported Flowseal backup version: {}", backup.version));
+    }
+
+    // Validate and normalize every list before reading or writing any target.
+    let include = normalize_backup_entries("list-general-user.txt", &backup.include)?;
+    let exclude = normalize_backup_entries("list-exclude-user.txt", &backup.exclude)?;
+    let ips = normalize_backup_entries("ipset-exclude-user.txt", &backup.ips)?;
+    let paths = [
+        resolve_path(root, "list-general-user.txt")?,
+        resolve_path(root, "list-exclude-user.txt")?,
+        resolve_path(root, "ipset-exclude-user.txt")?,
+    ];
+    let originals: Vec<Option<Vec<u8>>> = paths
+        .iter()
+        .map(|path| match fs::read(path) {
+            Ok(data) => {
+                if data.len() as u64 > MAX_LIST_BYTES {
+                    Err(format!("Existing list is too large to back up: {}", path.display()))
+                } else {
+                    Ok(Some(data))
+                }
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+            Err(error) => Err(format!("Cannot read existing list {}: {error}", path.display())),
+        })
+        .collect::<Result<_, _>>()?;
+
+    let lists = [&include, &exclude, &ips];
+    for (index, (path, entries)) in paths.iter().zip(lists).enumerate() {
+        if let Err(error) = write_raw_lines(path, entries) {
+            let mut message = format!("Cannot restore Flowseal backup: {error}");
+            // The failed write may have truncated its target, so restore it too.
+            for (restore_path, original) in paths[..=index].iter().zip(&originals) {
+                let restored = match original {
+                    Some(data) => fs::write(restore_path, data),
+                    None => match fs::remove_file(restore_path) {
+                        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+                        result => result,
+                    },
+                };
+                if let Err(restore_error) = restored {
+                    message.push_str(&format!(
+                        "; failed to restore {}: {restore_error}",
+                        restore_path.display()
+                    ));
+                }
+            }
+            return Err(message);
+        }
+    }
+
+    Ok(BackupSnapshot {
+        include,
+        exclude,
+        ips,
+    })
+}
+
+
+#[cfg(test)]
+mod backup_tests {
+    use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    static NEXT_DIRECTORY: AtomicUsize = AtomicUsize::new(0);
+
+    struct TestRoot(PathBuf);
+
+    impl TestRoot {
+        fn new() -> Self {
+            let root = std::env::temp_dir().join(format!(
+                "flowseal-user-list-backup-{}-{}",
+                std::process::id(),
+                NEXT_DIRECTORY.fetch_add(1, Ordering::Relaxed)
+            ));
+            fs::create_dir_all(root.join("lists")).unwrap();
+            Self(root)
+        }
+    }
+
+    impl Drop for TestRoot {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn exports_and_restores_all_three_lists() {
+        let root = TestRoot::new();
+        replace(&root.0, "list-general-user.txt", &["include.example.com".into()]).unwrap();
+        replace(&root.0, "list-exclude-user.txt", &["exclude.example.com".into()]).unwrap();
+        replace(&root.0, "ipset-exclude-user.txt", &["192.0.2.0/24".into()]).unwrap();
+
+        let backup = export_backup(&root.0).unwrap();
+        replace(&root.0, "list-general-user.txt", &[]).unwrap();
+        replace(&root.0, "list-exclude-user.txt", &[]).unwrap();
+        replace(&root.0, "ipset-exclude-user.txt", &[]).unwrap();
+
+        let snapshot = import_backup(&root.0, &backup).unwrap();
+        assert_eq!(snapshot.include, ["include.example.com"]);
+        assert_eq!(snapshot.exclude, ["exclude.example.com"]);
+        assert_eq!(snapshot.ips, ["192.0.2.0/24"]);
+    }
+
+    #[test]
+    fn validates_every_list_before_replacing_any_file() {
+        let root = TestRoot::new();
+        let include_path = root.0.join("lists/list-general-user.txt");
+        let exclude_path = root.0.join("lists/list-exclude-user.txt");
+        fs::write(&include_path, "# preserve comment\nold.example.com\n").unwrap();
+        fs::write(&exclude_path, "old-exclude.example.com").unwrap();
+
+        let invalid = r#"{"version":1,"include":["new.example.com"],"exclude":["not a domain"],"ips":[]}"#;
+        assert!(import_backup(&root.0, invalid).is_err());
+        assert_eq!(fs::read_to_string(include_path).unwrap(), "# preserve comment\nold.example.com\n");
+        assert_eq!(fs::read_to_string(exclude_path).unwrap(), "old-exclude.example.com");
+    }
+
+    #[test]
+    fn rejects_unsupported_version_and_deduplicates_entries() {
+        let root = TestRoot::new();
+        assert!(import_backup(&root.0, r#"{"version":2,"include":[],"exclude":[],"ips":[]}"#).is_err());
+
+        let content = r#"{"version":1,"include":["Example.com","example.com"],"exclude":[],"ips":["192.0.2.1","192.0.2.1"]}"#;
+        let snapshot = import_backup(&root.0, content).unwrap();
+        assert_eq!(snapshot.include, ["example.com"]);
+        assert_eq!(snapshot.ips, ["192.0.2.1"]);
     }
 }

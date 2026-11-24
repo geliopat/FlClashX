@@ -177,7 +177,6 @@ pub fn flowseal_save_game_filter(
     crate::zapret::game_filter::save(&PathBuf::from(root), &settings)
 }
 
-#[frb]
 pub struct FlowsealIpSetUpdateResult {
     pub changed: bool,
     pub count: u64,
@@ -199,5 +198,35 @@ pub async fn flowseal_update_ipset(root: String) -> Result<FlowsealIpSetUpdateRe
     Ok(FlowsealIpSetUpdateResult {
         changed: result.changed,
         count: result.count as u64,
+    })
+}
+
+pub struct FlowsealUserListsSnapshot {
+    pub include: Vec<String>,
+    pub exclude: Vec<String>,
+    pub ips: Vec<String>,
+}
+
+#[frb]
+pub fn flowseal_export_user_list(root: String, filename: String) -> Result<String, String> {
+    let entries = crate::zapret::user_lists::read(&PathBuf::from(root), &filename)?;
+    Ok(entries.join("\r\n"))
+}
+
+#[frb]
+pub fn flowseal_export_user_lists_backup(root: String) -> Result<String, String> {
+    crate::zapret::user_lists::export_backup(&PathBuf::from(root))
+}
+
+#[frb]
+pub fn flowseal_import_user_lists_backup(
+    root: String,
+    content: String,
+) -> Result<FlowsealUserListsSnapshot, String> {
+    let backup = crate::zapret::user_lists::import_backup(&PathBuf::from(root), &content)?;
+    Ok(FlowsealUserListsSnapshot {
+        include: backup.include,
+        exclude: backup.exclude,
+        ips: backup.ips,
     })
 }
