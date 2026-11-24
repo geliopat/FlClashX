@@ -57,7 +57,7 @@ const CORE_SOCKET_PREFIX: &str = "/tmp/FlClashSocket_";
 const CORE_SOCKET_SUFFIX: &str = ".sock";
 const PROTOCOL_VERSION_HEADER: &str = "x-flclashx-helper-protocol";
 #[cfg(windows)]
-const PROTOCOL_VERSION: &str = "8";
+const PROTOCOL_VERSION: &str = "9";
 #[cfg(not(windows))]
 const PROTOCOL_VERSION: &str = "6";
 const EXPECTED_CORE_SHA256: &str = env!("CORE_SHA256");
@@ -113,7 +113,17 @@ struct ZapretStatusResponse {
     running: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pid: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    strategy_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    engine: Option<String>,
     cleaned_processes: usize,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ZapretStartRequest {
+    strategy_id: String,
 }
 
 #[derive(Serialize)]
@@ -457,6 +467,8 @@ fn release_managed_core(managed: &mut Option<ManagedCore>) -> Result<(), Error> 
 struct ManagedZapret {
     child: Child,
     _job: CoreJob,
+    strategy_id: String,
+    engine: String,
 }
 
 #[cfg(windows)]
@@ -465,10 +477,6 @@ static MANAGED_ZAPRET: Lazy<Mutex<Option<ManagedZapret>>> =
 
 #[cfg(windows)]
 const ZAPRET_CREATE_NO_WINDOW: u32 = 0x08000000;
-
-#[cfg(windows)]
-const DISCORD_MEDIA_DOMAINS: &str =
-    "discord.media,gateway.discord.gg,discord.com,discordapp.com,discordapp.net,discordcdn.com,discord.gg,dis.gd,discord.co,discord.app,tenor.com,tenor.co,giphy.com";
 
 #[cfg(windows)]
 fn zapret_bin_dir() -> Result<PathBuf, Error> {
@@ -488,101 +496,6 @@ fn zapret_bin_dir() -> Result<PathBuf, Error> {
         return Err(Error::other("Zapret2 asset directory resolves outside the application directory"));
     }
     Ok(bin_dir)
-}
-
-#[cfg(windows)]
-fn zapret_default_args(bin_dir: &Path) -> Result<Vec<String>, Error> {
-    let list = |name: &str| -> Result<String, Error> {
-        let path = bin_dir.join("lists").join(name);
-        if !path.is_file() {
-            return Err(Error::other(format!(
-                "Zapret2 list is missing: {}",
-                path.display()
-            )));
-        }
-        Ok(format!("lists/{name}"))
-    };
-    for name in [
-        "WinDivert.dll",
-        "WinDivert64.sys",
-        "cygwin1.dll",
-        "zapret-lib.lua",
-        "zapret-antidpi.lua",
-        "ACTIVE_DISCORD_UDP.bin",
-        "quic_initial_www_google_com.bin",
-        "tls_clienthello_www_google_com.bin",
-        "tls_clienthello_max_ru.bin",
-        "stun2.bin",
-    ] {
-        let path = bin_dir.join(name);
-        if !path.is_file() {
-            return Err(Error::other(format!(
-                "Required Zapret2 asset is missing: {}",
-                path.display()
-            )));
-        }
-    }
-
-    Ok(vec![
-        "--wf-tcp-out=80,443,2053,2083,2087,2096,8443".into(),
-        "--wf-udp-out=443,19294-19344,50000-65535".into(),
-        "--lua-init=@zapret-lib.lua".into(),
-        "--lua-init=@zapret-antidpi.lua".into(),
-        "--blob=quic_google:@quic_initial_www_google_com.bin".into(),
-        "--blob=discord_udp:@ACTIVE_DISCORD_UDP.bin".into(),
-        "--blob=tls_google:@tls_clienthello_www_google_com.bin".into(),
-        "--blob=tls_max_ru:@tls_clienthello_max_ru.bin".into(),
-        "--blob=stun2:@stun2.bin".into(),
-        "--new=quic_youtube".into(),
-        "--filter-udp=443".into(),
-        format!("--hostlist={}", list("list-general.txt")?),
-        format!("--hostlist={}", list("list-general-user.txt")?),
-        format!("--hostlist-exclude={}", list("list-exclude.txt")?),
-        "--payload=quic_initial".into(),
-        "--lua-desync=fake:blob=quic_google:repeats=11".into(),
-        "--new=discord_voice".into(),
-        "--filter-udp=19294-19344,50000-65535".into(),
-        "--payload=all".into(),
-        "--out-range=n1-n4".into(),
-        "--lua-desync=fake:blob=discord_udp:repeats=6".into(),
-        "--new=discord_media".into(),
-        "--filter-tcp=443,2053,2083,2087,2096,8443".into(),
-        format!("--hostlist-domains={DISCORD_MEDIA_DOMAINS}"),
-        "--payload=tls_client_hello".into(),
-        "--out-range=n1-n4".into(),
-        "--lua-desync=fake:blob=tls_google:repeats=8:tcp_ts=1000".into(),
-        "--lua-desync=multisplit:pos=2:seqovl=681:seqovl_pattern=tls_google:tcp_ts=1000".into(),
-        "--new=youtube_4k".into(),
-        "--filter-tcp=443".into(),
-        format!("--hostlist={}", list("list-google.txt")?),
-        "--payload=tls_client_hello".into(),
-        "--out-range=n1-n4".into(),
-        "--lua-desync=fake:blob=tls_google:repeats=8:tcp_ts=1000:ip_id=zero".into(),
-        "--lua-desync=multisplit:pos=2:seqovl=681:seqovl_pattern=tls_google:tcp_ts=1000:ip_id=zero".into(),
-        "--new=general_https".into(),
-        "--filter-tcp=80,443".into(),
-        format!("--hostlist={}", list("list-general.txt")?),
-        format!("--hostlist={}", list("list-general-user.txt")?),
-        format!("--hostlist-exclude={}", list("list-exclude.txt")?),
-        "--payload=tls_client_hello".into(),
-        "--out-range=n1-n4".into(),
-        "--lua-desync=fake:blob=tls_max_ru:repeats=8:tcp_ts=1000".into(),
-        "--lua-desync=multisplit:pos=2:seqovl=664:seqovl_pattern=tls_max_ru:tcp_ts=1000".into(),
-        "--new=general_http".into(),
-        "--filter-tcp=80".into(),
-        format!("--hostlist={}", list("list-general.txt")?),
-        "--payload=http_req".into(),
-        "--lua-desync=fake:blob=tls_max_ru:tcp_ts=1000".into(),
-        "--lua-desync=multisplit:pos=2:seqovl=664:seqovl_pattern=tls_max_ru:tcp_ts=1000".into(),
-        "--new=ipset_fallback".into(),
-        "--filter-tcp=80,443,8443".into(),
-        format!("--ipset={}", list("ipset-all.txt")?),
-        format!("--hostlist-exclude={}", list("list-exclude.txt")?),
-        "--payload=tls_client_hello".into(),
-        "--out-range=n1-n4".into(),
-        "--lua-desync=fake:blob=tls_max_ru:repeats=8:tcp_ts=1000".into(),
-        "--lua-desync=multisplit:pos=2:seqovl=664:seqovl_pattern=tls_max_ru:tcp_ts=1000".into(),
-    ])
 }
 
 #[cfg(windows)]
@@ -657,21 +570,28 @@ fn zapret_status_response(
     managed: &mut Option<ManagedZapret>,
     cleaned_processes: usize,
 ) -> Result<warp::reply::Response, Error> {
-    let (pid, exited_status) = match managed.as_mut() {
+    let (pid, exited_status, strategy_id, engine) = match managed.as_mut() {
         Some(zapret) => match zapret.child.try_wait()? {
-            Some(status) => (None, Some(status)),
-            None => (Some(zapret.child.id()), None),
+            Some(status) => (None, Some(status), None, None),
+            None => (
+                Some(zapret.child.id()),
+                None,
+                Some(zapret.strategy_id.clone()),
+                Some(zapret.engine.clone()),
+            ),
         },
-        None => (None, None),
+        None => (None, None, None, None),
     };
     if let Some(status) = exited_status {
-        log_message(format!("Zapret2 engine exited: {status}"));
+        log_message(format!("Zapret engine exited: {status}"));
         *managed = None;
     }
     Ok(json_response(
         &ZapretStatusResponse {
             running: pid.is_some(),
             pid,
+            strategy_id,
+            engine,
             cleaned_processes,
         },
         StatusCode::OK,
@@ -698,7 +618,7 @@ fn stop_managed_zapret(
 }
 
 #[cfg(windows)]
-fn launch_zapret(restart: bool) -> warp::reply::Response {
+fn launch_zapret(restart: bool, strategy_id: String) -> warp::reply::Response {
     if SHUTTING_DOWN.load(Ordering::SeqCst) {
         return error_response(
             "helperStopping",
@@ -710,8 +630,10 @@ fn launch_zapret(restart: bool) -> warp::reply::Response {
     if !restart {
         match zapret_status_response(&mut managed, 0) {
             Ok(status) => {
-                let active = managed.as_ref().is_some();
-                if active {
+                let same_strategy = managed
+                    .as_ref()
+                    .is_some_and(|active| active.strategy_id == strategy_id);
+                if same_strategy {
                     return status;
                 }
             }
@@ -720,6 +642,31 @@ fn launch_zapret(restart: bool) -> warp::reply::Response {
             }
         }
     }
+    // Resolve and validate the requested profile before stopping a currently
+    // working engine. A stale/unknown ID or missing asset must never take down
+    // the user's active bypass.
+    let bin_dir = match zapret_bin_dir() {
+        Ok(path) => path,
+        Err(error) => return error_response("zapretAssetsMissing", error.to_string(), StatusCode::CONFLICT),
+    };
+    let launch = match super::zapret::build_launch(&bin_dir, &strategy_id) {
+        Ok(launch) => launch,
+        Err(error) if error.kind() == std::io::ErrorKind::InvalidInput => {
+            return error_response("invalidZapretStrategy", error.to_string(), StatusCode::BAD_REQUEST);
+        }
+        Err(error) => {
+            return error_response("zapretAssetsMissing", error.to_string(), StatusCode::CONFLICT);
+        }
+    };
+    let executable = match fs::canonicalize(bin_dir.join(launch.executable)) {
+        Ok(path) if path.starts_with(&bin_dir) && path.is_file() => path,
+        Ok(_) => return error_response("zapretExecutableInvalid", format!("{} resolves outside the Zapret directory", launch.executable), StatusCode::CONFLICT),
+        Err(error) => return error_response("zapretAssetsMissing", error.to_string(), StatusCode::CONFLICT),
+    };
+    let args = launch.args;
+    let engine = launch.strategy.engine.to_string();
+    let strategy_id = launch.strategy.id.to_string();
+
     if let Err(error) = stop_managed_zapret(&mut managed) {
         return error_response("zapretStopFailed", error.to_string(), StatusCode::INTERNAL_SERVER_ERROR);
     }
@@ -728,20 +675,6 @@ fn launch_zapret(restart: bool) -> warp::reply::Response {
     if cleaned > 0 {
         log_message(format!("Zapret cleanup terminated {cleaned} orphaned winws processes"));
     }
-
-    let bin_dir = match zapret_bin_dir() {
-        Ok(path) => path,
-        Err(error) => return error_response("zapretAssetsMissing", error.to_string(), StatusCode::CONFLICT),
-    };
-    let executable = match fs::canonicalize(bin_dir.join("winws2.exe")) {
-        Ok(path) if path.starts_with(&bin_dir) && path.is_file() => path,
-        Ok(_) => return error_response("zapretExecutableInvalid", "winws2.exe resolves outside the Zapret directory", StatusCode::CONFLICT),
-        Err(error) => return error_response("zapretAssetsMissing", error.to_string(), StatusCode::CONFLICT),
-    };
-    let args = match zapret_default_args(&bin_dir) {
-        Ok(args) => args,
-        Err(error) => return error_response("zapretAssetsMissing", error.to_string(), StatusCode::CONFLICT),
-    };
 
     let mut command = Command::new(&executable);
     command
@@ -758,10 +691,11 @@ fn launch_zapret(restart: bool) -> warp::reply::Response {
     let pid = child.id();
 
     if let Some(stderr) = child.stderr.take() {
+        let log_strategy = strategy_id.clone();
         thread::spawn(move || {
             for line in io::BufReader::new(stderr).lines() {
                 match line {
-                    Ok(output) => log_message(format!("[zapret] {output}")),
+                    Ok(output) => log_message(format!("[zapret:{log_strategy}] {output}")),
                     Err(_) => break,
                 }
             }
@@ -775,16 +709,23 @@ fn launch_zapret(restart: bool) -> warp::reply::Response {
             let _ = wait_for_child_exit(&mut child, CORE_EXIT_TIMEOUT);
             return error_response(
                 "zapretConfinementFailed",
-                format!("Could not place winws2.exe in a kill-on-close job: {error}"),
+                format!("Could not place {} in a kill-on-close job: {error}", launch.executable),
                 StatusCode::INTERNAL_SERVER_ERROR,
             );
         }
     };
-    *managed = Some(ManagedZapret { child, _job: job });
+    *managed = Some(ManagedZapret {
+        child,
+        _job: job,
+        strategy_id: strategy_id.clone(),
+        engine: engine.clone(),
+    });
     json_response(
         &ZapretStatusResponse {
             running: true,
             pid: Some(pid),
+            strategy_id: Some(strategy_id),
+            engine: Some(engine),
             cleaned_processes: cleaned,
         },
         StatusCode::OK,
@@ -809,10 +750,16 @@ fn stop_zapret() -> warp::reply::Response {
         &ZapretStatusResponse {
             running: false,
             pid: None,
+            strategy_id: None,
+            engine: None,
             cleaned_processes: cleaned,
         },
         StatusCode::OK,
     )
+}
+
+fn get_zapret_strategies() -> warp::reply::Response {
+    json_response(&super::zapret::strategies(), StatusCode::OK)
 }
 
 #[cfg(windows)]
@@ -825,7 +772,7 @@ fn get_zapret_status() -> warp::reply::Response {
 }
 
 #[cfg(not(windows))]
-fn launch_zapret(_restart: bool) -> warp::reply::Response {
+fn launch_zapret(_restart: bool, _strategy_id: String) -> warp::reply::Response {
     error_response("unsupportedPlatform", "Zapret is available only on Windows", StatusCode::NOT_IMPLEMENTED)
 }
 #[cfg(not(windows))]
@@ -837,8 +784,11 @@ fn get_zapret_status() -> warp::reply::Response {
     error_response("unsupportedPlatform", "Zapret is available only on Windows", StatusCode::NOT_IMPLEMENTED)
 }
 
-async fn launch_zapret_request(restart: bool) -> Result<warp::reply::Response, Rejection> {
-    match tokio::task::spawn_blocking(move || launch_zapret(restart)).await {
+async fn launch_zapret_request(
+    restart: bool,
+    request: ZapretStartRequest,
+) -> Result<warp::reply::Response, Rejection> {
+    match tokio::task::spawn_blocking(move || launch_zapret(restart, request.strategy_id)).await {
         Ok(response) => Ok(response),
         Err(error) => Ok(error_response("zapretTaskFailed", error.to_string(), StatusCode::INTERNAL_SERVER_ERROR)),
     }
@@ -1273,6 +1223,12 @@ pub(super) fn routes() -> impl Filter<Extract = (impl Reply,), Error = Infallibl
         .and(warp::get())
         .map(get_logs);
 
+    let api_zapret_strategies = warp::path("zapret")
+        .and(warp::path("strategies"))
+        .and(warp::path::end())
+        .and(warp::get())
+        .map(get_zapret_strategies);
+
     let api_zapret_status = warp::path("zapret")
         .and(warp::path::end())
         .and(warp::get())
@@ -1282,13 +1238,17 @@ pub(super) fn routes() -> impl Filter<Extract = (impl Reply,), Error = Infallibl
         .and(warp::path("start"))
         .and(warp::path::end())
         .and(warp::post())
-        .and_then(|| launch_zapret_request(false));
+        .and(warp::body::content_length_limit(MAX_REQUEST_BODY_BYTES))
+        .and(warp::body::json())
+        .and_then(|request| launch_zapret_request(false, request));
 
     let api_zapret_restart = warp::path("zapret")
         .and(warp::path("restart"))
         .and(warp::path::end())
         .and(warp::post())
-        .and_then(|| launch_zapret_request(true));
+        .and(warp::body::content_length_limit(MAX_REQUEST_BODY_BYTES))
+        .and(warp::body::json())
+        .and_then(|request| launch_zapret_request(true, request));
 
     let api_zapret_stop = warp::path("zapret")
         .and(warp::path("stop"))
@@ -1302,6 +1262,7 @@ pub(super) fn routes() -> impl Filter<Extract = (impl Reply,), Error = Infallibl
                 .or(api_start)
                 .or(api_stop)
                 .or(api_logs)
+                .or(api_zapret_strategies)
                 .or(api_zapret_status)
                 .or(api_zapret_start)
                 .or(api_zapret_restart)
@@ -1878,6 +1839,32 @@ mod tests {
 
         assert!(managed.is_none());
         assert!(release_managed_core(&mut managed).is_ok());
+    }
+
+    #[tokio::test]
+    async fn zapret_strategy_catalog_exposes_all_builtin_engine_families() {
+        let response = warp::test::request()
+            .method("GET")
+            .path("/zapret/strategies")
+            .reply(&routes())
+            .await;
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let strategies: Vec<serde_json::Value> =
+            serde_json::from_slice(response.body()).unwrap();
+        assert_eq!(strategies.len(), 41);
+        assert_eq!(
+            strategies.iter().filter(|item| item["engine"] == "winws").count(),
+            5
+        );
+        assert_eq!(
+            strategies.iter().filter(|item| item["engine"] == "winws2").count(),
+            36
+        );
+        assert_eq!(
+            strategies.iter().filter(|item| item["id"].as_str().unwrap().starts_with("kinlay0-")).count(),
+            26
+        );
     }
 
     #[tokio::test]

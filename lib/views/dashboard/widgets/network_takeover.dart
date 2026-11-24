@@ -11,6 +11,7 @@ import 'package:material_new_shapes/material_new_shapes.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'card.dart';
+import 'zapret_strategy_sheet.dart';
 
 typedef _RowMetrics = ({
   EdgeInsets padding,
@@ -296,9 +297,90 @@ class ZapretTile extends ConsumerWidget {
           ? null
           : (value) => _change(ref, value),
     );
+    HelperZapretStrategy? selectedStrategy;
+    for (final item in state.strategies) {
+      if (item.id == state.selectedStrategyId) {
+        selectedStrategy = item;
+        break;
+      }
+    }
     return DashboardCard(
       padding: EdgeInsets.zero,
-      child: row,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          row,
+          if (selectedStrategy != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 10, 10),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(DashboardCorner.tab),
+                      onTap: () => showZapretStrategiesSheet(context),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 8,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Стратегия',
+                              style: AppTextStyle.caption1.of(context).copyWith(
+                                    color: context.colorScheme.onSurfaceVariant,
+                                  ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              selectedStrategy.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTextStyle.footnote.of(
+                                context,
+                                emphasized: true,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  DashboardIconButton(
+                    glyph: AppGlyphs.chevronDown,
+                    tooltip: 'Выбрать стратегию Zapret',
+                    onPressed: () => showZapretStrategiesSheet(context),
+                  ),
+                ],
+              ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 10, 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      state.error ?? 'Загрузка каталога стратегий...',
+                      style: AppTextStyle.footnote.of(context).copyWith(
+                            color: context.colorScheme.onSurfaceVariant,
+                          ),
+                    ),
+                  ),
+                  DashboardIconButton(
+                    glyph: AppGlyphs.refresh,
+                    tooltip: 'Повторить загрузку стратегий',
+                    onPressed: () => ref
+                        .read(zapretControllerProvider.notifier)
+                        .loadStrategies(),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

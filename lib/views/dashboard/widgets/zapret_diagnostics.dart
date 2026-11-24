@@ -10,6 +10,7 @@ import 'package:material_ui/material_ui.dart';
 import '../style.dart';
 import 'card.dart';
 import 'network_takeover.dart';
+import 'zapret_strategy_sheet.dart';
 
 /// The `zapret` item from `flclashx-widgets`.
 /// ProviderMode uses it for latency diagnostics; the regular dashboard uses
@@ -53,6 +54,11 @@ class ZapretDiagnosticsCard extends ConsumerWidget {
             title: 'Сетевые задержки · HTTPS',
             trailing: [
               DashboardIconButton(
+                glyph: AppGlyphs.filter,
+                tooltip: 'Выбрать стратегию Zapret',
+                onPressed: () => showZapretStrategiesSheet(context),
+              ),
+              DashboardIconButton(
                 glyph: AppGlyphs.refresh,
                 tooltip: 'Проверить сейчас',
                 onPressed: () =>
@@ -84,7 +90,7 @@ class ZapretDiagnosticsCard extends ConsumerWidget {
                   SizedBox(
                     width: groupWidth,
                     child: _ProbeGroup(
-                      title: 'Discord Gateway / Voice API',
+                      title: 'Discord Voice / Gateway',
                       first: ZapretProbeTarget.discordGateway,
                       second: ZapretProbeTarget.discordVoice,
                       state: state,

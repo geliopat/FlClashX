@@ -15,8 +15,8 @@ class ZapretStatusButton extends ConsumerWidget {
     final status = ref.read(zapretControllerProvider);
     if (status.busy || !status.available) return;
     final message = status.running
-        ? 'Перезапустить Zapret? Перед запуском будут проверены и завершены зависшие процессы winws2.exe, winws.exe и winws2-split.exe.'
-        : 'Запустить Zapret2? Перед запуском будут проверены и завершены зависшие процессы winws2.exe, winws.exe и winws2-split.exe.';
+        ? 'Перезапустить выбранную стратегию Zapret? Перед запуском будут проверены и завершены зависшие процессы winws.exe, winws2.exe и winws2-split.exe.'
+        : 'Запустить выбранную стратегию Zapret? Перед запуском будут проверены и завершены зависшие процессы winws.exe, winws2.exe и winws2-split.exe.';
     final confirmed = await dialogs.showMessage(
       title: 'Zapret',
       message: TextSpan(text: message),
@@ -93,9 +93,10 @@ class ZapretMark extends StatelessWidget {
             fontSize: 18,
             height: 1,
             fontWeight: FontWeight.w800,
-            color: color ?? (running
-                ? context.colorScheme.primary
-                : context.colorScheme.onSurfaceVariant),
+            color: color ??
+                (running
+                    ? context.colorScheme.success
+                    : context.colorScheme.error),
           ),
         ),
       ),

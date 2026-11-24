@@ -17,6 +17,140 @@ const _coreSha256 =
     '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 
 void main() {
+  test('Zapret catalog preserves the original engine families and categories', () async {
+    final client = _client(
+      _ResponseAdapter(
+        (_) => _jsonListResponse([
+          {
+            'id': 'flowseal-alt',
+            'name': 'Flowseal ALT',
+            'filename': 'general (ALT).bat',
+            'description': 'Flowseal strategy',
+            'engine': 'winws',
+            'category': 'flowseal',
+          },
+          {
+            'id': 'zapret2-ru-ultimate',
+            'name': 'Zapret2 Ultimate',
+            'filename': 'zapret2-ru-ultimate.lua',
+            'description': 'Lua strategy',
+            'engine': 'winws2',
+            'category': 'zapret2',
+          },
+          {
+            'id': 'kinlay0-alt14',
+            'name': 'kinlay0 ALT14',
+            'filename': 'general (ALT14).bat',
+            'description': 'Imported BAT translated to winws2',
+            'engine': 'winws2',
+            'category': 'zapret2',
+          },
+        ]),
+      ),
+    );
+
+    final result = await client.zapretStrategies();
+
+    expect(result.map((item) => item.id), [
+      'flowseal-alt',
+      'zapret2-ru-ultimate',
+      'kinlay0-alt14',
+    ]);
+    expect(result.first.engine, 'winws');
+    expect(result.last.engine, 'winws2');
+  });
+
+  test('Zapret start sends only a strategy identifier and parses the active engine', () async {
+    final adapter = _ResponseAdapter((options) {
+      expect(options.method, 'POST');
+      expect(options.path, endsWith('/zapret/start'));
+      expect(options.data, {'strategyId': 'flowseal-alt'});
+      return _jsonResponse({
+        'running': true,
+        'pid': 3210,
+        'strategyId': 'flowseal-alt',
+        'engine': 'winws',
+        'cleanedProcesses': 2,
+      });
+    });
+    final client = _client(adapter);
+
+    final result = await client.startZapret(strategyId: 'flowseal-alt');
+
+    expect(result.running, isTrue);
+    expect(result.pid, 3210);
+    expect(result.strategyId, 'flowseal-alt');
+    expect(result.engine, 'winws');
+    expect(result.cleanedProcesses, 2);
+  });
+
+  test('Zapret refuses a running status without a known strategy engine', () async {
+    final client = _client(
+      _ResponseAdapter(
+        (_) => _jsonResponse({
+          'running': true,
+          'pid': 3210,
+          'cleanedProcesses': 0,
+        }),
+      ),
+    );
+
+    await expectLater(
+      client.zapretStatus(),
+      throwsA(
+        isA<HelperException>().having(
+          (error) => error.code,
+          'code',
+          'invalidResponse',
+        ),
+      ),
+    );
+  });
+
+  test('rejects an empty built-in Zapret strategy catalog', () async {
+    final client = _client(
+      _ResponseAdapter((_) => _jsonListResponse([])),
+    );
+
+    await expectLater(
+      client.zapretStrategies(),
+      throwsA(
+        isA<HelperException>().having(
+          (error) => error.code,
+          'code',
+          'invalidResponse',
+        ),
+      ),
+    );
+  });
+
+  test('rejects duplicate IDs in the Zapret strategy catalog', () async {
+    Map<String, Object?> strategy() => {
+      'id': 'flowseal-alt',
+      'name': 'Flowseal ALT',
+      'filename': 'general (ALT).bat',
+      'description': 'Flowseal strategy',
+      'engine': 'winws',
+      'category': 'flowseal',
+    };
+    final client = _client(
+      _ResponseAdapter(
+        (_) => _jsonListResponse([strategy(), strategy()]),
+      ),
+    );
+
+    await expectLater(
+      client.zapretStrategies(),
+      throwsA(
+        isA<HelperException>().having(
+          (error) => error.code,
+          'code',
+          'invalidResponse',
+        ),
+      ),
+    );
+  });
+
   test('reads the port from the key the Windows service publishes it in', () {
     final peer = File('services/helper/src/service/peer.rs').readAsStringSync();
 
@@ -455,7 +589,7 @@ void main() {
     },
   );
 
-  test('ping requires protocol 6 and the expected Helper path', () async {
+  test('ping requires the current Helper protocol and the expected path', () async {
     final adapter = _ResponseAdapter((options) {
       expect(options.queryParameters, {'coreSha256': _coreSha256});
       return ResponseBody.fromString(
@@ -816,6 +950,16 @@ HelperClient _client(
 }
 
 ResponseBody _jsonResponse(Map<String, Object?> body, {int statusCode = 200}) {
+  return ResponseBody.fromString(
+    jsonEncode(body),
+    statusCode,
+    headers: {
+      Headers.contentTypeHeader: ['application/json'],
+    },
+  );
+}
+
+ResponseBody _jsonListResponse(List<Object?> body, {int statusCode = 200}) {
   return ResponseBody.fromString(
     jsonEncode(body),
     statusCode,

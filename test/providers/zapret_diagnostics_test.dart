@@ -23,6 +23,13 @@ void main() {
     expect(result.latencyMs, 80);
   });
 
+  test('does not treat an HTTP redirect as a successful probe', () {
+    expect(
+      classifyZapretProbe(statusCode: 302, latencyMs: 120).status,
+      ZapretProbeStatus.degraded,
+    );
+  });
+
   test('marks a missing HTTP response as blocked', () {
     expect(
       classifyZapretProbe(statusCode: null, latencyMs: 3500).status,

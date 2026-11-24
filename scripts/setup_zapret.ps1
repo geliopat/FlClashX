@@ -49,7 +49,7 @@ try {
         Get-ChildItem -Path $FlowsealLists.FullName -File | ForEach-Object { Copy-Item -Path $_.FullName -Destination $ListsDir -Force }
     }
 
-    $StrategySource = Join-Path $Root "services\\helper\\strategies"
+    $StrategySource = Join-Path $Root "services\helper\strategies"
     $StrategyDir = Join-Path $AssetDir "strategies"
     New-Item -ItemType Directory -Path $StrategyDir -Force | Out-Null
 
@@ -70,7 +70,7 @@ try {
         throw "The pinned kinlay0 strategy folder is missing."
     }
     Copy-Item -Path $ImportedSource -Destination $StrategyDir -Recurse -Force
-    $ImportedBatFiles = @(Get-ChildItem -Path (Join-Path $StrategyDir "imported\\kinlay0") -File -Filter "*.bat")
+    $ImportedBatFiles = @(Get-ChildItem -Path (Join-Path $StrategyDir "imported\kinlay0") -File -Filter "*.bat")
     if ($ImportedBatFiles.Count -ne 26) {
         throw "Expected 26 pinned kinlay0 BAT strategies, found $($ImportedBatFiles.Count)."
     }
@@ -80,7 +80,7 @@ try {
         }
     }
     foreach ($RequiredSource in @("translate.py","README.md","LICENSE")) {
-        if (-not (Test-Path (Join-Path (Join-Path $StrategyDir "imported\\kinlay0") $RequiredSource) -PathType Leaf)) {
+        if (-not (Test-Path (Join-Path (Join-Path $StrategyDir "imported\kinlay0") $RequiredSource) -PathType Leaf)) {
             throw "Required kinlay0 source file is missing: $RequiredSource"
         }
     }

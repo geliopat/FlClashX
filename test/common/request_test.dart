@@ -8,6 +8,7 @@ import 'package:dio/dio.dart';
 import 'package:fl_clash/common/app_localizations.dart';
 import 'package:fl_clash/common/constant.dart';
 import 'package:fl_clash/common/exception.dart';
+import 'package:fl_clash/common/package.dart';
 import 'package:fl_clash/common/request.dart';
 import 'package:fl_clash/l10n/l10n.dart';
 import 'package:fl_clash/state.dart';
@@ -462,7 +463,7 @@ void main() {
         await fetch();
         expect(
           userAgent,
-          'FlClashZ/v0.5.0 core/1.19.34 Platform/${Platform.operatingSystem}',
+          'FlClashZ/v${globalState.packageInfo.displayVersion} core/v1.19.34 Platform/${Platform.operatingSystem}',
         );
       } finally {
         globalState.coreVersion = previousCoreVersion;

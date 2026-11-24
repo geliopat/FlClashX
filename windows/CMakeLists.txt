@@ -129,7 +129,7 @@ install(FILES
 
 # Zapret2 engines, Lua strategies, blobs and lists are staged by
 # scripts/setup_zapret.ps1 before Windows builds. Keep them beside the Helper:
-# the elevated service owns winws2.exe and resolves all assets from this folder.
+# the elevated service selects winws.exe or winws2.exe from this directory.
 set(ZAPRET_ASSETS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/zapret")
 if(EXISTS "${ZAPRET_ASSETS_DIR}/winws2.exe")
   install(DIRECTORY "${ZAPRET_ASSETS_DIR}/"

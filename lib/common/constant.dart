@@ -25,7 +25,7 @@ const helperPortValue = 'Port';
 final helperSocketPath = helperSocketPathFor(pre: isPreDesktopApp);
 final helperUnitPath = helperUnitPathFor(pre: isPreDesktopApp);
 const helperProtocolVersionHeader = 'x-flclashx-helper-protocol';
-final helperProtocolVersion = Platform.isWindows ? '8' : '6';
+final helperProtocolVersion = Platform.isWindows ? '9' : '6';
 const maxTextScale = 1.4;
 const minTextScale = 0.8;
 

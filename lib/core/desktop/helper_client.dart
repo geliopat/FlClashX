@@ -35,14 +35,62 @@ final class HelperStopResponse {
   const HelperStopResponse({required this.stopped});
 }
 
+final class HelperZapretStrategy {
+  final String id;
+  final String name;
+  final String filename;
+  final String description;
+  final String engine;
+  final String category;
+
+  const HelperZapretStrategy({
+    required this.id,
+    required this.name,
+    required this.filename,
+    required this.description,
+    required this.engine,
+    required this.category,
+  });
+
+  factory HelperZapretStrategy.fromJson(Object? value) {
+    if (value is! Map) {
+      throw const FormatException('Zapret strategy must be an object');
+    }
+    final map = Map<String, Object?>.from(value);
+    String field(String key) {
+      final item = map[key];
+      if (item is! String || item.isEmpty) {
+        throw FormatException('Zapret strategy field $key is invalid');
+      }
+      return item;
+    }
+    final engine = field('engine');
+    if (engine != 'winws' && engine != 'winws2') {
+      throw const FormatException('Unsupported Zapret engine');
+    }
+    return HelperZapretStrategy(
+      id: field('id'),
+      name: field('name'),
+      filename: field('filename'),
+      description: field('description'),
+      engine: engine,
+      category: field('category'),
+    );
+  }
+}
+
 final class HelperZapretStatus {
   final bool running;
   final int? pid;
+  final String? strategyId;
+  final String? engine;
   final int cleanedProcesses;
 
   const HelperZapretStatus({
     required this.running,
     required this.pid,
+    this.strategyId,
+    this.engine,
     this.cleanedProcesses = 0,
   });
 }
@@ -358,8 +406,52 @@ final class HelperClient {
     }
   }
 
-  /// Reads the Helper-owned Zapret2 process. The Helper keeps this process
-  /// in a kill-on-close Job Object independently of the Flutter window.
+  /// Reads the built-in Zapret2/Flowseal strategy catalog from the Helper.
+  Future<List<HelperZapretStrategy>> zapretStrategies() async {
+    try {
+      final response = await _dio.get<Object?>(
+        '$baseUrl/zapret/strategies',
+        options: _options(ResponseType.json, receiveTimeout: const Duration(seconds: 3)),
+      );
+      final value = response.data;
+      if (value is! List || value.isEmpty) {
+        throw HelperException(
+          code: 'invalidResponse',
+          message: 'Helper вернул пустой или некорректный список стратегий Zapret',
+          details: value,
+        );
+      }
+      try {
+        final strategies = value
+            .map(HelperZapretStrategy.fromJson)
+            .toList(growable: false);
+        final ids = strategies.map((item) => item.id).toSet();
+        if (ids.length != strategies.length) {
+          throw const FormatException('Duplicate Zapret strategy IDs');
+        }
+        return strategies;
+      } on FormatException catch (error) {
+        throw HelperException(
+          code: 'invalidResponse',
+          message: 'Helper вернул некорректный каталог стратегий Zapret',
+          details: error.message,
+        );
+      }
+    } on HelperException {
+      rethrow;
+    } on DioException catch (error) {
+      throw _mapZapretDioException(error, operation: 'strategies');
+    } catch (error) {
+      throw HelperException(
+        code: 'transportError',
+        message: 'Не удалось получить каталог стратегий Zapret через Helper',
+        details: error.toString(),
+      );
+    }
+  }
+
+  /// Reads the Helper-owned Zapret process, regardless of which engine the
+  /// selected profile uses. The Helper keeps it in a kill-on-close Job Object.
   Future<HelperZapretStatus> zapretStatus() async {
     try {
       final response = await _dio.get<Object?>(
@@ -380,22 +472,24 @@ final class HelperClient {
     }
   }
 
-  Future<HelperZapretStatus> startZapret() =>
-      _zapretAction('start', operation: 'start');
+  Future<HelperZapretStatus> startZapret({required String strategyId}) =>
+      _zapretAction('start', operation: 'start', strategyId: strategyId);
 
   Future<HelperZapretStatus> stopZapret() =>
       _zapretAction('stop', operation: 'stop');
 
-  Future<HelperZapretStatus> restartZapret() =>
-      _zapretAction('restart', operation: 'restart');
+  Future<HelperZapretStatus> restartZapret({required String strategyId}) =>
+      _zapretAction('restart', operation: 'restart', strategyId: strategyId);
 
   Future<HelperZapretStatus> _zapretAction(
     String route, {
     required String operation,
+    String? strategyId,
   }) async {
     try {
       final response = await _dio.post<Object?>(
         '$baseUrl/zapret/$route',
+        data: strategyId == null ? null : {'strategyId': strategyId},
         options: _options(
           ResponseType.json,
           receiveTimeout: operation == 'stop'
@@ -425,12 +519,16 @@ final class HelperClient {
     final running = data['running'];
     final pid = data['pid'];
     final cleaned = data['cleanedProcesses'] ?? 0;
+    final strategyId = data['strategyId'];
+    final engine = data['engine'];
     if (running is! bool ||
         (pid != null && (pid is! int || pid <= 0)) ||
         cleaned is! int ||
         cleaned < 0 ||
-        (running && pid == null) ||
-        (!running && pid != null)) {
+        (strategyId != null && (strategyId is! String || strategyId.isEmpty)) ||
+        (engine != null && engine != 'winws' && engine != 'winws2') ||
+        (running && (pid == null || strategyId == null || engine == null)) ||
+        (!running && (pid != null || strategyId != null || engine != null))) {
       throw HelperException(
         code: 'invalidResponse',
         message: 'Helper вернул некорректное состояние Zapret',
@@ -440,6 +538,8 @@ final class HelperClient {
     return HelperZapretStatus(
       running: running,
       pid: pid as int?,
+      strategyId: strategyId as String?,
+      engine: engine as String?,
       cleanedProcesses: cleaned,
     );
   }

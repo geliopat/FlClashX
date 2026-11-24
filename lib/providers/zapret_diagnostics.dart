@@ -65,9 +65,7 @@ ZapretProbeResult classifyZapretProbe({
       message: 'Сервер не ответил',
     );
   }
-  final accepted = (statusCode >= 200 && statusCode < 300) ||
-      statusCode == 301 ||
-      statusCode == 302;
+  final accepted = statusCode >= 200 && statusCode < 300;
   final status = !accepted || latencyMs > 450
       ? ZapretProbeStatus.degraded
       : ZapretProbeStatus.operational;

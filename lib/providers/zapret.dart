@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:fl_clash/core/desktop/helper_client.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 final zapretControllerProvider =
     NotifierProvider<ZapretController, ZapretState>(ZapretController.new);
@@ -13,14 +14,22 @@ class ZapretState {
   final bool busy;
   final int? pid;
   final int cleanedProcesses;
+  final String? activeStrategyId;
+  final String? activeEngine;
+  final List<HelperZapretStrategy> strategies;
+  final String selectedStrategyId;
   final String? error;
 
   const ZapretState({
-    this.available = true,
+    this.available = false,
     this.running = false,
     this.busy = false,
     this.pid,
     this.cleanedProcesses = 0,
+    this.activeStrategyId,
+    this.activeEngine,
+    this.strategies = const [],
+    this.selectedStrategyId = ZapretController.defaultStrategyId,
     this.error,
   });
 
@@ -31,6 +40,12 @@ class ZapretState {
     int? pid,
     bool clearPid = false,
     int? cleanedProcesses,
+    String? activeStrategyId,
+    bool clearActiveStrategy = false,
+    String? activeEngine,
+    bool clearActiveEngine = false,
+    List<HelperZapretStrategy>? strategies,
+    String? selectedStrategyId,
     String? error,
     bool clearError = false,
   }) {
@@ -40,12 +55,20 @@ class ZapretState {
       busy: busy ?? this.busy,
       pid: clearPid ? null : pid ?? this.pid,
       cleanedProcesses: cleanedProcesses ?? this.cleanedProcesses,
+      activeStrategyId: clearActiveStrategy
+          ? null
+          : activeStrategyId ?? this.activeStrategyId,
+      activeEngine: clearActiveEngine ? null : activeEngine ?? this.activeEngine,
+      strategies: strategies ?? this.strategies,
+      selectedStrategyId: selectedStrategyId ?? this.selectedStrategyId,
       error: clearError ? null : error ?? this.error,
     );
   }
 }
 
 class ZapretController extends Notifier<ZapretState> {
+  static const defaultStrategyId = 'flowseal-alt';
+  static const _selectedStrategyPreferenceKey = 'zapret.strategyId';
   static const _pollInterval = Duration(seconds: 3);
   static const _readinessTimeout = Duration(seconds: 3);
 
@@ -58,13 +81,61 @@ class ZapretController extends Notifier<ZapretState> {
     ref.onDispose(() => _poller?.cancel());
     if (Platform.isWindows) {
       scheduleMicrotask(() {
-        if (ref.mounted) unawaited(refresh());
+        if (!ref.mounted) return;
+        unawaited(loadStrategies());
+        unawaited(refresh());
       });
       _poller = Timer.periodic(_pollInterval, (_) {
         if (ref.mounted) unawaited(refresh());
       });
     }
     return const ZapretState();
+  }
+
+  /// Loads the same pinned strategy catalog as zapret2-gui. The selected
+  /// strategy is persisted independently of the running profile.
+  Future<void> loadStrategies() async {
+    if (!Platform.isWindows || !ref.mounted) return;
+    try {
+      final strategies = await _client.zapretStrategies();
+      final preferences = await SharedPreferences.getInstance();
+      final savedId = preferences.getString(_selectedStrategyPreferenceKey);
+      final currentId = state.selectedStrategyId;
+      final selectedId = strategies.isEmpty
+          ? currentId
+          : strategies.any((item) => item.id == currentId)
+              ? currentId
+              : strategies.any((item) => item.id == savedId)
+                  ? savedId!
+                  : strategies.any((item) => item.id == defaultStrategyId)
+                      ? defaultStrategyId
+                      : strategies.first.id;
+      if (!ref.mounted) return;
+      state = state.copyWith(
+        available: strategies.isNotEmpty,
+        strategies: strategies,
+        selectedStrategyId: selectedId,
+        clearError: strategies.isNotEmpty,
+      );
+      if (strategies.isNotEmpty && savedId != selectedId) {
+        await preferences.setString(_selectedStrategyPreferenceKey, selectedId);
+      }
+    } catch (error) {
+      if (!ref.mounted) return;
+      state = state.copyWith(
+        available: false,
+        error: _errorMessage(error),
+      );
+    }
+  }
+
+  Future<void> selectStrategy(String strategyId) async {
+    if (!state.strategies.any((item) => item.id == strategyId)) {
+      throw ArgumentError.value(strategyId, 'strategyId', 'Unknown Zapret strategy');
+    }
+    state = state.copyWith(selectedStrategyId: strategyId, clearError: true);
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(_selectedStrategyPreferenceKey, strategyId);
   }
 
   Future<void> refresh() async {
@@ -74,12 +145,16 @@ class ZapretController extends Notifier<ZapretState> {
       final response = await _client.zapretStatus();
       if (!ref.mounted) return;
       state = state.copyWith(
-        available: true,
+        available: state.strategies.isNotEmpty,
         running: response.running,
         pid: response.pid,
         clearPid: !response.running,
         cleanedProcesses: response.cleanedProcesses,
-        clearError: true,
+        activeStrategyId: response.strategyId,
+        activeEngine: response.engine,
+        clearActiveStrategy: !response.running,
+        clearActiveEngine: !response.running,
+        clearError: state.strategies.isNotEmpty,
       );
     } on HelperException catch (error) {
       if (!ref.mounted) return;
@@ -107,7 +182,7 @@ class ZapretController extends Notifier<ZapretState> {
     try {
       await _requireHelper();
       final response = enabled
-          ? await _client.startZapret()
+          ? await _client.startZapret(strategyId: state.selectedStrategyId)
           : await _client.stopZapret();
       if (!ref.mounted) return;
       state = state.copyWith(
@@ -116,6 +191,10 @@ class ZapretController extends Notifier<ZapretState> {
         pid: response.pid,
         clearPid: !response.running,
         cleanedProcesses: response.cleanedProcesses,
+        activeStrategyId: response.strategyId,
+        activeEngine: response.engine,
+        clearActiveStrategy: !response.running,
+        clearActiveEngine: !response.running,
       );
     } catch (error) {
       if (ref.mounted) {
@@ -130,13 +209,15 @@ class ZapretController extends Notifier<ZapretState> {
   }
 
   /// Restart also runs the upstream GUI's orphaned-process cleanup in Helper
-  /// before it starts a fresh winws2.exe.
+  /// before it starts the selected winws.exe or winws2.exe profile.
   Future<void> restart() async {
     if (!Platform.isWindows || state.busy) return;
     state = state.copyWith(busy: true, clearError: true);
     try {
       await _requireHelper();
-      final response = await _client.restartZapret();
+      final response = await _client.restartZapret(
+        strategyId: state.selectedStrategyId,
+      );
       if (!ref.mounted) return;
       state = state.copyWith(
         available: true,
@@ -144,6 +225,10 @@ class ZapretController extends Notifier<ZapretState> {
         pid: response.pid,
         clearPid: !response.running,
         cleanedProcesses: response.cleanedProcesses,
+        activeStrategyId: response.strategyId,
+        activeEngine: response.engine,
+        clearActiveStrategy: !response.running,
+        clearActiveEngine: !response.running,
       );
     } catch (error) {
       if (ref.mounted) {
