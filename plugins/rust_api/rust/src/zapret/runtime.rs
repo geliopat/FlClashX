@@ -513,7 +513,7 @@ pub(crate) fn split_windows_arguments(input: &str) -> Result<Vec<String>, String
     Ok(arguments)
 }
 
-fn validate_argument_paths(arguments: &[String], root: &Path) -> Result<(), String> {
+pub(crate) fn validate_argument_paths(arguments: &[String], root: &Path) -> Result<(), String> {
     let mut index = 0usize;
     while index < arguments.len() {
         let argument = &arguments[index];
