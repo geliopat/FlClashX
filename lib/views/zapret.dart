@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/common/window.dart';
 import 'package:fl_clash/ui/ui.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
@@ -234,6 +236,27 @@ class _FlowsealViewState extends State<FlowsealView> {
     final strategy = _selectedStrategy;
     if (strategy == null || !_installed) return;
     await _withBusy(() async {
+      if (!await flowsealIsElevated()) {
+        final launched =
+            windows?.runas(
+              Platform.resolvedExecutable,
+              '--flowseal-elevated',
+              showWindow: true,
+            ) ??
+            false;
+        if (!launched) {
+          throw Exception(
+            'Не удалось перезапустить FlClashX с правами администратора. '
+            'Запрос UAC был отменён или отклонён.',
+          );
+        }
+        commonPrint.log(
+          'Flowseal requested an elevated FlClashX restart through UAC',
+        );
+        window?.forceExit();
+        return;
+      }
+
       final status = await flowsealStart(
         root: _root,
         strategy: strategy,
@@ -289,8 +312,10 @@ class _FlowsealViewState extends State<FlowsealView> {
                   Text(
                     'FlClashX читает BAT-файлы как описания стратегий. '
                     'Сами BAT/CMD и сценарии установки не запускаются. '
-                    'Установка выполняется в выбранный каталог без SYSTEM; '
-                    'для записи в него нужны права текущего пользователя.',
+                    'Для запуска winws.exe FlClashX запросит UAC и '
+                    'перезапустится с правами администратора. '
+                    'winws.exe будет дочерним процессом FlClashX, '
+                    'без запуска через SYSTEM Helper.',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                     ),

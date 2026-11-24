@@ -19,6 +19,24 @@ constexpr char kClearStaleProxyArgument[] = "--clear-stale-proxy";
 // running window would only raise it.
 constexpr char kRestartCoreArgument[] = "--restart-core";
 
+// A UAC relaunch must own its elevated process tree rather than attaching
+// winws.exe to the SYSTEM Helper or relying on a ShellExecute process handle.
+constexpr char kFlowsealElevatedArgument[] = "--flowseal-elevated";
+
+bool IsCurrentProcessElevated() {
+  HANDLE token = nullptr;
+  if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token)) {
+    return false;
+  }
+
+  TOKEN_ELEVATION elevation{};
+  DWORD returned = 0;
+  const BOOL queried = GetTokenInformation(
+      token, TokenElevation, &elevation, sizeof(elevation), &returned);
+  CloseHandle(token);
+  return queried && elevation.TokenIsElevated != 0;
+}
+
 int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
                       _In_ wchar_t *command_line, _In_ int show_command) {
   std::vector<std::string> command_line_arguments =
@@ -31,7 +49,18 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   const bool restart_core =
       std::find(command_line_arguments.begin(), command_line_arguments.end(),
                 kRestartCoreArgument) != command_line_arguments.end();
-  if (HWND running = restart_core ? nullptr : WindowPluginFindRunningWindow()) {
+  const bool flowseal_elevated =
+      std::find(command_line_arguments.begin(), command_line_arguments.end(),
+                kFlowsealElevatedArgument) != command_line_arguments.end();
+  if (flowseal_elevated && !IsCurrentProcessElevated()) {
+    return ERROR_ELEVATION_REQUIRED;
+  }
+
+  // The elevated relaunch intentionally starts a separate app process. Its
+  // unelevated parent exits once ShellExecuteW accepts the UAC request.
+  if (HWND running =
+          (restart_core || flowseal_elevated) ? nullptr
+                                              : WindowPluginFindRunningWindow()) {
     SendAppLink(running);
     WindowPluginActivateWindow(running);
     return EXIT_SUCCESS;
