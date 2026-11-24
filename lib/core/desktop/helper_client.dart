@@ -79,6 +79,46 @@ final class HelperZapretStrategy {
   }
 }
 
+final class HelperZapretListInfo {
+  final String filename;
+  final int bytes;
+  final int entries;
+  final bool userManaged;
+
+  const HelperZapretListInfo({
+    required this.filename,
+    required this.bytes,
+    required this.entries,
+    required this.userManaged,
+  });
+
+  factory HelperZapretListInfo.fromJson(Object? value) {
+    if (value is! Map) throw const FormatException('Zapret list info must be an object');
+    final map = Map<String, Object?>.from(value);
+    final filename = map['filename'];
+    final bytes = map['bytes'];
+    final entries = map['entries'];
+    final userManaged = map['userManaged'];
+    if (filename is! String || bytes is! int || entries is! int || userManaged is! bool ||
+        bytes < 0 || entries < 0) {
+      throw const FormatException('Zapret list info fields are invalid');
+    }
+    return HelperZapretListInfo(
+      filename: filename,
+      bytes: bytes,
+      entries: entries,
+      userManaged: userManaged,
+    );
+  }
+}
+
+final class HelperZapretListContent {
+  final String filename;
+  final String content;
+
+  const HelperZapretListContent({required this.filename, required this.content});
+}
+
 final class HelperZapretStatus {
   final bool running;
   final int? pid;
@@ -447,6 +487,67 @@ final class HelperClient {
         message: 'Не удалось получить каталог стратегий Zapret через Helper',
         details: error.toString(),
       );
+    }
+  }
+
+  /// Lists the editable, allow-listed Zapret text files.
+  Future<List<HelperZapretListInfo>> zapretLists() async {
+    try {
+      final response = await _dio.get<Object?>(
+        '$baseUrl/zapret/lists',
+        options: _options(ResponseType.json, receiveTimeout: const Duration(seconds: 4)),
+      );
+      final value = response.data;
+      if (value is! List) {
+        throw HelperException(code: 'invalidResponse', message: 'Helper вернул некорректный список файлов Zapret', details: value);
+      }
+      return value.map(HelperZapretListInfo.fromJson).toList(growable: false);
+    } on HelperException {
+      rethrow;
+    } on DioException catch (error) {
+      throw _mapZapretDioException(error, operation: 'lists');
+    } catch (error) {
+      throw HelperException(code: 'transportError', message: 'Не удалось получить списки Zapret', details: error.toString());
+    }
+  }
+
+  Future<HelperZapretListContent> readZapretList(String filename) async {
+    try {
+      final response = await _dio.get<Object?>(
+        '$baseUrl/zapret/lists/${Uri.encodeComponent(filename)}',
+        options: _options(ResponseType.json, receiveTimeout: const Duration(seconds: 4)),
+      );
+      final data = _responseMap(response, operation: 'Zapret list');
+      final returnedName = data['filename'];
+      final content = data['content'];
+      if (returnedName != filename || content is! String) {
+        throw HelperException(code: 'invalidResponse', message: 'Helper вернул некорректное содержимое списка Zapret', details: data);
+      }
+      return HelperZapretListContent(filename: filename, content: content);
+    } on HelperException {
+      rethrow;
+    } on DioException catch (error) {
+      throw _mapZapretDioException(error, operation: 'read list');
+    } catch (error) {
+      throw HelperException(code: 'transportError', message: 'Не удалось прочитать список Zapret', details: error.toString());
+    }
+  }
+
+  Future<HelperZapretListInfo> writeZapretList(String filename, String content) async {
+    try {
+      final response = await _dio.put<Object?>(
+        '$baseUrl/zapret/lists/${Uri.encodeComponent(filename)}',
+        data: {'content': content},
+        options: _options(ResponseType.json, receiveTimeout: const Duration(seconds: 8)),
+      );
+      final data = _responseMap(response, operation: 'Save Zapret list');
+      return HelperZapretListInfo.fromJson(data);
+    } on HelperException {
+      rethrow;
+    } on DioException catch (error) {
+      throw _mapZapretDioException(error, operation: 'save list');
+    } catch (error) {
+      throw HelperException(code: 'transportError', message: 'Не удалось сохранить список Zapret', details: error.toString());
     }
   }
 
