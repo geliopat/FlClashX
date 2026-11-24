@@ -6,6 +6,8 @@ import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/window.dart';
+import 'package:fl_clash/state.dart';
+import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/ui/ui.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
@@ -50,6 +52,12 @@ class _FlowsealViewState extends State<FlowsealView> {
   List<String> _strategies = const [];
   bool _busy = false;
   bool _pollingStatus = false;
+  String _listQuery = '';
+  String _testType = 'combined';
+  bool _testing = false;
+  FlowsealStrategyTestProgress? _testProgress;
+  List<FlowsealStrategyTestResult> _testResults = const [];
+  StreamSubscription<FlowsealStrategyTestProgress>? _testSubscription;
   Timer? _statusTimer;
 
   bool get _installed => _installation?.installed ?? false;
@@ -68,6 +76,7 @@ class _FlowsealViewState extends State<FlowsealView> {
     _rootController.dispose();
     _tcpController.dispose();
     _udpController.dispose();
+    _testSubscription?.cancel();
     _listEntryController.dispose();
     _listSearchController.dispose();
     super.dispose();
