@@ -236,25 +236,58 @@ class _FlowsealViewState extends State<FlowsealView> {
   }
 
   Future<void> _importStrategy() async {
-    if (!_installed) return;
+    if (!_installed || _busy || _testing) return;
     final file = await FilePicker.pickFile(
       type: FileType.custom,
       allowedExtensions: const ['bat'],
     );
     if (file == null || !mounted) return;
+
+    final initialName = p.basenameWithoutExtension(file.name).trim();
+    final name = await dialogs.showCommonDialog<String>(
+      child: InputDialog(
+        title: 'Импорт стратегии',
+        value: initialName,
+        hintText: 'Имя стратегии',
+        maxLength: 64,
+        validator: (value) {
+          final candidate = value?.trim() ?? '';
+          if (candidate.isEmpty) return 'Укажите имя стратегии.';
+          if (candidate.length > 64 ||
+              !RegExp(r'^[a-zA-Z0-9 _.-]+$').hasMatch(candidate) ||
+              candidate == '.' ||
+              candidate == '..' ||
+              candidate.toLowerCase() == 'service') {
+            return 'Допустимы латинские буквы, цифры, пробел, точка, дефис и подчёркивание.';
+          }
+          return null;
+        },
+      ),
+    );
+    if (name == null || !mounted) return;
+
     await _withBusy(() async {
-      if ((file.lengthSync() ?? await file.length()) > 256 * 1024) {
-        throw Exception('Размер BAT-файла превышает 256 КиБ.');
+      final length = file.lengthSync() ?? await file.length();
+      if (length == 0 || length > 256 * 1024) {
+        throw Exception('BAT-файл пустой или превышает 256 КиБ.');
       }
       final content = utf8.decode(await file.readAsBytes());
-      final name = p.basenameWithoutExtension(file.name).trim();
-      await flowsealImportStrategy(root: _root, name: name, content: content);
+      await flowsealImportStrategy(
+        root: _root,
+        name: name.trim(),
+        content: content,
+      );
       await _refresh();
       if (!mounted) return;
       setState(() {
-        _selectedStrategy = name;
-        _validation = null;
+        _selectedStrategy = name.trim();
+        _preview = null;
+        _validation = 'Стратегия «\${name.trim()}» добавлена.';
       });
+      dialogs.showNotifier(
+        'Стратегия «\${name.trim()}» добавлена в каталог.',
+        level: MessageLevel.success,
+      );
     });
   }
 
