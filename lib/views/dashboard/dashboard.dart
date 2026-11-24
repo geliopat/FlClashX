@@ -136,6 +136,7 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
               gap: gap,
               editing: editing,
               providerMode: providerMode,
+              zapretWidgetEnabled: zapretWidgetEnabled,
               cardKeyOf: _cardKeyOf,
               onDone: () => _setEditing(false, platform),
             ),
@@ -185,6 +186,7 @@ class _MobileDashboard extends ConsumerWidget {
     required this.gap,
     required this.editing,
     required this.providerMode,
+    required this.zapretWidgetEnabled,
     required this.cardKeyOf,
     required this.onDone,
   });
@@ -196,6 +198,7 @@ class _MobileDashboard extends ConsumerWidget {
   final double gap;
   final bool editing;
   final bool providerMode;
+  final bool zapretWidgetEnabled;
   final GlobalKey Function(DashboardWidget widget) cardKeyOf;
   final VoidCallback onDone;
 

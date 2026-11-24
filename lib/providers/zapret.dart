@@ -103,10 +103,10 @@ class ZapretController extends Notifier<ZapretState> {
       final currentId = state.selectedStrategyId;
       final selectedId = strategies.isEmpty
           ? currentId
-          : strategies.any((item) => item.id == currentId)
-              ? currentId
-              : strategies.any((item) => item.id == savedId)
-                  ? savedId!
+          : strategies.any((item) => item.id == savedId)
+              ? savedId!
+              : strategies.any((item) => item.id == currentId)
+                  ? currentId
                   : strategies.any((item) => item.id == defaultStrategyId)
                       ? defaultStrategyId
                       : strategies.first.id;

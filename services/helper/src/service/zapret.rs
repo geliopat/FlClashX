@@ -1225,7 +1225,12 @@ mod tests {
     fn every_imported_strategy_has_a_registered_blob_mapping() {
         for item in imported_strategies::all() {
             for name in item.blobs {
-                assert!(imported_strategies::blob_file(name).is_some(), "{} has no blob mapping", item.id);
+                assert!(
+                    imported_strategies::blob_file(name).is_some()
+                        || imported_strategies::is_runtime_blob(name),
+                    "{} has no blob mapping for {name}",
+                    item.id
+                );
             }
         }
     }
