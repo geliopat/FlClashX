@@ -124,6 +124,9 @@ final class HelperZapretStatus {
   final int? pid;
   final String? strategyId;
   final String? engine;
+  final String? mode;
+  final List<String> winDivertFilters;
+  final List<String> processingLists;
   final int cleanedProcesses;
 
   const HelperZapretStatus({
@@ -131,6 +134,9 @@ final class HelperZapretStatus {
     required this.pid,
     this.strategyId,
     this.engine,
+    this.mode,
+    this.winDivertFilters = const [],
+    this.processingLists = const [],
     this.cleanedProcesses = 0,
   });
 }
@@ -625,12 +631,18 @@ final class HelperClient {
     final cleaned = data['cleanedProcesses'] ?? 0;
     final strategyId = data['strategyId'];
     final engine = data['engine'];
+    final mode = data['mode'];
+    final filters = data['winDivertFilters'] ?? const [];
+    final lists = data['processingLists'] ?? const [];
     if (running is! bool ||
         (pid != null && (pid is! int || pid <= 0)) ||
         cleaned is! int ||
         cleaned < 0 ||
         (strategyId != null && (strategyId is! String || strategyId.isEmpty)) ||
         (engine != null && engine != 'winws' && engine != 'winws2') ||
+        (mode != null && mode != 'strictSplit' && mode != 'fullBypass') ||
+        filters is! List || filters.any((item) => item is! String) ||
+        lists is! List || lists.any((item) => item is! String) ||
         (running && (pid == null || strategyId == null || engine == null)) ||
         (!running && (pid != null || strategyId != null || engine != null))) {
       throw HelperException(
@@ -644,6 +656,9 @@ final class HelperClient {
       pid: pid as int?,
       strategyId: strategyId as String?,
       engine: engine as String?,
+      mode: mode as String?,
+      winDivertFilters: filters.cast<String>().toList(growable: false),
+      processingLists: lists.cast<String>().toList(growable: false),
       cleanedProcesses: cleaned,
     );
   }
