@@ -38,8 +38,62 @@ class _FlowsealLaunchIntent {
 }
 
 bool _validFlowsealPortRange(String value) {
-  if (value.isEmpty || value.length > 64 ||
-      !RegExp(r'^[0-9,-]+
+  if (value.isEmpty || value.length > 64) return false;
+  for (final character in value.codeUnits) {
+    final digit = character >= 48 && character <= 57;
+    if (!digit && character != 44 && character != 45) return false;
+  }
+  for (final part in value.split(',')) {
+    final bounds = part.split('-');
+    if (bounds.isEmpty || bounds.length > 2 ||
+        bounds.any((bound) => bound.isEmpty)) {
+      return false;
+    }
+    final start = int.tryParse(bounds.first);
+    final end = int.tryParse(bounds.length == 2 ? bounds.last : bounds.first);
+    if (start == null || end == null || start < 1 || end > 65535 || start > end) {
+      return false;
+    }
+  }
+  return true;
+}
+
+_FlowsealLaunchIntent? _readFlowsealLaunchIntent(List<String> args) {
+  String? encoded;
+  for (final argument in args) {
+    if (argument.startsWith(_flowsealStartLaunchArgument)) {
+      if (encoded != null) return null;
+      encoded = argument.substring(_flowsealStartLaunchArgument.length);
+    }
+  }
+  if (encoded == null || encoded.isEmpty || encoded.length > 4096) return null;
+  try {
+    final decoded = jsonDecode(
+      utf8.decode(base64Url.decode(base64Url.normalize(encoded))),
+    );
+    if (decoded is! Map<String, dynamic>) return null;
+    final strategy = decoded['strategy'];
+    final mode = decoded['gameFilterMode'];
+    final tcp = decoded['gameFilterTcp'];
+    final udp = decoded['gameFilterUdp'];
+    if (strategy is! String || strategy.trim().isEmpty || strategy.length > 64 ||
+        mode is! String || !const {'none', 'all', 'tcp', 'udp'}.contains(mode) ||
+        tcp is! String ||
+        (const {'all', 'tcp'}.contains(mode) && !_validFlowsealPortRange(tcp)) ||
+        udp is! String ||
+        (const {'all', 'udp'}.contains(mode) && !_validFlowsealPortRange(udp))) {
+      return null;
+    }
+    return _FlowsealLaunchIntent(
+      strategy: strategy,
+      gameFilterMode: mode,
+      gameFilterTcp: tcp,
+      gameFilterUdp: udp,
+    );
+  } catch (_) {
+    return null;
+  }
+}
 
 void main(List<String> args) {
   runZonedGuarded(
@@ -140,154 +194,6 @@ void main(List<String> args) {
             }
           });
         }
-        if (system.isDesktop) {
-          unawaited(
-            coreCliServer.start(
-              restartCore: () => _restartCoreByCommand(container),
-            ),
-          );
-        }
-      } catch (e, s) {
-        runApp(
-          InitErrorApp(
-            error: e,
-            stack: s,
-            onClearData: clearAppData,
-            onExit: _exitAfterInitFailure,
-          ),
-        );
-        unawaited(window?.showInitFailure(onExit: _exitAfterInitFailure));
-      }
-    },
-    (error, stack) {
-      FlutterError.reportError(
-        FlutterErrorDetails(exception: error, stack: stack),
-      );
-    },
-  );
-}
-
-/// A restart asked from the command line shows in the app as one asked there.
-Future<bool> _restartCoreByCommand(ProviderContainer container) async {
-  final appLocalizations = currentAppLocalizations;
-  try {
-    final restarted = await container
-        .read(coreActionProvider.notifier)
-        .restartCore();
-    dialogs.showNotifier(
-      restarted
-          ? appLocalizations.coreRestartedByCommand
-          : appLocalizations.coreRestartByCommandFailed,
-      level: restarted ? MessageLevel.info : MessageLevel.error,
-    );
-    return restarted;
-  } catch (error) {
-    dialogs.showNotifier(
-      '${appLocalizations.coreRestartByCommandFailed}: $error',
-      level: MessageLevel.error,
-    );
-    rethrow;
-  }
-}
-
-Future<void> _exitAfterInitFailure() async {
-  await system.exit();
-  window?.forceExit();
-}
-).hasMatch(value)) {
-    return false;
-  }
-  for (final part in value.split(',')) {
-    final bounds = part.split('-');
-    if (bounds.isEmpty || bounds.length > 2) return false;
-    final start = int.tryParse(bounds.first);
-    final end = int.tryParse(bounds.length == 2 ? bounds.last : bounds.first);
-    if (start == null || end == null || start < 1 || end > 65535 || start > end) {
-      return false;
-    }
-  }
-  return true;
-}
-
-_FlowsealLaunchIntent? _readFlowsealLaunchIntent(List<String> args) {
-  String? encoded;
-  for (final argument in args) {
-    if (argument.startsWith(_flowsealStartLaunchArgument)) {
-      if (encoded != null) return null;
-      encoded = argument.substring(_flowsealStartLaunchArgument.length);
-    }
-  }
-  if (encoded == null || encoded.isEmpty || encoded.length > 4096) return null;
-  try {
-    final decoded = jsonDecode(
-      utf8.decode(base64Url.decode(base64Url.normalize(encoded))),
-    );
-    if (decoded is! Map<String, dynamic>) return null;
-    final strategy = decoded['strategy'];
-    final mode = decoded['gameFilterMode'];
-    final tcp = decoded['gameFilterTcp'];
-    final udp = decoded['gameFilterUdp'];
-    if (strategy is! String || strategy.trim().isEmpty || strategy.length > 64 ||
-        mode is! String || !const {'none', 'all', 'tcp', 'udp'}.contains(mode) ||
-        tcp is! String ||
-        (const {'all', 'tcp'}.contains(mode) && !_validFlowsealPortRange(tcp)) ||
-        udp is! String ||
-        (const {'all', 'udp'}.contains(mode) && !_validFlowsealPortRange(udp))) {
-      return null;
-    }
-    return _FlowsealLaunchIntent(
-      strategy: strategy,
-      gameFilterMode: mode,
-      gameFilterTcp: tcp,
-      gameFilterUdp: udp,
-    );
-  } catch (_) {
-    return null;
-  }
-}
-
-void main(List<String> args) {
-  runZonedGuarded(
-    () async {
-      WidgetsFlutterBinding.ensureInitialized();
-      if (args.contains(restartCoreArgument)) {
-        exit((await runRestartCoreCli()).code);
-      }
-      fileLogger.enable();
-      if (Platform.isWindows || Platform.isLinux) {
-        SharedPreferencesStorePlatform.instance = AtomicFilePreferencesStore(
-          appPath.sharedPreferencesPath,
-        );
-      }
-      if (Platform.isLinux) {
-        linkManager.seedInitialLink(args);
-      }
-      FlutterError.onError = (details) {
-        Future.microtask(() {
-          commonPrint.log(
-            'exception: ${details.exception} stack: ${details.stack}',
-            logLevel: LogLevel.warning,
-          );
-        });
-      };
-      try {
-        await RustLib.init();
-        final version = await system.init();
-        final container = await bootstrap.init(
-          version,
-          waitForDataLock:
-              Platform.isWindows &&
-              args.contains(_flowsealElevatedLaunchArgument),
-        );
-        await FlClashHttpOverrides.trustCoreRoots();
-        HttpOverrides.global = FlClashHttpOverrides(container);
-        request.attach(container.read);
-        runApp(
-          UncontrolledProviderScope(
-            container: container,
-            child: const Application(),
-          ),
-        );
         if (system.isDesktop) {
           unawaited(
             coreCliServer.start(
