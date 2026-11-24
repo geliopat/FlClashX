@@ -1,5 +1,6 @@
 pub mod channel;
 pub mod core;
+pub mod game_filter;
 pub mod installer;
 pub mod ipset;
 pub mod providers;

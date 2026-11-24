@@ -18,6 +18,12 @@ pub struct FlowsealRuntimeStatus {
     pub elevated: bool,
 }
 
+pub struct FlowsealGameFilterSettings {
+    pub mode: String,
+    pub tcp_range: String,
+    pub udp_range: String,
+}
+
 fn provider(root: String) -> FlowsealProvider {
     FlowsealProvider::new(PathBuf::from(root))
 }
@@ -104,7 +110,9 @@ pub fn flowseal_start(
         tcp_range: game_filter_tcp,
         udp_range: game_filter_udp,
     };
-    runtime::start(PathBuf::from(root), &strategy, &filter).map(runtime_status)
+    let root = PathBuf::from(root);
+    crate::zapret::game_filter::save(&root, &filter)?;
+    runtime::start(root, &strategy, &filter).map(runtime_status)
 }
 
 #[frb]
@@ -142,4 +150,29 @@ pub fn flowseal_replace_user_list(
     entries: Vec<String>,
 ) -> Result<Vec<String>, String> {
     crate::zapret::user_lists::replace(&PathBuf::from(root), &filename, &entries)
+}
+
+#[frb]
+pub fn flowseal_get_game_filter(root: String) -> Result<FlowsealGameFilterSettings, String> {
+    let settings = crate::zapret::game_filter::read(&PathBuf::from(root))?;
+    Ok(FlowsealGameFilterSettings {
+        mode: settings.mode,
+        tcp_range: settings.tcp_range,
+        udp_range: settings.udp_range,
+    })
+}
+
+#[frb]
+pub fn flowseal_save_game_filter(
+    root: String,
+    mode: String,
+    tcp_range: String,
+    udp_range: String,
+) -> Result<(), String> {
+    let settings = GameFilterSettings {
+        mode,
+        tcp_range,
+        udp_range,
+    };
+    crate::zapret::game_filter::save(&PathBuf::from(root), &settings)
 }

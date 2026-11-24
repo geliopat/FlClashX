@@ -28,8 +28,8 @@ class FlowsealView extends StatefulWidget {
 
 class _FlowsealViewState extends State<FlowsealView> {
   final _rootController = TextEditingController();
-  final _tcpController = TextEditingController(text: '12');
-  final _udpController = TextEditingController(text: '12');
+  final _tcpController = TextEditingController(text: '1024-65535');
+  final _udpController = TextEditingController(text: '1024-65535');
   final _listEntryController = TextEditingController();
   final _listSearchController = TextEditingController();
 
@@ -181,12 +181,20 @@ class _FlowsealViewState extends State<FlowsealView> {
             filename: _selectedUserList,
           )
         : <String>[];
+    final gameFilter = installation.installed
+        ? await flowsealGetGameFilter(root: root)
+        : null;
     if (!mounted) return;
     setState(() {
       _installation = installation;
       _runtime = runtime;
       _strategies = strategies;
       _userListEntries = userListEntries;
+      if (gameFilter != null) {
+        _filterMode = gameFilter.mode;
+        _tcpController.text = gameFilter.tcpRange;
+        _udpController.text = gameFilter.udpRange;
+      }
       if (_selectedStrategy == null ||
           !strategies.contains(_selectedStrategy)) {
         _selectedStrategy = strategies.isEmpty ? null : strategies.first;
