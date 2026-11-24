@@ -43,6 +43,10 @@ class ZapretDiagnosticsCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(zapretDiagnosticsProvider);
+    final zapret = ref.watch(zapretControllerProvider);
+    final activeStrategy = zapret.strategies.where((item) => item.id == zapret.activeStrategyId).firstOrNull;
+    final selectedStrategy = zapret.strategies.where((item) => item.id == zapret.selectedStrategyId).firstOrNull;
+    final displayedStrategy = zapret.running ? activeStrategy : selectedStrategy;
     final colors = DashboardColors.of(context);
     return DashboardCard(
       semanticLabel: 'Сетевые задержки YouTube, GoogleVideo и Discord',
@@ -66,7 +70,39 @@ class ZapretDiagnosticsCard extends ConsumerWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: colors.tone,
+              borderRadius: BorderRadius.circular(DashboardCorner.tab),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      zapret.running ? 'Активная стратегия' : 'Выбрана стратегия',
+                      style: AppTextStyle.footnote.of(context).copyWith(
+                        color: context.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      displayedStrategy?.name ?? (zapret.running ? 'Не определена' : 'Не выбрана'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.end,
+                      style: AppTextStyle.subheadline.of(context, emphasized: true),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
           LayoutBuilder(
             builder: (context, constraints) {
               final compact = constraints.maxWidth < 560;
