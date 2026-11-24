@@ -21,6 +21,7 @@ import 'config/custom_resources.dart';
 import 'developer.dart';
 import 'disclaimer.dart';
 import 'theme.dart';
+import 'zapret.dart';
 
 class ToolsView extends ConsumerStatefulWidget {
   const ToolsView({super.key});
@@ -68,6 +69,7 @@ class _ToolViewState extends ConsumerState<ToolsView> {
         if (system.isAndroid) const _AccessItem(),
         const _AdvancedConfigItem(),
         const _CustomResourcesItem(),
+        if (system.isWindows) const _FlowsealItem(),
         const _GeneralItem(),
       ],
       footer: [
@@ -305,6 +307,21 @@ class _DeveloperItem extends StatelessWidget {
       leading: const GlyphIcon(AppGlyphs.cpu),
       title: Text(context.appLocalizations.developerMode),
       widget: const DeveloperView(),
+    );
+  }
+}
+
+
+class _FlowsealItem extends StatelessWidget {
+  const _FlowsealItem();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListItem.open(
+      leading: const GlyphIcon(AppGlyphs.wrench),
+      title: const Text('Zapret / Flowseal'),
+      subtitle: const Text('Управление стратегиями Flowseal'),
+      widget: const FlowsealView(),
     );
   }
 }
