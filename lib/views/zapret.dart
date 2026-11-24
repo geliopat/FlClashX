@@ -749,13 +749,8 @@ class _FlowsealViewState extends State<FlowsealView> {
       );
       if (!mounted) return;
       final wasCancelled = _testWasCancelled;
-      FlowsealStrategyTestResult? best;
-      for (final result in results) {
-        if (result.score > 0) {
-          best = result;
-          break;
-        }
-      }
+      final FlowsealStrategyTestResult? best =
+          results.isEmpty ? null : results.first;
       setState(() {
         _testResults = results;
         if (best != null) {
@@ -774,17 +769,25 @@ class _FlowsealViewState extends State<FlowsealView> {
                     best.strategy,
           level: MessageLevel.info,
         );
-      } else if (best != null) {
+      } else if (best == null) {
+        dialogs.showNotifier(
+          'Не удалось получить результаты проверки стратегий.',
+          level: MessageLevel.warning,
+        );
+      } else if (best.status == 'failed') {
+        dialogs.showNotifier(
+          'По рейтингу лидирует «' + best.strategy +
+              '», но успешные соединения не подтверждены. Проверьте результаты.',
+          level: MessageLevel.warning,
+        );
+      } else {
         dialogs.showNotifier(
           'Лучшая стратегия: ' + best.strategy + ' · HTTP ' +
               best.httpOk.toString() + '/' +
               (best.httpOk + best.httpError).toString(),
-          level: MessageLevel.success,
-        );
-      } else {
-        dialogs.showNotifier(
-          'Все стратегии завершились с ошибками. Проверьте каталог и подключение.',
-          level: MessageLevel.warning,
+          level: best.status == 'success'
+              ? MessageLevel.success
+              : MessageLevel.warning,
         );
       }
       await _refresh();
