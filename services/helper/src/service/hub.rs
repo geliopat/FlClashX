@@ -124,6 +124,8 @@ struct ZapretStatusResponse {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ZapretStartRequest {
     strategy_id: String,
+    #[serde(default)]
+    mode: super::zapret::ZapretLaunchMode,
 }
 
 #[derive(Serialize)]
@@ -469,6 +471,7 @@ struct ManagedZapret {
     _job: CoreJob,
     strategy_id: String,
     engine: String,
+    mode: super::zapret::ZapretLaunchMode,
 }
 
 #[cfg(windows)]
@@ -618,7 +621,7 @@ fn stop_managed_zapret(
 }
 
 #[cfg(windows)]
-fn launch_zapret(restart: bool, strategy_id: String) -> warp::reply::Response {
+fn launch_zapret(restart: bool, strategy_id: String, mode: super::zapret::ZapretLaunchMode) -> warp::reply::Response {
     if SHUTTING_DOWN.load(Ordering::SeqCst) {
         return error_response(
             "helperStopping",
@@ -632,7 +635,7 @@ fn launch_zapret(restart: bool, strategy_id: String) -> warp::reply::Response {
             Ok(status) => {
                 let same_strategy = managed
                     .as_ref()
-                    .is_some_and(|active| active.strategy_id == strategy_id);
+                    .is_some_and(|active| active.strategy_id == strategy_id && active.mode == mode);
                 if same_strategy {
                     return status;
                 }
@@ -649,7 +652,7 @@ fn launch_zapret(restart: bool, strategy_id: String) -> warp::reply::Response {
         Ok(path) => path,
         Err(error) => return error_response("zapretAssetsMissing", error.to_string(), StatusCode::CONFLICT),
     };
-    let launch = match super::zapret::build_launch(&bin_dir, &strategy_id) {
+    let launch = match super::zapret::build_launch(&bin_dir, &strategy_id, mode) {
         Ok(launch) => launch,
         Err(error) if error.kind() == std::io::ErrorKind::InvalidInput => {
             return error_response("invalidZapretStrategy", error.to_string(), StatusCode::BAD_REQUEST);
@@ -719,6 +722,7 @@ fn launch_zapret(restart: bool, strategy_id: String) -> warp::reply::Response {
         _job: job,
         strategy_id: strategy_id.clone(),
         engine: engine.clone(),
+        mode,
     });
     json_response(
         &ZapretStatusResponse {
@@ -772,7 +776,7 @@ fn get_zapret_status() -> warp::reply::Response {
 }
 
 #[cfg(not(windows))]
-fn launch_zapret(_restart: bool, _strategy_id: String) -> warp::reply::Response {
+fn launch_zapret(_restart: bool, _strategy_id: String, _mode: super::zapret::ZapretLaunchMode) -> warp::reply::Response {
     error_response("unsupportedPlatform", "Zapret is available only on Windows", StatusCode::NOT_IMPLEMENTED)
 }
 #[cfg(not(windows))]
@@ -788,7 +792,7 @@ async fn launch_zapret_request(
     restart: bool,
     request: ZapretStartRequest,
 ) -> Result<warp::reply::Response, Rejection> {
-    match tokio::task::spawn_blocking(move || launch_zapret(restart, request.strategy_id)).await {
+    match tokio::task::spawn_blocking(move || launch_zapret(restart, request.strategy_id, request.mode)).await {
         Ok(response) => Ok(response),
         Err(error) => Ok(error_response("zapretTaskFailed", error.to_string(), StatusCode::INTERNAL_SERVER_ERROR)),
     }
