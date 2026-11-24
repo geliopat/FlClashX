@@ -127,8 +127,14 @@ class _FlowsealViewState extends State<FlowsealView> {
     }
   }
 
-  Future<void> _selectStrategy(String strategy) async {
-    if (_busy || _testing || !_strategies.contains(strategy)) return;
+  Future<void> _selectStrategy(
+    String strategy, {
+    bool allowDuringOperation = false,
+  }) async {
+    if ((!allowDuringOperation && (_busy || _testing)) ||
+        !_strategies.contains(strategy)) {
+      return;
+    }
     setState(() {
       _selectedStrategy = strategy;
       _preview = null;
@@ -295,7 +301,7 @@ class _FlowsealViewState extends State<FlowsealView> {
       );
       await _refresh();
       if (!mounted) return;
-      await _selectStrategy(name.trim());
+      await _selectStrategy(name.trim(), allowDuringOperation: true);
       if (!mounted) return;
       setState(() {
         _validation = 'Стратегия «${name.trim()}» добавлена.';
@@ -675,21 +681,26 @@ class _FlowsealViewState extends State<FlowsealView> {
   };
 
   Future<void> _requestElevationForTest() async {
-    final launched =
-        windows?.runas(
-          Platform.resolvedExecutable,
-          '--flowseal-elevated',
-          showWindow: true,
-        ) ??
-        false;
-    if (!launched) {
-      throw Exception(
-        'Не удалось перезапустить FlClashX с правами администратора. '
-        'Проверьте запрос UAC.',
-      );
+    try {
+      final launched =
+          windows?.runas(
+            Platform.resolvedExecutable,
+            '--flowseal-elevated',
+            showWindow: true,
+          ) ??
+          false;
+      if (!launched) {
+        _setError(
+          'Не удалось перезапустить FlClashX с правами администратора. '
+          'Запрос UAC был отменён или отклонён.',
+        );
+        return;
+      }
+      commonPrint.log('Flowseal strategy test requested elevated FlClashX');
+      window?.forceExit();
+    } catch (error) {
+      _setError('Не удалось запросить права администратора: $error');
     }
-    commonPrint.log('Flowseal strategy test requested elevated FlClashX');
-    window?.forceExit();
   }
 
   Future<void> _runStrategyTests() async {
@@ -753,7 +764,9 @@ class _FlowsealViewState extends State<FlowsealView> {
           _validation = 'Автотест выбрал «' + best.strategy + '».';
         }
       });
-      if (best != null) await _selectStrategy(best.strategy);
+      if (best != null) {
+        await _selectStrategy(best.strategy, allowDuringOperation: true);
+      }
       if (wasCancelled) {
         dialogs.showNotifier(
           best == null
@@ -787,6 +800,7 @@ class _FlowsealViewState extends State<FlowsealView> {
 
   Future<void> _cancelStrategyTests() async {
     if (!_testing) return;
+    setState(() => _testWasCancelled = true);
     await flowsealCancelStrategyTests();
   }
 
