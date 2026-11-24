@@ -168,7 +168,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
         addLine(domain);
       }
     }
-    return '${lines.join('\r\n')}\\r\\n';
+    return '${lines.join('\r\n')}\r\n';
   }
 
   Future<void> _updateLists() async {
