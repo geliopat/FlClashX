@@ -85,6 +85,25 @@ jobs:
         run: cargo generate-lockfile --manifest-path plugins/rust_api/rust/Cargo.toml
       - name: Build Windows app
         run: flutter build windows --debug
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup -y
+          echo "C:\Program Files (x86)\Inno Setup 6" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Build Windows release packages
+        run: dart setup.dart windows --env pre --targets exe,zip --arch amd64 -v
+
+      - name: Upload Windows Zapret test packages
+        uses: actions/upload-artifact@v6
+        with:
+          name: FlClashX-Zapret-Windows-x64-pre
+          path: |
+            dist/FlClashX-windows-amd64.zip
+            dist/FlClashX-windows-amd64-setup.exe
+          if-no-files-found: error
+          retention-days: 7
       - name: Commit generated bindings
         shell: pwsh
         run: |
