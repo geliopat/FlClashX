@@ -35,6 +35,9 @@ class ZapretState {
   final int cleanedProcesses;
   final String? activeStrategyId;
   final String? activeEngine;
+  final String? activeMode;
+  final List<String> winDivertFilters;
+  final List<String> processingLists;
   final List<HelperZapretStrategy> strategies;
   final String selectedStrategyId;
   final ZapretMode mode;
@@ -48,6 +51,9 @@ class ZapretState {
     this.cleanedProcesses = 0,
     this.activeStrategyId,
     this.activeEngine,
+    this.activeMode,
+    this.winDivertFilters = const [],
+    this.processingLists = const [],
     this.strategies = const [],
     this.selectedStrategyId = ZapretController.defaultStrategyId,
     this.mode = ZapretMode.fullBypass,
@@ -65,6 +71,10 @@ class ZapretState {
     bool clearActiveStrategy = false,
     String? activeEngine,
     bool clearActiveEngine = false,
+    String? activeMode,
+    bool clearActiveMode = false,
+    List<String>? winDivertFilters,
+    List<String>? processingLists,
     List<HelperZapretStrategy>? strategies,
     String? selectedStrategyId,
     ZapretMode? mode,
@@ -81,6 +91,9 @@ class ZapretState {
           ? null
           : activeStrategyId ?? this.activeStrategyId,
       activeEngine: clearActiveEngine ? null : activeEngine ?? this.activeEngine,
+      activeMode: clearActiveMode ? null : activeMode ?? this.activeMode,
+      winDivertFilters: winDivertFilters ?? this.winDivertFilters,
+      processingLists: processingLists ?? this.processingLists,
       strategies: strategies ?? this.strategies,
       selectedStrategyId: selectedStrategyId ?? this.selectedStrategyId,
       mode: mode ?? this.mode,
@@ -202,6 +215,10 @@ class ZapretController extends Notifier<ZapretState> {
         activeEngine: response.engine,
         clearActiveStrategy: !response.running,
         clearActiveEngine: !response.running,
+        activeMode: response.mode,
+        clearActiveMode: !response.running,
+        winDivertFilters: response.winDivertFilters,
+        processingLists: response.processingLists,
         clearError: state.strategies.isNotEmpty,
       );
     } on HelperException catch (error) {
@@ -246,6 +263,10 @@ class ZapretController extends Notifier<ZapretState> {
         activeEngine: response.engine,
         clearActiveStrategy: !response.running,
         clearActiveEngine: !response.running,
+        activeMode: response.mode,
+        clearActiveMode: !response.running,
+        winDivertFilters: response.winDivertFilters,
+        processingLists: response.processingLists,
       );
     } catch (error) {
       if (ref.mounted) {
@@ -281,6 +302,10 @@ class ZapretController extends Notifier<ZapretState> {
         activeEngine: response.engine,
         clearActiveStrategy: !response.running,
         clearActiveEngine: !response.running,
+        activeMode: response.mode,
+        clearActiveMode: !response.running,
+        winDivertFilters: response.winDivertFilters,
+        processingLists: response.processingLists,
       );
     } catch (error) {
       if (ref.mounted) {
