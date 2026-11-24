@@ -525,7 +525,10 @@ class _FlowsealViewState extends State<FlowsealView> {
       if ((file.lengthSync() ?? await file.length()) > 2 * 1024 * 1024) {
         throw Exception('Размер списка превышает 2 МиБ.');
       }
-      final content = utf8.decode(await file.readAsBytes());
+      final content = utf8.decode(
+        await file.readAsBytes(),
+        allowMalformed: true,
+      );
       final imported = content
           .replaceFirst('\uFEFF', '')
           .split(RegExp(r'\r?\n'))
@@ -556,7 +559,7 @@ class _FlowsealViewState extends State<FlowsealView> {
     });
   }
 
-  Future<void> _clearUserList(BuildContext context) async {
+  Future<void> _clearUserList() async {
     if (!_installed || _busy || _testing || _userListEntries.isEmpty) return;
     final confirmed = await dialogs.showMessage(
       title: 'Очистить список?',
@@ -1198,7 +1201,10 @@ class _FlowsealViewState extends State<FlowsealView> {
                   options: const ['standard', 'dpi', 'combined'],
                   value: _testType,
                   textBuilder: _testTypeLabel,
-                  onChanged: (value) => setState(() => _testType = value),
+                  onChanged: (value) {
+                    if (_busy || _testing) return;
+                    setState(() => _testType = value);
+                  },
                 ),
                 ListItem(
                   leading: Icon(
@@ -1314,7 +1320,7 @@ class _FlowsealViewState extends State<FlowsealView> {
                   title: const Text('Очистить выбранный список'),
                   onTap: _busy || _testing || _userListEntries.isEmpty
                       ? null
-                      : () => _clearUserList(context),
+                      : _clearUserList,
                 ),
                 ListItem(
                   leading: const Icon(Icons.backup_outlined),
