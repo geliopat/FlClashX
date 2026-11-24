@@ -31,6 +31,8 @@ permissions:
 
 jobs:
   rust-windows:
+    # Temporary pause requested by user; restore when compilation is authorized.
+    if: false
     name: Rust (windows-2022)
     runs-on: windows-2022
     steps:
@@ -46,8 +48,9 @@ jobs:
         run: cargo test --manifest-path plugins/rust_api/rust/Cargo.toml
 
   generate-bindings:
+    # Temporary pause requested by user; restore when compilation is authorized.
+    if: false
     name: Generate Flutter Rust Bridge bindings (Windows)
-    if: github.event_name == 'push'
     needs: rust-windows
     runs-on: windows-2022
     steps:
