@@ -237,10 +237,20 @@ class _FlowsealViewState extends State<FlowsealView> {
     if (strategy == null || !_installed) return;
     await _withBusy(() async {
       if (!await flowsealIsElevated()) {
+        final handoff = base64Url.encode(
+          utf8.encode(
+            jsonEncode({
+              'strategy': strategy,
+              'gameFilterMode': _filterMode,
+              'gameFilterTcp': _tcpController.text.trim(),
+              'gameFilterUdp': _udpController.text.trim(),
+            }),
+          ),
+        );
         final launched =
             windows?.runas(
               Platform.resolvedExecutable,
-              '--flowseal-elevated',
+              '--flowseal-elevated --flowseal-start=$handoff',
               showWindow: true,
             ) ??
             false;
