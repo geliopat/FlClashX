@@ -847,6 +847,9 @@ class _FlowsealViewState extends State<FlowsealView> {
         .where((entry) => entry.toLowerCase().contains(_listQuery))
         .toList();
     final visibleEntries = filteredEntries.take(200).toList();
+    final filteredStrategies = _strategies
+        .where((strategy) => strategy.toLowerCase().contains(_listQuery))
+        .toList();
     final progress = _testProgress;
     final progressValue = progress == null || progress.total == BigInt.zero
         ? null
@@ -1021,27 +1024,56 @@ class _FlowsealViewState extends State<FlowsealView> {
             generateSection(
               title: 'Стратегии Flowseal',
               items: [
+                ListItem(
+                  leading: const Icon(Icons.tune),
+                  title: Text(
+                    _selectedStrategy == null
+                        ? 'Стратегия не выбрана'
+                        : 'Выбрана: ${_selectedStrategy!}',
+                  ),
+                  subtitle: Text(
+                    'Доступно стратегий: ${_strategies.length}. '
+                    'Показываются готовые и импортированные BAT.',
+                  ),
+                ),
                 if (_strategies.isEmpty)
                   const ListItem(
                     title: Text('Готовые стратегии не найдены'),
-                    subtitle: Text('Проверьте установку Flowseal'),
+                    subtitle: Text('Проверьте установку Flowseal или импортируйте BAT-файл'),
+                  )
+                else if (filteredStrategies.isEmpty)
+                  const ListItem(
+                    title: Text('Совпадений не найдено'),
+                    subtitle: Text('Измените поисковый запрос в верхней панели'),
                   )
                 else
-                  ListItem.options<String>(
-                    leading: const Icon(Icons.tune),
-                    title: const Text('Выбранная стратегия'),
-                    subtitle: const Text('Выберите один из готовых или импортированных BAT'),
-                    options: _strategies,
-                    value: _selectedStrategy != null &&
-                            _strategies.contains(_selectedStrategy)
-                        ? _selectedStrategy!
-                        : _strategies.first,
-                    textBuilder: (strategy) => strategy,
-                    onChanged: (strategy) => setState(() {
-                      _selectedStrategy = strategy;
-                      _preview = null;
-                    }),
-                  ),
+                  for (final strategy in filteredStrategies)
+                    ListItem(
+                      leading: Icon(
+                        strategy == _selectedStrategy
+                            ? Icons.radio_button_checked
+                            : Icons.radio_button_unchecked,
+                        color: strategy == _selectedStrategy
+                            ? context.colorScheme.primary
+                            : context.colorScheme.onSurfaceVariant,
+                      ),
+                      title: Text(
+                        strategy,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      subtitle: Text(
+                        strategy == _selectedStrategy
+                            ? 'Выбрана для запуска'
+                            : 'Нажмите, чтобы выбрать',
+                      ),
+                      onTap: _busy || _testing
+                          ? null
+                          : () => setState(() {
+                                _selectedStrategy = strategy;
+                                _preview = null;
+                              }),
+                    ),
                 ListItem.options<String>(
                   leading: const Icon(Icons.sports_esports_outlined),
                   title: const Text('Game Filter'),
@@ -1055,6 +1087,7 @@ class _FlowsealViewState extends State<FlowsealView> {
                     _ => 'Отключён',
                   },
                   onChanged: (mode) {
+                    if (_busy || _testing) return;
                     setState(() {
                       _filterMode = mode;
                       _preview = null;
@@ -1071,7 +1104,7 @@ class _FlowsealViewState extends State<FlowsealView> {
                   maxLength: 64,
                   keyboardType: TextInputType.text,
                   onChanged: (value) {
-                    if (value == null) return;
+                    if (value == null || _busy || _testing) return;
                     _tcpController.text = value;
                     setState(() => _preview = null);
                     unawaited(_saveGameFilterSettings());
@@ -1086,7 +1119,7 @@ class _FlowsealViewState extends State<FlowsealView> {
                   maxLength: 64,
                   keyboardType: TextInputType.text,
                   onChanged: (value) {
-                    if (value == null) return;
+                    if (value == null || _busy || _testing) return;
                     _udpController.text = value;
                     setState(() => _preview = null);
                     unawaited(_saveGameFilterSettings());
@@ -1194,9 +1227,10 @@ class _FlowsealViewState extends State<FlowsealView> {
                     'loaded' => 'Использовать список IP',
                     _ => 'Без фильтрации',
                   },
-                  onChanged: _busy || _testing
-                      ? (_) {}
-                      : (mode) => unawaited(_changeIpSetMode(mode)),
+                  onChanged: (mode) {
+                    if (_busy || _testing) return;
+                    unawaited(_changeIpSetMode(mode));
+                  },
                 ),
                 ListItem(
                   leading: const Icon(Icons.download_outlined),
@@ -1216,7 +1250,10 @@ class _FlowsealViewState extends State<FlowsealView> {
                   options: _flowsealUserLists.keys.toList(),
                   value: _selectedUserList,
                   textBuilder: (filename) => _flowsealUserLists[filename] ?? filename,
-                  onChanged: (filename) => unawaited(_selectUserList(filename)),
+                  onChanged: (filename) {
+                    if (_busy || _testing) return;
+                    unawaited(_selectUserList(filename));
+                  },
                 ),
                 ListItem(
                   leading: const Icon(Icons.add_circle_outline),
