@@ -15,6 +15,7 @@ import 'package:rust_api/rust_api.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _flowsealRootPreference = 'flowseal.installRoot';
+const _flowsealStrategyPreference = 'flowseal.selectedStrategy';
 
 const _flowsealUserLists = <String, String>{
   'list-general-user.txt': 'Домены для обработки Zapret',
@@ -87,6 +88,7 @@ class _FlowsealViewState extends State<FlowsealView> {
     try {
       final preferences = await SharedPreferences.getInstance();
       final savedRoot = preferences.getString(_flowsealRootPreference);
+      final savedStrategy = preferences.getString(_flowsealStrategyPreference);
       final root = savedRoot == null || savedRoot.trim().isEmpty
           ? p.join(await appPath.homeDirPath, 'Flowseal')
           : savedRoot;
@@ -97,6 +99,7 @@ class _FlowsealViewState extends State<FlowsealView> {
       setState(() {
         _root = root;
         _rootController.text = root;
+        _selectedStrategy = savedStrategy;
       });
       if (root.isNotEmpty) await _refresh();
     } catch (error) {
@@ -122,6 +125,16 @@ class _FlowsealViewState extends State<FlowsealView> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  Future<void> _selectStrategy(String strategy) async {
+    if (_busy || _testing || !_strategies.contains(strategy)) return;
+    setState(() {
+      _selectedStrategy = strategy;
+      _preview = null;
+    });
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(_flowsealStrategyPreference, strategy);
   }
 
   Future<void> _saveRoot() async {
@@ -282,9 +295,9 @@ class _FlowsealViewState extends State<FlowsealView> {
       );
       await _refresh();
       if (!mounted) return;
+      await _selectStrategy(name.trim());
+      if (!mounted) return;
       setState(() {
-        _selectedStrategy = name.trim();
-        _preview = null;
         _validation = 'Стратегия «${name.trim()}» добавлена.';
       });
       dialogs.showNotifier(
@@ -736,11 +749,11 @@ class _FlowsealViewState extends State<FlowsealView> {
       setState(() {
         _testResults = results;
         if (best != null) {
-          _selectedStrategy = best.strategy;
           _preview = null;
           _validation = 'Автотест выбрал «' + best.strategy + '».';
         }
       });
+      if (best != null) await _selectStrategy(best.strategy);
       if (wasCancelled) {
         dialogs.showNotifier(
           best == null
@@ -844,10 +857,7 @@ class _FlowsealViewState extends State<FlowsealView> {
           : const Icon(Icons.radio_button_unchecked),
       onTap: _busy || _testing
           ? null
-          : () => setState(() {
-                _selectedStrategy = result.strategy;
-                _preview = null;
-              }),
+          : () => unawaited(_selectStrategy(result.strategy)),
     );
   }
 
@@ -1080,10 +1090,7 @@ class _FlowsealViewState extends State<FlowsealView> {
                       ),
                       onTap: _busy || _testing
                           ? null
-                          : () => setState(() {
-                                _selectedStrategy = strategy;
-                                _preview = null;
-                              }),
+                          : () => unawaited(_selectStrategy(strategy)),
                     ),
                 ListItem.options<String>(
                   leading: const Icon(Icons.sports_esports_outlined),
