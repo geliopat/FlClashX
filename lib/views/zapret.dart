@@ -473,24 +473,23 @@ class _FlowsealViewState extends State<FlowsealView> {
     );
     if (file == null || !mounted) return;
 
-    final append = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Импорт пользовательского списка'),
-        content: const Text(
+    final append = await dialogs.showCommonDialog<bool>(
+      child: CommonDialog(
+        title: 'Импорт пользовательского списка',
+        child: const Text(
           'Добавить записи к существующему списку или полностью заменить его?',
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(null),
+            onPressed: () => Navigator.of(context).pop(null),
             child: const Text('Отмена'),
           ),
-          OutlinedButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
             child: const Text('Заменить'),
           ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
             child: const Text('Добавить'),
           ),
         ],
@@ -535,24 +534,13 @@ class _FlowsealViewState extends State<FlowsealView> {
 
   Future<void> _clearUserList(BuildContext context) async {
     if (!_installed || _userListEntries.isEmpty) return;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Очистить список?'),
-        content: Text(
-          'Удалить все записи из «${_flowsealUserLists[_selectedUserList]}»?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Отмена'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Очистить'),
-          ),
-        ],
+    final confirmed = await dialogs.showMessage(
+      title: 'Очистить список?',
+      message: TextSpan(
+        text: 'Удалить все записи из «${_flowsealUserLists[_selectedUserList]}»?',
       ),
+      confirmText: 'Очистить',
+      destructive: true,
     );
     if (confirmed != true || !mounted) return;
     await _withBusy(() async {
