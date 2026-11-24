@@ -49,11 +49,40 @@ try {
         Get-ChildItem -Path $FlowsealLists.FullName -File | ForEach-Object { Copy-Item -Path $_.FullName -Destination $ListsDir -Force }
     }
 
+    $StrategySource = Join-Path $Root "services\\helper\\strategies"
+    $StrategyDir = Join-Path $AssetDir "strategies"
+    New-Item -ItemType Directory -Path $StrategyDir -Force | Out-Null
+
+    # Keep the original zapret2-gui directory structure in the installed bundle.
+    # The root copies are retained because the flagship and imported profiles
+    # load the shared Lua libraries from the engine working directory.
     $LuaFiles = @("zapret-lib.lua","zapret-antidpi.lua","zapret-auto.lua","zapret-discord-light.lua","zapret-extsplit.lua","zapret-firstbyte.lua","zapret-ipfrag.lua","zapret-obfs.lua","zapret-pcap.lua","zapret-sites-light.lua","zapret-syndata.lua","zapret-tests.lua","zapret-tspu-max.lua","zapret-yt4k.lua")
     foreach ($Name in $LuaFiles) {
-        $Path = Join-Path $AssetDir $Name
-        Invoke-WebRequest -Uri "$ZapretSourceBase/bin/$Name" -OutFile $Path
-        if ((Get-Item $Path).Length -eq 0) { throw "Downloaded Lua strategy is empty: $Name" }
+        $SourcePath = Join-Path $StrategySource $Name
+        if (-not (Test-Path $SourcePath -PathType Leaf)) { throw "Bundled Lua strategy is missing: $SourcePath" }
+        Copy-Item -Path $SourcePath -Destination (Join-Path $AssetDir $Name) -Force
+        Copy-Item -Path $SourcePath -Destination (Join-Path $StrategyDir $Name) -Force
+        if ((Get-Item (Join-Path $StrategyDir $Name)).Length -eq 0) { throw "Bundled Lua strategy is empty: $Name" }
+    }
+
+    $ImportedSource = Join-Path $StrategySource "imported"
+    if (-not (Test-Path (Join-Path $ImportedSource "kinlay0") -PathType Container)) {
+        throw "The pinned kinlay0 strategy folder is missing."
+    }
+    Copy-Item -Path $ImportedSource -Destination $StrategyDir -Recurse -Force
+    $ImportedBatFiles = @(Get-ChildItem -Path (Join-Path $StrategyDir "imported\\kinlay0") -File -Filter "*.bat")
+    if ($ImportedBatFiles.Count -ne 26) {
+        throw "Expected 26 pinned kinlay0 BAT strategies, found $($ImportedBatFiles.Count)."
+    }
+    foreach ($RequiredStrategy in @("zapret-antidpi.lua","zapret-discord-light.lua","zapret-extsplit.lua","zapret-firstbyte.lua","zapret-ipfrag.lua","zapret-sites-light.lua","zapret-syndata.lua","zapret-tspu-max.lua","zapret-yt4k.lua")) {
+        if (-not (Test-Path (Join-Path $StrategyDir $RequiredStrategy) -PathType Leaf)) {
+            throw "Required built-in Lua strategy is missing: $RequiredStrategy"
+        }
+    }
+    foreach ($RequiredSource in @("translate.py","README.md","LICENSE")) {
+        if (-not (Test-Path (Join-Path (Join-Path $StrategyDir "imported\\kinlay0") $RequiredSource) -PathType Leaf)) {
+            throw "Required kinlay0 source file is missing: $RequiredSource"
+        }
     }
 
     $BlobFiles = @("ACTIVE_DISCORD_UDP.bin","ACTIVE_GAME_UDP.bin","quic_initial_4pda_to.bin","quic_initial_5ka_ru.bin","quic_initial_lemana_pro.bin","quic_initial_rutube_ru.bin","quic_initial_steam_chat_com.bin","quic_initial_steamcommunity_com.bin","quic_initial_steamstatic_com.bin","quic_initial_tencent_com.bin","quic_initial_www_google_com.bin","stun.bin","stun2.bin","tls_clienthello_4pda_to.bin","tls_clienthello_5ka_ru.bin","tls_clienthello_awswaf_com.bin","tls_clienthello_max_ru.bin","tls_clienthello_retext_ai.bin","tls_clienthello_sochi_park.bin","tls_clienthello_steam_chat_com.bin","tls_clienthello_steamstatic_com.bin","tls_clienthello_teamspeak_com.bin","tls_clienthello_www_google_com.bin","tls_clienthello_www_sferum_ru.bin")
