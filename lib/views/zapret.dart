@@ -164,8 +164,18 @@ class _FlowsealViewState extends State<FlowsealView> {
       _selectedStrategy = strategy;
       _preview = null;
     });
-    final preferences = await SharedPreferences.getInstance();
-    await preferences.setString(_flowsealStrategyPreference, strategy);
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setString(_flowsealStrategyPreference, strategy);
+    } catch (error) {
+      commonPrint.log('Could not persist Flowseal strategy selection: $error');
+      if (mounted) {
+        dialogs.showNotifier(
+          'Стратегия выбрана, но не удалось сохранить выбор между перезапусками.',
+          level: MessageLevel.warning,
+        );
+      }
+    }
   }
 
   Future<void> _saveRoot() async {
