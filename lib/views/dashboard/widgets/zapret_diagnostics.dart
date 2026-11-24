@@ -44,9 +44,15 @@ class ZapretDiagnosticsCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(zapretDiagnosticsProvider);
     final zapret = ref.watch(zapretControllerProvider);
-    final activeStrategy = zapret.strategies.where((item) => item.id == zapret.activeStrategyId).firstOrNull;
-    final selectedStrategy = zapret.strategies.where((item) => item.id == zapret.selectedStrategyId).firstOrNull;
-    final displayedStrategy = zapret.running ? activeStrategy : selectedStrategy;
+    String? strategyName(String? id) {
+      for (final item in zapret.strategies) {
+        if (item.id == id) return item.name;
+      }
+      return null;
+    }
+    final displayedStrategyName = strategyName(
+      zapret.running ? zapret.activeStrategyId : zapret.selectedStrategyId,
+    );
     final colors = DashboardColors.of(context);
     return DashboardCard(
       semanticLabel: 'Сетевые задержки YouTube, GoogleVideo и Discord',
@@ -91,7 +97,7 @@ class ZapretDiagnosticsCard extends ConsumerWidget {
                   const SizedBox(width: 8),
                   Flexible(
                     child: Text(
-                      displayedStrategy?.name ?? (zapret.running ? 'Не определена' : 'Не выбрана'),
+                      displayedStrategyName ?? (zapret.running ? 'Не определена' : 'Не выбрана'),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       textAlign: TextAlign.end,
