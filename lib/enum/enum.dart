@@ -452,14 +452,15 @@ enum DashboardWidget {
   announcement,
   networkSpeed,
   outboundMode,
-  vpnButton(platforms: [SupportPlatform.Android]),
+  vpnButton(platforms: [SupportPlatform.Android, SupportPlatform.Windows]),
   networkTakeover(platforms: desktopPlatforms),
   serviceStatus,
   profiles,
   proxyGroups,
   connectionStats,
   intranetIp,
-  memoryInfo;
+  memoryInfo,
+  zapretDiagnostics(platforms: [SupportPlatform.Windows]);
 
   final List<SupportPlatform> platforms;
 

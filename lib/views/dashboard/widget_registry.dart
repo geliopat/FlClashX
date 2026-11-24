@@ -20,6 +20,7 @@ extension DashboardWidgetView on DashboardWidget {
     DashboardWidget.connectionStats => const ConnectionStatsCard(),
     DashboardWidget.intranetIp => const IntranetIpCard(),
     DashboardWidget.memoryInfo => const MemoryInfo(),
+    DashboardWidget.zapretDiagnostics => const ZapretDiagnosticsCard(),
   };
 
   Glyph get glyph => switch (this) {
@@ -35,6 +36,7 @@ extension DashboardWidgetView on DashboardWidget {
     DashboardWidget.connectionStats => AppGlyphs.connections,
     DashboardWidget.intranetIp => AppGlyphs.devices,
     DashboardWidget.memoryInfo => AppGlyphs.memory,
+    DashboardWidget.zapretDiagnostics => AppGlyphs.speed,
   };
 
   String label(BuildContext context) {
@@ -52,6 +54,7 @@ extension DashboardWidgetView on DashboardWidget {
       DashboardWidget.connectionStats => appLocalizations.connectionStats,
       DashboardWidget.intranetIp => appLocalizations.intranetIP,
       DashboardWidget.memoryInfo => appLocalizations.memoryInfo,
+      DashboardWidget.zapretDiagnostics => 'Сетевые задержки',
     };
   }
 
@@ -68,9 +71,12 @@ extension DashboardWidgetView on DashboardWidget {
   /// The status card holds the start button, which has nowhere else to go
   /// unless [providerMode] puts it at the foot of the page, and the
   /// announcement comes and goes with the subscription.
-  bool removable({required bool providerMode}) =>
+  bool removable({required bool providerMode, SupportPlatform? platform}) =>
       (providerMode || this != DashboardWidget.currentOutbound) &&
-      this != DashboardWidget.announcement;
+      this != DashboardWidget.announcement &&
+      !(platform == SupportPlatform.Windows &&
+          (this == DashboardWidget.vpnButton ||
+              this == DashboardWidget.zapretDiagnostics));
 }
 
 /// The status card, or under `providermode` the server's location.
@@ -91,8 +97,9 @@ List<DashboardWidget> withFixedCards(
   List<DashboardWidget> saved, {
   required bool announcement,
   bool providerMode = false,
+  SupportPlatform? platform,
 }) {
-  return [
+  final result = <DashboardWidget>[
     if (announcement && !saved.contains(DashboardWidget.announcement))
       DashboardWidget.announcement,
     if (!providerMode && !saved.contains(DashboardWidget.currentOutbound))
@@ -100,4 +107,14 @@ List<DashboardWidget> withFixedCards(
     for (final card in saved)
       if (announcement || card != DashboardWidget.announcement) card,
   ];
+  // Keep the Windows Zapret controls visible in layouts saved by older builds.
+  if (platform == SupportPlatform.Windows) {
+    if (!result.contains(DashboardWidget.vpnButton)) {
+      result.add(DashboardWidget.vpnButton);
+    }
+    if (!result.contains(DashboardWidget.zapretDiagnostics)) {
+      result.add(DashboardWidget.zapretDiagnostics);
+    }
+  }
+  return result;
 }

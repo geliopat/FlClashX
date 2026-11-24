@@ -41,12 +41,7 @@ class ZapretStatusButton extends ConsumerWidget {
             dimension: 18,
             child: CircularProgressIndicator(strokeWidth: 2),
           )
-        : Icon(
-            Icons.shield_outlined,
-            color: state.running
-                ? context.colorScheme.primary
-                : context.colorScheme.onSurfaceVariant,
-          );
+        : ZapretMark(running: state.running);
     const style = ElasticPress.buttonStyle;
     final iconOnly = state.running || ViewScope.isMobileOf(context);
     return Tooltip(
@@ -73,6 +68,35 @@ class ZapretStatusButton extends ConsumerWidget {
                         ? 'Zapret включён'
                         : 'Zapret выключен'),
               ),
+      ),
+    );
+  }
+}
+
+
+/// The Zapret mark uses the same compact footprint as the Core heartbeat.
+class ZapretMark extends StatelessWidget {
+  const ZapretMark({super.key, required this.running});
+
+  final bool running;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox.square(
+      dimension: 18,
+      child: Center(
+        child: Text(
+          'Z',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 18,
+            height: 1,
+            fontWeight: FontWeight.w800,
+            color: running
+                ? context.colorScheme.primary
+                : context.colorScheme.onSurfaceVariant,
+          ),
+        ),
       ),
     );
   }

@@ -159,7 +159,7 @@ class _WideCards extends ConsumerWidget {
       cards: withFixedCards([
         for (final widget in saved)
           if (widget.platforms.contains(platform)) widget,
-      ], announcement: announcement),
+      ], announcement: announcement, platform: platform),
       columns: columns,
       gap: gap,
     );
@@ -223,6 +223,7 @@ class _MobileDashboard extends ConsumerWidget {
               ],
               announcement: announcement,
               providerMode: providerMode,
+              platform: platform,
             );
             if (editing) {
               return DashboardEditor(

@@ -29,6 +29,30 @@ void main() {
     ]);
   });
 
+  test('keeps Windows Zapret widgets in older saved layouts', () {
+    final result = withFixedCards(
+      const [speed, profiles],
+      announcement: false,
+      platform: SupportPlatform.Windows,
+    );
+    expect(result, contains(DashboardWidget.vpnButton));
+    expect(result, contains(DashboardWidget.zapretDiagnostics));
+    expect(
+      DashboardWidget.vpnButton.removable(
+        providerMode: false,
+        platform: SupportPlatform.Windows,
+      ),
+      isFalse,
+    );
+    expect(
+      DashboardWidget.zapretDiagnostics.removable(
+        providerMode: false,
+        platform: SupportPlatform.Windows,
+      ),
+      isFalse,
+    );
+  });
+
   test('leaves the announcement out while the subscription sends none', () {
     expect(
       withFixedCards(const [speed, announcement, status], announcement: false),

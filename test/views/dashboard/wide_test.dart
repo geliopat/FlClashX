@@ -48,7 +48,15 @@ void main() {
     );
     expect(
       wideDashboardWidgetsOf(SupportPlatform.Windows),
-      isNot(contains(DashboardWidget.vpnButton)),
+      contains(DashboardWidget.vpnButton),
+    );
+    expect(
+      wideDashboardWidgetsOf(SupportPlatform.Windows),
+      contains(DashboardWidget.zapretDiagnostics),
+    );
+    expect(
+      _rows(wideDashboardWidgetsOf(SupportPlatform.Windows), 4),
+      contains([DashboardWidget.zapretDiagnostics]),
     );
   });
 

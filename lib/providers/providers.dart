@@ -7,3 +7,4 @@ export 'on_demand.dart';
 export 'route_state.dart';
 export 'state.dart';
 export 'zapret.dart';
+export 'zapret_diagnostics.dart';
