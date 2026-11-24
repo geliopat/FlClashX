@@ -245,6 +245,19 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
                 Text('Стратегия: ${activeName ?? 'не активна'}'),
                 if (zapret.running) ...[
                   Text('Движок: ${zapret.activeEngine ?? '—'} · PID: ${zapret.pid ?? '—'}'),
+                  Text('Режим: ${zapret.activeMode ?? 'собственные правила стратегии'}'),
+                  const SizedBox(height: 8),
+                  Text('Фильтры перехвата WinDivert', style: Theme.of(context).textTheme.labelLarge),
+                  Text(
+                    zapret.winDivertFilters.isEmpty ? 'Не переданы' : zapret.winDivertFilters.join(' · '),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
+                  ),
+                  const SizedBox(height: 8),
+                  Text('Списки обработки трафика', style: Theme.of(context).textTheme.labelLarge),
+                  Text(
+                    zapret.processingLists.isEmpty ? 'Не переданы' : zapret.processingLists.join('\\n'),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
+                  ),
                 ],
                 if (zapret.error != null)
                   Text(zapret.error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
