@@ -916,21 +916,24 @@ class _FlowsealViewState extends State<FlowsealView> {
           ? AppBarSearchState(onSearch: _handleListSearch)
           : null,
       iconActions: [
-        IconButtonData(
-          glyph: AppGlyphs.importFile,
-          tooltip: 'Импортировать BAT',
-          onPressed: _installed && !_busy && !_testing
-              ? _importStrategy
-              : null,
-        ),
-        IconButtonData(
-          glyph: AppGlyphs.sync,
-          tooltip: _testing ? 'Проверка стратегий выполняется' : 'Автотест стратегий',
-          isLoading: _testing,
-          onPressed: _installed && !_busy && !_testing
-              ? _runStrategyTests
-              : null,
-        ),
+        if (!_testing)
+          IconButtonData(
+            glyph: AppGlyphs.importFile,
+            tooltip: 'Импортировать BAT',
+            onPressed: _installed && !_busy ? _importStrategy : null,
+          ),
+        if (_testing)
+          IconButtonData(
+            glyph: AppGlyphs.stop,
+            tooltip: 'Остановить автотест',
+            onPressed: _cancelStrategyTests,
+          )
+        else
+          IconButtonData(
+            glyph: AppGlyphs.sync,
+            tooltip: 'Автотест стратегий',
+            onPressed: _installed && !_busy ? _runStrategyTests : null,
+          ),
       ],
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16).copyWith(
