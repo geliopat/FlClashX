@@ -32,10 +32,25 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
+      - name: Format Rust sources
+        run: cargo fmt --manifest-path plugins/rust_api/rust/Cargo.toml
       - name: Check formatting
         run: cargo fmt --manifest-path plugins/rust_api/rust/Cargo.toml -- --check
       - name: Compile and run unit tests
         run: cargo test --manifest-path plugins/rust_api/rust/Cargo.toml
+      - name: Commit Rust formatting
+        if: github.event_name == 'push'
+        shell: pwsh
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add plugins/rust_api/rust/src
+          if (-not (git diff --cached --quiet)) {
+            git commit -m "Format Flowseal Windows runtime Rust sources"
+            git push origin HEAD:feature/zapret-ui-integration
+          } else {
+            Write-Host "Rust sources are already formatted."
+          }
 
   generate-bindings:
     name: Generate Flutter Rust Bridge bindings (Windows)
@@ -51,6 +66,8 @@ jobs:
           channel: stable
           flutter-version: '3.47.6'
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
       - name: Install project dependencies
         run: flutter pub get
       - name: Install Flutter Rust Bridge code generator
@@ -58,14 +75,18 @@ jobs:
       - name: Generate bindings
         working-directory: plugins/rust_api
         run: flutter_rust_bridge_codegen generate
+      - name: Format generated bindings and Rust sources
+        run: cargo fmt --manifest-path plugins/rust_api/rust/Cargo.toml
+      - name: Verify Rust formatting
+        run: cargo fmt --manifest-path plugins/rust_api/rust/Cargo.toml -- --check
       - name: Commit generated bindings
         shell: pwsh
         run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add plugins/rust_api/rust/src/frb_generated.rs plugins/rust_api/lib/src/rust plugins/rust_api/lib/rust_api.dart
+          git add plugins/rust_api/rust/src plugins/rust_api/lib/src/rust plugins/rust_api/lib/rust_api.dart
           if (-not (git diff --cached --quiet)) {
-            git commit -m "Generate Flowseal Flutter Rust Bridge bindings"
+            git commit -m "Generate and format Flowseal Flutter Rust Bridge bindings"
             git push origin HEAD:feature/zapret-ui-integration
           } else {
             Write-Host "Generated bindings are already up to date."
