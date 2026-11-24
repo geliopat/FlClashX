@@ -1,4 +1,5 @@
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/core/desktop/helper_client.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/ui/ui.dart';
@@ -252,6 +253,56 @@ class VpnTile extends ConsumerWidget {
   }
 }
 
+/// The Zapret switch beside VPN in the dashboard control row.
+class ZapretTile extends ConsumerWidget {
+  const ZapretTile({super.key});
+
+  Future<void> _change(WidgetRef ref, bool value) async {
+    try {
+      await ref.read(zapretControllerProvider.notifier).setEnabled(value);
+    } catch (error) {
+      dialogs.showNotifier(
+        error is HelperException ? error.message : error.toString(),
+        level: MessageLevel.error,
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final metrics = _tileMetricsOf(DashboardDensityScope.of(context));
+    final state = ref.watch(zapretControllerProvider);
+    final subtitle = !state.available
+        ? 'Служба Helper недоступна'
+        : state.busy
+        ? 'Выполняется операция...'
+        : state.running
+        ? 'Включён'
+        : 'Выключен';
+    final enabled = state.running;
+    final row = DashboardSwitchRow(
+      glyph: AppGlyphs.filter,
+      title: 'Zapret',
+      subtitle: metrics.subtitle ? subtitle : null,
+      value: enabled,
+      iconSize: metrics.icon,
+      padding: metrics.padding,
+      radius: metrics.radius,
+      color: Colors.transparent,
+      onTap: !state.available || state.busy
+          ? null
+          : () => _change(ref, !enabled),
+      onChanged: !state.available || state.busy
+          ? null
+          : (value) => _change(ref, value),
+    );
+    return DashboardCard(
+      padding: EdgeInsets.zero,
+      child: row,
+    );
+  }
+}
+
 class VpnCard extends ConsumerWidget {
   const VpnCard({super.key});
 
@@ -259,6 +310,16 @@ class VpnCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (system.isWindows) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        spacing: 8,
+        children: const [
+          Expanded(child: VpnTile()),
+          Expanded(child: ZapretTile()),
+        ],
+      );
+    }
     final appLocalizations = context.appLocalizations;
     final colorScheme = context.colorScheme;
     final colors = DashboardColors.of(context);
