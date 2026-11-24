@@ -41,7 +41,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -2043088119;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 346368621;
 
 // Section: executor
 
@@ -1159,6 +1159,147 @@ fn wire__crate__api__script__evaluate_script_impl(
         },
     )
 }
+fn wire__crate__api__zapret__flowseal_add_user_list_entry_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "flowseal_add_user_list_entry",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_root = <String>::sse_decode(&mut deserializer);
+            let api_filename = <String>::sse_decode(&mut deserializer);
+            let api_entry = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let output_ok = crate::api::zapret::flowseal_add_user_list_entry(
+                        api_root,
+                        api_filename,
+                        api_entry,
+                    )?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__zapret__flowseal_export_user_list_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "flowseal_export_user_list",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_root = <String>::sse_decode(&mut deserializer);
+            let api_filename = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let output_ok =
+                        crate::api::zapret::flowseal_export_user_list(api_root, api_filename)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__zapret__flowseal_export_user_lists_backup_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "flowseal_export_user_lists_backup",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_root = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let output_ok =
+                        crate::api::zapret::flowseal_export_user_lists_backup(api_root)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__zapret__flowseal_get_game_filter_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "flowseal_get_game_filter",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_root = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let output_ok = crate::api::zapret::flowseal_get_game_filter(api_root)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
 fn wire__crate__api__zapret__flowseal_import_strategy_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -1190,6 +1331,43 @@ fn wire__crate__api__zapret__flowseal_import_strategy_impl(
                     let output_ok = crate::api::zapret::flowseal_import_strategy(
                         api_root,
                         api_name,
+                        api_content,
+                    )?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__zapret__flowseal_import_user_lists_backup_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "flowseal_import_user_lists_backup",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_root = <String>::sse_decode(&mut deserializer);
+            let api_content = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let output_ok = crate::api::zapret::flowseal_import_user_lists_backup(
+                        api_root,
                         api_content,
                     )?;
                     std::result::Result::Ok(output_ok)
@@ -1231,6 +1409,39 @@ fn wire__crate__api__zapret__flowseal_install_or_update_impl(
                     })()
                     .await,
                 )
+            }
+        },
+    )
+}
+fn wire__crate__api__zapret__flowseal_ip_set_status_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "flowseal_ip_set_status",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_root = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let output_ok = crate::api::zapret::flowseal_ip_set_status(api_root)?;
+                    std::result::Result::Ok(output_ok)
+                })())
             }
         },
     )
@@ -1376,6 +1587,195 @@ fn wire__crate__api__zapret__flowseal_process_status_impl(
         },
     )
 }
+fn wire__crate__api__zapret__flowseal_read_user_list_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "flowseal_read_user_list",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_root = <String>::sse_decode(&mut deserializer);
+            let api_filename = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let output_ok =
+                        crate::api::zapret::flowseal_read_user_list(api_root, api_filename)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__zapret__flowseal_remove_user_list_entry_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "flowseal_remove_user_list_entry",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_root = <String>::sse_decode(&mut deserializer);
+            let api_filename = <String>::sse_decode(&mut deserializer);
+            let api_entry = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let output_ok = crate::api::zapret::flowseal_remove_user_list_entry(
+                        api_root,
+                        api_filename,
+                        api_entry,
+                    )?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__zapret__flowseal_replace_user_list_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "flowseal_replace_user_list",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_root = <String>::sse_decode(&mut deserializer);
+            let api_filename = <String>::sse_decode(&mut deserializer);
+            let api_entries = <Vec<String>>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let output_ok = crate::api::zapret::flowseal_replace_user_list(
+                        api_root,
+                        api_filename,
+                        api_entries,
+                    )?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__zapret__flowseal_save_game_filter_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "flowseal_save_game_filter",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_root = <String>::sse_decode(&mut deserializer);
+            let api_mode = <String>::sse_decode(&mut deserializer);
+            let api_tcp_range = <String>::sse_decode(&mut deserializer);
+            let api_udp_range = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let output_ok = crate::api::zapret::flowseal_save_game_filter(
+                        api_root,
+                        api_mode,
+                        api_tcp_range,
+                        api_udp_range,
+                    )?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__zapret__flowseal_set_ip_set_filter_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "flowseal_set_ip_set_filter",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_root = <String>::sse_decode(&mut deserializer);
+            let api_mode = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let output_ok =
+                        crate::api::zapret::flowseal_set_ip_set_filter(api_root, api_mode)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
 fn wire__crate__api__zapret__flowseal_start_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -1481,6 +1881,43 @@ fn wire__crate__api__zapret__flowseal_stop_impl(
                     let output_ok = crate::api::zapret::flowseal_stop(api_root)?;
                     std::result::Result::Ok(output_ok)
                 })())
+            }
+        },
+    )
+}
+fn wire__crate__api__zapret__flowseal_update_ip_set_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "flowseal_update_ip_set",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_root = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, String>(
+                    (move || async move {
+                        let output_ok =
+                            crate::api::zapret::flowseal_update_ip_set(api_root).await?;
+                        std::result::Result::Ok(output_ok)
+                    })()
+                    .await,
+                )
             }
         },
     )
@@ -1969,6 +2406,32 @@ impl SseDecode for crate::api::editor::EditorOpenErrorKind {
     }
 }
 
+impl SseDecode for crate::api::zapret::FlowsealGameFilterSettings {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_mode = <String>::sse_decode(deserializer);
+        let mut var_tcpRange = <String>::sse_decode(deserializer);
+        let mut var_udpRange = <String>::sse_decode(deserializer);
+        return crate::api::zapret::FlowsealGameFilterSettings {
+            mode: var_mode,
+            tcp_range: var_tcpRange,
+            udp_range: var_udpRange,
+        };
+    }
+}
+
+impl SseDecode for crate::api::zapret::FlowsealIpSetUpdateResult {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_changed = <bool>::sse_decode(deserializer);
+        let mut var_count = <u64>::sse_decode(deserializer);
+        return crate::api::zapret::FlowsealIpSetUpdateResult {
+            changed: var_changed,
+            count: var_count,
+        };
+    }
+}
+
 impl SseDecode for crate::api::zapret::FlowsealRuntimeStatus {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1997,6 +2460,20 @@ impl SseDecode for crate::api::zapret::FlowsealStatus {
             installed: var_installed,
             version: var_version,
             executable: var_executable,
+        };
+    }
+}
+
+impl SseDecode for crate::api::zapret::FlowsealUserListsSnapshot {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_include = <Vec<String>>::sse_decode(deserializer);
+        let mut var_exclude = <Vec<String>>::sse_decode(deserializer);
+        let mut var_ips = <Vec<String>>::sse_decode(deserializer);
+        return crate::api::zapret::FlowsealUserListsSnapshot {
+            include: var_include,
+            exclude: var_exclude,
+            ips: var_ips,
         };
     }
 }
@@ -2238,6 +2715,13 @@ impl SseDecode for u32 {
     }
 }
 
+impl SseDecode for u64 {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        deserializer.cursor.read_u64::<NativeEndian>().unwrap()
+    }
+}
+
 impl SseDecode for u8 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -2279,53 +2763,119 @@ fn pde_ffi_dispatcher_primary_impl(
         21 => wire__crate__api__editor__RopeUpload_finish_impl(port, ptr, rust_vec_len, data_len),
         23 => wire__crate__api__editor__RopeUpload_push_impl(port, ptr, rust_vec_len, data_len),
         24 => wire__crate__api__script__evaluate_script_impl(port, ptr, rust_vec_len, data_len),
-        25 => wire__crate__api__zapret__flowseal_import_strategy_impl(
+        25 => wire__crate__api__zapret__flowseal_add_user_list_entry_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        26 => wire__crate__api__zapret__flowseal_install_or_update_impl(
+        26 => wire__crate__api__zapret__flowseal_export_user_list_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        27 => {
+        27 => wire__crate__api__zapret__flowseal_export_user_lists_backup_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        28 => wire__crate__api__zapret__flowseal_get_game_filter_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        29 => wire__crate__api__zapret__flowseal_import_strategy_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        30 => wire__crate__api__zapret__flowseal_import_user_lists_backup_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        31 => wire__crate__api__zapret__flowseal_install_or_update_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        32 => {
+            wire__crate__api__zapret__flowseal_ip_set_status_impl(port, ptr, rust_vec_len, data_len)
+        }
+        33 => {
             wire__crate__api__zapret__flowseal_is_elevated_impl(port, ptr, rust_vec_len, data_len)
         }
-        28 => wire__crate__api__zapret__flowseal_list_strategies_impl(
+        34 => wire__crate__api__zapret__flowseal_list_strategies_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        29 => wire__crate__api__zapret__flowseal_parse_strategy_impl(
+        35 => wire__crate__api__zapret__flowseal_parse_strategy_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        30 => wire__crate__api__zapret__flowseal_process_status_impl(
+        36 => wire__crate__api__zapret__flowseal_process_status_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        31 => wire__crate__api__zapret__flowseal_start_impl(port, ptr, rust_vec_len, data_len),
-        32 => wire__crate__api__zapret__flowseal_status_impl(port, ptr, rust_vec_len, data_len),
-        33 => wire__crate__api__zapret__flowseal_stop_impl(port, ptr, rust_vec_len, data_len),
-        34 => wire__crate__api__zapret__flowseal_validate_installation_impl(
+        37 => wire__crate__api__zapret__flowseal_read_user_list_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        35 => wire__crate__api__editor__folds_compute_all_impl(port, ptr, rust_vec_len, data_len),
-        38 => wire__crate__api__hotkey__hot_key_events_impl(port, ptr, rust_vec_len, data_len),
-        39 => wire__crate__api__init__init_app_impl(port, ptr, rust_vec_len, data_len),
-        40 => wire__crate__api__hotkey__set_hot_keys_impl(port, ptr, rust_vec_len, data_len),
-        41 => wire__crate__api__editor__words_extract_impl(port, ptr, rust_vec_len, data_len),
+        38 => wire__crate__api__zapret__flowseal_remove_user_list_entry_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        39 => wire__crate__api__zapret__flowseal_replace_user_list_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        40 => wire__crate__api__zapret__flowseal_save_game_filter_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        41 => wire__crate__api__zapret__flowseal_set_ip_set_filter_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        42 => wire__crate__api__zapret__flowseal_start_impl(port, ptr, rust_vec_len, data_len),
+        43 => wire__crate__api__zapret__flowseal_status_impl(port, ptr, rust_vec_len, data_len),
+        44 => wire__crate__api__zapret__flowseal_stop_impl(port, ptr, rust_vec_len, data_len),
+        45 => {
+            wire__crate__api__zapret__flowseal_update_ip_set_impl(port, ptr, rust_vec_len, data_len)
+        }
+        46 => wire__crate__api__zapret__flowseal_validate_installation_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        47 => wire__crate__api__editor__folds_compute_all_impl(port, ptr, rust_vec_len, data_len),
+        50 => wire__crate__api__hotkey__hot_key_events_impl(port, ptr, rust_vec_len, data_len),
+        51 => wire__crate__api__init__init_app_impl(port, ptr, rust_vec_len, data_len),
+        52 => wire__crate__api__hotkey__set_hot_keys_impl(port, ptr, rust_vec_len, data_len),
+        53 => wire__crate__api__editor__words_extract_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -2357,10 +2907,10 @@ fn pde_ffi_dispatcher_sync_impl(
         18 => wire__crate__api__editor__RopeBridge_slice_impl(ptr, rust_vec_len, data_len),
         19 => wire__crate__api__editor__RopeBridge_snapshot_impl(ptr, rust_vec_len, data_len),
         22 => wire__crate__api__editor__RopeUpload_new_impl(ptr, rust_vec_len, data_len),
-        36 => {
+        48 => {
             wire__crate__api__editor__folds_find_matching_bracket_impl(ptr, rust_vec_len, data_len)
         }
-        37 => wire__crate__api__editor__guides_compute_viewport_impl(ptr, rust_vec_len, data_len),
+        49 => wire__crate__api__editor__guides_compute_viewport_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -2456,6 +3006,49 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::editor::EditorOpenErrorKind>
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::zapret::FlowsealGameFilterSettings {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.mode.into_into_dart().into_dart(),
+            self.tcp_range.into_into_dart().into_dart(),
+            self.udp_range.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::zapret::FlowsealGameFilterSettings
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::zapret::FlowsealGameFilterSettings>
+    for crate::api::zapret::FlowsealGameFilterSettings
+{
+    fn into_into_dart(self) -> crate::api::zapret::FlowsealGameFilterSettings {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::zapret::FlowsealIpSetUpdateResult {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.changed.into_into_dart().into_dart(),
+            self.count.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::zapret::FlowsealIpSetUpdateResult
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::zapret::FlowsealIpSetUpdateResult>
+    for crate::api::zapret::FlowsealIpSetUpdateResult
+{
+    fn into_into_dart(self) -> crate::api::zapret::FlowsealIpSetUpdateResult {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::zapret::FlowsealRuntimeStatus {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -2498,6 +3091,28 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::zapret::FlowsealStatus>
     for crate::api::zapret::FlowsealStatus
 {
     fn into_into_dart(self) -> crate::api::zapret::FlowsealStatus {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::zapret::FlowsealUserListsSnapshot {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.include.into_into_dart().into_dart(),
+            self.exclude.into_into_dart().into_dart(),
+            self.ips.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::zapret::FlowsealUserListsSnapshot
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::zapret::FlowsealUserListsSnapshot>
+    for crate::api::zapret::FlowsealUserListsSnapshot
+{
+    fn into_into_dart(self) -> crate::api::zapret::FlowsealUserListsSnapshot {
         self
     }
 }
@@ -2768,6 +3383,23 @@ impl SseEncode for crate::api::editor::EditorOpenErrorKind {
     }
 }
 
+impl SseEncode for crate::api::zapret::FlowsealGameFilterSettings {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.mode, serializer);
+        <String>::sse_encode(self.tcp_range, serializer);
+        <String>::sse_encode(self.udp_range, serializer);
+    }
+}
+
+impl SseEncode for crate::api::zapret::FlowsealIpSetUpdateResult {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.changed, serializer);
+        <u64>::sse_encode(self.count, serializer);
+    }
+}
+
 impl SseEncode for crate::api::zapret::FlowsealRuntimeStatus {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -2785,6 +3417,15 @@ impl SseEncode for crate::api::zapret::FlowsealStatus {
         <bool>::sse_encode(self.installed, serializer);
         <String>::sse_encode(self.version, serializer);
         <String>::sse_encode(self.executable, serializer);
+    }
+}
+
+impl SseEncode for crate::api::zapret::FlowsealUserListsSnapshot {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <Vec<String>>::sse_encode(self.include, serializer);
+        <Vec<String>>::sse_encode(self.exclude, serializer);
+        <Vec<String>>::sse_encode(self.ips, serializer);
     }
 }
 
@@ -2982,6 +3623,13 @@ impl SseEncode for u32 {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         serializer.cursor.write_u32::<NativeEndian>(self).unwrap();
+    }
+}
+
+impl SseEncode for u64 {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        serializer.cursor.write_u64::<NativeEndian>(self).unwrap();
     }
 }
 

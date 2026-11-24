@@ -179,10 +179,7 @@ class _FlowsealViewState extends State<FlowsealView> {
         ? await flowsealListStrategies(root: root)
         : <String>[];
     final userListEntries = installation.installed
-        ? await flowsealReadUserList(
-            root: root,
-            filename: _selectedUserList,
-          )
+        ? await flowsealReadUserList(root: root, filename: _selectedUserList)
         : <String>[];
     final gameFilter = installation.installed
         ? await flowsealGetGameFilter(root: root)
@@ -303,7 +300,6 @@ class _FlowsealViewState extends State<FlowsealView> {
     }
   }
 
-
   Future<void> _changeIpSetMode(String mode) async {
     if (!_installed || mode == _ipsetMode) return;
     await _withBusy(() async {
@@ -363,7 +359,6 @@ class _FlowsealViewState extends State<FlowsealView> {
       await _restartAfterListChange();
     });
   }
-
 
   Future<void> _exportSelectedUserList() async {
     if (!_installed) return;
@@ -469,17 +464,16 @@ class _FlowsealViewState extends State<FlowsealView> {
       final imported = content
           .replaceFirst('\uFEFF', '')
           .split(RegExp(r'\r?\n'))
-          .where((line) => line.trim().isNotEmpty && !line.trim().startsWith('#'))
+          .where(
+            (line) => line.trim().isNotEmpty && !line.trim().startsWith('#'),
+          )
           .toList();
       if (imported.isEmpty) {
         throw Exception('В выбранном файле нет записей для импорта.');
       }
 
       final existing = append
-          ? await flowsealReadUserList(
-              root: _root,
-              filename: _selectedUserList,
-            )
+          ? await flowsealReadUserList(root: _root, filename: _selectedUserList)
           : <String>[];
       final saved = await flowsealReplaceUserList(
         root: _root,
@@ -1028,8 +1022,8 @@ class _FlowsealViewState extends State<FlowsealView> {
               'Списки хранятся в каталоге Flowseal. При работающем winws.exe '
               'изменения применяются перезапуском процесса.',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
+                color: colorScheme.onSurfaceVariant,
+              ),
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
@@ -1043,10 +1037,7 @@ class _FlowsealViewState extends State<FlowsealView> {
                 for (final item in _flowsealUserLists.entries)
                   DropdownMenuItem(
                     value: item.key,
-                    child: Text(
-                      item.value,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    child: Text(item.value, overflow: TextOverflow.ellipsis),
                   ),
               ],
               onChanged: _busy
@@ -1112,7 +1103,9 @@ class _FlowsealViewState extends State<FlowsealView> {
                 ),
                 IconButton(
                   tooltip: 'Обновить список',
-                  onPressed: _busy ? null : () => _selectUserList(_selectedUserList),
+                  onPressed: _busy
+                      ? null
+                      : () => _selectUserList(_selectedUserList),
                   icon: const Icon(Icons.refresh),
                 ),
               ],
@@ -1146,8 +1139,8 @@ class _FlowsealViewState extends State<FlowsealView> {
                         ? 'Список пуст.'
                         : 'Совпадений не найдено.',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
+                      color: colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
               )
@@ -1183,8 +1176,8 @@ class _FlowsealViewState extends State<FlowsealView> {
               child: Text(
                 'Записей: ${_userListEntries.length}',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
+                  color: colorScheme.onSurfaceVariant,
+                ),
               ),
             ),
           ],
@@ -1192,7 +1185,6 @@ class _FlowsealViewState extends State<FlowsealView> {
       ),
     );
   }
-
 
   Widget _buildIpSetCard(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -1218,8 +1210,8 @@ class _FlowsealViewState extends State<FlowsealView> {
               'Режим списка IP-адресов и подсетей Flowseal. '
               'При смене режима работающая стратегия перезапускается.',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
+                color: colorScheme.onSurfaceVariant,
+              ),
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
@@ -1260,9 +1252,9 @@ class _FlowsealViewState extends State<FlowsealView> {
               const SizedBox(height: 8),
               Text(
                 _ipsetUpdateMessage!,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: colorScheme.primary,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: colorScheme.primary),
               ),
             ],
           ],
@@ -1270,5 +1262,4 @@ class _FlowsealViewState extends State<FlowsealView> {
       ),
     );
   }
-
 }

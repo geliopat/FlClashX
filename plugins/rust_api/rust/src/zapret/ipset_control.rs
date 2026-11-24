@@ -156,11 +156,13 @@ pub fn set_mode(root: &Path, mode: &str) -> Result<String, String> {
                     .filter(|line| !line.is_empty())
                     .collect::<Vec<_>>();
                 if !nonempty.is_empty() && !nonempty.iter().any(|line| *line == NONE_SENTINEL) {
-                    fs::copy(&backup, &active)
-                        .map_err(|error| format!("Cannot restore Flowseal IPSet backup: {error}"))?;
+                    fs::copy(&backup, &active).map_err(|error| {
+                        format!("Cannot restore Flowseal IPSet backup: {error}")
+                    })?;
                 } else {
-                    fs::write(&active, DEFAULT_IPSET)
-                        .map_err(|error| format!("Cannot initialize Flowseal IPSet list: {error}"))?;
+                    fs::write(&active, DEFAULT_IPSET).map_err(|error| {
+                        format!("Cannot initialize Flowseal IPSet list: {error}")
+                    })?;
                 }
             } else {
                 fs::write(&active, DEFAULT_IPSET)
@@ -199,7 +201,8 @@ pub async fn update(root: &Path) -> Result<UpdateResult, String> {
     let mut stream = response.bytes_stream();
     let mut bytes = Vec::new();
     while let Some(chunk) = stream.next().await {
-        let chunk = chunk.map_err(|error| format!("Cannot read Flowseal IPSet response: {error}"))?;
+        let chunk =
+            chunk.map_err(|error| format!("Cannot read Flowseal IPSet response: {error}"))?;
         if bytes.len().saturating_add(chunk.len()) > MAX_DOWNLOAD_BYTES {
             return Err("Downloaded Flowseal IPSet exceeds the 32 MiB size limit".into());
         }
@@ -287,7 +290,10 @@ mod tests {
             "# comment\r\n192.0.2.0/24\r\n"
         );
         assert_eq!(set_mode(&root.0, "loaded").unwrap(), "loaded");
-        assert_eq!(fs::read_to_string(active).unwrap(), "# comment\r\n192.0.2.0/24\r\n");
+        assert_eq!(
+            fs::read_to_string(active).unwrap(),
+            "# comment\r\n192.0.2.0/24\r\n"
+        );
         assert_eq!(set_mode(&root.0, "none").unwrap(), "none");
         assert_eq!(set_mode(&root.0, "loaded").unwrap(), "loaded");
     }
@@ -302,7 +308,8 @@ mod tests {
         #[cfg(unix)]
         std::os::unix::fs::symlink(&outside, root.0.join("lists").join(ACTIVE_LIST)).unwrap();
         #[cfg(windows)]
-        std::os::windows::fs::symlink_file(&outside, root.0.join("lists").join(ACTIVE_LIST)).unwrap();
+        std::os::windows::fs::symlink_file(&outside, root.0.join("lists").join(ACTIVE_LIST))
+            .unwrap();
         assert!(status(&root.0).is_err());
     }
 }

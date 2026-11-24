@@ -44,15 +44,18 @@ fn settings_path(root: &Path) -> Result<PathBuf, String> {
             Err("Flowseal game filter settings are not a regular file".into())
         }
         Ok(_) => {
-            let canonical = fs::canonicalize(&path)
-                .map_err(|error| format!("Cannot resolve Flowseal game filter settings: {error}"))?;
+            let canonical = fs::canonicalize(&path).map_err(|error| {
+                format!("Cannot resolve Flowseal game filter settings: {error}")
+            })?;
             if canonical.parent() != Some(utils.as_path()) {
                 return Err("Flowseal game filter settings escape the utils directory".into());
             }
             Ok(canonical)
         }
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(path),
-        Err(error) => Err(format!("Cannot inspect Flowseal game filter settings: {error}")),
+        Err(error) => Err(format!(
+            "Cannot inspect Flowseal game filter settings: {error}"
+        )),
     }
 }
 
@@ -129,7 +132,9 @@ pub fn read(root: &Path) -> Result<GameFilterSettings, String> {
     match fs::read_to_string(&path) {
         Ok(content) => Ok(parse_settings(&content)),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(default_settings()),
-        Err(error) => Err(format!("Cannot read Flowseal game filter settings: {error}")),
+        Err(error) => Err(format!(
+            "Cannot read Flowseal game filter settings: {error}"
+        )),
     }
 }
 

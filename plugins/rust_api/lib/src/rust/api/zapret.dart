@@ -67,6 +67,137 @@ Future<FlowsealRuntimeStatus> flowsealStart({
 Future<FlowsealRuntimeStatus> flowsealStop({required String root}) =>
     RustLib.instance.api.crateApiZapretFlowsealStop(root: root);
 
+Future<List<String>> flowsealReadUserList({
+  required String root,
+  required String filename,
+}) => RustLib.instance.api.crateApiZapretFlowsealReadUserList(
+  root: root,
+  filename: filename,
+);
+
+Future<List<String>> flowsealAddUserListEntry({
+  required String root,
+  required String filename,
+  required String entry,
+}) => RustLib.instance.api.crateApiZapretFlowsealAddUserListEntry(
+  root: root,
+  filename: filename,
+  entry: entry,
+);
+
+Future<List<String>> flowsealRemoveUserListEntry({
+  required String root,
+  required String filename,
+  required String entry,
+}) => RustLib.instance.api.crateApiZapretFlowsealRemoveUserListEntry(
+  root: root,
+  filename: filename,
+  entry: entry,
+);
+
+Future<List<String>> flowsealReplaceUserList({
+  required String root,
+  required String filename,
+  required List<String> entries,
+}) => RustLib.instance.api.crateApiZapretFlowsealReplaceUserList(
+  root: root,
+  filename: filename,
+  entries: entries,
+);
+
+Future<FlowsealGameFilterSettings> flowsealGetGameFilter({
+  required String root,
+}) => RustLib.instance.api.crateApiZapretFlowsealGetGameFilter(root: root);
+
+Future<void> flowsealSaveGameFilter({
+  required String root,
+  required String mode,
+  required String tcpRange,
+  required String udpRange,
+}) => RustLib.instance.api.crateApiZapretFlowsealSaveGameFilter(
+  root: root,
+  mode: mode,
+  tcpRange: tcpRange,
+  udpRange: udpRange,
+);
+
+Future<String> flowsealIpSetStatus({required String root}) =>
+    RustLib.instance.api.crateApiZapretFlowsealIpSetStatus(root: root);
+
+Future<String> flowsealSetIpSetFilter({
+  required String root,
+  required String mode,
+}) => RustLib.instance.api.crateApiZapretFlowsealSetIpSetFilter(
+  root: root,
+  mode: mode,
+);
+
+Future<FlowsealIpSetUpdateResult> flowsealUpdateIpSet({required String root}) =>
+    RustLib.instance.api.crateApiZapretFlowsealUpdateIpSet(root: root);
+
+Future<String> flowsealExportUserList({
+  required String root,
+  required String filename,
+}) => RustLib.instance.api.crateApiZapretFlowsealExportUserList(
+  root: root,
+  filename: filename,
+);
+
+Future<String> flowsealExportUserListsBackup({required String root}) => RustLib
+    .instance
+    .api
+    .crateApiZapretFlowsealExportUserListsBackup(root: root);
+
+Future<FlowsealUserListsSnapshot> flowsealImportUserListsBackup({
+  required String root,
+  required String content,
+}) => RustLib.instance.api.crateApiZapretFlowsealImportUserListsBackup(
+  root: root,
+  content: content,
+);
+
+class FlowsealGameFilterSettings {
+  final String mode;
+  final String tcpRange;
+  final String udpRange;
+
+  const FlowsealGameFilterSettings({
+    required this.mode,
+    required this.tcpRange,
+    required this.udpRange,
+  });
+
+  @override
+  int get hashCode => mode.hashCode ^ tcpRange.hashCode ^ udpRange.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FlowsealGameFilterSettings &&
+          runtimeType == other.runtimeType &&
+          mode == other.mode &&
+          tcpRange == other.tcpRange &&
+          udpRange == other.udpRange;
+}
+
+class FlowsealIpSetUpdateResult {
+  final bool changed;
+  final BigInt count;
+
+  const FlowsealIpSetUpdateResult({required this.changed, required this.count});
+
+  @override
+  int get hashCode => changed.hashCode ^ count.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FlowsealIpSetUpdateResult &&
+          runtimeType == other.runtimeType &&
+          changed == other.changed &&
+          count == other.count;
+}
+
 class FlowsealRuntimeStatus {
   final bool running;
   final int? pid;
@@ -125,4 +256,28 @@ class FlowsealStatus {
           installed == other.installed &&
           version == other.version &&
           executable == other.executable;
+}
+
+class FlowsealUserListsSnapshot {
+  final List<String> include;
+  final List<String> exclude;
+  final List<String> ips;
+
+  const FlowsealUserListsSnapshot({
+    required this.include,
+    required this.exclude,
+    required this.ips,
+  });
+
+  @override
+  int get hashCode => include.hashCode ^ exclude.hashCode ^ ips.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FlowsealUserListsSnapshot &&
+          runtimeType == other.runtimeType &&
+          include == other.include &&
+          exclude == other.exclude &&
+          ips == other.ips;
 }

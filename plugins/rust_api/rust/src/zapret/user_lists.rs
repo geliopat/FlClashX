@@ -44,22 +44,27 @@ fn resolve_path(root: &Path, filename: &str) -> Result<PathBuf, String> {
 
     let path = lists.join(filename);
     match fs::symlink_metadata(&path) {
-        Ok(metadata) if metadata.file_type().is_symlink() => {
-            Err(format!("Flowseal user list must not be a symbolic link: {filename}"))
-        }
-        Ok(metadata) if !metadata.is_file() => {
-            Err(format!("Flowseal user list is not a regular file: {filename}"))
-        }
+        Ok(metadata) if metadata.file_type().is_symlink() => Err(format!(
+            "Flowseal user list must not be a symbolic link: {filename}"
+        )),
+        Ok(metadata) if !metadata.is_file() => Err(format!(
+            "Flowseal user list is not a regular file: {filename}"
+        )),
         Ok(_) => {
-            let canonical = fs::canonicalize(&path)
-                .map_err(|error| format!("Cannot resolve Flowseal user list {filename}: {error}"))?;
+            let canonical = fs::canonicalize(&path).map_err(|error| {
+                format!("Cannot resolve Flowseal user list {filename}: {error}")
+            })?;
             if canonical.parent() != Some(lists.as_path()) {
-                return Err(format!("Flowseal user list escapes its directory: {filename}"));
+                return Err(format!(
+                    "Flowseal user list escapes its directory: {filename}"
+                ));
             }
             Ok(canonical)
         }
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(path),
-        Err(error) => Err(format!("Cannot inspect Flowseal user list {filename}: {error}")),
+        Err(error) => Err(format!(
+            "Cannot inspect Flowseal user list {filename}: {error}"
+        )),
     }
 }
 
@@ -76,7 +81,9 @@ fn normalize_entry(filename: &str, value: &str) -> Result<String, String> {
                     .parse::<u8>()
                     .map_err(|_| format!("Invalid IPv4 prefix length: {value}"))?;
                 if prefix > 32 {
-                    return Err(format!("IPv4 prefix length must be between 0 and 32: {value}"));
+                    return Err(format!(
+                        "IPv4 prefix length must be between 0 and 32: {value}"
+                    ));
                 }
                 (address, Some(prefix))
             }
@@ -113,12 +120,9 @@ fn normalize_entry(filename: &str, value: &str) -> Result<String, String> {
                     .bytes()
                     .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
         })
-        && domain
-            .rsplit('.')
-            .next()
-            .is_some_and(|suffix| {
-                suffix.len() >= 2 && suffix.bytes().all(|byte| byte.is_ascii_lowercase())
-            });
+        && domain.rsplit('.').next().is_some_and(|suffix| {
+            suffix.len() >= 2 && suffix.bytes().all(|byte| byte.is_ascii_lowercase())
+        });
     if !valid {
         return Err(format!("Invalid domain name: {value}"));
     }
@@ -142,7 +146,9 @@ fn read_raw_lines(path: &Path) -> Result<Vec<String>, String> {
 
 fn write_raw_lines(path: &Path, lines: &[String]) -> Result<(), String> {
     if lines.len() > MAX_LIST_ENTRIES {
-        return Err(format!("Flowseal user list exceeds {MAX_LIST_ENTRIES} entries"));
+        return Err(format!(
+            "Flowseal user list exceeds {MAX_LIST_ENTRIES} entries"
+        ));
     }
     let content = lines.join("\r\n");
     fs::write(path, content).map_err(|error| format!("Cannot write Flowseal user list: {error}"))
@@ -168,13 +174,13 @@ pub fn add(root: &Path, filename: &str, value: &str) -> Result<Vec<String>, Stri
     let mut lines = read_raw_lines(&path)?;
     let duplicate = lines.iter().any(|line| {
         let line = line.trim();
-        !line.is_empty()
-            && !line.starts_with('#')
-            && line.eq_ignore_ascii_case(&entry)
+        !line.is_empty() && !line.starts_with('#') && line.eq_ignore_ascii_case(&entry)
     });
     if !duplicate {
         if visible_entries(&lines).len() >= MAX_LIST_ENTRIES {
-            return Err(format!("Flowseal user list exceeds {MAX_LIST_ENTRIES} entries"));
+            return Err(format!(
+                "Flowseal user list exceeds {MAX_LIST_ENTRIES} entries"
+            ));
         }
         lines.push(entry);
         write_raw_lines(&path, &lines)?;
@@ -190,9 +196,7 @@ pub fn remove(root: &Path, filename: &str, value: &str) -> Result<Vec<String>, S
         .into_iter()
         .filter(|line| {
             let trimmed = line.trim();
-            trimmed.is_empty()
-                || trimmed.starts_with('#')
-                || !trimmed.eq_ignore_ascii_case(&entry)
+            trimmed.is_empty() || trimmed.starts_with('#') || !trimmed.eq_ignore_ascii_case(&entry)
         })
         .collect();
     write_raw_lines(&path, &remaining)?;
@@ -251,16 +255,25 @@ mod tests {
     #[test]
     fn normalizes_domains_like_the_reference_ui() {
         assert_eq!(
-            normalize_entry("list-general-user.txt", " HTTPS://WWW.Example.COM/path ")
-                .unwrap(),
+            normalize_entry("list-general-user.txt", " HTTPS://WWW.Example.COM/path ").unwrap(),
             "example.com"
         );
         assert_eq!(
             normalize_entry("list-exclude-user.txt", "sub-domain.example.org").unwrap(),
             "sub-domain.example.org"
         );
-        for invalid in ["example", "-bad.example.com", "bad..example.com", "bad.example.1", "bad.example.com:443", "#comment"] {
-            assert!(normalize_entry("list-general-user.txt", invalid).is_err(), "{invalid}");
+        for invalid in [
+            "example",
+            "-bad.example.com",
+            "bad..example.com",
+            "bad.example.1",
+            "bad.example.com:443",
+            "#comment",
+        ] {
+            assert!(
+                normalize_entry("list-general-user.txt", invalid).is_err(),
+                "{invalid}"
+            );
         }
     }
 
@@ -275,17 +288,29 @@ mod tests {
             "10.0.0.1"
         );
         for invalid in ["256.0.0.1", "192.0.2.1/33", "192.0.2.1/-1", "1.2.3.4/8/9"] {
-            assert!(normalize_entry("ipset-exclude-user.txt", invalid).is_err(), "{invalid}");
+            assert!(
+                normalize_entry("ipset-exclude-user.txt", invalid).is_err(),
+                "{invalid}"
+            );
         }
     }
 
     #[test]
     fn only_allows_the_three_reference_user_lists() {
         let root = TestRoot::new();
-        for filename in ["list-general-user.txt", "list-exclude-user.txt", "ipset-exclude-user.txt"] {
+        for filename in [
+            "list-general-user.txt",
+            "list-exclude-user.txt",
+            "ipset-exclude-user.txt",
+        ] {
             assert!(read(&root.0, filename).unwrap().is_empty());
         }
-        for filename in ["../../outside.txt", "ipset-all.txt", "strategies.json", "custom.txt"] {
+        for filename in [
+            "../../outside.txt",
+            "ipset-all.txt",
+            "strategies.json",
+            "custom.txt",
+        ] {
             assert!(read(&root.0, filename).is_err(), "{filename}");
         }
     }
@@ -296,7 +321,12 @@ mod tests {
         let path = root.0.join("lists").join("list-general-user.txt");
         fs::write(&path, "# user comment\r\nold.example.com\r\n").unwrap();
 
-        let added = add(&root.0, "list-general-user.txt", "HTTPS://WWW.New.Example/path").unwrap();
+        let added = add(
+            &root.0,
+            "list-general-user.txt",
+            "HTTPS://WWW.New.Example/path",
+        )
+        .unwrap();
         assert_eq!(added, ["old.example.com", "new.example"]);
         assert_eq!(
             fs::read_to_string(&path).unwrap(),
@@ -307,7 +337,9 @@ mod tests {
 
         let removed = remove(&root.0, "list-general-user.txt", "old.example.com").unwrap();
         assert_eq!(removed, ["new.example"]);
-        assert!(fs::read_to_string(path).unwrap().starts_with("# user comment"));
+        assert!(fs::read_to_string(path)
+            .unwrap()
+            .starts_with("# user comment"));
     }
 
     #[test]
@@ -342,11 +374,11 @@ mod tests {
         #[cfg(unix)]
         std::os::unix::fs::symlink(&outside, root.0.join("lists/list-general-user.txt")).unwrap();
         #[cfg(windows)]
-        std::os::windows::fs::symlink_file(&outside, root.0.join("lists/list-general-user.txt")).unwrap();
+        std::os::windows::fs::symlink_file(&outside, root.0.join("lists/list-general-user.txt"))
+            .unwrap();
         assert!(read(&root.0, "list-general-user.txt").is_err());
     }
 }
-
 
 #[derive(Serialize, Deserialize)]
 struct BackupData {
@@ -364,7 +396,9 @@ pub struct BackupSnapshot {
 
 fn normalize_backup_entries(filename: &str, values: &[String]) -> Result<Vec<String>, String> {
     if values.len() > MAX_LIST_ENTRIES {
-        return Err(format!("Backup exceeds {MAX_LIST_ENTRIES} entries per list"));
+        return Err(format!(
+            "Backup exceeds {MAX_LIST_ENTRIES} entries per list"
+        ));
     }
     let mut seen = HashSet::new();
     let mut result = Vec::new();
@@ -399,7 +433,10 @@ pub fn import_backup(root: &Path, content: &str) -> Result<BackupSnapshot, Strin
     let backup: BackupData = serde_json::from_str(content.trim_start_matches('\u{feff}'))
         .map_err(|error| format!("Invalid Flowseal backup file: {error}"))?;
     if backup.version != 1 {
-        return Err(format!("Unsupported Flowseal backup version: {}", backup.version));
+        return Err(format!(
+            "Unsupported Flowseal backup version: {}",
+            backup.version
+        ));
     }
 
     // Validate and normalize every list before reading or writing any target.
@@ -416,13 +453,19 @@ pub fn import_backup(root: &Path, content: &str) -> Result<BackupSnapshot, Strin
         .map(|path| match fs::read(path) {
             Ok(data) => {
                 if data.len() as u64 > MAX_LIST_BYTES {
-                    Err(format!("Existing list is too large to back up: {}", path.display()))
+                    Err(format!(
+                        "Existing list is too large to back up: {}",
+                        path.display()
+                    ))
                 } else {
                     Ok(Some(data))
                 }
             }
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
-            Err(error) => Err(format!("Cannot read existing list {}: {error}", path.display())),
+            Err(error) => Err(format!(
+                "Cannot read existing list {}: {error}",
+                path.display()
+            )),
         })
         .collect::<Result<_, _>>()?;
 
@@ -457,7 +500,6 @@ pub fn import_backup(root: &Path, content: &str) -> Result<BackupSnapshot, Strin
     })
 }
 
-
 #[cfg(test)]
 mod backup_tests {
     use super::*;
@@ -488,8 +530,18 @@ mod backup_tests {
     #[test]
     fn exports_and_restores_all_three_lists() {
         let root = TestRoot::new();
-        replace(&root.0, "list-general-user.txt", &["include.example.com".into()]).unwrap();
-        replace(&root.0, "list-exclude-user.txt", &["exclude.example.com".into()]).unwrap();
+        replace(
+            &root.0,
+            "list-general-user.txt",
+            &["include.example.com".into()],
+        )
+        .unwrap();
+        replace(
+            &root.0,
+            "list-exclude-user.txt",
+            &["exclude.example.com".into()],
+        )
+        .unwrap();
         replace(&root.0, "ipset-exclude-user.txt", &["192.0.2.0/24".into()]).unwrap();
 
         let backup = export_backup(&root.0).unwrap();
@@ -511,16 +563,27 @@ mod backup_tests {
         fs::write(&include_path, "# preserve comment\nold.example.com\n").unwrap();
         fs::write(&exclude_path, "old-exclude.example.com").unwrap();
 
-        let invalid = r#"{"version":1,"include":["new.example.com"],"exclude":["not a domain"],"ips":[]}"#;
+        let invalid =
+            r#"{"version":1,"include":["new.example.com"],"exclude":["not a domain"],"ips":[]}"#;
         assert!(import_backup(&root.0, invalid).is_err());
-        assert_eq!(fs::read_to_string(include_path).unwrap(), "# preserve comment\nold.example.com\n");
-        assert_eq!(fs::read_to_string(exclude_path).unwrap(), "old-exclude.example.com");
+        assert_eq!(
+            fs::read_to_string(include_path).unwrap(),
+            "# preserve comment\nold.example.com\n"
+        );
+        assert_eq!(
+            fs::read_to_string(exclude_path).unwrap(),
+            "old-exclude.example.com"
+        );
     }
 
     #[test]
     fn rejects_unsupported_version_and_deduplicates_entries() {
         let root = TestRoot::new();
-        assert!(import_backup(&root.0, r#"{"version":2,"include":[],"exclude":[],"ips":[]}"#).is_err());
+        assert!(import_backup(
+            &root.0,
+            r#"{"version":2,"include":[],"exclude":[],"ips":[]}"#
+        )
+        .is_err());
 
         let content = r#"{"version":1,"include":["Example.com","example.com"],"exclude":[],"ips":["192.0.2.1","192.0.2.1"]}"#;
         let snapshot = import_backup(&root.0, content).unwrap();

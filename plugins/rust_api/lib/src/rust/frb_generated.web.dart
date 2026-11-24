@@ -118,10 +118,25 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   EditorOpenErrorKind dco_decode_editor_open_error_kind(dynamic raw);
 
   @protected
+  FlowsealGameFilterSettings dco_decode_flowseal_game_filter_settings(
+    dynamic raw,
+  );
+
+  @protected
+  FlowsealIpSetUpdateResult dco_decode_flowseal_ip_set_update_result(
+    dynamic raw,
+  );
+
+  @protected
   FlowsealRuntimeStatus dco_decode_flowseal_runtime_status(dynamic raw);
 
   @protected
   FlowsealStatus dco_decode_flowseal_status(dynamic raw);
+
+  @protected
+  FlowsealUserListsSnapshot dco_decode_flowseal_user_lists_snapshot(
+    dynamic raw,
+  );
 
   @protected
   GuideBlock dco_decode_guide_block(dynamic raw);
@@ -182,6 +197,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   int dco_decode_u_32(dynamic raw);
+
+  @protected
+  BigInt dco_decode_u_64(dynamic raw);
 
   @protected
   int dco_decode_u_8(dynamic raw);
@@ -280,12 +298,27 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  FlowsealGameFilterSettings sse_decode_flowseal_game_filter_settings(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  FlowsealIpSetUpdateResult sse_decode_flowseal_ip_set_update_result(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   FlowsealRuntimeStatus sse_decode_flowseal_runtime_status(
     SseDeserializer deserializer,
   );
 
   @protected
   FlowsealStatus sse_decode_flowseal_status(SseDeserializer deserializer);
+
+  @protected
+  FlowsealUserListsSnapshot sse_decode_flowseal_user_lists_snapshot(
+    SseDeserializer deserializer,
+  );
 
   @protected
   GuideBlock sse_decode_guide_block(SseDeserializer deserializer);
@@ -352,6 +385,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   int sse_decode_u_32(SseDeserializer deserializer);
+
+  @protected
+  BigInt sse_decode_u_64(SseDeserializer deserializer);
 
   @protected
   int sse_decode_u_8(SseDeserializer deserializer);
@@ -468,6 +504,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_flowseal_game_filter_settings(
+    FlowsealGameFilterSettings self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_flowseal_ip_set_update_result(
+    FlowsealIpSetUpdateResult self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_flowseal_runtime_status(
     FlowsealRuntimeStatus self,
     SseSerializer serializer,
@@ -476,6 +524,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_flowseal_status(
     FlowsealStatus self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_flowseal_user_lists_snapshot(
+    FlowsealUserListsSnapshot self,
     SseSerializer serializer,
   );
 
@@ -559,6 +613,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_u_32(int self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_u_64(BigInt self, SseSerializer serializer);
 
   @protected
   void sse_encode_u_8(int self, SseSerializer serializer);
