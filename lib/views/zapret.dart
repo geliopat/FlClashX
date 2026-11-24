@@ -462,6 +462,22 @@ class _FlowsealViewState extends State<FlowsealView> {
     });
   }
 
+  Future<void> _saveGameFilterSettings() async {
+    if (!_installed) return;
+    await _withBusy(() async {
+      await flowsealSaveGameFilter(
+        root: _root,
+        mode: _filterMode,
+        tcpRange: _tcpController.text.trim(),
+        udpRange: _udpController.text.trim(),
+      );
+      await _restartAfterListChange();
+      if (mounted) {
+        setState(() => _validation = 'Параметры Game Filter сохранены.');
+      }
+    });
+  }
+
   Future<void> _showPreview() async {
     final strategy = _selectedStrategy;
     if (strategy == null) return;
@@ -839,10 +855,14 @@ class _FlowsealViewState extends State<FlowsealView> {
               ],
               onChanged: _busy
                   ? null
-                  : (value) => setState(() {
-                      _filterMode = value ?? 'none';
-                      _preview = null;
-                    }),
+                  : (value) {
+                      if (value == null) return;
+                      setState(() {
+                        _filterMode = value;
+                        _preview = null;
+                      });
+                      unawaited(_saveGameFilterSettings());
+                    },
             ),
             const SizedBox(height: 10),
             Row(
@@ -877,6 +897,11 @@ class _FlowsealViewState extends State<FlowsealView> {
               spacing: 8,
               runSpacing: 8,
               children: [
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : _saveGameFilterSettings,
+                  icon: const Icon(Icons.save_outlined),
+                  label: const Text('Сохранить фильтр'),
+                ),
                 OutlinedButton.icon(
                   onPressed: enabled && _selectedStrategy != null
                       ? _showPreview
