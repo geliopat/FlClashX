@@ -176,3 +176,28 @@ pub fn flowseal_save_game_filter(
     };
     crate::zapret::game_filter::save(&PathBuf::from(root), &settings)
 }
+
+#[frb]
+pub struct FlowsealIpSetUpdateResult {
+    pub changed: bool,
+    pub count: u64,
+}
+
+#[frb]
+pub fn flowseal_ipset_status(root: String) -> Result<String, String> {
+    crate::zapret::ipset_control::status(&PathBuf::from(root))
+}
+
+#[frb]
+pub fn flowseal_set_ipset_filter(root: String, mode: String) -> Result<String, String> {
+    crate::zapret::ipset_control::set_mode(&PathBuf::from(root), &mode)
+}
+
+#[frb]
+pub async fn flowseal_update_ipset(root: String) -> Result<FlowsealIpSetUpdateResult, String> {
+    let result = crate::zapret::ipset_control::update(&PathBuf::from(root)).await?;
+    Ok(FlowsealIpSetUpdateResult {
+        changed: result.changed,
+        count: result.count as u64,
+    })
+}

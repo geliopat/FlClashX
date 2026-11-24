@@ -3,6 +3,7 @@ pub mod core;
 pub mod game_filter;
 pub mod installer;
 pub mod ipset;
+pub mod ipset_control;
 pub mod providers;
 pub mod runtime;
 pub mod user_lists;

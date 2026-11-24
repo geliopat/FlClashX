@@ -37,6 +37,8 @@ class _FlowsealViewState extends State<FlowsealView> {
   String _selectedUserList = _flowsealUserLists.keys.first;
   List<String> _userListEntries = const [];
   bool _listLoading = false;
+  String _ipsetMode = 'any';
+  String? _ipsetUpdateMessage;
   String _filterMode = 'none';
   String? _selectedStrategy;
   String? _error;
@@ -184,12 +186,16 @@ class _FlowsealViewState extends State<FlowsealView> {
     final gameFilter = installation.installed
         ? await flowsealGetGameFilter(root: root)
         : null;
+    final ipsetMode = installation.installed
+        ? await flowsealIpSetStatus(root: root)
+        : null;
     if (!mounted) return;
     setState(() {
       _installation = installation;
       _runtime = runtime;
       _strategies = strategies;
       _userListEntries = userListEntries;
+      if (ipsetMode != null) _ipsetMode = ipsetMode;
       if (gameFilter != null) {
         _filterMode = gameFilter.mode;
         _tcpController.text = gameFilter.tcpRange;
@@ -294,6 +300,36 @@ class _FlowsealViewState extends State<FlowsealView> {
       setState(() => _runtime = restarted);
       _syncStatusPolling();
     }
+  }
+
+
+  Future<void> _changeIpSetMode(String mode) async {
+    if (!_installed || mode == _ipsetMode) return;
+    await _withBusy(() async {
+      final selected = await flowsealSetIpSetFilter(root: _root, mode: mode);
+      if (!mounted) return;
+      setState(() {
+        _ipsetMode = selected;
+        _ipsetUpdateMessage = null;
+      });
+      await _restartAfterListChange();
+    });
+  }
+
+  Future<void> _updateIpSet() async {
+    if (!_installed) return;
+    await _withBusy(() async {
+      final result = await flowsealUpdateIpSet(root: _root);
+      final mode = await flowsealIpSetStatus(root: _root);
+      if (!mounted) return;
+      setState(() {
+        _ipsetMode = mode;
+        _ipsetUpdateMessage = result.changed
+            ? 'Список обновлён: ${result.count} записей.'
+            : 'Список уже актуален: ${result.count} записей.';
+      });
+      await _restartAfterListChange();
+    });
   }
 
   Future<void> _addUserListEntry() async {
@@ -531,6 +567,8 @@ class _FlowsealViewState extends State<FlowsealView> {
             ),
           ],
           if (_installed) ...[
+            const SizedBox(height: 12),
+            _buildIpSetCard(context),
             const SizedBox(height: 12),
             _buildStrategyCard(context),
             const SizedBox(height: 12),
@@ -965,6 +1003,84 @@ class _FlowsealViewState extends State<FlowsealView> {
                     ),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+
+  Widget _buildIpSetCard(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final modeLabel = switch (_ipsetMode) {
+      'none' => 'Отключён',
+      'any' => 'Без фильтрации по IPSet',
+      'loaded' => 'Использовать список IP',
+      _ => 'Состояние неизвестно',
+    };
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'IPSet Filter',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Режим списка IP-адресов и подсетей Flowseal. '
+              'При смене режима работающая стратегия перезапускается.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: _ipsetMode,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Режим IPSet',
+                border: OutlineInputBorder(),
+              ),
+              items: const [
+                DropdownMenuItem(value: 'none', child: Text('Отключён')),
+                DropdownMenuItem(value: 'any', child: Text('Без фильтрации')),
+                DropdownMenuItem(value: 'loaded', child: Text('Список IP')),
+              ],
+              onChanged: _busy
+                  ? null
+                  : (value) {
+                      if (value != null) unawaited(_changeIpSetMode(value));
+                    },
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Текущее состояние: $modeLabel',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+                FilledButton.tonalIcon(
+                  onPressed: _busy ? null : _updateIpSet,
+                  icon: const Icon(Icons.download),
+                  label: const Text('Обновить IPSet'),
+                ),
+              ],
+            ),
+            if (_ipsetUpdateMessage != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                _ipsetUpdateMessage!,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colorScheme.primary,
+                    ),
+              ),
+            ],
           ],
         ),
       ),
