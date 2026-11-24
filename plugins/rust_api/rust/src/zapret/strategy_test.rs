@@ -49,11 +49,11 @@ const DEFAULT_TARGETS: [(&str, &str); 17] = [
     ("Google Gstatic", "https://www.gstatic.com"),
     ("Cloudflare Web", "https://www.cloudflare.com"),
     ("Cloudflare CDN", "https://cdnjs.cloudflare.com"),
-    ("Cloudflare DNS 1.1.1.1", "PING:1.1.1.1"),
-    ("Cloudflare DNS 1.0.0.1", "PING:1.0.0.1"),
-    ("Google DNS 8.8.8.8", "PING:8.8.8.8"),
-    ("Google DNS 8.8.4.4", "PING:8.8.4.4"),
-    ("Quad9 DNS 9.9.9.9", "PING:9.9.9.9"),
+    ("Cloudflare HTTPS IP :443 (1.1.1.1)", "PING:1.1.1.1"),
+    ("Cloudflare HTTPS IP :443 (1.0.0.1)", "PING:1.0.0.1"),
+    ("Google HTTPS IP :443 (8.8.8.8)", "PING:8.8.8.8"),
+    ("Google HTTPS IP :443 (8.8.4.4)", "PING:8.8.4.4"),
+    ("Quad9 HTTPS IP :443 (9.9.9.9)", "PING:9.9.9.9"),
 ];
 
 struct Target {
@@ -301,6 +301,7 @@ async fn load_dpi_targets() -> Vec<Target> {
     }
 
     if let Ok(client) = Client::builder()
+        .no_proxy()
         .timeout(Duration::from_secs(5))
         .build()
     {
