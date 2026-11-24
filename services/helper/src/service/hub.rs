@@ -509,18 +509,25 @@ fn zapret_bin_dir() -> Result<PathBuf, Error> {
 }
 
 #[cfg(windows)]
-fn process_image_matches(handle: HANDLE, expected_exe_name: &str) -> bool {
+fn process_image_matches(handle: HANDLE, expected_exe_name: &str, zapret_root: &Path) -> bool {
     unsafe {
         let mut buffer = [0u16; 1024];
         let mut size = buffer.len() as u32;
         if QueryFullProcessImageNameW(handle, 0, buffer.as_mut_ptr(), &mut size) == 0 {
             return false;
         }
-        let path = String::from_utf16_lossy(&buffer[..size as usize]);
-        Path::new(&path)
-            .file_name()
-            .and_then(|name| name.to_str())
-            .is_some_and(|name| name.eq_ignore_ascii_case(expected_exe_name))
+        let image_path = String::from_utf16_lossy(&buffer[..size as usize]);
+        let Some(name) = Path::new(&image_path).file_name().and_then(|name| name.to_str()) else {
+            return false;
+        };
+        if !name.eq_ignore_ascii_case(expected_exe_name) {
+            return false;
+        }
+        // Never terminate another Zapret installation (or another application)
+        // merely because it uses the same executable filename.
+        let root = zapret_root.to_string_lossy().trim_end_matches(['\\\\', '/']).to_ascii_lowercase();
+        let candidate = image_path.to_ascii_lowercase();
+        candidate.starts_with(&format!("{root}\\\\"))
     }
 }
 
@@ -530,6 +537,9 @@ fn process_image_matches(handle: HANDLE, expected_exe_name: &str) -> bool {
 #[cfg(windows)]
 fn kill_stray_winws2_processes(exclude_pid: Option<u32>) -> usize {
     let targets = ["winws2.exe", "winws.exe", "winws2-split.exe"];
+    let Ok(zapret_root) = zapret_bin_dir() else {
+        return 0;
+    };
     let mut terminated = 0usize;
     unsafe {
         let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
@@ -557,7 +567,7 @@ fn kill_stray_winws2_processes(exclude_pid: Option<u32>) -> usize {
                         if process != 0 {
                             let confirmed = targets
                                 .iter()
-                                .any(|target| process_image_matches(process, target));
+                                .any(|target| process_image_matches(process, target, &zapret_root));
                             if confirmed && TerminateProcess(process, 1) != 0 {
                                 terminated += 1;
                             }
