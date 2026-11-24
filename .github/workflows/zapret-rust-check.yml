@@ -1,5 +1,9 @@
 name: Zapret Windows checks
 
+concurrency:
+  group: zapret-windows-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches:
