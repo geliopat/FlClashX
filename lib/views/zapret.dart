@@ -111,6 +111,32 @@ class _FlowsealViewState extends State<FlowsealView> {
     setState(() => _error = error);
   }
 
+  String _friendlyError(Object error) {
+    final raw = error.toString();
+    final separator = raw.indexOf(':');
+    final key = separator < 0 ? raw : raw.substring(0, separator);
+    final details = separator < 0 ? '' : raw.substring(separator + 1).trim();
+    final message = switch (key) {
+      'strategy_import_error_parse' =>
+        'Не удалось разобрать BAT. Проверьте, что в нём есть команда запуска winws.exe с аргументами.',
+      'strategy_import_error_exists' =>
+        'Стратегия с таким именем уже существует. Выберите другое имя.',
+      'strategy_import_error_invalid_name' =>
+        'Недопустимое имя стратегии. Разрешены латинские буквы, цифры, пробел, точка, дефис и подчёркивание.',
+      'strategy_import_error_reserved_name' =>
+        'Имя service зарезервировано Flowseal.',
+      'strategy_import_error_invalid_content' =>
+        'Файл пустой, слишком большой или содержит недопустимые данные.',
+      'strategy_import_error_write' =>
+        'Не удалось сохранить BAT в каталоге пользовательских стратегий.',
+      'strategy_import_error_catalog' =>
+        'Файл сохранён не был добавлен в каталог стратегий. Проверьте каталог Flowseal.',
+      _ => raw,
+    };
+    if (message == raw || details.isEmpty) return message;
+    return '$message $details';
+  }
+
   Future<void> _withBusy(Future<void> Function() action) async {
     if (_busy || _testing) return;
     setState(() {
@@ -120,7 +146,7 @@ class _FlowsealViewState extends State<FlowsealView> {
     try {
       await action();
     } catch (error) {
-      _setError(error.toString());
+      _setError(_friendlyError(error));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
