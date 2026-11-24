@@ -272,7 +272,9 @@ class _FlowsealViewState extends State<FlowsealView> {
       if (length == 0 || length > 256 * 1024) {
         throw Exception('BAT-файл пустой или превышает 256 КиБ.');
       }
-      final content = utf8.decode(await file.readAsBytes());
+      final content = utf8
+          .decode(await file.readAsBytes(), allowMalformed: true)
+          .replaceFirst('\uFEFF', '');
       await flowsealImportStrategy(
         root: _root,
         name: name.trim(),
@@ -723,9 +725,10 @@ class _FlowsealViewState extends State<FlowsealView> {
         gameFilterUdp: _udpController.text.trim(),
       );
       if (!mounted) return;
+      final wasCancelled = _testWasCancelled;
       FlowsealStrategyTestResult? best;
       for (final result in results) {
-        if (result.status != 'failed' && result.httpOk > 0) {
+        if (result.score > 0) {
           best = result;
           break;
         }
@@ -738,7 +741,15 @@ class _FlowsealViewState extends State<FlowsealView> {
           _validation = 'Автотест выбрал «' + best.strategy + '».';
         }
       });
-      if (best != null) {
+      if (wasCancelled) {
+        dialogs.showNotifier(
+          best == null
+              ? 'Проверка остановлена. Завершённых успешных результатов нет.'
+              : 'Проверка остановлена. Лучший результат среди проверенных: ' +
+                    best.strategy,
+          level: MessageLevel.info,
+        );
+      } else if (best != null) {
         dialogs.showNotifier(
           'Лучшая стратегия: ' + best.strategy + ' · HTTP ' +
               best.httpOk.toString() + '/' +
