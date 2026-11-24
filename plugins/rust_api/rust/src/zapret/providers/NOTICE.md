@@ -1,14 +1,28 @@
-# Vendored Flowseal provider
+# Source attribution: geliopat/zapret-ui
 
-The Flowseal strategy provider in `flowseal.rs` is ported from
-[`geliopat/zapret-ui`](https://github.com/geliopat/zapret-ui), file
-`src-tauri/src/providers/flowseal.rs`.
+Parts of the Windows Zapret / Flowseal integration are adapted from
+[`geliopat/zapret-ui`](https://github.com/geliopat/zapret-ui), which is
+licensed under the MIT License.
 
-The source repository's root `LICENSE` identifies the project as MIT-licensed
-and carries the following copyright and permission notice. The Flowseal
-provider's parser, argument resolver, strategy catalog, migration, backup
-recovery, custom-strategy import, validation, and tests retain that provenance.
-The surrounding Tauri application layer is not copied.
+Adapted source areas include:
+
+- `src-tauri/src/providers/flowseal.rs`: Flowseal strategy provider,
+  BAT parsing, argument resolution, strategy catalog, migrations,
+  custom-strategy import and validation.
+- `src-tauri/src/core/channel.rs`, `src-tauri/src/core/installation.rs`
+  and related core modules: signed stable-channel resolution, artifact
+  verification, safe extraction, transactional installation and rollback.
+- `src-tauri/src/lib.rs`: Game Filter settings compatibility and persistence,
+  IPSet mode handling and update validation, user-list validation,
+  import/export and backup/restore behavior.
+- `src-tauri/src/ipset.rs`: IPSet list comparison and install-if-changed logic.
+- `src/features/filters.js` and `src/features/user-lists.js`: corresponding
+  filter and user-list workflows adapted to FlClashX's Flutter UI.
+
+The FlClashX integration replaces the source application's Tauri commands,
+window lifecycle and service layer with FlClashX's Flutter/Rust bridge and
+Windows process ownership model. The source repository's unrelated application
+features are not included.
 
 ## MIT License
 

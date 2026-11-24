@@ -373,7 +373,7 @@ class _FlowsealViewState extends State<FlowsealView> {
         filename: _selectedUserList,
       );
       final baseName = p.basenameWithoutExtension(_selectedUserList);
-      await FilePicker.platform.saveFile(
+      await FilePicker.saveFile(
         dialogTitle: 'Экспорт пользовательского списка',
         fileName: '$baseName.txt',
         type: FileType.custom,
@@ -387,7 +387,7 @@ class _FlowsealViewState extends State<FlowsealView> {
     if (!_installed) return;
     await _withBusy(() async {
       final content = await flowsealExportUserListsBackup(root: _root);
-      await FilePicker.platform.saveFile(
+      await FilePicker.saveFile(
         dialogTitle: 'Создать резервную копию Flowseal',
         fileName: 'flowseal-user-lists.json',
         type: FileType.custom,
@@ -428,35 +428,107 @@ class _FlowsealViewState extends State<FlowsealView> {
     });
   }
 
-  Future<void> _importUserList() async {
+  Future<void> _importUserList(BuildContext context) async {
     if (!_installed) return;
     final file = await FilePicker.pickFile(
       type: FileType.custom,
       allowedExtensions: const ['txt'],
     );
     if (file == null || !mounted) return;
+
+    final append = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Импорт пользовательского списка'),
+        content: const Text(
+          'Добавить записи к существующему списку или полностью заменить его?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(null),
+            child: const Text('Отмена'),
+          ),
+          OutlinedButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Заменить'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Добавить'),
+          ),
+        ],
+      ),
+    );
+    if (append == null || !mounted) return;
+
     await _withBusy(() async {
       if ((file.lengthSync() ?? await file.length()) > 2 * 1024 * 1024) {
         throw Exception('Размер списка превышает 2 МиБ.');
       }
       final content = utf8.decode(await file.readAsBytes());
-      final entries = content
+      final imported = content
           .replaceFirst('\uFEFF', '')
           .split(RegExp(r'\r?\n'))
           .where((line) => line.trim().isNotEmpty && !line.trim().startsWith('#'))
           .toList();
-      if (entries.isEmpty) {
+      if (imported.isEmpty) {
         throw Exception('В выбранном файле нет записей для импорта.');
       }
+
+      final existing = append
+          ? await flowsealReadUserList(
+              root: _root,
+              filename: _selectedUserList,
+            )
+          : <String>[];
       final saved = await flowsealReplaceUserList(
         root: _root,
         filename: _selectedUserList,
-        entries: entries,
+        entries: [...existing, ...imported],
       );
       if (!mounted) return;
       setState(() {
         _userListEntries = saved;
-        _validation = 'Импортировано записей: ${saved.length}';
+        _validation = append
+            ? 'Добавлено записей: ${saved.length - existing.length}. Всего: ${saved.length}.'
+            : 'Импортировано записей: ${saved.length}';
+      });
+      await _restartAfterListChange();
+    });
+  }
+
+  Future<void> _clearUserList(BuildContext context) async {
+    if (!_installed || _userListEntries.isEmpty) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Очистить список?'),
+        content: Text(
+          'Удалить все записи из «${_flowsealUserLists[_selectedUserList]}»?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Очистить'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await _withBusy(() async {
+      final entries = await flowsealReplaceUserList(
+        root: _root,
+        filename: _selectedUserList,
+        entries: const [],
+      );
+      if (!mounted) return;
+      setState(() {
+        _userListEntries = entries;
+        _validation = 'Список очищен.';
       });
       await _restartAfterListChange();
     });
@@ -1012,9 +1084,16 @@ class _FlowsealViewState extends State<FlowsealView> {
               runSpacing: 8,
               children: [
                 OutlinedButton.icon(
-                  onPressed: _busy ? null : _importUserList,
+                  onPressed: _busy ? null : () => _importUserList(context),
                   icon: const Icon(Icons.file_upload_outlined),
                   label: const Text('Импорт TXT'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _busy || _userListEntries.isEmpty
+                      ? null
+                      : () => _clearUserList(context),
+                  icon: const Icon(Icons.delete_sweep_outlined),
+                  label: const Text('Очистить'),
                 ),
                 OutlinedButton.icon(
                   onPressed: _busy ? null : _exportSelectedUserList,
