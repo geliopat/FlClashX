@@ -156,11 +156,19 @@ fn emit_progress(
     }
 }
 
+fn system_tool(name: &str) -> PathBuf {
+    std::env::var_os("SystemRoot")
+        .or_else(|| std::env::var_os("WINDIR"))
+        .map(PathBuf::from)
+        .map(|root| root.join("System32").join(name))
+        .unwrap_or_else(|| PathBuf::from(name))
+}
+
 pub fn cancel() {
     TEST_CANCELLED.store(true, Ordering::Release);
     let pid = TEST_PROCESS_PID.load(Ordering::Acquire);
     if pid != 0 {
-        let _ = Command::new("taskkill.exe")
+        let _ = Command::new(system_tool("taskkill.exe"))
             .args(["/F", "/T", "/PID", &pid.to_string()])
             .creation_flags(CREATE_NO_WINDOW)
             .stdout(Stdio::null())
@@ -370,7 +378,13 @@ async fn dpi_target(
 }
 
 fn test_ipset_override(root: &Path) -> Result<TestIpsetOverride, String> {
-    let lists = root.join("lists");
+    let canonical_root = fs::canonicalize(root)
+        .map_err(|error| format!("Не удалось разрешить каталог Flowseal: {error}"))?;
+    let lists = fs::canonicalize(canonical_root.join("lists"))
+        .map_err(|error| format!("Не удалось разрешить каталог списков Flowseal: {error}"))?;
+    if !lists.starts_with(&canonical_root) {
+        return Err("Каталог списков Flowseal выходит за пределы установки.".into());
+    }
     let original = lists.join("ipset-all.txt");
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -482,7 +496,7 @@ fn start_strategy(
 }
 
 fn ensure_no_external_winws() -> Result<(), String> {
-    let output = Command::new("tasklist.exe")
+    let output = Command::new(system_tool("tasklist.exe"))
         .args(["/FI", "IMAGENAME eq winws.exe", "/FO", "CSV", "/NH"])
         .creation_flags(CREATE_NO_WINDOW)
         .stdout(Stdio::piped())
@@ -619,6 +633,8 @@ pub async fn run(
         return Err("Для автоматического тестирования стратегий нужны права администратора. Перезапустите FlClashX от имени администратора.".into());
     }
     runtime::validate_game_filter_settings(game_filter)?;
+    let root = fs::canonicalize(&root)
+        .map_err(|error| format!("Не удалось разрешить каталог Flowseal: {error}"))?;
     if runtime::status(&root)?.running {
         return Err("Сначала остановите запущенный winws.exe. Во время проверки стратегии запускаются по очереди.".into());
     }
@@ -631,8 +647,10 @@ pub async fn run(
         _ => return Err("Неизвестный тип проверки стратегий.".into()),
     };
     let provider = FlowsealProvider::new(root.clone());
-    provider.validate_installation()?;
-    let strategies = provider.strategies()?;
+    if !provider.is_installed() {
+        return Err("Установка Flowseal не обнаружена или не завершена.".into());
+    }
+    let strategies = provider.strategies_readonly()?;
     if strategies.is_empty() {
         return Err("В каталоге Flowseal нет готовых стратегий для проверки.".into());
     }
