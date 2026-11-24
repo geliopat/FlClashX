@@ -161,19 +161,14 @@ impl FlowsealProvider {
                 crate::zapret::ipset_mode(text.trim_start_matches('\u{feff}')) == "loaded"
             }) {
             arguments
-                .split_whitespace()
-                .map(|argument| {
-                    if matches!(
-                        argument,
-                        "--ipset=\"%LISTS%ipset-all.txt\"" | "--ipset=%LISTS%ipset-all.txt"
-                    ) {
-                        format!("{argument} --ipset=\"%LISTS%{user_list}\"")
-                    } else {
-                        argument.to_owned()
-                    }
-                })
-                .collect::<Vec<_>>()
-                .join(" ")
+                .replace(
+                    "--ipset=\"%LISTS%ipset-all.txt\"",
+                    &format!("--ipset=\"%LISTS%ipset-all.txt\" --ipset=\"%LISTS%{user_list}\""),
+                )
+                .replace(
+                    "--ipset=%LISTS%ipset-all.txt",
+                    &format!("--ipset=%LISTS%ipset-all.txt --ipset=%LISTS%{user_list}"),
+                )
         } else {
             arguments.to_owned()
         };
@@ -183,16 +178,9 @@ impl FlowsealProvider {
             .replace("%GameFilterUDP%", gfudp)
             .replace("%BIN%", &bin)
             .replace("%LISTS%", &lists);
-        args.split_whitespace()
-            .map(|word| {
-                if let Some(rest) = word.strip_prefix("\"@") {
-                    format!("\"{}{}", root, rest)
-                } else {
-                    word.to_owned()
-                }
-            })
-            .collect::<Vec<_>>()
-            .join(" ")
+        // Expand quoted @-relative payload paths without tokenizing the
+        // command line: paths under a user profile may contain spaces.
+        args.replace("\"@", &format!("\"{root}"))
     }
 
     fn strategy_files(directory: &Path) -> Result<Vec<(String, PathBuf)>, String> {
@@ -884,6 +872,33 @@ mod tests {
         assert!(args.contains("--quoted=\"^!\""));
         assert!(!args.contains("--fake=^!"));
         assert!(FlowsealProvider::extract_strategy_arguments("echo no", "ALT").is_err());
+    }
+
+    #[test]
+    fn keeps_quoted_paths_with_spaces_when_resolving_flowseal_arguments() {
+        let root = temp().join("Flowseal install with spaces");
+        let lists = root.join("lists");
+        fs::create_dir_all(&lists).unwrap();
+        fs::write(lists.join(crate::zapret::ipset::USER_INCLUDE_FILE), "192.0.2.1/32\n")
+            .unwrap();
+        fs::write(lists.join("ipset-all.txt"), "198.51.100.0/24\n").unwrap();
+
+        let provider = FlowsealProvider::new(&root);
+        let arguments = provider.resolve_strategy_arguments(
+            r#"--ipset="%LISTS%ipset-all.txt" --hostlist="%LISTS%list-general.txt" --fake="@bin\fake.bin""#,
+            &GameFilterSettings {
+                mode: "disabled".into(),
+                tcp_range: "12".into(),
+                udp_range: "12".into(),
+            },
+        );
+
+        let list_path = lists.join("list-general.txt");
+        let fake_path = root.join("bin").join("fake.bin");
+        assert!(arguments.contains(&format!("\"{}\"", list_path.display())));
+        assert!(arguments.contains(&format!("\"{}\"", fake_path.display())));
+        assert!(arguments.contains(crate::zapret::ipset::USER_INCLUDE_FILE));
+        let _ = fs::remove_dir_all(root.parent().unwrap());
     }
 
     #[test]

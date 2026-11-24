@@ -1,6 +1,7 @@
 pub mod core;
 pub mod ipset;
 pub mod providers;
+pub mod runtime;
 
 pub(crate) fn ipset_mode(content: &str) -> &'static str {
     let mut lines = content
