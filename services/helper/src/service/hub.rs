@@ -791,17 +791,25 @@ fn launch_zapret(restart: bool) -> warp::reply::Response {
 #[cfg(windows)]
 fn stop_zapret() -> warp::reply::Response {
     let mut managed = lock_surviving_poison(&MANAGED_ZAPRET);
-    match stop_managed_zapret(&mut managed) {
-        Ok(()) => json_response(
-            &ZapretStatusResponse {
-                running: false,
-                pid: None,
-                cleaned_processes: 0,
-            },
-            StatusCode::OK,
-        ),
-        Err(error) => error_response("zapretStopFailed", error.to_string(), StatusCode::INTERNAL_SERVER_ERROR),
+    if let Err(error) = stop_managed_zapret(&mut managed) {
+        return error_response(
+            "zapretStopFailed",
+            error.to_string(),
+            StatusCode::INTERNAL_SERVER_ERROR,
+        );
     }
+    let cleaned = kill_stray_winws2_processes(None);
+    if cleaned > 0 {
+        log_message(format!("Zapret stop cleaned {cleaned} orphaned winws processes"));
+    }
+    json_response(
+        &ZapretStatusResponse {
+            running: false,
+            pid: None,
+            cleaned_processes: cleaned,
+        },
+        StatusCode::OK,
+    )
 }
 
 #[cfg(windows)]
