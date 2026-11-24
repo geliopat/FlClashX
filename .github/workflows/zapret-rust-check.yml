@@ -13,6 +13,7 @@ on:
       - "plugins/rust_api/lib/**"
       - "windows/**"
       - "lib/**"
+      - "test/**"
       - ".github/workflows/zapret-rust-check.yml"
   pull_request:
     branches:
@@ -66,8 +67,10 @@ jobs:
           cache-dependency-path: core/go.sum
       - name: Install project dependencies
         run: flutter pub get
-      - name: Format Flowseal Flutter UI
-        run: dart format lib/views/zapret.dart lib/views/tools.dart lib/views/views.dart
+      - name: Format Flowseal Flutter UI and UAC handoff
+        run: dart format lib/views/zapret.dart lib/views/tools.dart lib/views/views.dart lib/main.dart lib/bootstrap.dart lib/common/lock.dart test/common/lock_test.dart
+      - name: Test Windows single-instance lock handoff
+        run: flutter test test/common/lock_test.dart
       - name: Install Flutter Rust Bridge code generator
         run: cargo install --locked --version 2.13.0 flutter_rust_bridge_codegen
       - name: Generate bindings
