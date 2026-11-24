@@ -35,6 +35,18 @@ final class HelperStopResponse {
   const HelperStopResponse({required this.stopped});
 }
 
+final class HelperZapretStatus {
+  final bool running;
+  final int? pid;
+  final int cleanedProcesses;
+
+  const HelperZapretStatus({
+    required this.running,
+    required this.pid,
+    this.cleanedProcesses = 0,
+  });
+}
+
 final class HelperException implements Exception {
   final String code;
   final String message;
@@ -344,6 +356,105 @@ final class HelperClient {
         details: error.toString(),
       );
     }
+  }
+
+  /// Reads the Helper-owned Zapret2 process. The Helper keeps this process
+  /// in a kill-on-close Job Object independently of the Flutter window.
+  Future<HelperZapretStatus> zapretStatus() async {
+    try {
+      final response = await _dio.get<Object?>(
+        '$baseUrl/zapret',
+        options: _options(ResponseType.json, receiveTimeout: const Duration(seconds: 3)),
+      );
+      return _parseZapretResponse(response, operation: 'Zapret status');
+    } on HelperException {
+      rethrow;
+    } on DioException catch (error) {
+      throw _mapZapretDioException(error, operation: 'status');
+    } catch (error) {
+      throw HelperException(
+        code: 'transportError',
+        message: 'Не удалось получить состояние Zapret через Helper',
+        details: error.toString(),
+      );
+    }
+  }
+
+  Future<HelperZapretStatus> startZapret() =>
+      _zapretAction('start', operation: 'start');
+
+  Future<HelperZapretStatus> stopZapret() =>
+      _zapretAction('stop', operation: 'stop');
+
+  Future<HelperZapretStatus> restartZapret() =>
+      _zapretAction('restart', operation: 'restart');
+
+  Future<HelperZapretStatus> _zapretAction(
+    String route, {
+    required String operation,
+  }) async {
+    try {
+      final response = await _dio.post<Object?>(
+        '$baseUrl/zapret/$route',
+        options: _options(
+          ResponseType.json,
+          receiveTimeout: operation == 'stop'
+              ? stopTimeout
+              : const Duration(seconds: 20),
+        ),
+      );
+      return _parseZapretResponse(response, operation: 'Zapret $operation');
+    } on HelperException {
+      rethrow;
+    } on DioException catch (error) {
+      throw _mapZapretDioException(error, operation: operation);
+    } catch (error) {
+      throw HelperException(
+        code: 'transportError',
+        message: 'Не удалось выполнить операцию Zapret через Helper',
+        details: error.toString(),
+      );
+    }
+  }
+
+  HelperZapretStatus _parseZapretResponse(
+    Response<Object?> response, {
+    required String operation,
+  }) {
+    final data = _responseMap(response, operation: operation);
+    final running = data['running'];
+    final pid = data['pid'];
+    final cleaned = data['cleanedProcesses'] ?? 0;
+    if (running is! bool ||
+        (pid != null && (pid is! int || pid <= 0)) ||
+        cleaned is! int ||
+        cleaned < 0 ||
+        (running && pid == null) ||
+        (!running && pid != null)) {
+      throw HelperException(
+        code: 'invalidResponse',
+        message: 'Helper вернул некорректное состояние Zapret',
+        details: data,
+      );
+    }
+    return HelperZapretStatus(
+      running: running,
+      pid: pid as int?,
+      cleanedProcesses: cleaned,
+    );
+  }
+
+  HelperException _mapZapretDioException(
+    DioException error, {
+    required String operation,
+  }) {
+    if (error.response?.statusCode == HttpStatus.notFound) {
+      return const HelperException(
+        code: 'zapretUnsupported',
+        message: 'Служба Helper не поддерживает Zapret2. Перезапусти или обнови FlClashX, чтобы обновить службу.',
+      );
+    }
+    return _mapDioException(error, operation: 'Zapret $operation');
   }
 
   HelperStopResponse _parseStopResponse(
