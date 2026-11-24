@@ -705,7 +705,7 @@ impl StrategyBuilder {
             let mut current_block = Vec::new();
             for arg in args {
                 if arg == "--new" {
-                    let has_general = current_block.iter().any(|a: &String| a.contains("list-general.txt") || a.contains("ipset-all.txt"));
+                    let has_general = current_block.iter().any(|a: &String| a.contains("list-general") || a.contains("ipset-all.txt"));
                     if !has_general {
                         if !filtered.is_empty() {
                             filtered.push("--new".to_string());
@@ -1241,6 +1241,66 @@ mod tests {
         );
         assert!(lua.iter().any(|a| a.starts_with("--lua-desync=")));
         assert!(!lua.iter().any(|a| a.starts_with("--dpi-desync=")));
+    }
+
+    #[test]
+    fn strict_split_flowseal_keeps_only_specialized_list_sections() {
+        let args = StrategyBuilder::build_flowseal_args_inner(
+            "flowseal-alt",
+            Path::new("."),
+            Path::new("./lists"),
+            TunnelMode::Strict,
+            "1024-65535",
+            "1024-65535",
+            None,
+        );
+
+        assert!(args.iter().any(|arg| arg.contains("list-google.txt")));
+        assert!(args.iter().any(|arg| arg.contains("--hostlist-domains=")));
+        assert!(!args.iter().any(|arg| arg.contains("list-general")));
+        assert!(!args.iter().any(|arg| arg.contains("ipset-all.txt")));
+        assert!(!args.iter().any(|arg| arg == "--filter-udp=443"));
+        assert!(args.iter().any(|arg| arg == "--filter-udp=19294-19344,50000-65535"));
+    }
+
+    #[test]
+    fn strict_split_lua_keeps_discord_and_google_but_drops_youtube_quic() {
+        let args = StrategyBuilder::build_lua_preset_args(
+            TunnelMode::Strict,
+            "1024-65535",
+            "1024-65535",
+            Some("--lua-init=@zapret-lib.lua"),
+            Some("--lua-init=@strategies/zapret-yt4k.lua"),
+            "lists/list-google.txt",
+            "lists/ipset-all.txt",
+            None,
+            false,
+        );
+
+        assert!(args.iter().any(|arg| arg == "--new=discord_tcp"));
+        assert!(args.iter().any(|arg| arg == "--new=discord_voice"));
+        assert!(args.iter().any(|arg| arg == "--new=google_tcp"));
+        assert!(!args.iter().any(|arg| arg == "--new=quic"));
+        assert!(!args.iter().any(|arg| arg.contains("list-general")));
+        assert!(args.iter().any(|arg| arg.contains("list-google.txt")));
+    }
+
+    #[test]
+    fn full_bypass_lua_keeps_general_and_youtube_quic_sections() {
+        let args = StrategyBuilder::build_lua_preset_args(
+            TunnelMode::Full,
+            "1024-65535",
+            "1024-65535",
+            Some("--lua-init=@zapret-lib.lua"),
+            Some("--lua-init=@strategies/zapret-yt4k.lua"),
+            "lists/list-google.txt",
+            "lists/ipset-all.txt",
+            None,
+            false,
+        );
+
+        assert!(args.iter().any(|arg| arg == "--new=quic"));
+        assert!(args.iter().any(|arg| arg.contains("list-general.txt")));
     }
 
     #[test]
