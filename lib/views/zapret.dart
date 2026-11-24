@@ -168,8 +168,8 @@ class _FlowsealViewState extends State<FlowsealView> {
     );
     if (file == null || !mounted) return;
     await _withBusy(() async {
-      if ((file.lengthSync() ?? await file.length()) > 1024 * 1024) {
-        throw Exception('Размер BAT-файла превышает 1 МБ.');
+      if ((file.lengthSync() ?? await file.length()) > 256 * 1024) {
+        throw Exception('Размер BAT-файла превышает 256 КиБ.');
       }
       final content = utf8.decode(await file.readAsBytes());
       final name = p.basenameWithoutExtension(file.name).trim();
