@@ -6,6 +6,7 @@ pub mod ipset;
 pub mod ipset_control;
 pub mod providers;
 pub mod runtime;
+pub mod strategy_test;
 pub mod user_lists;
 
 pub(crate) fn ipset_mode(content: &str) -> &'static str {
