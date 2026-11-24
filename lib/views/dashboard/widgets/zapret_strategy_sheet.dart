@@ -78,6 +78,51 @@ class ZapretStrategySheet extends ConsumerWidget {
                   ],
                 ),
                 const SizedBox(height: 8),
+                if (state.supportsSplitMode) ...[
+                  SegmentedButton<ZapretMode>(
+                    segments: const [
+                      ButtonSegment(
+                        value: ZapretMode.strictSplit,
+                        label: Text('STRICT SPLIT'),
+                      ),
+                      ButtonSegment(
+                        value: ZapretMode.fullBypass,
+                        label: Text('FULL BYPASS'),
+                      ),
+                    ],
+                    selected: {state.mode},
+                    showSelectedIcon: false,
+                    onSelectionChanged: (selection) {
+                      ref
+                          .read(zapretControllerProvider.notifier)
+                          .setMode(selection.first)
+                          .catchError((error) {
+                        dialogs.showNotifier(
+                          error.toString(),
+                          level: MessageLevel.error,
+                        );
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    state.mode == ZapretMode.strictSplit
+                        ? 'Десинхронизация только для YouTube, Discord и Google-сервисов из списка. YouTube QUIC не затрагивается.'
+                        : 'Десинхронизация на всех перехваченных портах выбранного пресета.',
+                    style: AppTextStyle.footnote
+                        .of(context)
+                        .copyWith(color: context.colorScheme.onSurfaceVariant),
+                  ),
+                  const SizedBox(height: 8),
+                ] else if (strategies.isNotEmpty) ...[
+                  Text(
+                    'Для этой стратегии режимы STRICT SPLIT / FULL BYPASS не применяются: используются собственные правила конфигурации.',
+                    style: AppTextStyle.footnote
+                        .of(context)
+                        .copyWith(color: context.colorScheme.onSurfaceVariant),
+                  ),
+                  const SizedBox(height: 8),
+                ],
                 if (strategies.isEmpty)
                   Expanded(
                     child: Center(
@@ -121,8 +166,8 @@ class ZapretStrategySheet extends ConsumerWidget {
                 const SizedBox(height: 4),
                 Text(
                   state.running && state.activeStrategyId != null
-                      ? 'Работает: ${_strategyName(strategies, state.activeStrategyId!)} · ${state.activeEngine}'
-                      : 'Выбранный профиль запускается при следующем включении',
+                      ? 'Работает: ${_strategyName(strategies, state.activeStrategyId!)} · ${state.activeEngine}. Новый режим применится после перезапуска.'
+                      : 'Выбранная стратегия и режим применятся при следующем запуске',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: AppTextStyle.footnote
