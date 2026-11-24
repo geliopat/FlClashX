@@ -35,7 +35,6 @@ class _FlowsealViewState extends State<FlowsealView> {
   final _tcpController = TextEditingController(text: '1024-65535');
   final _udpController = TextEditingController(text: '1024-65535');
   final _listEntryController = TextEditingController();
-  final _listSearchController = TextEditingController();
 
   String _root = '';
   String _selectedUserList = _flowsealUserLists.keys.first;
@@ -75,12 +74,12 @@ class _FlowsealViewState extends State<FlowsealView> {
   @override
   void dispose() {
     _statusTimer?.cancel();
+    if (_testing) unawaited(flowsealCancelStrategyTests());
     _rootController.dispose();
     _tcpController.dispose();
     _udpController.dispose();
     _testSubscription?.cancel();
     _listEntryController.dispose();
-    _listSearchController.dispose();
     super.dispose();
   }
 
@@ -1328,13 +1327,25 @@ class _FlowsealViewState extends State<FlowsealView> {
                   leading: const Icon(Icons.search),
                   title: Text('Записей: ' + _userListEntries.length.toString()),
                   subtitle: Text(
-                    filteredEntries.isEmpty
-                        ? 'Список пуст или совпадений нет'
-                        : 'Показано ' + visibleEntries.length.toString() +
-                            ' из ' + filteredEntries.length.toString(),
+                    _listLoading
+                        ? 'Загрузка списка...'
+                        : filteredEntries.isEmpty
+                            ? 'Список пуст или совпадений нет'
+                            : 'Показано ' + visibleEntries.length.toString() +
+                                ' из ' + filteredEntries.length.toString(),
                   ),
                 ),
-                for (final entry in visibleEntries)
+                if (_listLoading)
+                  const ListItem(
+                    leading: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    title: Text('Чтение файла списка'),
+                  ),
+                if (!_listLoading)
+                  for (final entry in visibleEntries)
                   ListItem(
                     title: Text(entry),
                     trailing: IconButton(
