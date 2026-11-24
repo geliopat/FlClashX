@@ -372,7 +372,14 @@ async fn dpi_target(
 fn test_ipset_override(root: &Path) -> Result<TestIpsetOverride, String> {
     let lists = root.join("lists");
     let original = lists.join("ipset-all.txt");
-    let temporary = lists.join(format!("ipset-test-{}.txt", std::process::id()));
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or_default();
+    let temporary = lists.join(format!(
+        "ipset-test-{}-{nonce}.txt",
+        std::process::id()
+    ));
     let mut file = OpenOptions::new()
         .write(true)
         .create_new(true)
@@ -414,16 +421,54 @@ fn prepare_test_arguments(
     Ok(arguments)
 }
 
-fn start_strategy(executable: &Path, arguments: &str, root: &Path) -> Result<RunningStrategy, String> {
+fn start_strategy(
+    executable: &Path,
+    arguments: &str,
+    requested_root: &Path,
+) -> Result<RunningStrategy, String> {
+    let root = fs::canonicalize(requested_root).map_err(|error| {
+        format!("Не удалось разрешить каталог Flowseal для теста: {error}")
+    })?;
+    let executable = fs::canonicalize(executable)
+        .map_err(|error| format!("Не удалось разрешить winws.exe для теста: {error}"))?;
+    if !executable.starts_with(&root)
+        || !executable
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.eq_ignore_ascii_case("winws.exe"))
+    {
+        return Err("Путь к winws.exe выходит за пределы каталога Flowseal.".into());
+    }
+
+    let bin_dir = fs::canonicalize(root.join("bin"))
+        .map_err(|error| format!("Не удалось разрешить каталог bin Flowseal: {error}"))?;
+    if !bin_dir.starts_with(&root) || !executable.starts_with(&bin_dir) {
+        return Err("Каталог bin Flowseal ссылается за пределы установки.".into());
+    }
+    for required in [
+        root.join("bin").join("WinDivert.dll"),
+        root.join("bin").join("WinDivert64.sys"),
+    ] {
+        let resolved = fs::canonicalize(&required).map_err(|error| {
+            format!("Не удалось разрешить файл Flowseal {}: {error}", required.display())
+        })?;
+        if !resolved.starts_with(&root) {
+            return Err(format!(
+                "Файл Flowseal выходит за пределы установки: {}",
+                required.display()
+            ));
+        }
+    }
+
     let args = runtime::split_windows_arguments(arguments)?;
     if args.is_empty() {
         return Err("В стратегии нет аргументов winws.exe.".into());
     }
-    runtime::validate_argument_paths(&args, root)?;
+    runtime::validate_argument_paths(&args, &root)?;
     let working_directory = executable
         .parent()
         .ok_or_else(|| "Не удалось определить рабочий каталог winws.exe.".to_string())?;
-    let child = Command::new(executable)
+    let child = Command::new(&executable)
         .args(args)
         .current_dir(working_directory)
         .stdin(Stdio::null())
@@ -434,6 +479,27 @@ fn start_strategy(executable: &Path, arguments: &str, root: &Path) -> Result<Run
         .map_err(|error| format!("Не удалось запустить winws.exe: {error}"))?;
     TEST_PROCESS_PID.store(child.id(), Ordering::Release);
     Ok(RunningStrategy { child })
+}
+
+fn ensure_no_external_winws() -> Result<(), String> {
+    let output = Command::new("tasklist.exe")
+        .args(["/FI", "IMAGENAME eq winws.exe", "/FO", "CSV", "/NH"])
+        .creation_flags(CREATE_NO_WINDOW)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .output()
+        .map_err(|error| format!("Не удалось проверить сторонние процессы winws.exe: {error}"))?;
+    if !output.status.success() {
+        return Err("Не удалось проверить, запущен ли другой winws.exe.".into());
+    }
+    let listing = String::from_utf8_lossy(&output.stdout).to_ascii_lowercase();
+    if listing.contains("winws.exe") {
+        return Err(
+            "Обнаружен уже запущенный winws.exe. Остановите его вручную перед автотестом."
+                .into(),
+        );
+    }
+    Ok(())
 }
 
 #[derive(Clone)]
@@ -552,9 +618,11 @@ pub async fn run(
     if !runtime::is_elevated() {
         return Err("Для автоматического тестирования стратегий нужны права администратора. Перезапустите FlClashX от имени администратора.".into());
     }
+    runtime::validate_game_filter_settings(game_filter)?;
     if runtime::status(&root)?.running {
         return Err("Сначала остановите запущенный winws.exe. Во время проверки стратегии запускаются по очереди.".into());
     }
+    ensure_no_external_winws()?;
 
     let kind = match test_type {
         "standard" => TestKind::Standard,
