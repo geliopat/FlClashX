@@ -8,9 +8,9 @@ use std::cmp::Ordering;
 use crate::zapret::core::{CoreArtifact, CoreRelease};
 
 const PRODUCTION_URL: &str =
-    "https://raw.githubusercontent.com/larrriiin/zapret-ui/main/core-channel/stable.json";
+    "https://raw.githubusercontent.com/geliopat/zapret-ui/main/core-channel/stable.json";
 const PRODUCTION_SIGNATURE_URL: &str =
-    "https://raw.githubusercontent.com/larrriiin/zapret-ui/main/core-channel/stable.json.sig";
+    "https://raw.githubusercontent.com/geliopat/zapret-ui/main/core-channel/stable.json.sig";
 const CORE_CHANNEL_PUBLIC_KEY: &str = "RWSF180m7EnKBXIHk0nI+xssrK0ft4gpVAuq3H1BtC3ICzDhZV7pHFji";
 const MAX_MANIFEST_BYTES: usize = 256 * 1024;
 const MAX_SIGNATURE_BYTES: usize = 16 * 1024;
@@ -282,6 +282,36 @@ mod tests {
         assert_eq!(
             compare_versions("Err", "1.2.3"),
             VersionComparison::Unknown
+        );
+    }
+
+    #[test]
+    fn verifies_the_published_flowseal_stable_channel_signature() {
+        const MANIFEST: &str = r#"{
+  "schemaVersion": 1,
+  "channel": "stable",
+  "provider": "flowseal",
+  "version": "1.10.4",
+  "artifacts": [
+    {
+      "url": "https://github.com/Flowseal/zapret-discord-youtube/releases/download/1.10.4/zapret-discord-youtube-1.10.4.zip",
+      "checksum": {
+        "algorithm": "sha256",
+        "value": "291af673bd0238506f9548e0e94ca0abf244000f4c9a06960544fb01c5f97b34"
+      }
+    }
+  ]
+}
+"#;
+        const SIGNATURE: &str = "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTRjE4MG03RW5LQmJSZnNLSWpWMlVQVTVXTWp0ZkRnMHNoMklNdUZ5LzZ6ZUgwVCtJRlNhUkhac3d0SitmY3JWcXFGcGd5QzdnUGZ1ckdEd1A3R2VmUGZTWkl3SHhoZGc0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNTE5NDQ0CWZpbGU6c3RhYmxlLmpzb24Kc0oyRHlhRU1MK0dMekVEdk14bHVna29ORElnVnZuM1hwd1QwQTJ1ZGdXeVByZGVKUmZ0UDFEbERlTmgvcGV4RmpHYnlOdzR2cVZzTktMTlF2Y2hZRHc9PQo=";
+        verify_signature(MANIFEST.as_bytes(), SIGNATURE.as_bytes()).unwrap();
+        let release =
+            StableManifest::parse_and_validate(MANIFEST.as_bytes(), "flowseal").unwrap();
+        assert_eq!(release.version, "1.10.4");
+        assert_eq!(release.artifacts.len(), 1);
+        assert_eq!(
+            release.artifacts[0].sha256,
+            "291af673bd0238506f9548e0e94ca0abf244000f4c9a06960544fb01c5f97b34"
         );
     }
 
