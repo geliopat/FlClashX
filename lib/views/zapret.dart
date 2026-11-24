@@ -13,6 +13,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 const _flowsealRootPreference = 'flowseal.installRoot';
 
+const _flowsealUserLists = <String, String>{
+  'list-general-user.txt': 'Домены для обработки Zapret',
+  'list-exclude-user.txt': 'Домены вне обработки Zapret',
+  'ipset-exclude-user.txt': 'IP-адреса и подсети-исключения',
+};
+
 class FlowsealView extends StatefulWidget {
   const FlowsealView({super.key});
 
@@ -24,8 +30,13 @@ class _FlowsealViewState extends State<FlowsealView> {
   final _rootController = TextEditingController();
   final _tcpController = TextEditingController(text: '12');
   final _udpController = TextEditingController(text: '12');
+  final _listEntryController = TextEditingController();
+  final _listSearchController = TextEditingController();
 
   String _root = '';
+  String _selectedUserList = _flowsealUserLists.keys.first;
+  List<String> _userListEntries = const [];
+  bool _listLoading = false;
   String _filterMode = 'none';
   String? _selectedStrategy;
   String? _error;
@@ -54,6 +65,8 @@ class _FlowsealViewState extends State<FlowsealView> {
     _rootController.dispose();
     _tcpController.dispose();
     _udpController.dispose();
+    _listEntryController.dispose();
+    _listSearchController.dispose();
     super.dispose();
   }
 
@@ -162,11 +175,18 @@ class _FlowsealViewState extends State<FlowsealView> {
     final strategies = installation.installed
         ? await flowsealListStrategies(root: root)
         : <String>[];
+    final userListEntries = installation.installed
+        ? await flowsealReadUserList(
+            root: root,
+            filename: _selectedUserList,
+          )
+        : <String>[];
     if (!mounted) return;
     setState(() {
       _installation = installation;
       _runtime = runtime;
       _strategies = strategies;
+      _userListEntries = userListEntries;
       if (_selectedStrategy == null ||
           !strategies.contains(_selectedStrategy)) {
         _selectedStrategy = strategies.isEmpty ? null : strategies.first;
@@ -214,6 +234,122 @@ class _FlowsealViewState extends State<FlowsealView> {
         _selectedStrategy = name;
         _validation = null;
       });
+    });
+  }
+
+  Future<void> _selectUserList(String filename) async {
+    setState(() {
+      _selectedUserList = filename;
+      _userListEntries = const [];
+      _listLoading = true;
+    });
+    try {
+      final entries = await flowsealReadUserList(
+        root: _root,
+        filename: filename,
+      );
+      if (!mounted || filename != _selectedUserList) return;
+      setState(() => _userListEntries = entries);
+    } catch (error) {
+      _setError('Не удалось прочитать список: $error');
+    } finally {
+      if (mounted && filename == _selectedUserList) {
+        setState(() => _listLoading = false);
+      }
+    }
+  }
+
+  Future<void> _restartAfterListChange() async {
+    final running = _runtime;
+    if (running?.running != true) return;
+    final strategy = running?.strategy;
+    if (strategy == null || strategy.isEmpty) {
+      throw Exception(
+        'Список сохранён. Остановите и запустите winws.exe вручную, '
+        'чтобы применить изменения.',
+      );
+    }
+
+    final stopped = await flowsealStop(root: _root);
+    if (mounted) {
+      setState(() => _runtime = stopped);
+      _syncStatusPolling();
+    }
+    final restarted = await flowsealStart(
+      root: _root,
+      strategy: strategy,
+      gameFilterMode: _filterMode,
+      gameFilterTcp: _tcpController.text.trim(),
+      gameFilterUdp: _udpController.text.trim(),
+    );
+    if (mounted) {
+      setState(() => _runtime = restarted);
+      _syncStatusPolling();
+    }
+  }
+
+  Future<void> _addUserListEntry() async {
+    final entry = _listEntryController.text.trim();
+    if (entry.isEmpty || !_installed) return;
+    await _withBusy(() async {
+      final entries = await flowsealAddUserListEntry(
+        root: _root,
+        filename: _selectedUserList,
+        entry: entry,
+      );
+      if (!mounted) return;
+      setState(() {
+        _userListEntries = entries;
+        _listEntryController.clear();
+      });
+      await _restartAfterListChange();
+    });
+  }
+
+  Future<void> _removeUserListEntry(String entry) async {
+    await _withBusy(() async {
+      final entries = await flowsealRemoveUserListEntry(
+        root: _root,
+        filename: _selectedUserList,
+        entry: entry,
+      );
+      if (!mounted) return;
+      setState(() => _userListEntries = entries);
+      await _restartAfterListChange();
+    });
+  }
+
+  Future<void> _importUserList() async {
+    if (!_installed) return;
+    final file = await FilePicker.pickFile(
+      type: FileType.custom,
+      allowedExtensions: const ['txt'],
+    );
+    if (file == null || !mounted) return;
+    await _withBusy(() async {
+      if ((file.lengthSync() ?? await file.length()) > 2 * 1024 * 1024) {
+        throw Exception('Размер списка превышает 2 МиБ.');
+      }
+      final content = utf8.decode(await file.readAsBytes());
+      final entries = content
+          .replaceFirst('\uFEFF', '')
+          .split(RegExp(r'\r?\n'))
+          .where((line) => line.trim().isNotEmpty && !line.trim().startsWith('#'))
+          .toList();
+      if (entries.isEmpty) {
+        throw Exception('В выбранном файле нет записей для импорта.');
+      }
+      final saved = await flowsealReplaceUserList(
+        root: _root,
+        filename: _selectedUserList,
+        entries: entries,
+      );
+      if (!mounted) return;
+      setState(() {
+        _userListEntries = saved;
+        _validation = 'Импортировано записей: ${saved.length}';
+      });
+      await _restartAfterListChange();
     });
   }
 
@@ -389,6 +525,8 @@ class _FlowsealViewState extends State<FlowsealView> {
           if (_installed) ...[
             const SizedBox(height: 12),
             _buildStrategyCard(context),
+            const SizedBox(height: 12),
+            _buildUserListsCard(context),
           ],
         ],
       ),
@@ -656,4 +794,173 @@ class _FlowsealViewState extends State<FlowsealView> {
       ),
     );
   }
+
+  Widget _buildUserListsCard(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final query = _listSearchController.text.trim().toLowerCase();
+    final filteredEntries = _userListEntries
+        .where((entry) => entry.toLowerCase().contains(query))
+        .toList();
+    final listHeight = (filteredEntries.length * 56.0)
+        .clamp(56.0, 280.0)
+        .toDouble();
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Пользовательские списки',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Списки хранятся в каталоге Flowseal. При работающем winws.exe '
+              'изменения применяются перезапуском процесса.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: _selectedUserList,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Тип списка',
+                border: OutlineInputBorder(),
+              ),
+              items: [
+                for (final item in _flowsealUserLists.entries)
+                  DropdownMenuItem(
+                    value: item.key,
+                    child: Text(
+                      item.value,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+              ],
+              onChanged: _busy
+                  ? null
+                  : (value) {
+                      if (value != null) unawaited(_selectUserList(value));
+                    },
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _listEntryController,
+                    enabled: !_busy,
+                    decoration: const InputDecoration(
+                      labelText: 'Домен или IPv4/CIDR',
+                      hintText: 'example.com или 192.0.2.0/24',
+                      border: OutlineInputBorder(),
+                    ),
+                    onSubmitted: (_) => _addUserListEntry(),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                FilledButton.tonalIcon(
+                  onPressed: _busy ? null : _addUserListEntry,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Добавить'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : _importUserList,
+                  icon: const Icon(Icons.file_upload_outlined),
+                  label: const Text('Импорт TXT'),
+                ),
+                IconButton(
+                  tooltip: 'Обновить список',
+                  onPressed: _busy ? null : () => _selectUserList(_selectedUserList),
+                  icon: const Icon(Icons.refresh),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _listSearchController,
+              enabled: !_busy,
+              decoration: const InputDecoration(
+                labelText: 'Поиск по списку',
+                prefixIcon: Icon(Icons.search),
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: 8),
+            if (_listLoading)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(16),
+                  child: CircularProgressIndicator(),
+                ),
+              )
+            else if (filteredEntries.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 18),
+                child: Center(
+                  child: Text(
+                    _userListEntries.isEmpty
+                        ? 'Список пуст.'
+                        : 'Совпадений не найдено.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                ),
+              )
+            else
+              SizedBox(
+                height: listHeight,
+                child: ListView.separated(
+                  itemCount: filteredEntries.length,
+                  itemBuilder: (context, index) {
+                    final entry = filteredEntries[index];
+                    return ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(
+                        entry,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      trailing: IconButton(
+                        tooltip: 'Удалить запись',
+                        onPressed: _busy
+                            ? null
+                            : () => _removeUserListEntry(entry),
+                        icon: const Icon(Icons.delete_outline),
+                      ),
+                    );
+                  },
+                  separatorBuilder: (_, _) => const Divider(height: 1),
+                ),
+              ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                'Записей: ${_userListEntries.length}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
 }

@@ -111,3 +111,35 @@ pub fn flowseal_start(
 pub fn flowseal_stop(root: String) -> Result<FlowsealRuntimeStatus, String> {
     runtime::stop(&PathBuf::from(root)).map(runtime_status)
 }
+
+#[frb]
+pub fn flowseal_read_user_list(root: String, filename: String) -> Result<Vec<String>, String> {
+    crate::zapret::user_lists::read(&PathBuf::from(root), &filename)
+}
+
+#[frb]
+pub fn flowseal_add_user_list_entry(
+    root: String,
+    filename: String,
+    entry: String,
+) -> Result<Vec<String>, String> {
+    crate::zapret::user_lists::add(&PathBuf::from(root), &filename, &entry)
+}
+
+#[frb]
+pub fn flowseal_remove_user_list_entry(
+    root: String,
+    filename: String,
+    entry: String,
+) -> Result<Vec<String>, String> {
+    crate::zapret::user_lists::remove(&PathBuf::from(root), &filename, &entry)
+}
+
+#[frb]
+pub fn flowseal_replace_user_list(
+    root: String,
+    filename: String,
+    entries: Vec<String>,
+) -> Result<Vec<String>, String> {
+    crate::zapret::user_lists::replace(&PathBuf::from(root), &filename, &entries)
+}
