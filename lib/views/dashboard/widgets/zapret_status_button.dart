@@ -1,0 +1,75 @@
+import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/providers/providers.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:material_ui/material_ui.dart';
+
+class ZapretStatusButton extends ConsumerWidget {
+  const ZapretStatusButton({super.key});
+
+  Future<void> _restart(BuildContext context, WidgetRef ref) async {
+    final status = ref.read(zapretControllerProvider);
+    if (status.busy || !status.available) return;
+    final message = status.running
+        ? 'Перезапустить Zapret? Перед запуском будут проверены и завершены зависшие процессы winws2.exe, winws.exe и winws2-split.exe.'
+        : 'Запустить Zapret2? Перед запуском будут проверены и завершены зависшие процессы winws2.exe, winws.exe и winws2-split.exe.';
+    final confirmed = await dialogs.showMessage(
+      title: 'Zapret',
+      message: TextSpan(text: message),
+      confirmText: status.running ? 'Перезапустить' : 'Запустить',
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      await ref.read(zapretControllerProvider.notifier).restart();
+    } catch (error) {
+      dialogs.showNotifier(
+        error is HelperException ? error.message : error.toString(),
+        level: MessageLevel.error,
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(zapretControllerProvider);
+    final icon = state.busy
+        ? const SizedBox.square(
+            dimension: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )
+        : Icon(
+            Icons.shield_outlined,
+            color: state.running
+                ? context.colorScheme.primary
+                : context.colorScheme.onSurfaceVariant,
+          );
+    const style = ElasticPress.buttonStyle;
+    final iconOnly = state.running || ViewScope.isMobileOf(context);
+    return Tooltip(
+      message: 'Zapret',
+      child: FadeScaleBox(
+        alignment: Alignment.centerRight,
+        child: iconOnly
+            ? IconButton.filled(
+                style: style,
+                onPressed: state.busy || !state.available
+                    ? null
+                    : () => _restart(context, ref),
+                icon: icon,
+              )
+            : FilledButton.icon(
+                onPressed: state.busy || !state.available
+                    ? null
+                    : () => _restart(context, ref),
+                style: style,
+                icon: icon,
+                label: Text(state.busy
+                    ? 'Запуск...'
+                    : state.running
+                        ? 'Zapret включён'
+                        : 'Zapret выключен'),
+              ),
+      ),
+    );
+  }
+}
