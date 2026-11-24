@@ -43,6 +43,16 @@ windows-sys = { version = "0.61", features = [
   "Win32_System_Registry",
 ] }
 
+
+# Flowseal's signed update channel and verified ZIP installation are Windows-only.
+[target.'cfg(windows)'.dependencies]
+base64 = "0.23.1"
+futures-util = "0.3.34"
+minisign-verify = "0.3.0"
+reqwest = { version = "0.13.5", features = ["json", "stream"] }
+sha2 = "0.11.1"
+zip = { version = "9.4.2", default-features = false, features = ["deflate", "deflate-flate2", "bzip2"] }
+
 [profile.release]
 opt-level = "s"
 lto = true
