@@ -20,7 +20,7 @@ extension DashboardWidgetView on DashboardWidget {
     DashboardWidget.connectionStats => const ConnectionStatsCard(),
     DashboardWidget.intranetIp => const IntranetIpCard(),
     DashboardWidget.memoryInfo => const MemoryInfo(),
-    DashboardWidget.zapret => const ZapretTile(),
+    DashboardWidget.zapret => const ZapretWidgetCard(),
   };
 
   Glyph get glyph => switch (this) {
@@ -71,11 +71,9 @@ extension DashboardWidgetView on DashboardWidget {
   /// The status card holds the start button, which has nowhere else to go
   /// unless [providerMode] puts it at the foot of the page, and the
   /// announcement comes and goes with the subscription.
-  bool removable({required bool providerMode, SupportPlatform? platform}) =>
+  bool removable({required bool providerMode}) =>
       (providerMode || this != DashboardWidget.currentOutbound) &&
-      this != DashboardWidget.announcement &&
-      !(platform == SupportPlatform.Windows &&
-          this == DashboardWidget.zapret);
+      this != DashboardWidget.announcement;
 }
 
 /// The status card, or under `providermode` the server's location.
@@ -96,24 +94,13 @@ List<DashboardWidget> withFixedCards(
   List<DashboardWidget> saved, {
   required bool announcement,
   bool providerMode = false,
-  SupportPlatform? platform,
 }) {
-  final result = <DashboardWidget>[
+  return [
     if (announcement && !saved.contains(DashboardWidget.announcement))
       DashboardWidget.announcement,
     if (!providerMode && !saved.contains(DashboardWidget.currentOutbound))
       DashboardWidget.currentOutbound,
     for (final card in saved)
-      if ((announcement || card != DashboardWidget.announcement) &&
-          !(providerMode &&
-              platform == SupportPlatform.Windows &&
-              card == DashboardWidget.zapret))
-        card,
+      if (announcement || card != DashboardWidget.announcement) card,
   ];
-  // Older card layouts did not know about the standalone Windows Zapret card.
-  if (!providerMode && platform == SupportPlatform.Windows &&
-      !result.contains(DashboardWidget.zapret)) {
-    result.add(DashboardWidget.zapret);
-  }
-  return result;
 }

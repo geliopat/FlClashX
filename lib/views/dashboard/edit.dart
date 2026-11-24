@@ -169,10 +169,7 @@ class _DashboardEditorState extends ConsumerState<DashboardEditor>
     final providerMode = ref.watch(providerModeProvider);
     final addable = [
       for (final card in DashboardWidget.values)
-        if (card.removable(
-              providerMode: providerMode,
-              platform: widget.platform,
-            ) &&
+        if (card.removable(providerMode: providerMode) &&
             card.platforms.contains(widget.platform) &&
             !shown.contains(card))
           card,
@@ -213,10 +210,7 @@ class _DashboardEditorState extends ConsumerState<DashboardEditor>
                       cardKey: widget.cardKeyOf(card),
                       index: index,
                       sway: sway,
-                      onRemove: card.removable(
-                            providerMode: providerMode,
-                            platform: widget.platform,
-                          )
+                      onRemove: card.removable(providerMode: providerMode)
                           ? () => _remove(card)
                           : null,
                     ),

@@ -290,6 +290,23 @@ void main() {
       );
     });
 
+    test('accepts zapret as an ordinary flclashx-widgets entry', () {
+      expect(
+        const ProviderHeaders({'flclashx-widgets': 'zapret'}).dashboardWidgets,
+        [DashboardWidget.zapret],
+      );
+      expect(
+        const ProviderHeaders({
+          'flclashx-widgets': 'networkSpeed,zapret,profiles',
+        }).dashboardWidgets,
+        [
+          DashboardWidget.networkSpeed,
+          DashboardWidget.zapret,
+          DashboardWidget.profiles,
+        ],
+      );
+    });
+
     test('drops names nothing answers to and repeats', () {
       expect(
         const ProviderHeaders({

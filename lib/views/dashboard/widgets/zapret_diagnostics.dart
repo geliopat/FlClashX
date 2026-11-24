@@ -1,3 +1,40 @@
+import 'package:fl_clash/enum/enum.dart';
+import 'package:fl_clash/providers/providers.dart';
+import 'package:fl_clash/ui/icons/icons.dart';
+import 'package:fl_clash/widgets/widgets.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:material_ui/material_ui.dart';
+
+import '../style.dart';
+import 'card.dart';
+import 'network_takeover.dart';
+
+/// The `zapret` item from `flclashx-widgets`.
+/// ProviderMode uses it for latency diagnostics; the regular dashboard uses
+/// the native Zapret on/off card.
+class ZapretWidgetCard extends ConsumerWidget {
+  const ZapretWidgetCard({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final providerMode = ref.watch(providerModeProvider);
+    if (providerMode) {
+      final enabled = ref.watch(
+        currentProfileProvider.select(
+          (profile) =>
+              profile?.headers.dashboardWidgets?.contains(DashboardWidget.zapret) ??
+              false,
+        ),
+      );
+      return enabled
+          ? const ZapretDiagnosticsCard()
+          : const SizedBox.shrink();
+    }
+    return const ZapretTile();
+  }
+}
+
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/widgets/widgets.dart';

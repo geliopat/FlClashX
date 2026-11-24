@@ -447,6 +447,28 @@ void main() {
       return pending;
     }
 
+    test('sends the FlClashZ user agent on subscription downloads', () async {
+      final previousCoreVersion = globalState.coreVersion;
+      globalState.coreVersion = '1.19.34';
+      String? userAgent;
+      server.listen((incoming) {
+        userAgent = incoming.headers.value(HttpHeaders.userAgentHeader);
+        incoming.response
+          ..statusCode = HttpStatus.ok
+          ..write('proxies: []');
+        unawaited(incoming.response.close());
+      });
+      try {
+        await fetch();
+        expect(
+          userAgent,
+          'FlClashZ/v0.5.0 core/1.19.34 Platform/${Platform.operatingSystem}',
+        );
+      } finally {
+        globalState.coreVersion = previousCoreVersion;
+      }
+    });
+
     test('that answers with part of the file is refused', () async {
       server.listen((request) {
         request.response

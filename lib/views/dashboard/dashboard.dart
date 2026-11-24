@@ -17,7 +17,6 @@ import 'wide.dart';
 import 'widget_registry.dart';
 import 'widgets/core_status_button.dart';
 import 'widgets/zapret_status_button.dart';
-import 'widgets/zapret_diagnostics.dart';
 import 'widgets/profile_detail.dart';
 
 class DashboardView extends ConsumerStatefulWidget {
@@ -56,6 +55,13 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
     final platform = widget.platform ?? SupportPlatform.currentPlatform;
     final scale = math.max(1.0, MediaQuery.textScalerOf(context).scale(1));
     final providerMode = ref.watch(providerModeProvider);
+    final zapretWidgetEnabled = ref.watch(
+      currentProfileProvider.select(
+        (profile) =>
+            profile?.headers.dashboardWidgets?.contains(DashboardWidget.zapret) ??
+            false,
+      ),
+    );
     final editable = !ref.watch(widgetEditingDeniedProvider);
     final chosen = ref.watch(
       appSettingProvider.select((state) => state.dashboardWidgetsChosen),
@@ -73,7 +79,10 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
           : appLocalizations.dashboard,
       actions: [
         if (!editing) const CoreStatusButton(),
-        if (!editing && providerMode && platform == SupportPlatform.Windows)
+        if (!editing &&
+            providerMode &&
+            zapretWidgetEnabled &&
+            platform == SupportPlatform.Windows)
           const ZapretStatusButton(),
       ],
       confirmationAction: editing
@@ -161,7 +170,7 @@ class _WideCards extends ConsumerWidget {
       cards: withFixedCards([
         for (final widget in saved)
           if (widget.platforms.contains(platform)) widget,
-      ], announcement: announcement, platform: platform),
+      ], announcement: announcement),
       columns: columns,
       gap: gap,
     );
@@ -225,7 +234,6 @@ class _MobileDashboard extends ConsumerWidget {
               ],
               announcement: announcement,
               providerMode: providerMode,
-              platform: platform,
             );
             if (editing) {
               return DashboardEditor(
@@ -250,8 +258,6 @@ class _MobileDashboard extends ConsumerWidget {
                         padding: EdgeInsets.only(bottom: 4),
                         child: ProviderHeader(),
                       ),
-                    if (providerMode && platform == SupportPlatform.Windows)
-                      const ZapretDiagnosticsCard(),
                     for (final widget in widgets)
                       RepaintBoundary(
                         key: cardKeyOf(widget),
@@ -293,7 +299,7 @@ class _MobileDashboard extends ConsumerWidget {
         Expanded(child: content),
         Padding(
           padding: EdgeInsets.fromLTRB(side, 0, side, 16 + context.bottomInset),
-          child: platform == SupportPlatform.Windows
+          child: zapretWidgetEnabled && platform == SupportPlatform.Windows
               ? const Row(
                   spacing: 8,
                   children: [

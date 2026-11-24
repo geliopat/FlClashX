@@ -29,29 +29,23 @@ void main() {
     ]);
   });
 
-  test('keeps Windows Zapret widgets in older saved layouts', () {
+  test('keeps only the widgets selected by the dashboard header', () {
     final result = withFixedCards(
       const [speed, profiles],
       announcement: false,
-      platform: SupportPlatform.Windows,
     );
-    expect(result, contains(DashboardWidget.zapret));
-    expect(result, isNot(contains(DashboardWidget.vpnButton)));
+    expect(result, isNot(contains(DashboardWidget.zapret)));
     expect(
-      DashboardWidget.zapret.removable(
-        providerMode: false,
-        platform: SupportPlatform.Windows,
-      ),
-      isFalse,
+      DashboardWidget.zapret.removable(providerMode: false),
+      isTrue,
     );
     expect(
       withFixedCards(
-        const [speed, profiles],
+        const [speed, DashboardWidget.zapret, profiles],
         announcement: false,
         providerMode: true,
-        platform: SupportPlatform.Windows,
       ),
-      isNot(contains(DashboardWidget.zapret)),
+      contains(DashboardWidget.zapret),
     );
   });
 
