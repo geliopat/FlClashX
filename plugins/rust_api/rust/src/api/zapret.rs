@@ -1,6 +1,8 @@
 use crate::zapret::core::{CoreProvider, GameFilterSettings};
 use crate::zapret::providers::flowseal::FlowsealProvider;
 use crate::zapret::runtime;
+use crate::frb_generated::StreamSink;
+use flutter_rust_bridge::for_generated::SseCodec;
 use flutter_rust_bridge::frb;
 use std::path::PathBuf;
 
@@ -229,4 +231,54 @@ pub fn flowseal_import_user_lists_backup(
         exclude: backup.exclude,
         ips: backup.ips,
     })
+}
+
+
+#[derive(Clone)]
+pub struct FlowsealStrategyTestResult {
+    pub strategy: String,
+    pub status: String,
+    pub http_ok: i32,
+    pub http_error: i32,
+    pub ping_ok: i32,
+    pub ping_fail: i32,
+    pub avg_ping_ms: i32,
+    pub score: i32,
+}
+
+#[derive(Clone)]
+pub struct FlowsealStrategyTestProgress {
+    pub message: String,
+    pub kind: String,
+    pub current: u64,
+    pub total: u64,
+    pub strategy: String,
+}
+
+#[frb]
+pub fn flowseal_strategy_test_events(
+    sink: StreamSink<FlowsealStrategyTestProgress, SseCodec>,
+) -> Result<(), String> {
+    crate::zapret::strategy_test::listen(sink)
+}
+
+#[frb]
+pub fn flowseal_cancel_strategy_tests() {
+    crate::zapret::strategy_test::cancel();
+}
+
+#[frb]
+pub async fn flowseal_test_strategies(
+    root: String,
+    test_type: String,
+    game_filter_mode: String,
+    game_filter_tcp: String,
+    game_filter_udp: String,
+) -> Result<Vec<FlowsealStrategyTestResult>, String> {
+    let filter = GameFilterSettings {
+        mode: game_filter_mode,
+        tcp_range: game_filter_tcp,
+        udp_range: game_filter_udp,
+    };
+    crate::zapret::strategy_test::run(PathBuf::from(root), &test_type, &filter).await
 }
