@@ -45,13 +45,18 @@ bool _validFlowsealPortRange(String value) {
   }
   for (final part in value.split(',')) {
     final bounds = part.split('-');
-    if (bounds.isEmpty || bounds.length > 2 ||
+    if (bounds.isEmpty ||
+        bounds.length > 2 ||
         bounds.any((bound) => bound.isEmpty)) {
       return false;
     }
     final start = int.tryParse(bounds.first);
     final end = int.tryParse(bounds.length == 2 ? bounds.last : bounds.first);
-    if (start == null || end == null || start < 1 || end > 65535 || start > end) {
+    if (start == null ||
+        end == null ||
+        start < 1 ||
+        end > 65535 ||
+        start > end) {
       return false;
     }
   }
@@ -76,12 +81,17 @@ _FlowsealLaunchIntent? _readFlowsealLaunchIntent(List<String> args) {
     final mode = decoded['gameFilterMode'];
     final tcp = decoded['gameFilterTcp'];
     final udp = decoded['gameFilterUdp'];
-    if (strategy is! String || strategy.trim().isEmpty || strategy.length > 64 ||
-        mode is! String || !const {'none', 'all', 'tcp', 'udp'}.contains(mode) ||
+    if (strategy is! String ||
+        strategy.trim().isEmpty ||
+        strategy.length > 64 ||
+        mode is! String ||
+        !const {'none', 'all', 'tcp', 'udp'}.contains(mode) ||
         tcp is! String ||
-        (const {'all', 'tcp'}.contains(mode) && !_validFlowsealPortRange(tcp)) ||
+        (const {'all', 'tcp'}.contains(mode) &&
+            !_validFlowsealPortRange(tcp)) ||
         udp is! String ||
-        (const {'all', 'udp'}.contains(mode) && !_validFlowsealPortRange(udp))) {
+        (const {'all', 'udp'}.contains(mode) &&
+            !_validFlowsealPortRange(udp))) {
       return null;
     }
     return _FlowsealLaunchIntent(
@@ -130,8 +140,7 @@ void main(List<String> args) {
         );
 
         final flowsealIntent =
-            Platform.isWindows &&
-                args.contains(_flowsealElevatedLaunchArgument)
+            Platform.isWindows && args.contains(_flowsealElevatedLaunchArgument)
             ? _readFlowsealLaunchIntent(args)
             : null;
         String? flowsealStartError;
@@ -144,7 +153,9 @@ void main(List<String> args) {
         } else if (flowsealIntent != null) {
           try {
             final preferences = await SharedPreferences.getInstance();
-            final savedRoot = preferences.getString(_flowsealInstallRootPreference);
+            final savedRoot = preferences.getString(
+              _flowsealInstallRootPreference,
+            );
             final root = savedRoot == null || savedRoot.trim().isEmpty
                 ? p.join(await appPath.homeDirPath, 'Flowseal')
                 : savedRoot;

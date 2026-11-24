@@ -46,11 +46,7 @@ class Bootstrap {
     navigationPort = navigation;
     notificationPort = systemNotifications;
     final dynamicColor = await _initDynamicColor();
-    return _initData(
-      version,
-      dynamicColor,
-      waitForDataLock: waitForDataLock,
-    );
+    return _initData(version, dynamicColor, waitForDataLock: waitForDataLock);
   }
 
   Future<DynamicColorSeeds> _initDynamicColor() async {

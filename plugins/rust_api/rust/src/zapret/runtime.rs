@@ -264,7 +264,9 @@ pub fn start(
     if unsafe { AssignProcessToJobObject(job.as_raw_handle() as HANDLE, process_handle) } == 0 {
         let error = io::Error::last_os_error();
         let _ = stop_child(&mut child);
-        return Err(format!("Cannot attach Flowseal process to its job: {error}"));
+        return Err(format!(
+            "Cannot attach Flowseal process to its job: {error}"
+        ));
     }
 
     let log = Arc::new(Mutex::new(log_file));
@@ -310,9 +312,8 @@ pub fn start(
 pub fn stop(root: &Path) -> Result<ProcessStatus, String> {
     let mut slot = lock_process();
     let log_path = if let Some(running) = slot.as_mut() {
-        stop_child(&mut running.child).map_err(|error| {
-            format!("Cannot stop owned Flowseal winws.exe process: {error}")
-        })?;
+        stop_child(&mut running.child)
+            .map_err(|error| format!("Cannot stop owned Flowseal winws.exe process: {error}"))?;
         running.log_path.clone()
     } else {
         root.join("logs").join("winws.log")
