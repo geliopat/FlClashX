@@ -146,10 +146,14 @@ class ZapretController extends Notifier<ZapretState> {
         cleanedProcesses: response.cleanedProcesses,
       );
     } catch (error) {
-      state = state.copyWith(error: _errorMessage(error));
+      if (ref.mounted) {
+        state = state.copyWith(error: _errorMessage(error));
+      }
       rethrow;
     } finally {
-      state = state.copyWith(busy: false);
+      if (ref.mounted) {
+        state = state.copyWith(busy: false);
+      }
     }
   }
 
