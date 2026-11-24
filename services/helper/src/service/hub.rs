@@ -118,6 +118,10 @@ struct ZapretStatusResponse {
     strategy_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     engine: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    mode: Option<super::zapret::ZapretLaunchMode>,
+    win_divert_filters: Vec<String>,
+    processing_lists: Vec<String>,
     cleaned_processes: usize,
 }
 
@@ -479,6 +483,7 @@ struct ManagedZapret {
     strategy_id: String,
     engine: String,
     mode: super::zapret::ZapretLaunchMode,
+    args: Vec<String>,
 }
 
 #[cfg(windows)]
@@ -590,28 +595,45 @@ fn zapret_status_response(
     managed: &mut Option<ManagedZapret>,
     cleaned_processes: usize,
 ) -> Result<warp::reply::Response, Error> {
-    let (pid, exited_status, strategy_id, engine) = match managed.as_mut() {
+    let (pid, exited_status, strategy_id, engine, mode, args) = match managed.as_mut() {
         Some(zapret) => match zapret.child.try_wait()? {
-            Some(status) => (None, Some(status), None, None),
+            Some(status) => (None, Some(status), None, None, None, Vec::new()),
             None => (
                 Some(zapret.child.id()),
                 None,
                 Some(zapret.strategy_id.clone()),
                 Some(zapret.engine.clone()),
+                Some(zapret.mode),
+                zapret.args.clone(),
             ),
         },
-        None => (None, None, None, None),
+        None => (None, None, None, None, None, Vec::new()),
     };
     if let Some(status) = exited_status {
         log_message(format!("Zapret engine exited: {status}"));
         *managed = None;
     }
+    let win_divert_filters = args.iter()
+        .filter(|arg| arg.starts_with("--wf-tcp=") || arg.starts_with("--wf-udp="))
+        .cloned()
+        .collect();
+    let processing_lists = args.iter()
+        .filter(|arg| arg.starts_with("--hostlist=")
+            || arg.starts_with("--hostlist-domains=")
+            || arg.starts_with("--hostlist-exclude=")
+            || arg.starts_with("--ipset=")
+            || arg.starts_with("--ipset-exclude="))
+        .cloned()
+        .collect();
     Ok(json_response(
         &ZapretStatusResponse {
             running: pid.is_some(),
             pid,
             strategy_id,
             engine,
+            mode,
+            win_divert_filters,
+            processing_lists,
             cleaned_processes,
         },
         StatusCode::OK,
@@ -740,6 +762,7 @@ fn launch_zapret(restart: bool, strategy_id: String, mode: super::zapret::Zapret
         strategy_id: strategy_id.clone(),
         engine: engine.clone(),
         mode,
+        args: args.clone(),
     });
     json_response(
         &ZapretStatusResponse {
@@ -747,6 +770,19 @@ fn launch_zapret(restart: bool, strategy_id: String, mode: super::zapret::Zapret
             pid: Some(pid),
             strategy_id: Some(strategy_id),
             engine: Some(engine),
+            mode: Some(mode),
+            win_divert_filters: args.iter()
+                .filter(|arg| arg.starts_with("--wf-tcp=") || arg.starts_with("--wf-udp="))
+                .cloned()
+                .collect(),
+            processing_lists: args.iter()
+                .filter(|arg| arg.starts_with("--hostlist=")
+                    || arg.starts_with("--hostlist-domains=")
+                    || arg.starts_with("--hostlist-exclude=")
+                    || arg.starts_with("--ipset=")
+                    || arg.starts_with("--ipset-exclude="))
+                .cloned()
+                .collect(),
             cleaned_processes: cleaned,
         },
         StatusCode::OK,
@@ -773,6 +809,9 @@ fn stop_zapret() -> warp::reply::Response {
             pid: None,
             strategy_id: None,
             engine: None,
+            mode: None,
+            win_divert_filters: Vec::new(),
+            processing_lists: Vec::new(),
             cleaned_processes: cleaned,
         },
         StatusCode::OK,
