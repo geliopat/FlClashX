@@ -22,7 +22,7 @@ class ZapretDiagnosticsCard extends ConsumerWidget {
         children: [
           DashboardCardHeader(
             glyph: AppGlyphs.speed,
-            title: 'Сетевые задержки',
+            title: 'Сетевые задержки · HTTPS',
             trailing: [
               DashboardIconButton(
                 glyph: AppGlyphs.refresh,
@@ -56,7 +56,7 @@ class ZapretDiagnosticsCard extends ConsumerWidget {
                   SizedBox(
                     width: groupWidth,
                     child: _ProbeGroup(
-                      title: 'Discord Voice / Gateway',
+                      title: 'Discord Gateway / Voice API',
                       first: ZapretProbeTarget.discordGateway,
                       second: ZapretProbeTarget.discordVoice,
                       state: state,
