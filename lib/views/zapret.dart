@@ -714,6 +714,16 @@ class _FlowsealViewState extends State<FlowsealView> {
       );
       return;
     }
+    final ready = await dialogs.showMessage(
+      title: 'Проверка Zapret напрямую',
+      message: const TextSpan(
+        text: 'HTTP-проверки будут идти напрямую и игнорировать системный прокси. '
+            'Но включённый Mihomo TUN или другой VPN может перехватить трафик на уровне Windows. '
+            'Для достоверного сравнения временно отключите TUN/другие туннели, затем запустите тест.',
+      ),
+      confirmText: 'Продолжить',
+    );
+    if (ready != true || !mounted) return;
     if (!_elevated) {
       await _requestElevationForTest();
       return;
