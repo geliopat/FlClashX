@@ -36,7 +36,7 @@ use windows_sys::Win32::{
         },
     },
     UI::{
-        Shell::{ShellExecuteExW, SHELLEXECUTEINFOW, SEE_MASK_NOCLOSEPROCESS, SEE_MASK_NOASYNC},
+        Shell::{ShellExecuteExW, SEE_MASK_NOASYNC, SEE_MASK_NOCLOSEPROCESS, SHELLEXECUTEINFOW},
         WindowsAndMessaging::SW_HIDE,
     },
 };
@@ -374,7 +374,9 @@ pub fn start(
         if let Some(process) = elevated_process.as_ref() {
             let _ = stop_elevated(process);
         }
-        return Err(format!("Cannot attach Flowseal process to its job: {error}"));
+        return Err(format!(
+            "Cannot attach Flowseal process to its job: {error}"
+        ));
     }
 
     let log = Arc::new(Mutex::new(log_file));
@@ -428,11 +430,13 @@ pub fn stop(root: &Path) -> Result<ProcessStatus, String> {
     let mut slot = lock_process();
     let log_path = if let Some(running) = slot.as_mut() {
         if let Some(process) = running.child.as_mut() {
-            stop_child(process)
-                .map_err(|error| format!("Cannot stop owned Flowseal winws.exe process: {error}"))?;
+            stop_child(process).map_err(|error| {
+                format!("Cannot stop owned Flowseal winws.exe process: {error}")
+            })?;
         } else if let Some(process) = running.elevated_process.as_ref() {
-            stop_elevated(process)
-                .map_err(|error| format!("Cannot stop elevated Flowseal winws.exe process: {error}"))?;
+            stop_elevated(process).map_err(|error| {
+                format!("Cannot stop elevated Flowseal winws.exe process: {error}")
+            })?;
         }
         running.log_path.clone()
     } else {
