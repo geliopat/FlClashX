@@ -127,6 +127,16 @@ install(FILES
   DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
   COMPONENT Runtime)
 
+# Zapret2 engines, Lua strategies, blobs and lists are staged by
+# scripts/setup_zapret.ps1 before Windows builds. Keep them beside the Helper:
+# the elevated service owns winws2.exe and resolves all assets from this folder.
+set(ZAPRET_ASSETS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/zapret")
+if(EXISTS "${ZAPRET_ASSETS_DIR}/winws2.exe")
+  install(DIRECTORY "${ZAPRET_ASSETS_DIR}/"
+    DESTINATION "${INSTALL_BUNDLE_LIB_DIR}/zapret"
+    COMPONENT Runtime)
+endif()
+
 # Copy the native assets provided by the build.dart from all packages.
 set(NATIVE_ASSETS_DIR "${PROJECT_BUILD_DIR}native_assets/windows/")
 install(DIRECTORY "${NATIVE_ASSETS_DIR}"
