@@ -181,6 +181,11 @@ jobs:
 
       # Compiles the desktop runners and the native plugin code that only the
       # tagged release matrix built before; the bundle itself is discarded.
+      - name: Stage pinned Zapret2 and Flowseal assets
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: ./scripts/setup_zapret.ps1
+
       - name: Build debug bundle
         run: flutter build ${{ matrix.platform }} --debug
 
@@ -482,6 +487,11 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" "$keychain"
           security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
           security find-identity -v -p codesigning "$keychain"
+
+      - name: Stage pinned Zapret2 and Flowseal assets
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: ./scripts/setup_zapret.ps1
 
       - name: Setup
         env:
