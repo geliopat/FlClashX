@@ -1292,9 +1292,8 @@ class _FlowsealViewState extends State<FlowsealView> {
                 for (final result in _testResults)
                   _buildTestResult(context, result),
               ],
-              footer: 'DNS разрешается системным сетевым стеком Windows и при активном Mihomo TUN перехватывается Mihomo (dns-hijack: any:53). '
-                  'HTTP-прокси обходится, но TUN и его DNS-перехват остаются включёнными. '
-                  'Комплексный режим проверяет HTTP/TCP и DPI. Лучшая стратегия выбирается автоматически, но не запускается без твоего действия.',
+              footer: 'Тест отправляет HTTP-запросы без системного HTTP-прокси, но не обходит Mihomo TUN. DNS обрабатывает Mihomo (dns-hijack: any:53), а маршрут запросов определяется активными правилами Mihomo: YouTube и Discord с правилом DIRECT идут напрямую. WinDivert/Zapret проверяет и обрабатывает исходящие пакеты. '
+                  'Автотест не меняет правила маршрутизации и не принудительно задаёт DIRECT. Комплексный режим проверяет HTTP/TCP и DPI; выбранная стратегия не запускается без твоего действия.',
             ),
             generateSection(
               title: 'IPSet Filter',
