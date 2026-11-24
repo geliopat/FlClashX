@@ -238,6 +238,7 @@ fn load_standard_targets(root: &Path) -> Vec<Target> {
 
 fn build_client(kind: ProbeKind, timeout: Duration) -> Result<Client, String> {
     let mut builder = Client::builder()
+        .no_proxy()
         .timeout(timeout)
         .connect_timeout(Duration::from_secs(3))
         .redirect(reqwest::redirect::Policy::limited(5))
