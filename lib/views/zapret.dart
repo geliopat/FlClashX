@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:file_picker/file_picker.dart';
@@ -32,6 +33,8 @@ class _FlowsealViewState extends State<FlowsealView> {
   FlowsealRuntimeStatus? _runtime;
   List<String> _strategies = const [];
   bool _busy = false;
+  bool _pollingStatus = false;
+  Timer? _statusTimer;
 
   bool get _installed => _installation?.installed ?? false;
   bool get _running => _runtime?.running ?? false;
@@ -45,6 +48,7 @@ class _FlowsealViewState extends State<FlowsealView> {
 
   @override
   void dispose() {
+    _statusTimer?.cancel();
     _rootController.dispose();
     _tcpController.dispose();
     _udpController.dispose();
@@ -121,6 +125,33 @@ class _FlowsealViewState extends State<FlowsealView> {
     await _saveRoot();
   }
 
+  void _syncStatusPolling() {
+    if (_running) {
+      _statusTimer ??= Timer.periodic(
+        const Duration(seconds: 3),
+        (_) => unawaited(_pollRuntimeStatus()),
+      );
+    } else {
+      _statusTimer?.cancel();
+      _statusTimer = null;
+    }
+  }
+
+  Future<void> _pollRuntimeStatus() async {
+    if (!mounted || _busy || _pollingStatus || _root.trim().isEmpty) return;
+    _pollingStatus = true;
+    try {
+      final status = await flowsealProcessStatus(root: _root);
+      if (!mounted) return;
+      setState(() => _runtime = status);
+      _syncStatusPolling();
+    } catch (_) {
+      // A transient status read must not hide the current runtime state.
+    } finally {
+      _pollingStatus = false;
+    }
+  }
+
   Future<void> _refresh() async {
     if (_root.trim().isEmpty) return;
     final root = _root.trim();
@@ -140,6 +171,7 @@ class _FlowsealViewState extends State<FlowsealView> {
       }
       _preview = null;
     });
+    _syncStatusPolling();
   }
 
   Future<void> _validate() async {
@@ -209,14 +241,20 @@ class _FlowsealViewState extends State<FlowsealView> {
         gameFilterTcp: _tcpController.text.trim(),
         gameFilterUdp: _udpController.text.trim(),
       );
-      if (mounted) setState(() => _runtime = status);
+      if (mounted) {
+        setState(() => _runtime = status);
+        _syncStatusPolling();
+      }
     });
   }
 
   Future<void> _stop() async {
     await _withBusy(() async {
       final status = await flowsealStop(root: _root);
-      if (mounted) setState(() => _runtime = status);
+      if (mounted) {
+        setState(() => _runtime = status);
+        _syncStatusPolling();
+      }
     });
   }
 
