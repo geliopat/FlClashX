@@ -142,7 +142,7 @@ class _WideDashboardState extends ConsumerState<WideDashboard> {
       WideRowKind.top => (compact ? 176 : 208) * scale,
       WideRowKind.control => (compact ? 56 : 64) * scale,
       WideRowKind.middle => ((compact ? 152 : 176) + (offers ? 44 : 0)) * scale,
-      WideRowKind.diagnostics => (compact ? 124 : 136) * scale,
+      WideRowKind.diagnostics => (compact ? 176 : 184) * scale,
       WideRowKind.bottom => (compact ? 112 : 120) * scale,
     };
     final tablesHeight = connectionsTableMinHeight(density, scale);

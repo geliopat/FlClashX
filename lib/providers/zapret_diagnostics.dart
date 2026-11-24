@@ -12,14 +12,31 @@ final zapretDiagnosticsProvider =
 enum ZapretProbeStatus { checking, operational, degraded, blocked }
 
 enum ZapretProbeTarget {
-  youtube('YouTube', 'https://www.youtube.com/generate_204'),
-  googleVideo('GoogleVideo', 'https://redirector.googlevideo.com/report_mapping'),
-  discordGateway('Discord Gateway', 'https://discord.com/api/v10/gateway'),
-  discordVoice('Discord Voice API', 'https://discord.com/api/v10/voice/regions');
+  youtube(
+    'YouTube',
+    'www.youtube.com',
+    'https://www.youtube.com/generate_204',
+  ),
+  googleVideo(
+    'GoogleVideo',
+    'redirector.googlevideo.com',
+    'https://redirector.googlevideo.com/report_mapping',
+  ),
+  discordGateway(
+    'Discord Gateway',
+    'gateway.discord.gg',
+    'https://discord.com/api/v10/gateway',
+  ),
+  discordVoice(
+    'Discord Voice API',
+    'discord.media',
+    'https://discord.com/api/v10/voice/regions',
+  );
 
-  const ZapretProbeTarget(this.label, this.url);
+  const ZapretProbeTarget(this.label, this.host, this.url);
 
   final String label;
+  final String host;
   final String url;
 }
 
@@ -78,6 +95,7 @@ class ZapretDiagnosticsState {
 
 class ZapretDiagnosticsController extends Notifier<ZapretDiagnosticsState> {
   static const _pollInterval = Duration(seconds: 30);
+  static const _dnsTimeout = Duration(seconds: 2);
   static const _connectTimeout = Duration(milliseconds: 2500);
   static const _requestTimeout = Duration(milliseconds: 3500);
 
@@ -91,7 +109,11 @@ class ZapretDiagnosticsController extends Notifier<ZapretDiagnosticsState> {
       maxRedirects: 3,
       validateStatus: (status) =>
           status != null && status >= 100 && status < 600,
-      headers: const {'Cache-Control': 'no-cache'},
+      headers: const {
+        'Cache-Control': 'no-cache',
+        'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      },
     ),
   );
 
@@ -137,6 +159,31 @@ class ZapretDiagnosticsController extends Notifier<ZapretDiagnosticsState> {
   Future<(ZapretProbeTarget, ZapretProbeResult)> _measure(
     ZapretProbeTarget target,
   ) async {
+    // Match zapret2-gui: DNS is a separate phase and is not added to the
+    // displayed HTTPS latency.
+    try {
+      final addresses = await InternetAddress.lookup(target.host).timeout(
+        _dnsTimeout,
+      );
+      if (addresses.isEmpty) {
+        return (
+          target,
+          const ZapretProbeResult(
+            status: ZapretProbeStatus.blocked,
+            message: 'DNS: адрес не найден',
+          ),
+        );
+      }
+    } catch (error) {
+      return (
+        target,
+        ZapretProbeResult(
+          status: ZapretProbeStatus.blocked,
+          message: 'Ошибка DNS: $error',
+        ),
+      );
+    }
+
     final stopwatch = Stopwatch()..start();
     try {
       final response = await _client.get<String>(target.url);
