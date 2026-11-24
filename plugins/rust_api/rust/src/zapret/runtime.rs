@@ -7,7 +7,7 @@
 use crate::zapret::core::{CoreProvider, GameFilterSettings};
 use crate::zapret::providers::flowseal::FlowsealProvider;
 use std::os::windows::{
-    io::{AsRawHandle, FromRawHandle, OwnedHandle},
+    io::{AsRawHandle, FromRawHandle, OwnedHandle, RawHandle},
     process::CommandExt,
 };
 use std::{
@@ -66,6 +66,14 @@ fn process_is_running(running: &mut RunningProcess) -> io::Result<bool> {
     Ok(running.child.try_wait()?.is_none())
 }
 
+fn require_admin_token(elevated: bool) -> Result<(), &'static str> {
+    if elevated {
+        Ok(())
+    } else {
+        Err("Flowseal requires administrator privileges. Approve the UAC prompt to restart FlClashX, then start the strategy again.")
+    }
+}
+
 pub fn is_elevated() -> bool {
     // Read the actual token elevation state; membership in the local
     // Administrators group alone is not enough under UAC.
@@ -113,12 +121,7 @@ pub fn start(
     strategy: &str,
     game_filter: &GameFilterSettings,
 ) -> Result<ProcessStatus, String> {
-    if !is_elevated() {
-        return Err(
-            "Flowseal requires administrator privileges. Approve the UAC prompt to restart FlClashX, then start the strategy again."
-                .into(),
-        );
-    }
+    require_admin_token(is_elevated()).map_err(str::to_owned)?;
 
     let root = fs::canonicalize(&requested_root).map_err(|error| {
         format!(
@@ -577,6 +580,16 @@ fn canonicalize_with_missing_tail(path: &Path) -> Result<PathBuf, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn refuses_to_start_winws_without_an_elevated_token() {
+        assert!(require_admin_token(false).is_err());
+    }
+
+    #[test]
+    fn allows_winws_start_with_an_elevated_token() {
+        assert!(require_admin_token(true).is_ok());
+    }
 
     #[test]
     fn splits_quoted_arguments_with_spaces_and_windows_escapes() {

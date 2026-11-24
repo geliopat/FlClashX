@@ -509,7 +509,7 @@ class _FlowsealViewState extends State<FlowsealView> {
                       ? null
                       : _start,
                   icon: const Icon(Icons.play_arrow),
-                  label: const Text('Запустить'),
+                  label: Text(_elevated ? 'Запустить' : 'Запустить с UAC'),
                 ),
                 OutlinedButton.icon(
                   onPressed: _busy || !_running ? null : _stop,
