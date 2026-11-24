@@ -63,6 +63,7 @@ const PROTOCOL_VERSION: &str = "6";
 const EXPECTED_CORE_SHA256: &str = env!("CORE_SHA256");
 const LOG_CAPACITY: usize = 100;
 const MAX_REQUEST_BODY_BYTES: u64 = 4096;
+const MAX_ZAPRET_LIST_BODY_BYTES: u64 = 2 * 1024 * 1024;
 const CORE_EXIT_TIMEOUT: Duration = Duration::from_millis(1500);
 const CORE_GRACEFUL_EXIT_TIMEOUT: Duration = Duration::from_millis(3000);
 const CORE_EXIT_POLL_INTERVAL: Duration = Duration::from_millis(20);
@@ -126,6 +127,12 @@ struct ZapretStartRequest {
     strategy_id: String,
     #[serde(default)]
     mode: super::zapret::ZapretLaunchMode,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ZapretListWriteRequest {
+    content: String,
 }
 
 #[derive(Serialize)]
@@ -766,6 +773,38 @@ fn get_zapret_strategies() -> warp::reply::Response {
     json_response(&super::zapret::strategies(), StatusCode::OK)
 }
 
+fn get_zapret_lists() -> warp::reply::Response {
+    match super::zapret_lists::list() {
+        Ok(lists) => json_response(&lists, StatusCode::OK),
+        Err(error) => error_response("zapretListsUnavailable", error.to_string(), StatusCode::CONFLICT),
+    }
+}
+
+fn get_zapret_list(filename: String) -> warp::reply::Response {
+    match super::zapret_lists::read(&filename) {
+        Ok(list) => json_response(&list, StatusCode::OK),
+        Err(error) if error.kind() == std::io::ErrorKind::InvalidInput => {
+            error_response("invalidZapretList", error.to_string(), StatusCode::BAD_REQUEST)
+        }
+        Err(error) => error_response("zapretListReadFailed", error.to_string(), StatusCode::CONFLICT),
+    }
+}
+
+async fn put_zapret_list(
+    filename: String,
+    request: ZapretListWriteRequest,
+) -> Result<warp::reply::Response, Rejection> {
+    match tokio::task::spawn_blocking(move || super::zapret_lists::write(&filename, request.content)).await {
+        Ok(Ok(list)) => Ok(json_response(&list, StatusCode::OK)),
+        Ok(Err(error)) if error.kind() == std::io::ErrorKind::InvalidInput => {
+            Ok(error_response("invalidZapretList", error.to_string(), StatusCode::BAD_REQUEST))
+        }
+        Ok(Err(error)) => Ok(error_response("zapretListWriteFailed", error.to_string(), StatusCode::CONFLICT)),
+        Err(error) => Ok(error_response("zapretListTaskFailed", error.to_string(), StatusCode::INTERNAL_SERVER_ERROR)),
+    }
+}
+
+
 #[cfg(windows)]
 fn get_zapret_status() -> warp::reply::Response {
     let mut managed = lock_surviving_poison(&MANAGED_ZAPRET);
@@ -1238,6 +1277,28 @@ pub(super) fn routes() -> impl Filter<Extract = (impl Reply,), Error = Infallibl
         .and(warp::get())
         .map(get_zapret_status);
 
+    let api_zapret_lists = warp::path("zapret")
+        .and(warp::path("lists"))
+        .and(warp::path::end())
+        .and(warp::get())
+        .map(get_zapret_lists);
+
+    let zapret_list_path = warp::path("zapret")
+        .and(warp::path("lists"))
+        .and(warp::path::param::<String>())
+        .and(warp::path::end());
+
+    let api_zapret_list_get = zapret_list_path
+        .clone()
+        .and(warp::get())
+        .map(get_zapret_list);
+
+    let api_zapret_list_put = zapret_list_path
+        .and(warp::put())
+        .and(warp::body::content_length_limit(MAX_ZAPRET_LIST_BODY_BYTES))
+        .and(warp::body::json())
+        .and_then(put_zapret_list);
+
     let api_zapret_start = warp::path("zapret")
         .and(warp::path("start"))
         .and(warp::path::end())
@@ -1268,6 +1329,9 @@ pub(super) fn routes() -> impl Filter<Extract = (impl Reply,), Error = Infallibl
                 .or(api_logs)
                 .or(api_zapret_strategies)
                 .or(api_zapret_status)
+                .or(api_zapret_lists)
+                .or(api_zapret_list_get)
+                .or(api_zapret_list_put)
                 .or(api_zapret_start)
                 .or(api_zapret_restart)
                 .or(api_zapret_stop),
