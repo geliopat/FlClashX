@@ -756,17 +756,6 @@ class _FlowsealViewState extends State<FlowsealView> {
       await _requestElevationForTest();
       return;
     }
-    final ready = await dialogs.showMessage(
-      title: 'Проверка Zapret напрямую',
-      message: const TextSpan(
-        text: 'HTTP-проверки будут идти напрямую и игнорировать системный прокси. '
-            'Но включённый Mihomo TUN или другой VPN может перехватить трафик на уровне Windows. '
-            'Для достоверного сравнения временно отключите TUN/другие туннели, затем запустите тест.',
-      ),
-      confirmText: 'Продолжить',
-    );
-    if (ready != true || !mounted) return;
-
     setState(() {
       _testing = true;
       _testWasCancelled = false;
@@ -1303,8 +1292,9 @@ class _FlowsealViewState extends State<FlowsealView> {
                 for (final result in _testResults)
                   _buildTestResult(context, result),
               ],
-              footer: 'Комплексный режим проверяет обычные HTTP/TCP-соединения и DPI-запросы. '
-                  'Лучшая доступная стратегия автоматически выбирается, но не запускается без твоего действия.',
+              footer: 'DNS разрешается системным сетевым стеком Windows и при активном Mihomo TUN перехватывается Mihomo (dns-hijack: any:53). '
+                  'HTTP-прокси обходится, но TUN и его DNS-перехват остаются включёнными. '
+                  'Комплексный режим проверяет HTTP/TCP и DPI. Лучшая стратегия выбирается автоматически, но не запускается без твоего действия.',
             ),
             generateSection(
               title: 'IPSet Filter',
