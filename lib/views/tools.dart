@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
@@ -21,6 +22,7 @@ import 'config/custom_resources.dart';
 import 'developer.dart';
 import 'disclaimer.dart';
 import 'theme.dart';
+import 'zapret_settings.dart';
 
 class ToolsView extends ConsumerStatefulWidget {
   const ToolsView({super.key});
@@ -55,7 +57,12 @@ class _ToolViewState extends ConsumerState<ToolsView> {
     if (simple) {
       return generateSection(
         title: appLocalizations.settings,
-        items: const [_LocaleItem(), _ThemeItem(), _GeneralItem()],
+        items: [
+          const _LocaleItem(),
+          const _ThemeItem(),
+          if (Platform.isWindows) const _ZapretItem(),
+          const _GeneralItem(),
+        ],
       );
     }
     return generateSection(
@@ -68,6 +75,7 @@ class _ToolViewState extends ConsumerState<ToolsView> {
         if (system.isAndroid) const _AccessItem(),
         const _AdvancedConfigItem(),
         const _CustomResourcesItem(),
+        if (Platform.isWindows) const _ZapretItem(),
         const _GeneralItem(),
       ],
       footer: [
@@ -227,6 +235,20 @@ class _AccessItem extends StatelessWidget {
       leading: const GlyphIcon(AppGlyphs.appsList),
       title: Text(context.appLocalizations.accessControl),
       widget: const AccessView(),
+    );
+  }
+}
+
+class _ZapretItem extends StatelessWidget {
+  const _ZapretItem();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListItem.open(
+      leading: const GlyphIcon(AppGlyphs.wrench),
+      title: const Text('Zapret'),
+      subtitle: const Text('Диагностика, списки и обновления'),
+      widget: const ZapretSettingsView(),
     );
   }
 }
