@@ -311,7 +311,6 @@ class _DeveloperItem extends StatelessWidget {
   }
 }
 
-
 class _FlowsealItem extends StatelessWidget {
   const _FlowsealItem();
 

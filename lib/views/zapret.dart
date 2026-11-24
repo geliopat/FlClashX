@@ -406,10 +406,7 @@ class _FlowsealViewState extends State<FlowsealView> {
             ],
             if (_validation != null) ...[
               const SizedBox(height: 8),
-              Text(
-                _validation!,
-                style: TextStyle(color: colorScheme.primary),
-              ),
+              Text(_validation!, style: TextStyle(color: colorScheme.primary)),
             ],
             const SizedBox(height: 10),
             Wrap(
@@ -419,7 +416,11 @@ class _FlowsealViewState extends State<FlowsealView> {
                 FilledButton.icon(
                   onPressed: _busy ? null : _installOrUpdate,
                   icon: const Icon(Icons.download),
-                  label: Text(_installed ? 'Установить обновление' : 'Установить Flowseal'),
+                  label: Text(
+                    _installed
+                        ? 'Установить обновление'
+                        : 'Установить Flowseal',
+                  ),
                 ),
                 OutlinedButton.icon(
                   onPressed: _busy || !_installed ? null : _validate,
@@ -443,14 +444,17 @@ class _FlowsealViewState extends State<FlowsealView> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Процесс winws.exe', style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              'Процесс winws.exe',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
             const SizedBox(height: 8),
             Text(
-              _running
-                  ? 'Запущен · PID ${runtime?.pid ?? '-'}'
-                  : 'Остановлен',
+              _running ? 'Запущен · PID ${runtime?.pid ?? '-'}' : 'Остановлен',
               style: TextStyle(
-                color: _running ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                color: _running
+                    ? colorScheme.primary
+                    : colorScheme.onSurfaceVariant,
               ),
             ),
             if (runtime?.strategy case final strategy?) ...[
@@ -472,7 +476,11 @@ class _FlowsealViewState extends State<FlowsealView> {
               runSpacing: 8,
               children: [
                 FilledButton.icon(
-                  onPressed: _busy || !_installed || _running || _selectedStrategy == null
+                  onPressed:
+                      _busy ||
+                          !_installed ||
+                          _running ||
+                          _selectedStrategy == null
                       ? null
                       : _start,
                   icon: const Icon(Icons.play_arrow),
@@ -603,9 +611,9 @@ class _FlowsealViewState extends State<FlowsealView> {
               const SizedBox(height: 12),
               SelectableText(
                 _preview!,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  fontFamily: 'JetBrainsMono',
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(fontFamily: 'JetBrainsMono'),
               ),
             ],
           ],

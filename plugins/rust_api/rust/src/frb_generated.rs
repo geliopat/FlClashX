@@ -41,7 +41,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 954485961;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -2043088119;
 
 // Section: executor
 
@@ -1198,6 +1198,43 @@ fn wire__crate__api__zapret__flowseal_import_strategy_impl(
         },
     )
 }
+fn wire__crate__api__zapret__flowseal_install_or_update_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "flowseal_install_or_update",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_root = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, String>(
+                    (move || async move {
+                        let output_ok =
+                            crate::api::zapret::flowseal_install_or_update(api_root).await?;
+                        std::result::Result::Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
 fn wire__crate__api__zapret__flowseal_is_elevated_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -2248,41 +2285,47 @@ fn pde_ffi_dispatcher_primary_impl(
             rust_vec_len,
             data_len,
         ),
-        26 => {
+        26 => wire__crate__api__zapret__flowseal_install_or_update_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        27 => {
             wire__crate__api__zapret__flowseal_is_elevated_impl(port, ptr, rust_vec_len, data_len)
         }
-        27 => wire__crate__api__zapret__flowseal_list_strategies_impl(
+        28 => wire__crate__api__zapret__flowseal_list_strategies_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        28 => wire__crate__api__zapret__flowseal_parse_strategy_impl(
+        29 => wire__crate__api__zapret__flowseal_parse_strategy_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        29 => wire__crate__api__zapret__flowseal_process_status_impl(
+        30 => wire__crate__api__zapret__flowseal_process_status_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        30 => wire__crate__api__zapret__flowseal_start_impl(port, ptr, rust_vec_len, data_len),
-        31 => wire__crate__api__zapret__flowseal_status_impl(port, ptr, rust_vec_len, data_len),
-        32 => wire__crate__api__zapret__flowseal_stop_impl(port, ptr, rust_vec_len, data_len),
-        33 => wire__crate__api__zapret__flowseal_validate_installation_impl(
+        31 => wire__crate__api__zapret__flowseal_start_impl(port, ptr, rust_vec_len, data_len),
+        32 => wire__crate__api__zapret__flowseal_status_impl(port, ptr, rust_vec_len, data_len),
+        33 => wire__crate__api__zapret__flowseal_stop_impl(port, ptr, rust_vec_len, data_len),
+        34 => wire__crate__api__zapret__flowseal_validate_installation_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        34 => wire__crate__api__editor__folds_compute_all_impl(port, ptr, rust_vec_len, data_len),
-        37 => wire__crate__api__hotkey__hot_key_events_impl(port, ptr, rust_vec_len, data_len),
-        38 => wire__crate__api__init__init_app_impl(port, ptr, rust_vec_len, data_len),
-        39 => wire__crate__api__hotkey__set_hot_keys_impl(port, ptr, rust_vec_len, data_len),
-        40 => wire__crate__api__editor__words_extract_impl(port, ptr, rust_vec_len, data_len),
+        35 => wire__crate__api__editor__folds_compute_all_impl(port, ptr, rust_vec_len, data_len),
+        38 => wire__crate__api__hotkey__hot_key_events_impl(port, ptr, rust_vec_len, data_len),
+        39 => wire__crate__api__init__init_app_impl(port, ptr, rust_vec_len, data_len),
+        40 => wire__crate__api__hotkey__set_hot_keys_impl(port, ptr, rust_vec_len, data_len),
+        41 => wire__crate__api__editor__words_extract_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -2314,10 +2357,10 @@ fn pde_ffi_dispatcher_sync_impl(
         18 => wire__crate__api__editor__RopeBridge_slice_impl(ptr, rust_vec_len, data_len),
         19 => wire__crate__api__editor__RopeBridge_snapshot_impl(ptr, rust_vec_len, data_len),
         22 => wire__crate__api__editor__RopeUpload_new_impl(ptr, rust_vec_len, data_len),
-        35 => {
+        36 => {
             wire__crate__api__editor__folds_find_matching_bracket_impl(ptr, rust_vec_len, data_len)
         }
-        36 => wire__crate__api__editor__guides_compute_viewport_impl(ptr, rust_vec_len, data_len),
+        37 => wire__crate__api__editor__guides_compute_viewport_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }

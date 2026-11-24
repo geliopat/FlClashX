@@ -8,6 +8,9 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `provider`, `runtime_status`
 
+Future<String> flowsealInstallOrUpdate({required String root}) =>
+    RustLib.instance.api.crateApiZapretFlowsealInstallOrUpdate(root: root);
+
 Future<FlowsealStatus> flowsealStatus({required String root}) =>
     RustLib.instance.api.crateApiZapretFlowsealStatus(root: root);
 

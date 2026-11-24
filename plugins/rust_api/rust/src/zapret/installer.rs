@@ -154,7 +154,10 @@ fn preserve_user_files(from: &Path, to: &Path) -> Result<(), String> {
         let source = from.join("lists").join(name);
         match fs::symlink_metadata(&source) {
             Ok(metadata) if metadata.file_type().is_symlink() => {
-                return Err(format!("User list cannot be a symbolic link: {}", source.display()));
+                return Err(format!(
+                    "User list cannot be a symbolic link: {}",
+                    source.display()
+                ));
             }
             Ok(metadata) if metadata.is_file() => {
                 fs::copy(&source, destination_lists.join(name))
@@ -163,7 +166,10 @@ fn preserve_user_files(from: &Path, to: &Path) -> Result<(), String> {
             Ok(_) => {}
             Err(error) if error.kind() == io::ErrorKind::NotFound => {}
             Err(error) => {
-                return Err(format!("Cannot inspect user list {}: {error}", source.display()));
+                return Err(format!(
+                    "Cannot inspect user list {}: {error}",
+                    source.display()
+                ));
             }
         }
     }
@@ -175,7 +181,10 @@ fn preserve_user_files(from: &Path, to: &Path) -> Result<(), String> {
         let source = from.join("bin").join(name);
         match fs::symlink_metadata(&source) {
             Ok(metadata) if metadata.file_type().is_symlink() => {
-                return Err(format!("Flowseal fake file cannot be a symbolic link: {}", source.display()));
+                return Err(format!(
+                    "Flowseal fake file cannot be a symbolic link: {}",
+                    source.display()
+                ));
             }
             Ok(metadata) if metadata.is_file() => {
                 fs::copy(&source, destination_bin.join(name))
@@ -184,7 +193,10 @@ fn preserve_user_files(from: &Path, to: &Path) -> Result<(), String> {
             Ok(_) => {}
             Err(error) if error.kind() == io::ErrorKind::NotFound => {}
             Err(error) => {
-                return Err(format!("Cannot inspect Flowseal fake file {}: {error}", source.display()));
+                return Err(format!(
+                    "Cannot inspect Flowseal fake file {}: {error}",
+                    source.display()
+                ));
             }
         }
     }
@@ -219,7 +231,10 @@ fn preserve_user_files(from: &Path, to: &Path) -> Result<(), String> {
             continue;
         }
         fs::copy(&source, custom_destination.join(entry.file_name())).map_err(|error| {
-            format!("Cannot preserve custom strategy {}: {error}", source.display())
+            format!(
+                "Cannot preserve custom strategy {}: {error}",
+                source.display()
+            )
         })?;
     }
     Ok(())
@@ -303,8 +318,8 @@ fn safe_archive_path(name: &str) -> Result<PathBuf, String> {
 }
 
 fn extract_zip_safely(zip_path: &Path, destination: &Path) -> Result<(), String> {
-    let file = File::open(zip_path)
-        .map_err(|error| format!("Cannot open Flowseal archive: {error}"))?;
+    let file =
+        File::open(zip_path).map_err(|error| format!("Cannot open Flowseal archive: {error}"))?;
     let mut archive = ZipArchive::new(file)
         .map_err(|error| format!("Flowseal archive is not a valid ZIP: {error}"))?;
     if archive.len() > MAX_ARCHIVE_ENTRIES {
@@ -375,7 +390,8 @@ fn copy_directory_contents(source: &Path, destination: &Path) -> Result<(), Stri
     for entry in fs::read_dir(source)
         .map_err(|error| format!("Cannot read extracted Flowseal package: {error}"))?
     {
-        let entry = entry.map_err(|error| format!("Cannot read extracted Flowseal entry: {error}"))?;
+        let entry =
+            entry.map_err(|error| format!("Cannot read extracted Flowseal entry: {error}"))?;
         let source_path = entry.path();
         let target_path = destination.join(entry.file_name());
         let metadata = fs::symlink_metadata(&source_path)
@@ -484,14 +500,7 @@ pub async fn install_or_update(requested_root: PathBuf) -> Result<String, String
     let mut last_error = None;
     for artifact in &release.artifacts {
         let _ = fs::remove_file(&archive_path);
-        match download_and_verify(
-            &client,
-            &artifact.url,
-            &artifact.sha256,
-            &archive_path,
-        )
-        .await
-        {
+        match download_and_verify(&client, &artifact.url, &artifact.sha256, &archive_path).await {
             Ok(()) => {
                 selected = Some((artifact.url.clone(), artifact.sha256.clone()));
                 break;
@@ -565,8 +574,9 @@ pub async fn install_or_update(requested_root: PathBuf) -> Result<String, String
     let root_was_installed = active_installed && root.is_dir();
     if root_was_installed {
         preserve_previous_if_managed(&previous)?;
-        fs::rename(&root, &previous)
-            .map_err(|error| format!("Cannot move current Flowseal installation to backup: {error}"))?;
+        fs::rename(&root, &previous).map_err(|error| {
+            format!("Cannot move current Flowseal installation to backup: {error}")
+        })?;
     } else if root.is_dir() {
         fs::remove_dir(&root)
             .map_err(|error| format!("Cannot replace empty Flowseal destination: {error}"))?;

@@ -177,11 +177,7 @@ pub async fn resolve_stable(
     provider: &str,
 ) -> Result<CoreRelease, String> {
     let manifest = download_limited(client, PRODUCTION_URL, MAX_MANIFEST_BYTES);
-    let signature = download_limited(
-        client,
-        PRODUCTION_SIGNATURE_URL,
-        MAX_SIGNATURE_BYTES,
-    );
+    let signature = download_limited(client, PRODUCTION_SIGNATURE_URL, MAX_SIGNATURE_BYTES);
     let (manifest, signature) = futures_util::future::join(manifest, signature).await;
     let manifest = manifest?;
     let signature = signature?;
@@ -278,14 +274,8 @@ mod tests {
             compare_versions("1.2", "1.2.0"),
             VersionComparison::UpToDate
         );
-        assert_eq!(
-            compare_versions("1.3.0", "1.2.3"),
-            VersionComparison::Ahead
-        );
-        assert_eq!(
-            compare_versions("Err", "1.2.3"),
-            VersionComparison::Unknown
-        );
+        assert_eq!(compare_versions("1.3.0", "1.2.3"), VersionComparison::Ahead);
+        assert_eq!(compare_versions("Err", "1.2.3"), VersionComparison::Unknown);
     }
 
     #[test]
@@ -308,8 +298,7 @@ mod tests {
 "#;
         const SIGNATURE: &str = "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTRjE4MG03RW5LQmJSZnNLSWpWMlVQVTVXTWp0ZkRnMHNoMklNdUZ5LzZ6ZUgwVCtJRlNhUkhac3d0SitmY3JWcXFGcGd5QzdnUGZ1ckdEd1A3R2VmUGZTWkl3SHhoZGc0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkyNTE5NDQ0CWZpbGU6c3RhYmxlLmpzb24Kc0oyRHlhRU1MK0dMekVEdk14bHVna29ORElnVnZuM1hwd1QwQTJ1ZGdXeVByZGVKUmZ0UDFEbERlTmgvcGV4RmpHYnlOdzR2cVZzTktMTlF2Y2hZRHc9PQo=";
         verify_signature(MANIFEST.as_bytes(), SIGNATURE.as_bytes()).unwrap();
-        let release =
-            StableManifest::parse_and_validate(MANIFEST.as_bytes(), "flowseal").unwrap();
+        let release = StableManifest::parse_and_validate(MANIFEST.as_bytes(), "flowseal").unwrap();
         assert_eq!(release.version, "1.10.4");
         assert_eq!(release.artifacts.len(), 1);
         assert_eq!(
