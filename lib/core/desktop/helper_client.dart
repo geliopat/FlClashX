@@ -472,24 +472,27 @@ final class HelperClient {
     }
   }
 
-  Future<HelperZapretStatus> startZapret({required String strategyId}) =>
-      _zapretAction('start', operation: 'start', strategyId: strategyId);
+  Future<HelperZapretStatus> startZapret({required String strategyId, required String mode}) =>
+      _zapretAction('start', operation: 'start', strategyId: strategyId, mode: mode);
 
   Future<HelperZapretStatus> stopZapret() =>
       _zapretAction('stop', operation: 'stop');
 
-  Future<HelperZapretStatus> restartZapret({required String strategyId}) =>
-      _zapretAction('restart', operation: 'restart', strategyId: strategyId);
+  Future<HelperZapretStatus> restartZapret({required String strategyId, required String mode}) =>
+      _zapretAction('restart', operation: 'restart', strategyId: strategyId, mode: mode);
 
   Future<HelperZapretStatus> _zapretAction(
     String route, {
     required String operation,
     String? strategyId,
+    String? mode,
   }) async {
     try {
       final response = await _dio.post<Object?>(
         '$baseUrl/zapret/$route',
-        data: strategyId == null ? null : {'strategyId': strategyId},
+        data: strategyId == null
+            ? null
+            : {'strategyId': strategyId, 'mode': mode ?? 'fullBypass'},
         options: _options(
           ResponseType.json,
           receiveTimeout: operation == 'stop'
