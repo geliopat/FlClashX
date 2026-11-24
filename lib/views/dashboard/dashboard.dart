@@ -16,6 +16,7 @@ import 'style.dart';
 import 'wide.dart';
 import 'widget_registry.dart';
 import 'widgets/core_status_button.dart';
+import 'widgets/zapret_status_button.dart';
 import 'widgets/profile_detail.dart';
 
 class DashboardView extends ConsumerStatefulWidget {
@@ -69,7 +70,10 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
       title: editing
           ? appLocalizations.editDashboard
           : appLocalizations.dashboard,
-      actions: [if (!editing) const CoreStatusButton()],
+      actions: [
+        if (!editing) const CoreStatusButton(),
+        if (!editing && system.isWindows) const ZapretStatusButton(),
+      ],
       confirmationAction: editing
           ? IconButtonData(
               glyph: AppGlyphs.check,
