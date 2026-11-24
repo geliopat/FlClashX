@@ -55,6 +55,7 @@ class _FlowsealViewState extends State<FlowsealView> {
   String _listQuery = '';
   String _testType = 'combined';
   bool _testing = false;
+  bool _testWasCancelled = false;
   FlowsealStrategyTestProgress? _testProgress;
   List<FlowsealStrategyTestResult> _testResults = const [];
   StreamSubscription<FlowsealStrategyTestProgress>? _testSubscription;
@@ -109,7 +110,7 @@ class _FlowsealViewState extends State<FlowsealView> {
   }
 
   Future<void> _withBusy(Future<void> Function() action) async {
-    if (_busy) return;
+    if (_busy || _testing) return;
     setState(() {
       _busy = true;
       _error = null;
@@ -292,6 +293,7 @@ class _FlowsealViewState extends State<FlowsealView> {
   }
 
   Future<void> _selectUserList(String filename) async {
+    if (_busy || _testing) return;
     setState(() {
       _selectedUserList = filename;
       _userListEntries = const [];
@@ -372,6 +374,7 @@ class _FlowsealViewState extends State<FlowsealView> {
   }
 
   Future<void> _addUserListEntry() async {
+    if (_busy || _testing) return;
     final entry = _listEntryController.text.trim();
     if (entry.isEmpty || !_installed) return;
     await _withBusy(() async {
@@ -390,6 +393,7 @@ class _FlowsealViewState extends State<FlowsealView> {
   }
 
   Future<void> _removeUserListEntry(String entry) async {
+    if (_busy || _testing) return;
     await _withBusy(() async {
       final entries = await flowsealRemoveUserListEntry(
         root: _root,
@@ -435,7 +439,7 @@ class _FlowsealViewState extends State<FlowsealView> {
   }
 
   Future<void> _importUserListsBackup() async {
-    if (!_installed) return;
+    if (!_installed || _busy || _testing) return;
     final file = await FilePicker.pickFile(
       type: FileType.custom,
       allowedExtensions: const ['json'],
@@ -466,7 +470,7 @@ class _FlowsealViewState extends State<FlowsealView> {
   }
 
   Future<void> _importUserList(BuildContext context) async {
-    if (!_installed) return;
+    if (!_installed || _busy || _testing) return;
     final file = await FilePicker.pickFile(
       type: FileType.custom,
       allowedExtensions: const ['txt'],
@@ -533,7 +537,7 @@ class _FlowsealViewState extends State<FlowsealView> {
   }
 
   Future<void> _clearUserList(BuildContext context) async {
-    if (!_installed || _userListEntries.isEmpty) return;
+    if (!_installed || _busy || _testing || _userListEntries.isEmpty) return;
     final confirmed = await dialogs.showMessage(
       title: 'Очистить список?',
       message: TextSpan(
@@ -559,7 +563,7 @@ class _FlowsealViewState extends State<FlowsealView> {
   }
 
   Future<void> _saveGameFilterSettings() async {
-    if (!_installed) return;
+    if (!_installed || _busy || _testing) return;
     await _withBusy(() async {
       await flowsealSaveGameFilter(
         root: _root,
@@ -575,6 +579,7 @@ class _FlowsealViewState extends State<FlowsealView> {
   }
 
   Future<void> _showPreview() async {
+    if (_busy || _testing) return;
     final strategy = _selectedStrategy;
     if (strategy == null) return;
     await _withBusy(() async {
@@ -688,6 +693,7 @@ class _FlowsealViewState extends State<FlowsealView> {
 
     setState(() {
       _testing = true;
+      _testWasCancelled = false;
       _testProgress = null;
       _testResults = const [];
       _error = null;
@@ -696,7 +702,12 @@ class _FlowsealViewState extends State<FlowsealView> {
     _testSubscription = flowsealStrategyTestEvents().listen(
       (event) {
         if (!mounted) return;
-        setState(() => _testProgress = event);
+        setState(() {
+          _testProgress = event;
+          if (event.message.toLowerCase().contains('остановлена пользователем')) {
+            _testWasCancelled = true;
+          }
+        });
       },
       onError: (Object error) {
         if (mounted) _setError('Ошибка потока автотеста: ' + error.toString());
