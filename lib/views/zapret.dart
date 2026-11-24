@@ -282,10 +282,10 @@ class _FlowsealViewState extends State<FlowsealView> {
       setState(() {
         _selectedStrategy = name.trim();
         _preview = null;
-        _validation = 'Стратегия «\${name.trim()}» добавлена.';
+        _validation = 'Стратегия «${name.trim()}» добавлена.';
       });
       dialogs.showNotifier(
-        'Стратегия «\${name.trim()}» добавлена в каталог.',
+        'Стратегия «${name.trim()}» добавлена в каталог.',
         level: MessageLevel.success,
       );
     });
@@ -658,6 +658,117 @@ class _FlowsealViewState extends State<FlowsealView> {
         _syncStatusPolling();
       }
     });
+  }
+
+  String _testTypeLabel(String value) => switch (value) {
+    'standard' => 'Сеть и доступность',
+    'dpi' => 'Проверка обхода DPI',
+    _ => 'Комплексный тест',
+  };
+
+  Future<void> _requestElevationForTest() async {
+    final launched =
+        windows?.runas(
+          Platform.resolvedExecutable,
+          '--flowseal-elevated',
+          showWindow: true,
+        ) ??
+        false;
+    if (!launched) {
+      throw Exception(
+        'Не удалось перезапустить FlClashX с правами администратора. '
+        'Проверьте запрос UAC.',
+      );
+    }
+    commonPrint.log('Flowseal strategy test requested elevated FlClashX');
+    window?.forceExit();
+  }
+
+  Future<void> _runStrategyTests() async {
+    if (!_installed || _testing || _busy) return;
+    if (_running) {
+      dialogs.showNotifier(
+        'Перед автотестом остановите текущий winws.exe.',
+        level: MessageLevel.warning,
+      );
+      return;
+    }
+    if (!_elevated) {
+      await _requestElevationForTest();
+      return;
+    }
+
+    setState(() {
+      _testing = true;
+      _testProgress = null;
+      _testResults = const [];
+      _error = null;
+    });
+    await _testSubscription?.cancel();
+    _testSubscription = flowsealStrategyTestEvents().listen(
+      (event) {
+        if (!mounted) return;
+        setState(() => _testProgress = event);
+      },
+      onError: (Object error) {
+        if (mounted) _setError('Ошибка потока автотеста: ' + error.toString());
+      },
+    );
+
+    try {
+      final results = await flowsealTestStrategies(
+        root: _root,
+        testType: _testType,
+        gameFilterMode: _filterMode,
+        gameFilterTcp: _tcpController.text.trim(),
+        gameFilterUdp: _udpController.text.trim(),
+      );
+      if (!mounted) return;
+      FlowsealStrategyTestResult? best;
+      for (final result in results) {
+        if (result.status != 'failed' && result.httpOk > 0) {
+          best = result;
+          break;
+        }
+      }
+      setState(() {
+        _testResults = results;
+        if (best != null) {
+          _selectedStrategy = best.strategy;
+          _preview = null;
+          _validation = 'Автотест выбрал «' + best.strategy + '».';
+        }
+      });
+      if (best != null) {
+        dialogs.showNotifier(
+          'Лучшая стратегия: ' + best.strategy + ' · HTTP ' +
+              best.httpOk.toString() + '/' +
+              (best.httpOk + best.httpError).toString(),
+          level: MessageLevel.success,
+        );
+      } else {
+        dialogs.showNotifier(
+          'Все стратегии завершились с ошибками. Проверьте каталог и подключение.',
+          level: MessageLevel.warning,
+        );
+      }
+      await _refresh();
+    } catch (error) {
+      if (mounted) _setError('Автотест не выполнен: ' + error.toString());
+    } finally {
+      await _testSubscription?.cancel();
+      _testSubscription = null;
+      if (mounted) setState(() => _testing = false);
+    }
+  }
+
+  Future<void> _cancelStrategyTests() async {
+    if (!_testing) return;
+    await flowsealCancelStrategyTests();
+  }
+
+  void _handleListSearch(String query) {
+    setState(() => _listQuery = query.trim().toLowerCase());
   }
 
   Future<void> _openLogFolder() async {
