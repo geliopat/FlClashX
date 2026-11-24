@@ -96,6 +96,40 @@ pub fn is_elevated() -> bool {
     }
 }
 
+fn is_valid_game_filter_range(value: &str) -> bool {
+    if value.is_empty() || value.len() > 64 {
+        return false;
+    }
+    value.split(',').all(|part| {
+        let (start, end) = part.split_once('-').unwrap_or((part, part));
+        if start.is_empty() || end.is_empty() || end.contains('-') {
+            return false;
+        }
+        let Ok(start) = start.parse::<u16>() else {
+            return false;
+        };
+        let Ok(end) = end.parse::<u16>() else {
+            return false;
+        };
+        start > 0 && end > 0 && start <= end
+    })
+}
+
+fn validate_game_filter_settings(settings: &GameFilterSettings) -> Result<(), String> {
+    let validate_tcp = matches!(settings.mode.as_str(), "all" | "tcp");
+    let validate_udp = matches!(settings.mode.as_str(), "all" | "udp");
+    if !matches!(settings.mode.as_str(), "none" | "all" | "tcp" | "udp") {
+        return Err("Unsupported Flowseal game filter mode".into());
+    }
+    if validate_tcp && !is_valid_game_filter_range(&settings.tcp_range) {
+        return Err("Flowseal TCP game filter must contain valid ports or port ranges".into());
+    }
+    if validate_udp && !is_valid_game_filter_range(&settings.udp_range) {
+        return Err("Flowseal UDP game filter must contain valid ports or port ranges".into());
+    }
+    Ok(())
+}
+
 pub fn status(root: &Path) -> Result<ProcessStatus, String> {
     let mut slot = lock_process();
     let completed_log = if let Some(running) = slot.as_mut() {
@@ -122,6 +156,7 @@ pub fn start(
     game_filter: &GameFilterSettings,
 ) -> Result<ProcessStatus, String> {
     require_admin_token(is_elevated()).map_err(str::to_owned)?;
+    validate_game_filter_settings(game_filter)?;
 
     let root = fs::canonicalize(&requested_root).map_err(|error| {
         format!(
@@ -589,6 +624,70 @@ mod tests {
     #[test]
     fn allows_winws_start_with_an_elevated_token() {
         assert!(require_admin_token(true).is_ok());
+    }
+
+    #[test]
+    fn validates_only_the_game_filter_ranges_selected_by_mode() {
+        let disabled = GameFilterSettings {
+            mode: "none".into(),
+            tcp_range: String::new(),
+            udp_range: String::new(),
+        };
+        assert!(validate_game_filter_settings(&disabled).is_ok());
+
+        let tcp_only = GameFilterSettings {
+            mode: "tcp".into(),
+            tcp_range: "80,443,1024-65535".into(),
+            udp_range: "not-used".into(),
+        };
+        assert!(validate_game_filter_settings(&tcp_only).is_ok());
+
+        let udp_only = GameFilterSettings {
+            mode: "udp".into(),
+            tcp_range: "not-used".into(),
+            udp_range: "2000-3000".into(),
+        };
+        assert!(validate_game_filter_settings(&udp_only).is_ok());
+
+        let all = GameFilterSettings {
+            mode: "all".into(),
+            tcp_range: "80,443".into(),
+            udp_range: "2000-3000".into(),
+        };
+        assert!(validate_game_filter_settings(&all).is_ok());
+    }
+
+    #[test]
+    fn rejects_injected_and_invalid_game_filter_ranges() {
+        for value in [
+            "",
+            "0",
+            "65536",
+            "100-50",
+            "1-",
+            "-80",
+            "80,",
+            "80 --hostlist=C:\\outside.txt",
+            "80\n--fake",
+        ] {
+            assert!(!is_valid_game_filter_range(value), "accepted {value:?}");
+        }
+        let injected = GameFilterSettings {
+            mode: "tcp".into(),
+            tcp_range: "80 --hostlist=C:\\outside.txt".into(),
+            udp_range: "12".into(),
+        };
+        assert!(validate_game_filter_settings(&injected).is_err());
+    }
+
+    #[test]
+    fn rejects_unknown_game_filter_modes() {
+        let settings = GameFilterSettings {
+            mode: "powershell".into(),
+            tcp_range: "12".into(),
+            udp_range: "12".into(),
+        };
+        assert!(validate_game_filter_settings(&settings).is_err());
     }
 
     #[test]

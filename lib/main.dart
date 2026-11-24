@@ -229,8 +229,10 @@ _FlowsealLaunchIntent? _readFlowsealLaunchIntent(List<String> args) {
     final udp = decoded['gameFilterUdp'];
     if (strategy is! String || strategy.trim().isEmpty || strategy.length > 64 ||
         mode is! String || !const {'none', 'all', 'tcp', 'udp'}.contains(mode) ||
-        tcp is! String || !_validFlowsealPortRange(tcp) ||
-        udp is! String || !_validFlowsealPortRange(udp)) {
+        tcp is! String ||
+        (const {'all', 'tcp'}.contains(mode) && !_validFlowsealPortRange(tcp)) ||
+        udp is! String ||
+        (const {'all', 'udp'}.contains(mode) && !_validFlowsealPortRange(udp))) {
       return null;
     }
     return _FlowsealLaunchIntent(
