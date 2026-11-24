@@ -107,10 +107,8 @@ pub fn build_launch(bin_dir: &Path, strategy_id: &str, launch_mode: ZapretLaunch
     let lists_dir = bin_dir.join("lists");
     // Split modes intentionally affect only Flowseal and built-in Lua presets.
     // Ultimate and imported/user strategies keep their own filters unchanged.
-    let supports_split_mode = strategy.engine == "winws"
-        || (strategy.engine == "winws2"
-            && strategy.id != "zapret2-ru-ultimate"
-            && imported_strategies::find(strategy.id).is_none());
+    let supports_split_mode = FLOWSEAL.iter().any(|item| item.id == strategy.id)
+        || LUA_STRATEGIES.iter().any(|item| item.id == strategy.id);
     let tunnel_mode = if launch_mode == ZapretLaunchMode::StrictSplit && supports_split_mode {
         TunnelMode::Strict
     } else {
