@@ -33,6 +33,11 @@ fn runtime_status(status: runtime::ProcessStatus) -> FlowsealRuntimeStatus {
 }
 
 #[frb]
+pub async fn flowseal_install_or_update(root: String) -> Result<String, String> {
+    crate::zapret::installer::install_or_update(PathBuf::from(root)).await
+}
+
+#[frb]
 pub fn flowseal_status(root: String) -> FlowsealStatus {
     let provider = provider(root);
     FlowsealStatus {
