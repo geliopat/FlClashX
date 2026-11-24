@@ -1,4 +1,6 @@
 pub mod core;
+pub mod channel;
+pub mod installer;
 pub mod ipset;
 pub mod providers;
 pub mod runtime;
