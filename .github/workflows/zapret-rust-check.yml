@@ -23,6 +23,7 @@ on:
       - "plugins/rust_api/lib/**"
       - "windows/**"
       - "lib/**"
+      - "test/**"
       - ".github/workflows/zapret-rust-check.yml"
 
 permissions:
