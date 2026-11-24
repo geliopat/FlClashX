@@ -151,15 +151,15 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
         if (!lines.contains(line)) lines.add(line);
         return;
       }
-      final key = line.replaceFirst(RegExp(r'^\\^'), '').toLowerCase();
+      final key = line.replaceFirst(RegExp(r'^\^'), '').toLowerCase();
       if (seen.add(key)) lines.add(line);
     }
 
-    for (final line in upstream.split(RegExp(r'\\r?\\n'))) {
+    for (final line in upstream.split(RegExp(r'\r?\n'))) {
       addLine(line);
     }
     // Match zapret2-gui: keep local additions when upstream removes an entry.
-    for (final line in existing.split(RegExp(r'\\r?\\n'))) {
+    for (final line in existing.split(RegExp(r'\r?\n'))) {
       addLine(line);
     }
     if (filename == 'list-google.txt') addLine('dl.google.com');
@@ -168,7 +168,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
         addLine(domain);
       }
     }
-    return '${lines.join('\\r\\n')}\\r\\n';
+    return '${lines.join('\r\n')}\\r\\n';
   }
 
   Future<void> _updateLists() async {
@@ -190,11 +190,11 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
         }
         final merged = _mergeList(upstream, current.content, entry.key);
         final oldCount = current.content
-            .split(RegExp(r'\\r?\\n'))
+            .split(RegExp(r'\r?\n'))
             .where((line) => line.trim().isNotEmpty && !line.trim().startsWith('#'))
             .length;
         final newCount = merged
-            .split(RegExp(r'\\r?\\n'))
+            .split(RegExp(r'\r?\n'))
             .where((line) => line.trim().isNotEmpty && !line.trim().startsWith('#'))
             .length;
         if (oldCount > 0 && newCount * 2 < oldCount) {
@@ -255,7 +255,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
                   const SizedBox(height: 8),
                   Text('Списки обработки трафика', style: Theme.of(context).textTheme.labelLarge),
                   Text(
-                    zapret.processingLists.isEmpty ? 'Не переданы' : zapret.processingLists.join('\\n'),
+                    zapret.processingLists.isEmpty ? 'Не переданы' : zapret.processingLists.join('\n'),
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
                   ),
                 ],
