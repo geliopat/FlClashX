@@ -3,7 +3,9 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::VecDeque;
 use std::convert::Infallible;
-use std::fs::{self, File, OpenOptions};
+use std::fs::{File, OpenOptions};
+#[cfg(windows)]
+use std::fs;
 use std::future::{pending, Future};
 use std::io::{BufRead, Error, Read};
 #[cfg(windows)]
@@ -104,6 +106,7 @@ struct StopResponse {
     reason: Option<&'static str>,
 }
 
+#[cfg(windows)]
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ZapretStatusResponse {
