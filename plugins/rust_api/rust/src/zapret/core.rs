@@ -38,6 +38,20 @@ pub struct GameFilterSettings {
     pub udp_range: String,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CoreArtifact {
+    pub url: String,
+    pub sha256: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CoreRelease {
+    pub provider: String,
+    pub channel: String,
+    pub version: String,
+    pub artifacts: Vec<CoreArtifact>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CoreManifest {
