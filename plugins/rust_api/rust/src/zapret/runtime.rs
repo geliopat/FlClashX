@@ -544,7 +544,6 @@ fn is_required_path_option(flag: &str) -> bool {
         flag,
         "--hostlist"
             | "--hostlist-exclude"
-            | "--hostlist-domains"
             | "--hostlist-auto"
             | "--hostlist-auto-fallback"
             | "--ipset"
@@ -710,6 +709,22 @@ mod tests {
     fn rejects_unmatched_quotes_and_control_characters() {
         assert!(split_windows_arguments(r#"--hostlist="unterminated"#).is_err());
         assert!(split_windows_arguments("--hostlist=one\ntwo").is_err());
+    }
+
+    #[test]
+    fn accepts_hostlist_domains_as_domain_values_not_file_paths() {
+        let root = std::env::temp_dir().join(format!(
+            "flowseal-runtime-domains-{}-{}",
+            std::process::id(),
+            unix_timestamp()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let args = vec![
+            "--hostlist-domains=discord.media,discord.com".to_string(),
+            "--hostlist-exclude-domains=example.com".to_string(),
+        ];
+        assert!(validate_argument_paths(&args, &root).is_ok());
+        let _ = fs::remove_dir_all(root);
     }
 
     #[test]
