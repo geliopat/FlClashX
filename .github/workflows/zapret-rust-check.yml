@@ -32,25 +32,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
-      - name: Format Rust sources
-        run: cargo fmt --manifest-path plugins/rust_api/rust/Cargo.toml
       - name: Check formatting
         run: cargo fmt --manifest-path plugins/rust_api/rust/Cargo.toml -- --check
       - name: Compile and run unit tests
         run: cargo test --manifest-path plugins/rust_api/rust/Cargo.toml
-      - name: Commit Rust formatting
-        if: github.event_name == 'push'
-        shell: pwsh
-        run: |
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add plugins/rust_api/rust/src
-          if (-not (git diff --cached --quiet)) {
-            git commit -m "Format Flowseal Windows runtime Rust sources"
-            git push origin HEAD:feature/zapret-ui-integration
-          } else {
-            Write-Host "Rust sources are already formatted."
-          }
 
   generate-bindings:
     name: Generate Flutter Rust Bridge bindings (Windows)
