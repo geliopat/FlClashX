@@ -530,7 +530,7 @@ fn process_image_matches(handle: HANDLE, expected_exe_name: &str, zapret_root: &
         }
         // Never terminate another Zapret installation (or another application)
         // merely because it uses the same executable filename.
-        let root = zapret_root.to_string_lossy().trim_end_matches(['\\', '/']).to_ascii_lowercase();
+        let root = zapret_root.to_string_lossy().trim_end_matches(|ch| ch == '\\' || ch == '/').to_ascii_lowercase();
         let candidate = image_path.to_ascii_lowercase();
         candidate.starts_with(&format!("{root}\\"))
     }
