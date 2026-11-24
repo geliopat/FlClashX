@@ -777,642 +777,514 @@ class _FlowsealViewState extends State<FlowsealView> {
     await system.openDirectory(p.dirname(logPath));
   }
 
+  Future<void> _promptAddUserListEntry() async {
+    final value = await dialogs.showCommonDialog<String>(
+      child: InputDialog(
+        title: 'Добавить запись',
+        value: '',
+        hintText: _selectedUserList == 'ipset-exclude-user.txt'
+            ? '192.0.2.0/24'
+            : 'example.com',
+        validator: (value) {
+          if (value == null || value.trim().isEmpty) {
+            return 'Введите домен или IP-адрес.';
+          }
+          return null;
+        },
+      ),
+    );
+    if (value == null || !mounted) return;
+    _listEntryController.text = value.trim();
+    await _addUserListEntry();
+  }
+
+  Widget _buildTestResult(BuildContext context, FlowsealStrategyTestResult result) {
+    final colorScheme = context.colorScheme;
+    final isSelected = result.strategy == _selectedStrategy;
+    final statusColor = switch (result.status) {
+      'success' => colorScheme.primary,
+      'partial' => colorScheme.tertiary,
+      _ => colorScheme.error,
+    };
+    final total = result.httpOk + result.httpError;
+    final ping = result.avgPingMs > 0
+        ? result.avgPingMs.toString() + ' мс'
+        : '—';
+    return ListItem(
+      leading: Icon(
+        result.status == 'success'
+            ? Icons.check_circle_outline
+            : result.status == 'partial'
+                ? Icons.warning_amber_rounded
+                : Icons.error_outline,
+        color: statusColor,
+      ),
+      title: Text(
+        result.strategy,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: isSelected ? TextStyle(color: colorScheme.primary) : null,
+      ),
+      subtitle: Text(
+        'HTTP ' + result.httpOk.toString() + '/' + total.toString() +
+        ' · TCP ' + ping + ' · Score ' + result.score.toString(),
+      ),
+      trailing: isSelected
+          ? Icon(Icons.radio_button_checked, color: colorScheme.primary)
+          : const Icon(Icons.radio_button_unchecked),
+      onTap: _busy || _testing
+          ? null
+          : () => setState(() {
+                _selectedStrategy = result.strategy;
+                _preview = null;
+              }),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return BaseScaffold(
+    final installation = _installation;
+    final filteredEntries = _userListEntries
+        .where((entry) => entry.toLowerCase().contains(_listQuery))
+        .toList();
+    final visibleEntries = filteredEntries.take(200).toList();
+    final progress = _testProgress;
+    final progressValue = progress == null || progress.total == BigInt.zero
+        ? null
+        : (progress.current.toDouble() / progress.total.toDouble())
+            .clamp(0.0, 1.0);
+
+    return CommonScaffold(
       title: 'Zapret / Flowseal',
+      isLoading: _busy || _testing,
+      searchState: _installed
+          ? AppBarSearchState(onSearch: _handleListSearch)
+          : null,
+      iconActions: [
+        IconButtonData(
+          glyph: AppGlyphs.importFile,
+          tooltip: 'Импортировать BAT',
+          onPressed: _installed && !_busy && !_testing
+              ? _importStrategy
+              : null,
+        ),
+        IconButtonData(
+          glyph: AppGlyphs.sync,
+          tooltip: _testing ? 'Проверка стратегий выполняется' : 'Автотест стратегий',
+          isLoading: _testing,
+          onPressed: _installed && !_busy && !_testing
+              ? _runStrategyTests
+              : null,
+        ),
+      ],
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16).copyWith(
-          top: context.contentTopPadding,
-          bottom: 24 + context.bottomInset,
+          top: context.sectionsTopPadding,
+          bottom: 20 + context.bottomInset,
         ),
         children: [
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Локальная интеграция Flowseal',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'FlClashX читает BAT-файлы как описания стратегий. '
-                    'Сами BAT/CMD и сценарии установки не запускаются. '
-                    'Для запуска winws.exe FlClashX запросит UAC и '
-                    'перезапустится с правами администратора. '
-                    'winws.exe будет дочерним процессом FlClashX, '
-                    'без запуска через SYSTEM Helper.',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _rootController,
-                    enabled: !_busy,
-                    decoration: const InputDecoration(
-                      labelText: 'Каталог Flowseal',
-                      hintText: r'C:\zapret',
-                      border: OutlineInputBorder(),
-                    ),
-                    onSubmitted: (_) => _saveRoot(),
-                  ),
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      OutlinedButton.icon(
-                        onPressed: _busy ? null : _pickRoot,
-                        icon: const Icon(Icons.folder_open),
-                        label: const Text('Выбрать папку'),
-                      ),
-                      FilledButton.tonalIcon(
-                        onPressed: _busy ? null : _saveRoot,
-                        icon: const Icon(Icons.check),
-                        label: const Text('Применить'),
-                      ),
-                      IconButton(
-                        tooltip: 'Обновить состояние',
-                        onPressed: _busy || _root.isEmpty
-                            ? null
-                            : () => _withBusy(_refresh),
-                        icon: const Icon(Icons.refresh),
-                      ),
-                    ],
-                  ),
-                ],
+          generateSection(
+            title: 'Установка Flowseal',
+            items: [
+              ListItem.input(
+                leading: const Icon(Icons.folder_outlined),
+                title: const Text('Каталог Flowseal'),
+                subtitle: Text(_root.isEmpty ? 'Не выбран' : _root),
+                dialogTitle: 'Каталог Flowseal',
+                value: _root,
+                maxLength: 512,
+                keyboardType: TextInputType.text,
+                onChanged: (value) {
+                  if (value == null || value.trim().isEmpty) return;
+                  _rootController.text = value.trim();
+                  unawaited(_saveRoot());
+                },
               ),
-            ),
+              ListItem(
+                leading: const Icon(Icons.folder_open_outlined),
+                title: const Text('Выбрать папку Flowseal'),
+                subtitle: const Text('Указать существующий каталог или место установки'),
+                onTap: _busy || _testing ? null : _pickRoot,
+              ),
+              ListItem(
+                leading: Icon(
+                  installation?.installed == true
+                      ? Icons.verified_outlined
+                      : Icons.info_outline,
+                  color: installation?.installed == true
+                      ? context.colorScheme.primary
+                      : context.colorScheme.onSurfaceVariant,
+                ),
+                title: Text(
+                  _root.isEmpty
+                      ? 'Каталог не выбран'
+                      : installation?.installed == true
+                          ? 'Flowseal найден · ' + installation!.version
+                          : 'Flowseal не обнаружен',
+                ),
+                subtitle: installation?.installed == true
+                    ? Text(installation!.executable)
+                    : const Text('Нужны winws.exe, WinDivert и каталог стратегий'),
+              ),
+              ListItem(
+                leading: const Icon(Icons.download_outlined),
+                title: Text(
+                  _installed ? 'Переустановить / обновить Flowseal' : 'Установить Flowseal',
+                ),
+                onTap: _busy || _testing || _root.isEmpty
+                    ? null
+                    : _installOrUpdate,
+              ),
+              ListItem(
+                leading: const Icon(Icons.fact_check_outlined),
+                title: const Text('Проверить установку'),
+                subtitle: const Text('Проверка файлов и каталога стратегий'),
+                onTap: _busy || _testing || !_installed ? null : _validate,
+              ),
+              if (_validation != null)
+                ListItem(
+                  leading: Icon(
+                    Icons.check_circle_outline,
+                    color: context.colorScheme.primary,
+                  ),
+                  title: Text(_validation!),
+                ),
+            ],
           ),
-          const SizedBox(height: 12),
-          _buildInstallationCard(context),
-          const SizedBox(height: 12),
-          _buildRuntimeCard(context),
-          if (_error != null) ...[
-            const SizedBox(height: 12),
-            Card(
-              color: colorScheme.errorContainer,
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Text(
-                  _error!,
-                  style: TextStyle(color: colorScheme.onErrorContainer),
+          generateSection(
+            title: 'Управление winws.exe',
+            items: [
+              ListItem(
+                leading: Icon(
+                  _running ? Icons.play_circle_fill : Icons.stop_circle_outlined,
+                  color: _running
+                      ? context.colorScheme.primary
+                      : context.colorScheme.onSurfaceVariant,
+                ),
+                title: Text(
+                  _running
+                      ? 'Запущен · PID ' + (_runtime?.pid?.toString() ?? '—')
+                      : 'Остановлен',
+                ),
+                subtitle: Text(
+                  _runtime?.strategy == null
+                      ? (_elevated
+                          ? 'Права администратора: есть'
+                          : 'Права администратора: нет')
+                      : 'Стратегия: ' + _runtime!.strategy!,
                 ),
               ),
+              if (!_elevated)
+                ListItem(
+                  leading: const Icon(Icons.admin_panel_settings_outlined),
+                  title: const Text('Перезапустить FlClashX с правами администратора'),
+                  subtitle: const Text('Нужно для запуска winws.exe и автотестирования'),
+                  onTap: _busy || _testing ? null : _requestElevationForTest,
+                ),
+              ListItem(
+                leading: const Icon(Icons.play_arrow_rounded),
+                title: Text(_elevated ? 'Запустить выбранную стратегию' : 'Запустить с UAC'),
+                subtitle: Text(_selectedStrategy ?? 'Сначала выберите стратегию'),
+                onTap: _busy || _testing || !_installed || _running ||
+                        _selectedStrategy == null
+                    ? null
+                    : _start,
+              ),
+              ListItem(
+                leading: const Icon(Icons.stop_rounded),
+                title: const Text('Остановить winws.exe'),
+                onTap: _busy || _testing || !_running ? null : _stop,
+              ),
+              ListItem(
+                leading: const Icon(Icons.folder_open_outlined),
+                title: const Text('Открыть папку логов'),
+                subtitle: Text(_runtime?.logPath ?? ''),
+                onTap: _runtime == null || _runtime!.logPath.isEmpty
+                    ? null
+                    : _openLogFolder,
+              ),
+            ],
+          ),
+          if (_error != null)
+            generateSection(
+              title: 'Ошибка',
+              items: [
+                ListItem(
+                  leading: Icon(Icons.error_outline, color: context.colorScheme.error),
+                  title: Text(
+                    _error!,
+                    style: TextStyle(color: context.colorScheme.error),
+                  ),
+                ),
+              ],
             ),
-          ],
           if (_installed) ...[
-            const SizedBox(height: 12),
-            _buildIpSetCard(context),
-            const SizedBox(height: 12),
-            _buildStrategyCard(context),
-            const SizedBox(height: 12),
-            _buildUserListsCard(context),
+            generateSection(
+              title: 'Стратегии Flowseal',
+              items: [
+                if (_strategies.isEmpty)
+                  const ListItem(
+                    title: Text('Готовые стратегии не найдены'),
+                    subtitle: Text('Проверьте установку Flowseal'),
+                  )
+                else
+                  ListItem.options<String>(
+                    leading: const Icon(Icons.tune),
+                    title: const Text('Выбранная стратегия'),
+                    subtitle: const Text('Выберите один из готовых или импортированных BAT'),
+                    options: _strategies,
+                    value: _selectedStrategy != null &&
+                            _strategies.contains(_selectedStrategy)
+                        ? _selectedStrategy!
+                        : _strategies.first,
+                    textBuilder: (strategy) => strategy,
+                    onChanged: (strategy) => setState(() {
+                      _selectedStrategy = strategy;
+                      _preview = null;
+                    }),
+                  ),
+                ListItem.options<String>(
+                  leading: const Icon(Icons.sports_esports_outlined),
+                  title: const Text('Game Filter'),
+                  subtitle: const Text('Фильтрация игровых TCP/UDP-портов'),
+                  options: const ['none', 'all', 'tcp', 'udp'],
+                  value: _filterMode,
+                  textBuilder: (mode) => switch (mode) {
+                    'all' => 'TCP + UDP',
+                    'tcp' => 'Только TCP',
+                    'udp' => 'Только UDP',
+                    _ => 'Отключён',
+                  },
+                  onChanged: (mode) {
+                    setState(() {
+                      _filterMode = mode;
+                      _preview = null;
+                    });
+                    unawaited(_saveGameFilterSettings());
+                  },
+                ),
+                ListItem.input(
+                  leading: const Icon(Icons.swap_horiz),
+                  title: const Text('TCP-порты'),
+                  subtitle: Text(_tcpController.text),
+                  dialogTitle: 'Диапазоны TCP-портов',
+                  value: _tcpController.text,
+                  maxLength: 64,
+                  keyboardType: TextInputType.text,
+                  onChanged: (value) {
+                    if (value == null) return;
+                    _tcpController.text = value;
+                    setState(() => _preview = null);
+                    unawaited(_saveGameFilterSettings());
+                  },
+                ),
+                ListItem.input(
+                  leading: const Icon(Icons.swap_vert),
+                  title: const Text('UDP-порты'),
+                  subtitle: Text(_udpController.text),
+                  dialogTitle: 'Диапазоны UDP-портов',
+                  value: _udpController.text,
+                  maxLength: 64,
+                  keyboardType: TextInputType.text,
+                  onChanged: (value) {
+                    if (value == null) return;
+                    _udpController.text = value;
+                    setState(() => _preview = null);
+                    unawaited(_saveGameFilterSettings());
+                  },
+                ),
+                ListItem(
+                  leading: const Icon(Icons.code),
+                  title: const Text('Просмотр аргументов winws.exe'),
+                  subtitle: const Text('Посмотреть, что будет передано выбранной стратегии'),
+                  onTap: _busy || _testing || _selectedStrategy == null
+                      ? null
+                      : _showPreview,
+                ),
+                if (_preview != null)
+                  ListItem(
+                    leading: const Icon(Icons.terminal),
+                    title: const Text('Аргументы стратегии'),
+                    subtitle: SelectableText(
+                      _preview!,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            fontFamily: 'JetBrainsMono',
+                            color: context.colorScheme.onSurface,
+                          ),
+                    ),
+                  ),
+                ListItem(
+                  leading: const Icon(Icons.file_open_outlined),
+                  title: const Text('Добавить стратегию из BAT-файла'),
+                  subtitle: const Text('Файл будет разобран и добавлен в список'),
+                  onTap: _busy || _testing ? null : _importStrategy,
+                ),
+              ],
+              footer: 'BAT используется только как источник аргументов winws.exe. '
+                  'Сценарии BAT/CMD не исполняются.',
+            ),
+            generateSection(
+              title: 'Автоматический подбор стратегии',
+              items: [
+                ListItem.options<String>(
+                  leading: const Icon(Icons.speed),
+                  title: const Text('Режим проверки'),
+                  options: const ['standard', 'dpi', 'combined'],
+                  value: _testType,
+                  textBuilder: _testTypeLabel,
+                  onChanged: (value) => setState(() => _testType = value),
+                ),
+                ListItem(
+                  leading: Icon(
+                    _testing ? Icons.sync : Icons.play_circle_outline,
+                    color: _testing
+                        ? context.colorScheme.primary
+                        : context.colorScheme.onSurfaceVariant,
+                  ),
+                  title: Text(_testing ? 'Проверка выполняется' : 'Запустить автотест всех стратегий'),
+                  subtitle: Text(
+                    _testing
+                        ? (progress?.message ?? 'Подготовка...')
+                        : 'winws.exe запускается по очереди для каждой стратегии',
+                  ),
+                  onTap: _testing || _busy ? null : _runStrategyTests,
+                ),
+                if (_testing) ...[
+                  ListItem(
+                    leading: const Icon(Icons.stop_circle_outlined),
+                    title: const Text('Остановить проверку'),
+                    onTap: _cancelStrategyTests,
+                  ),
+                  if (progressValue != null)
+                    ListItem(
+                      title: LinearProgressIndicator(value: progressValue),
+                      subtitle: Text(
+                        progress!.current.toString() + ' / ' +
+                        progress.total.toString() +
+                        (progress.strategy.isEmpty ? '' : ' · ' + progress.strategy),
+                      ),
+                    ),
+                ],
+                if (!_testing && _testResults.isNotEmpty)
+                  ListItem(
+                    leading: Icon(Icons.emoji_events_outlined, color: context.colorScheme.primary),
+                    title: Text('Лучшая: ' + _testResults.first.strategy),
+                    subtitle: Text(
+                      'HTTP ' + _testResults.first.httpOk.toString() + '/' +
+                      (_testResults.first.httpOk + _testResults.first.httpError).toString() +
+                      ' · Score ' + _testResults.first.score.toString(),
+                    ),
+                    trailing: const Icon(Icons.check_circle_outline),
+                  ),
+                for (final result in _testResults)
+                  _buildTestResult(context, result),
+              ],
+              footer: 'Комплексный режим проверяет обычные HTTP/TCP-соединения и DPI-запросы. '
+                  'Лучшая доступная стратегия автоматически выбирается, но не запускается без твоего действия.',
+            ),
+            generateSection(
+              title: 'IPSet Filter',
+              items: [
+                ListItem.options<String>(
+                  leading: const Icon(Icons.filter_alt_outlined),
+                  title: const Text('Режим IPSet'),
+                  options: const ['none', 'any', 'loaded'],
+                  value: _ipsetMode,
+                  textBuilder: (mode) => switch (mode) {
+                    'none' => 'Отключён',
+                    'loaded' => 'Использовать список IP',
+                    _ => 'Без фильтрации',
+                  },
+                  onChanged: _busy || _testing
+                      ? (_) {}
+                      : (mode) => unawaited(_changeIpSetMode(mode)),
+                ),
+                ListItem(
+                  leading: const Icon(Icons.download_outlined),
+                  title: const Text('Обновить IPSet'),
+                  subtitle: Text(_ipsetUpdateMessage ?? 'Загрузить актуальный список Flowseal'),
+                  onTap: _busy || _testing ? null : _updateIpSet,
+                ),
+              ],
+              footer: 'При смене режима работающая стратегия перезапускается.',
+            ),
+            generateSection(
+              title: 'Пользовательские списки',
+              items: [
+                ListItem.options<String>(
+                  leading: const Icon(Icons.list_alt),
+                  title: const Text('Тип списка'),
+                  options: _flowsealUserLists.keys.toList(),
+                  value: _selectedUserList,
+                  textBuilder: (filename) => _flowsealUserLists[filename] ?? filename,
+                  onChanged: (filename) => unawaited(_selectUserList(filename)),
+                ),
+                ListItem(
+                  leading: const Icon(Icons.add_circle_outline),
+                  title: const Text('Добавить запись'),
+                  subtitle: Text(
+                    _selectedUserList == 'ipset-exclude-user.txt'
+                        ? 'IPv4 или CIDR'
+                        : 'Доменное имя',
+                  ),
+                  onTap: _busy || _testing ? null : _promptAddUserListEntry,
+                ),
+                ListItem(
+                  leading: const Icon(Icons.file_upload_outlined),
+                  title: const Text('Импортировать TXT'),
+                  onTap: _busy || _testing ? null : () => _importUserList(context),
+                ),
+                ListItem(
+                  leading: const Icon(Icons.file_download_outlined),
+                  title: const Text('Экспортировать выбранный список'),
+                  onTap: _busy || _testing ? null : _exportSelectedUserList,
+                ),
+                ListItem(
+                  leading: const Icon(Icons.delete_sweep_outlined),
+                  title: const Text('Очистить выбранный список'),
+                  onTap: _busy || _testing || _userListEntries.isEmpty
+                      ? null
+                      : () => _clearUserList(context),
+                ),
+                ListItem(
+                  leading: const Icon(Icons.backup_outlined),
+                  title: const Text('Создать резервную копию всех списков'),
+                  onTap: _busy || _testing ? null : _exportUserListsBackup,
+                ),
+                ListItem(
+                  leading: const Icon(Icons.settings_backup_restore_outlined),
+                  title: const Text('Восстановить резервную копию'),
+                  onTap: _busy || _testing ? null : _importUserListsBackup,
+                ),
+                ListItem(
+                  leading: const Icon(Icons.search),
+                  title: Text('Записей: ' + _userListEntries.length.toString()),
+                  subtitle: Text(
+                    filteredEntries.isEmpty
+                        ? 'Список пуст или совпадений нет'
+                        : 'Показано ' + visibleEntries.length.toString() +
+                            ' из ' + filteredEntries.length.toString(),
+                  ),
+                ),
+                for (final entry in visibleEntries)
+                  ListItem(
+                    title: Text(entry),
+                    trailing: IconButton(
+                      tooltip: 'Удалить запись',
+                      onPressed: _busy || _testing
+                          ? null
+                          : () => _removeUserListEntry(entry),
+                      icon: const Icon(Icons.delete_outline),
+                    ),
+                  ),
+              ],
+              footer: 'Списки хранятся в каталоге Flowseal. При работающем winws.exe '
+                  'изменения применяются перезапуском процесса.',
+            ),
           ],
         ],
       ),
     );
   }
 
-  Widget _buildInstallationCard(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final installation = _installation;
-    final label = _root.isEmpty
-        ? 'Каталог не выбран'
-        : installation == null
-        ? 'Проверка не выполнена'
-        : installation.installed
-        ? 'Flowseal найден'
-        : 'Установка не обнаружена';
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  installation?.installed == true
-                      ? Icons.verified
-                      : Icons.info_outline,
-                  color: installation?.installed == true
-                      ? colorScheme.primary
-                      : colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    label,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                ),
-              ],
-            ),
-            if (installation != null) ...[
-              const SizedBox(height: 8),
-              Text('Версия: ${installation.version}'),
-              const SizedBox(height: 4),
-              SelectableText(
-                installation.executable,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-            if (_validation != null) ...[
-              const SizedBox(height: 8),
-              Text(_validation!, style: TextStyle(color: colorScheme.primary)),
-            ],
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                FilledButton.icon(
-                  onPressed: _busy ? null : _installOrUpdate,
-                  icon: const Icon(Icons.download),
-                  label: Text(
-                    _installed
-                        ? 'Установить обновление'
-                        : 'Установить Flowseal',
-                  ),
-                ),
-                OutlinedButton.icon(
-                  onPressed: _busy || !_installed ? null : _validate,
-                  icon: const Icon(Icons.fact_check_outlined),
-                  label: const Text('Проверить установку'),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRuntimeCard(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final runtime = _runtime;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Процесс winws.exe',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _running ? 'Запущен · PID ${runtime?.pid ?? '-'}' : 'Остановлен',
-              style: TextStyle(
-                color: _running
-                    ? colorScheme.primary
-                    : colorScheme.onSurfaceVariant,
-              ),
-            ),
-            if (runtime?.strategy case final strategy?) ...[
-              const SizedBox(height: 4),
-              Text('Стратегия: $strategy'),
-            ],
-            const SizedBox(height: 8),
-            Text(
-              _elevated
-                  ? 'Права администратора: есть'
-                  : 'Права администратора: нет',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: _elevated ? colorScheme.primary : colorScheme.error,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                FilledButton.icon(
-                  onPressed:
-                      _busy ||
-                          !_installed ||
-                          _running ||
-                          _selectedStrategy == null
-                      ? null
-                      : _start,
-                  icon: const Icon(Icons.play_arrow),
-                  label: Text(_elevated ? 'Запустить' : 'Запустить с UAC'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: _busy || !_running ? null : _stop,
-                  icon: const Icon(Icons.stop),
-                  label: const Text('Остановить'),
-                ),
-                TextButton.icon(
-                  onPressed: runtime == null || runtime.logPath.isEmpty
-                      ? null
-                      : _openLogFolder,
-                  icon: const Icon(Icons.folder),
-                  label: const Text('Папка логов'),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStrategyCard(BuildContext context) {
-    final enabled = _strategies.isNotEmpty && !_busy;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Стратегии', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 10),
-            if (_strategies.isEmpty)
-              const Text('BAT-стратегии в выбранном каталоге не найдены.')
-            else
-              DropdownButtonFormField<String>(
-                initialValue: _selectedStrategy,
-                isExpanded: true,
-                decoration: const InputDecoration(
-                  labelText: 'Стратегия',
-                  border: OutlineInputBorder(),
-                ),
-                items: [
-                  for (final strategy in _strategies)
-                    DropdownMenuItem(
-                      value: strategy,
-                      child: Text(strategy, overflow: TextOverflow.ellipsis),
-                    ),
-                ],
-                onChanged: _busy
-                    ? null
-                    : (value) => setState(() {
-                        _selectedStrategy = value;
-                        _preview = null;
-                      }),
-              ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              initialValue: _filterMode,
-              decoration: const InputDecoration(
-                labelText: 'Игровой фильтр',
-                border: OutlineInputBorder(),
-              ),
-              items: const [
-                DropdownMenuItem(value: 'none', child: Text('Отключён')),
-                DropdownMenuItem(value: 'all', child: Text('TCP + UDP')),
-                DropdownMenuItem(value: 'tcp', child: Text('Только TCP')),
-                DropdownMenuItem(value: 'udp', child: Text('Только UDP')),
-              ],
-              onChanged: _busy
-                  ? null
-                  : (value) {
-                      if (value == null) return;
-                      setState(() {
-                        _filterMode = value;
-                        _preview = null;
-                      });
-                      unawaited(_saveGameFilterSettings());
-                    },
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _tcpController,
-                    enabled: !_busy,
-                    decoration: const InputDecoration(
-                      labelText: 'TCP-порты',
-                      border: OutlineInputBorder(),
-                    ),
-                    onChanged: (_) => setState(() => _preview = null),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: TextField(
-                    controller: _udpController,
-                    enabled: !_busy,
-                    decoration: const InputDecoration(
-                      labelText: 'UDP-порты',
-                      border: OutlineInputBorder(),
-                    ),
-                    onChanged: (_) => _preview = null,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                OutlinedButton.icon(
-                  onPressed: _busy ? null : _saveGameFilterSettings,
-                  icon: const Icon(Icons.save_outlined),
-                  label: const Text('Сохранить фильтр'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: enabled && _selectedStrategy != null
-                      ? _showPreview
-                      : null,
-                  icon: const Icon(Icons.code),
-                  label: const Text('Просмотр аргументов'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: _busy ? null : _importStrategy,
-                  icon: const Icon(Icons.file_upload_outlined),
-                  label: const Text('Импортировать BAT'),
-                ),
-              ],
-            ),
-            if (_preview != null) ...[
-              const SizedBox(height: 12),
-              SelectableText(
-                _preview!,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(fontFamily: 'JetBrainsMono'),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildUserListsCard(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final query = _listSearchController.text.trim().toLowerCase();
-    final filteredEntries = _userListEntries
-        .where((entry) => entry.toLowerCase().contains(query))
-        .toList();
-    final listHeight = (filteredEntries.length * 56.0)
-        .clamp(56.0, 280.0)
-        .toDouble();
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Пользовательские списки',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Списки хранятся в каталоге Flowseal. При работающем winws.exe '
-              'изменения применяются перезапуском процесса.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              initialValue: _selectedUserList,
-              isExpanded: true,
-              decoration: const InputDecoration(
-                labelText: 'Тип списка',
-                border: OutlineInputBorder(),
-              ),
-              items: [
-                for (final item in _flowsealUserLists.entries)
-                  DropdownMenuItem(
-                    value: item.key,
-                    child: Text(item.value, overflow: TextOverflow.ellipsis),
-                  ),
-              ],
-              onChanged: _busy
-                  ? null
-                  : (value) {
-                      if (value != null) unawaited(_selectUserList(value));
-                    },
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _listEntryController,
-                    enabled: !_busy,
-                    decoration: const InputDecoration(
-                      labelText: 'Домен или IPv4/CIDR',
-                      hintText: 'example.com или 192.0.2.0/24',
-                      border: OutlineInputBorder(),
-                    ),
-                    onSubmitted: (_) => _addUserListEntry(),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                FilledButton.tonalIcon(
-                  onPressed: _busy ? null : _addUserListEntry,
-                  icon: const Icon(Icons.add),
-                  label: const Text('Добавить'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                OutlinedButton.icon(
-                  onPressed: _busy ? null : () => _importUserList(context),
-                  icon: const Icon(Icons.file_upload_outlined),
-                  label: const Text('Импорт TXT'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: _busy || _userListEntries.isEmpty
-                      ? null
-                      : () => _clearUserList(context),
-                  icon: const Icon(Icons.delete_sweep_outlined),
-                  label: const Text('Очистить'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: _busy ? null : _exportSelectedUserList,
-                  icon: const Icon(Icons.file_download_outlined),
-                  label: const Text('Экспорт TXT'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: _busy ? null : _exportUserListsBackup,
-                  icon: const Icon(Icons.backup_outlined),
-                  label: const Text('Бэкап'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: _busy ? null : _importUserListsBackup,
-                  icon: const Icon(Icons.settings_backup_restore),
-                  label: const Text('Восстановить'),
-                ),
-                IconButton(
-                  tooltip: 'Обновить список',
-                  onPressed: _busy
-                      ? null
-                      : () => _selectUserList(_selectedUserList),
-                  icon: const Icon(Icons.refresh),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _listSearchController,
-              enabled: !_busy,
-              decoration: const InputDecoration(
-                labelText: 'Поиск по списку',
-                prefixIcon: Icon(Icons.search),
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-              onChanged: (_) => setState(() {}),
-            ),
-            const SizedBox(height: 8),
-            if (_listLoading)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(16),
-                  child: CircularProgressIndicator(),
-                ),
-              )
-            else if (filteredEntries.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 18),
-                child: Center(
-                  child: Text(
-                    _userListEntries.isEmpty
-                        ? 'Список пуст.'
-                        : 'Совпадений не найдено.',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-              )
-            else
-              SizedBox(
-                height: listHeight,
-                child: ListView.separated(
-                  itemCount: filteredEntries.length,
-                  itemBuilder: (context, index) {
-                    final entry = filteredEntries[index];
-                    return ListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(
-                        entry,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      trailing: IconButton(
-                        tooltip: 'Удалить запись',
-                        onPressed: _busy
-                            ? null
-                            : () => _removeUserListEntry(entry),
-                        icon: const Icon(Icons.delete_outline),
-                      ),
-                    );
-                  },
-                  separatorBuilder: (_, _) => const Divider(height: 1),
-                ),
-              ),
-            Align(
-              alignment: Alignment.centerRight,
-              child: Text(
-                'Записей: ${_userListEntries.length}',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildIpSetCard(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final modeLabel = switch (_ipsetMode) {
-      'none' => 'Отключён',
-      'any' => 'Без фильтрации по IPSet',
-      'loaded' => 'Использовать список IP',
-      _ => 'Состояние неизвестно',
-    };
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'IPSet Filter',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Режим списка IP-адресов и подсетей Flowseal. '
-              'При смене режима работающая стратегия перезапускается.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              initialValue: _ipsetMode,
-              isExpanded: true,
-              decoration: const InputDecoration(
-                labelText: 'Режим IPSet',
-                border: OutlineInputBorder(),
-              ),
-              items: const [
-                DropdownMenuItem(value: 'none', child: Text('Отключён')),
-                DropdownMenuItem(value: 'any', child: Text('Без фильтрации')),
-                DropdownMenuItem(value: 'loaded', child: Text('Список IP')),
-              ],
-              onChanged: _busy
-                  ? null
-                  : (value) {
-                      if (value != null) unawaited(_changeIpSetMode(value));
-                    },
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Текущее состояние: $modeLabel',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ),
-                FilledButton.tonalIcon(
-                  onPressed: _busy ? null : _updateIpSet,
-                  icon: const Icon(Icons.download),
-                  label: const Text('Обновить IPSet'),
-                ),
-              ],
-            ),
-            if (_ipsetUpdateMessage != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                _ipsetUpdateMessage!,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(color: colorScheme.primary),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
 }
