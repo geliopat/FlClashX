@@ -143,9 +143,13 @@ void main(List<String> args) {
             Platform.isWindows && args.contains(_flowsealElevatedLaunchArgument)
             ? _readFlowsealLaunchIntent(args)
             : null;
+        final hasFlowsealStartRequest = args.any(
+          (argument) => argument.startsWith(_flowsealStartLaunchArgument),
+        );
         String? flowsealStartError;
         int? flowsealStartedPid;
         if (args.contains(_flowsealElevatedLaunchArgument) &&
+            hasFlowsealStartRequest &&
             flowsealIntent == null) {
           flowsealStartError =
               'The elevated Flowseal start request was missing or invalid.';
@@ -203,6 +207,16 @@ void main(List<String> args) {
                 level: MessageLevel.info,
               );
             }
+          });
+        }
+        if (Platform.isWindows &&
+            args.contains(_flowsealElevatedLaunchArgument) &&
+            !hasFlowsealStartRequest) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            dialogs.showNotifier(
+              'FlClashX запущен с правами администратора.',
+              level: MessageLevel.success,
+            );
           });
         }
         if (system.isDesktop) {
