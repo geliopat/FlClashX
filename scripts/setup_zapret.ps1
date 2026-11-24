@@ -1,0 +1,84 @@
+$ErrorActionPreference = "Stop"
+$ProgressPreference = "SilentlyContinue"
+$Root = Split-Path -Parent $PSScriptRoot
+$AssetDir = Join-Path $Root "windows\zapret"
+$TempRoot = Join-Path $env:TEMP ("flclashx-zapret-" + [Guid]::NewGuid().ToString("N"))
+$Zapret2Zip = Join-Path $TempRoot "zapret2.zip"
+$FlowsealZip = Join-Path $TempRoot "flowseal.zip"
+$Zapret2Extract = Join-Path $TempRoot "zapret2"
+$FlowsealExtract = Join-Path $TempRoot "flowseal"
+$Zapret2Url = "https://github.com/bol-van/zapret2/releases/download/v1.0.7/zapret2-v1.0.7.zip"
+$Zapret2Sha256 = "35e14e4e1f345b870c3b87269fa45353efd597241a25304d38375c46b9fd2967"
+$FlowsealUrl = "https://github.com/Flowseal/zapret-discord-youtube/releases/download/1.10.4/zapret-discord-youtube-1.10.4.zip"
+$FlowsealSha256 = "291af673bd0238506f9548e0e94ca0abf244000f4c9a06960544fb01c5f97b34"
+$ZapretSourceCommit = "8dd17fcbcca405a50f497a6e2346ca263901d775"
+$ZapretSourceBase = "https://raw.githubusercontent.com/geliopat/zapret2-gui/$ZapretSourceCommit"
+
+function Get-PinnedArchive {
+    param([string]$Url, [string]$Path, [string]$ExpectedSha256, [string]$Label)
+    Write-Host "Downloading $Label..."
+    Invoke-WebRequest -Uri $Url -OutFile $Path
+    $Actual = (Get-FileHash -Path $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($Actual -ne $ExpectedSha256.ToLowerInvariant()) {
+        throw "SHA256 mismatch for $Label. Expected $ExpectedSha256, got $Actual."
+    }
+    Write-Host "Verified SHA256: $Label"
+}
+
+try {
+    New-Item -ItemType Directory -Path $TempRoot -Force | Out-Null
+    New-Item -ItemType Directory -Path $AssetDir -Force | Out-Null
+    Get-ChildItem -Path $AssetDir -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force
+
+    Get-PinnedArchive -Url $Zapret2Url -Path $Zapret2Zip -ExpectedSha256 $Zapret2Sha256 -Label "bol-van/zapret2 v1.0.7"
+    Expand-Archive -Path $Zapret2Zip -DestinationPath $Zapret2Extract -Force
+    $Zapret2Bin = Get-ChildItem -Path $Zapret2Extract -Recurse -Directory | Where-Object { $_.Name -ieq "windows-x86_64" } | Select-Object -First 1
+    if (-not $Zapret2Bin) { throw "The zapret2 archive has no windows-x86_64 binary directory." }
+    Get-ChildItem -Path $Zapret2Bin.FullName -File | ForEach-Object { Copy-Item -Path $_.FullName -Destination $AssetDir -Force }
+
+    Get-PinnedArchive -Url $FlowsealUrl -Path $FlowsealZip -ExpectedSha256 $FlowsealSha256 -Label "Flowseal/zapret-discord-youtube 1.10.4"
+    Expand-Archive -Path $FlowsealZip -DestinationPath $FlowsealExtract -Force
+    $FlowsealEngine = Get-ChildItem -Path $FlowsealExtract -Recurse -File -Filter "winws.exe" | Select-Object -First 1
+    if (-not $FlowsealEngine) { throw "The Flowseal archive has no winws.exe." }
+    Copy-Item -Path $FlowsealEngine.FullName -Destination (Join-Path $AssetDir "winws.exe") -Force
+
+    $ListsDir = Join-Path $AssetDir "lists"
+    New-Item -ItemType Directory -Path $ListsDir -Force | Out-Null
+    $FlowsealLists = Get-ChildItem -Path $FlowsealExtract -Recurse -Directory -Filter "lists" | Select-Object -First 1
+    if ($FlowsealLists) {
+        Get-ChildItem -Path $FlowsealLists.FullName -File | ForEach-Object { Copy-Item -Path $_.FullName -Destination $ListsDir -Force }
+    }
+
+    $LuaFiles = @("zapret-lib.lua","zapret-antidpi.lua","zapret-auto.lua","zapret-discord-light.lua","zapret-extsplit.lua","zapret-firstbyte.lua","zapret-ipfrag.lua","zapret-obfs.lua","zapret-pcap.lua","zapret-sites-light.lua","zapret-syndata.lua","zapret-tests.lua","zapret-tspu-max.lua","zapret-yt4k.lua")
+    foreach ($Name in $LuaFiles) {
+        $Path = Join-Path $AssetDir $Name
+        Invoke-WebRequest -Uri "$ZapretSourceBase/bin/$Name" -OutFile $Path
+        if ((Get-Item $Path).Length -eq 0) { throw "Downloaded Lua strategy is empty: $Name" }
+    }
+
+    $BlobFiles = @("ACTIVE_DISCORD_UDP.bin","ACTIVE_GAME_UDP.bin","quic_initial_4pda_to.bin","quic_initial_5ka_ru.bin","quic_initial_lemana_pro.bin","quic_initial_rutube_ru.bin","quic_initial_steam_chat_com.bin","quic_initial_steamcommunity_com.bin","quic_initial_steamstatic_com.bin","quic_initial_tencent_com.bin","quic_initial_www_google_com.bin","stun.bin","stun2.bin","tls_clienthello_4pda_to.bin","tls_clienthello_5ka_ru.bin","tls_clienthello_awswaf_com.bin","tls_clienthello_max_ru.bin","tls_clienthello_retext_ai.bin","tls_clienthello_sochi_park.bin","tls_clienthello_steam_chat_com.bin","tls_clienthello_steamstatic_com.bin","tls_clienthello_teamspeak_com.bin","tls_clienthello_www_google_com.bin","tls_clienthello_www_sferum_ru.bin")
+    foreach ($Name in $BlobFiles) {
+        $Path = Join-Path $AssetDir $Name
+        Invoke-WebRequest -Uri "$ZapretSourceBase/bin/$Name" -OutFile $Path
+        if ((Get-Item $Path).Length -eq 0) { throw "Downloaded payload is empty: $Name" }
+    }
+
+    $ListFiles = @("ipset-all.txt","ipset-exclude.txt","ipset-exclude-user.txt","list-exclude.txt","list-exclude-user.txt","list-general.txt","list-general-user.txt","list-google.txt")
+    foreach ($Name in $ListFiles) {
+        $Path = Join-Path $ListsDir $Name
+        try {
+            Invoke-WebRequest -Uri "$ZapretSourceBase/lists/$Name" -OutFile $Path
+        } catch {
+            if ($Name.EndsWith("-user.txt")) { [System.IO.File]::WriteAllText($Path, "") } else { throw }
+        }
+    }
+
+    $Required = @("winws2.exe","winws.exe","WinDivert.dll","WinDivert64.sys","cygwin1.dll","zapret-lib.lua","zapret-antidpi.lua","ACTIVE_DISCORD_UDP.bin","quic_initial_www_google_com.bin","tls_clienthello_www_google_com.bin","tls_clienthello_max_ru.bin","stun2.bin")
+    foreach ($Name in $Required) {
+        $Path = Join-Path $AssetDir $Name
+        if (-not (Test-Path $Path -PathType Leaf) -or (Get-Item $Path).Length -eq 0) { throw "Required Zapret asset is missing or empty: $Name" }
+    }
+    Write-Host "Zapret2 and Flowseal Windows assets staged in $AssetDir"
+} finally {
+    if (Test-Path $TempRoot) { Remove-Item -Path $TempRoot -Recurse -Force -ErrorAction SilentlyContinue }
+}
