@@ -654,17 +654,17 @@ fn zapret_status_response(
     managed: &mut Option<ManagedZapret>,
     cleaned_processes: usize,
 ) -> Result<warp::reply::Response, Error> {
-    let pid = match managed.as_mut() {
+    let (pid, exited_status) = match managed.as_mut() {
         Some(zapret) => match zapret.child.try_wait()? {
-            Some(status) => {
-                log_message(format!("Zapret2 engine exited: {status}"));
-                *managed = None;
-                None
-            }
-            None => Some(zapret.child.id()),
+            Some(status) => (None, Some(status)),
+            None => (Some(zapret.child.id()), None),
         },
-        None => None,
+        None => (None, None),
     };
+    if let Some(status) = exited_status {
+        log_message(format!("Zapret2 engine exited: {status}"));
+        *managed = None;
+    }
     Ok(json_response(
         &ZapretStatusResponse {
             running: pid.is_some(),
