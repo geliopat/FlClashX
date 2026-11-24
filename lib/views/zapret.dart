@@ -187,14 +187,6 @@ class _FlowsealViewState extends State<FlowsealView> {
     final strategy = _selectedStrategy;
     if (strategy == null || !_installed) return;
     await _withBusy(() async {
-      final elevated = await flowsealIsElevated();
-      if (!elevated) {
-        throw Exception(
-          'Для запуска WinDivert нужны права администратора. '
-          'Закройте FlClashX и запустите его через «Запуск от имени администратора», '
-          'затем повторите запуск.',
-        );
-      }
       final status = await flowsealStart(
         root: _root,
         strategy: strategy,
