@@ -6,7 +6,9 @@
 
 use crate::zapret::core::{CoreProvider, GameFilterSettings};
 use crate::zapret::providers::flowseal::FlowsealProvider;
+use std::ffi::OsStr;
 use std::os::windows::{
+    ffi::OsStrExt,
     io::{AsRawHandle, FromRawHandle, OwnedHandle, RawHandle},
     process::CommandExt,
 };
@@ -28,7 +30,14 @@ use windows_sys::Win32::{
             SetInformationJobObject, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
             JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
         },
-        Threading::{GetCurrentProcess, OpenProcessToken},
+        Threading::{
+            GetCurrentProcess, GetProcessId, OpenProcessToken, TerminateProcess,
+            WaitForSingleObject,
+        },
+    },
+    UI::{
+        Shell::{ShellExecuteExW, SHELLEXECUTEINFOW, SEE_MASK_NOCLOSEPROCESS, SEE_MASK_NOASYNC},
+        WindowsAndMessaging::SW_HIDE,
     },
 };
 
@@ -39,10 +48,13 @@ pub struct ProcessStatus {
     pub pid: Option<u32>,
     pub strategy: Option<String>,
     pub log_path: String,
+    pub elevated: bool,
 }
 
 struct RunningProcess {
-    child: Child,
+    child: Option<Child>,
+    elevated_process: Option<OwnedHandle>,
+    pid: u32,
     // Closing the Job Object kills the process if FlClashX exits unexpectedly.
     _job: OwnedHandle,
     strategy: String,
@@ -58,6 +70,133 @@ fn lock_process() -> MutexGuard<'static, Option<RunningProcess>> {
     process_slot()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+fn process_is_running(running: &mut RunningProcess) -> io::Result<bool> {
+    if let Some(child) = running.child.as_mut() {
+        return Ok(child.try_wait()?.is_none());
+    }
+    let process = running
+        .elevated_process
+        .as_ref()
+        .ok_or_else(|| io::Error::other("Flowseal process handle is missing"))?;
+    match unsafe { WaitForSingleObject(process.as_raw_handle() as HANDLE, 0) } {
+        0 => Ok(false),
+        258 => Ok(true),
+        _ => Err(io::Error::last_os_error()),
+    }
+}
+
+fn stop_elevated(process: &OwnedHandle) -> io::Result<()> {
+    let handle = process.as_raw_handle() as HANDLE;
+    match unsafe { WaitForSingleObject(handle, 0) } {
+        0 => return Ok(()),
+        258 => {}
+        _ => return Err(io::Error::last_os_error()),
+    }
+    if unsafe { TerminateProcess(handle, 1) } == 0 {
+        if unsafe { WaitForSingleObject(handle, 0) } == 0 {
+            return Ok(());
+        }
+        return Err(io::Error::last_os_error());
+    }
+    match unsafe { WaitForSingleObject(handle, 5000) } {
+        0 => Ok(()),
+        258 => Err(io::Error::new(
+            io::ErrorKind::TimedOut,
+            "Timed out waiting for elevated winws.exe to exit",
+        )),
+        _ => Err(io::Error::last_os_error()),
+    }
+}
+
+fn launch_elevated(
+    executable: &Path,
+    arguments: &[String],
+    working_directory: &Path,
+) -> io::Result<(OwnedHandle, u32)> {
+    let verb = wide("runas");
+    let file = wide(executable.as_os_str());
+    let directory = wide(working_directory.as_os_str());
+    let parameters = wide(&build_windows_command_line(arguments));
+
+    let mut info: SHELLEXECUTEINFOW = unsafe { std::mem::zeroed() };
+    info.cbSize = std::mem::size_of::<SHELLEXECUTEINFOW>() as u32;
+    info.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NOASYNC;
+    info.lpVerb = verb.as_ptr();
+    info.lpFile = file.as_ptr();
+    info.lpParameters = parameters.as_ptr();
+    info.lpDirectory = directory.as_ptr();
+    info.nShow = SW_HIDE;
+
+    if unsafe { ShellExecuteExW(&mut info) } == 0 {
+        let error = io::Error::last_os_error();
+        return if error.raw_os_error() == Some(1223) {
+            Err(io::Error::new(
+                io::ErrorKind::Interrupted,
+                "The administrator approval request was cancelled",
+            ))
+        } else {
+            Err(error)
+        };
+    }
+    if info.hProcess.is_null() {
+        return Err(io::Error::other(
+            "Windows started Flowseal without returning a process handle",
+        ));
+    }
+
+    let process = unsafe { OwnedHandle::from_raw_handle(info.hProcess as RawHandle) };
+    let pid = unsafe { GetProcessId(info.hProcess) };
+    if pid == 0 {
+        let error = io::Error::last_os_error();
+        let _ = stop_elevated(&process);
+        return Err(error);
+    }
+    Ok((process, pid))
+}
+
+fn wide(value: &OsStr) -> Vec<u16> {
+    value.encode_wide().chain(std::iter::once(0)).collect()
+}
+
+fn build_windows_command_line(arguments: &[String]) -> String {
+    arguments
+        .iter()
+        .map(|argument| quote_windows_argument(argument))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn quote_windows_argument(argument: &str) -> String {
+    if !argument.is_empty()
+        && !argument
+            .chars()
+            .any(|character| character.is_whitespace() || character == '"')
+    {
+        return argument.to_owned();
+    }
+
+    let mut quoted = String::from("\"");
+    let mut backslashes = 0usize;
+    for character in argument.chars() {
+        match character {
+            '\\' => backslashes += 1,
+            '"' => {
+                quoted.extend(std::iter::repeat_n('\\', backslashes * 2 + 1));
+                quoted.push('"');
+                backslashes = 0;
+            }
+            _ => {
+                quoted.extend(std::iter::repeat_n('\\', backslashes));
+                backslashes = 0;
+                quoted.push(character);
+            }
+        }
+    }
+    quoted.extend(std::iter::repeat_n('\\', backslashes * 2));
+    quoted.push('"');
+    quoted
 }
 
 pub fn is_elevated() -> bool {
@@ -85,11 +224,12 @@ pub fn is_elevated() -> bool {
 pub fn status(root: &Path) -> Result<ProcessStatus, String> {
     let mut slot = lock_process();
     let completed_log = if let Some(running) = slot.as_mut() {
-        match running.child.try_wait() {
-            Ok(None) => return Ok(status_for_running(running)),
-            Ok(Some(_)) => Some(running.log_path.clone()),
-            Err(error) => return Err(format!("Cannot query winws.exe process: {error}")),
+        if process_is_running(running)
+            .map_err(|error| format!("Cannot query winws.exe process: {error}"))?
+        {
+            return Ok(status_for_running(running));
         }
+        Some(running.log_path.clone())
     } else {
         None
     };
@@ -106,10 +246,6 @@ pub fn start(
     strategy: &str,
     game_filter: &GameFilterSettings,
 ) -> Result<ProcessStatus, String> {
-    if !is_elevated() {
-        return Err("admin_required:flowseal".into());
-    }
-
     let root = fs::canonicalize(&requested_root).map_err(|error| {
         format!(
             "Cannot resolve Flowseal installation directory {}: {error}",
@@ -122,13 +258,12 @@ pub fn start(
 
     let mut slot = lock_process();
     if let Some(running) = slot.as_mut() {
-        match running.child.try_wait() {
-            Ok(None) => return Err(format!("flowseal_already_running:{}", running.child.id())),
-            Ok(Some(_)) => {
-                slot.take();
-            }
-            Err(error) => return Err(format!("Cannot query existing winws.exe process: {error}")),
+        if process_is_running(running)
+            .map_err(|error| format!("Cannot query existing winws.exe process: {error}"))?
+        {
+            return Err(format!("flowseal_already_running:{}", running.pid));
         }
+        slot.take();
     }
 
     let provider = FlowsealProvider::new(root.clone());
@@ -197,58 +332,79 @@ pub fn start(
     let working_directory = executable
         .parent()
         .ok_or_else(|| "Flowseal winws.exe has no parent directory".to_string())?;
-    let mut command = Command::new(&executable);
-    command
-        .args(&args)
-        .current_dir(working_directory)
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .creation_flags(CREATE_NO_WINDOW);
 
-    let mut child = command
-        .spawn()
-        .map_err(|error| format!("Cannot start Flowseal winws.exe: {error}"))?;
-    let pid = child.id();
+    let (mut child, elevated_process, pid) = if is_elevated() {
+        let mut command = Command::new(&executable);
+        command
+            .args(&args)
+            .current_dir(working_directory)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .creation_flags(CREATE_NO_WINDOW);
+        let child = command
+            .spawn()
+            .map_err(|error| format!("Cannot start Flowseal winws.exe: {error}"))?;
+        let pid = child.id();
+        (Some(child), None, pid)
+    } else {
+        let (process, pid) = launch_elevated(&executable, &args, working_directory)
+            .map_err(|error| format!("Cannot start elevated Flowseal winws.exe: {error}"))?;
+        (None, Some(process), pid)
+    };
+
+    let process_handle = child
+        .as_ref()
+        .map(|process| process.as_raw_handle() as HANDLE)
+        .or_else(|| {
+            elevated_process
+                .as_ref()
+                .map(|process| process.as_raw_handle() as HANDLE)
+        })
+        .ok_or_else(|| "Flowseal process handle is missing".to_string())?;
 
     // The process is never considered managed unless it is inside the
     // kill-on-close job. If assignment fails, terminate this exact child.
-    if unsafe {
-        AssignProcessToJobObject(
-            job.as_raw_handle() as HANDLE,
-            child.as_raw_handle() as HANDLE,
-        )
-    } == 0
-    {
+    if unsafe { AssignProcessToJobObject(job.as_raw_handle() as HANDLE, process_handle) } == 0 {
         let error = io::Error::last_os_error();
-        let _ = stop_child(&mut child);
-        return Err(format!(
-            "Cannot attach Flowseal process to its job: {error}"
-        ));
+        if let Some(process) = child.as_mut() {
+            let _ = stop_child(process);
+        }
+        if let Some(process) = elevated_process.as_ref() {
+            let _ = stop_elevated(process);
+        }
+        return Err(format!("Cannot attach Flowseal process to its job: {error}"));
     }
 
     let log = Arc::new(Mutex::new(log_file));
-    let stdout = child
-        .stdout
-        .take()
-        .ok_or_else(|| "Flowseal stdout pipe was not created".to_string())?;
-    if let Err(error) = spawn_log_reader("stdout", stdout, Arc::clone(&log)) {
-        let _ = stop_child(&mut child);
-        return Err(format!("Cannot start Flowseal stdout logger: {error}"));
-    }
-    let stderr = child
-        .stderr
-        .take()
-        .ok_or_else(|| "Flowseal stderr pipe was not created".to_string())?;
-    if let Err(error) = spawn_log_reader("stderr", stderr, Arc::clone(&log)) {
-        let _ = stop_child(&mut child);
-        return Err(format!("Cannot start Flowseal stderr logger: {error}"));
+    if let Some(process) = child.as_mut() {
+        let stdout = process
+            .stdout
+            .take()
+            .ok_or_else(|| "Flowseal stdout pipe was not created".to_string())?;
+        if let Err(error) = spawn_log_reader("stdout", stdout, Arc::clone(&log)) {
+            let _ = stop_child(process);
+            return Err(format!("Cannot start Flowseal stdout logger: {error}"));
+        }
+        let stderr = process
+            .stderr
+            .take()
+            .ok_or_else(|| "Flowseal stderr pipe was not created".to_string())?;
+        if let Err(error) = spawn_log_reader("stderr", stderr, Arc::clone(&log)) {
+            let _ = stop_child(process);
+            return Err(format!("Cannot start Flowseal stderr logger: {error}"));
+        }
     }
     {
         let mut file = log.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let launch = if elevated_process.is_some() {
+            "Started through UAC"
+        } else {
+            "Started in current elevated session"
+        };
         let _ = writeln!(
             file,
-            "[{}][flowseal] Started winws.exe PID {pid}",
+            "[{}][flowseal] {launch}: winws.exe PID {pid}",
             unix_timestamp()
         );
         let _ = file.flush();
@@ -256,6 +412,8 @@ pub fn start(
 
     let running = RunningProcess {
         child,
+        elevated_process,
+        pid,
         _job: job,
         strategy: strategy.to_owned(),
         log_path: log_path.clone(),
@@ -268,8 +426,13 @@ pub fn start(
 pub fn stop(root: &Path) -> Result<ProcessStatus, String> {
     let mut slot = lock_process();
     let log_path = if let Some(running) = slot.as_mut() {
-        stop_child(&mut running.child)
-            .map_err(|error| format!("Cannot stop owned Flowseal winws.exe process: {error}"))?;
+        if let Some(process) = running.child.as_mut() {
+            stop_child(process)
+                .map_err(|error| format!("Cannot stop owned Flowseal winws.exe process: {error}"))?;
+        } else if let Some(process) = running.elevated_process.as_ref() {
+            stop_elevated(process)
+                .map_err(|error| format!("Cannot stop elevated Flowseal winws.exe process: {error}"))?;
+        }
         running.log_path.clone()
     } else {
         root.join("logs").join("winws.log")
@@ -281,9 +444,10 @@ pub fn stop(root: &Path) -> Result<ProcessStatus, String> {
 fn status_for_running(running: &RunningProcess) -> ProcessStatus {
     ProcessStatus {
         running: true,
-        pid: Some(running.child.id()),
+        pid: Some(running.pid),
         strategy: Some(running.strategy.clone()),
         log_path: running.log_path.to_string_lossy().into_owned(),
+        elevated: running.elevated_process.is_some() || is_elevated(),
     }
 }
 
@@ -293,6 +457,7 @@ fn status_stopped(log_path: PathBuf) -> ProcessStatus {
         pid: None,
         strategy: None,
         log_path: log_path.to_string_lossy().into_owned(),
+        elevated: is_elevated(),
     }
 }
 
