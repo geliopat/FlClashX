@@ -28,7 +28,7 @@ fn runtime_status(status: runtime::ProcessStatus) -> FlowsealRuntimeStatus {
         pid: status.pid,
         strategy: status.strategy,
         log_path: status.log_path,
-        elevated: runtime::is_elevated(),
+        elevated: status.elevated,
     }
 }
 
