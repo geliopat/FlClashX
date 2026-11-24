@@ -4,7 +4,7 @@
 //! geliopat/zapret2-gui at 8dd17fcbcca405a50f497a6e2346ca263901d775. Keep Flowseal/winws profiles
 //! separate from Lua/winws2 profiles: these engines do not share a CLI.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::io::{Error, ErrorKind};
 use std::path::Path;
 
@@ -15,6 +15,17 @@ enum TunnelMode {
     Full,
     Strict,
     GameMode,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ZapretLaunchMode {
+    StrictSplit,
+    FullBypass,
+}
+
+impl Default for ZapretLaunchMode {
+    fn default() -> Self { Self::FullBypass }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -88,12 +99,23 @@ pub fn strategies() -> Vec<ZapretStrategy> {
     result
 }
 
-pub fn build_launch(bin_dir: &Path, strategy_id: &str) -> Result<ZapretLaunch, Error> {
+pub fn build_launch(bin_dir: &Path, strategy_id: &str, launch_mode: ZapretLaunchMode) -> Result<ZapretLaunch, Error> {
     let strategy = strategies()
         .into_iter()
         .find(|item| item.id == strategy_id)
         .ok_or_else(|| Error::new(ErrorKind::InvalidInput, format!("Unknown Zapret strategy: {strategy_id}")))?;
     let lists_dir = bin_dir.join("lists");
+    // Split modes intentionally affect only Flowseal and built-in Lua presets.
+    // Ultimate and imported/user strategies keep their own filters unchanged.
+    let supports_split_mode = strategy.engine == "winws"
+        || (strategy.engine == "winws2"
+            && strategy.id != "zapret2-ru-ultimate"
+            && imported_strategies::find(strategy.id).is_none());
+    let tunnel_mode = if launch_mode == ZapretLaunchMode::StrictSplit && supports_split_mode {
+        TunnelMode::Strict
+    } else {
+        TunnelMode::Full
+    };
     for name in [
         "list-general.txt", "list-general-user.txt", "list-exclude.txt",
         "list-exclude-user.txt", "list-google.txt", "ipset-all.txt",
@@ -105,7 +127,7 @@ pub fn build_launch(bin_dir: &Path, strategy_id: &str) -> Result<ZapretLaunch, E
         "winws" => (
             "winws.exe",
             StrategyBuilder::build_flowseal_args_inner(
-                strategy.id, bin_dir, &lists_dir, TunnelMode::Full,
+                strategy.id, bin_dir, &lists_dir, tunnel_mode,
                 "1024-65535", "1024-65535", None,
             ),
         ),
@@ -119,7 +141,7 @@ pub fn build_launch(bin_dir: &Path, strategy_id: &str) -> Result<ZapretLaunch, E
                 let script_path = bin_dir.join("strategies").join(strategy.filename);
                 require_file(&script_path)?;
                 StrategyBuilder::build_lua_preset_args(
-                    TunnelMode::Full,
+                    tunnel_mode,
                     "1024-65535",
                     "1024-65535",
                     Some("--lua-init=@zapret-lib.lua"),
