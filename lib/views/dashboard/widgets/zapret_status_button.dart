@@ -49,7 +49,7 @@ class ZapretStatusButton extends ConsumerWidget {
     const style = ElasticPress.buttonStyle;
     final iconOnly = state.running || ViewScope.isMobileOf(context);
     return Tooltip(
-      message: 'Zapret',
+      message: state.error ?? 'Zapret',
       child: FadeScaleBox(
         alignment: Alignment.centerRight,
         child: iconOnly
