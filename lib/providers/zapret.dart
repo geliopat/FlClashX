@@ -11,6 +11,23 @@ final zapretControllerProvider =
 enum ZapretMode { strictSplit, fullBypass }
 
 class ZapretState {
+  static const _splitModeStrategyIds = <String>{
+    'flowseal-alt',
+    'flowseal-alt11',
+    'flowseal-general',
+    'flowseal-fake-tls-auto',
+    'flowseal-simple-fake',
+    'antidpi',
+    'discord-light',
+    'extsplit',
+    'firstbyte',
+    'ipfrag',
+    'sites-light',
+    'syndata',
+    'tspu-max',
+    'yt4k',
+  };
+
   final bool available;
   final bool running;
   final bool busy;
@@ -74,10 +91,7 @@ class ZapretState {
   bool get supportsSplitMode {
     for (final strategy in strategies) {
       if (strategy.id != selectedStrategyId) continue;
-      return strategy.engine == 'winws' ||
-          (strategy.engine == 'winws2' &&
-              strategy.id != 'zapret2-ru-ultimate' &&
-              !strategy.id.startsWith('kinlay0-'));
+      return _splitModeStrategyIds.contains(strategy.id);
     }
     return false;
   }
