@@ -115,7 +115,7 @@ fn is_valid_game_filter_range(value: &str) -> bool {
     })
 }
 
-fn validate_game_filter_settings(settings: &GameFilterSettings) -> Result<(), String> {
+pub(crate) fn validate_game_filter_settings(settings: &GameFilterSettings) -> Result<(), String> {
     let validate_tcp = matches!(settings.mode.as_str(), "all" | "tcp");
     let validate_udp = matches!(settings.mode.as_str(), "all" | "udp");
     if !matches!(settings.mode.as_str(), "none" | "all" | "tcp" | "udp") {
