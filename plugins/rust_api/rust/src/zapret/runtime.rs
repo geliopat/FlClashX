@@ -6,6 +6,10 @@
 
 use crate::zapret::core::{CoreProvider, GameFilterSettings};
 use crate::zapret::providers::flowseal::FlowsealProvider;
+use std::os::windows::{
+    io::{AsRawHandle, FromRawHandle, OwnedHandle, RawHandle},
+    process::CommandExt,
+};
 use std::{
     fs::{self, File, OpenOptions},
     io::{self, BufRead, BufReader, Read, Write},
@@ -15,17 +19,13 @@ use std::{
     thread,
     time::{SystemTime, UNIX_EPOCH},
 };
-use std::os::windows::{
-    io::{AsRawHandle, FromRawHandle, OwnedHandle, RawHandle},
-    process::CommandExt,
-};
 use windows_sys::Win32::{
     Foundation::{CloseHandle, HANDLE},
     Security::{GetTokenInformation, TokenElevation, TOKEN_ELEVATION, TOKEN_QUERY},
     System::{
         JobObjects::{
-            AssignProcessToJobObject, CreateJobObjectW, SetInformationJobObject,
-            JobObjectExtendedLimitInformation, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+            AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation,
+            SetInformationJobObject, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
             JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
         },
         Threading::{GetCurrentProcess, OpenProcessToken},
@@ -55,7 +55,9 @@ fn process_slot() -> &'static Mutex<Option<RunningProcess>> {
 }
 
 fn lock_process() -> MutexGuard<'static, Option<RunningProcess>> {
-    process_slot().lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    process_slot()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 pub fn is_elevated() -> bool {
@@ -121,18 +123,11 @@ pub fn start(
     let mut slot = lock_process();
     if let Some(running) = slot.as_mut() {
         match running.child.try_wait() {
-            Ok(None) => {
-                return Err(format!(
-                    "flowseal_already_running:{}",
-                    running.child.id()
-                ))
-            }
+            Ok(None) => return Err(format!("flowseal_already_running:{}", running.child.id())),
             Ok(Some(_)) => {
                 slot.take();
             }
-            Err(error) => {
-                return Err(format!("Cannot query existing winws.exe process: {error}"))
-            }
+            Err(error) => return Err(format!("Cannot query existing winws.exe process: {error}")),
         }
     }
 
@@ -141,9 +136,8 @@ pub fn start(
         .validate_installation()
         .map_err(|error| format!("Flowseal installation is invalid: {error}"))?;
 
-    let executable = fs::canonicalize(provider.winws_executable()).map_err(|error| {
-        format!("Cannot resolve Flowseal winws.exe: {error}")
-    })?;
+    let executable = fs::canonicalize(provider.winws_executable())
+        .map_err(|error| format!("Cannot resolve Flowseal winws.exe: {error}"))?;
     if !executable.starts_with(&root)
         || !executable
             .file_name()
@@ -156,8 +150,12 @@ pub fn start(
         root.join("bin").join("WinDivert.dll"),
         root.join("bin").join("WinDivert64.sys"),
     ] {
-        let resolved = fs::canonicalize(&required)
-            .map_err(|error| format!("Cannot resolve required Flowseal file {}: {error}", required.display()))?;
+        let resolved = fs::canonicalize(&required).map_err(|error| {
+            format!(
+                "Cannot resolve required Flowseal file {}: {error}",
+                required.display()
+            )
+        })?;
         if !resolved.starts_with(&root) {
             return Err(format!(
                 "Required Flowseal file resolves outside the installation directory: {}",
@@ -215,10 +213,18 @@ pub fn start(
 
     // The process is never considered managed unless it is inside the
     // kill-on-close job. If assignment fails, terminate this exact child.
-    if unsafe { AssignProcessToJobObject(job.as_raw_handle() as HANDLE, child.as_raw_handle() as HANDLE) } == 0 {
+    if unsafe {
+        AssignProcessToJobObject(
+            job.as_raw_handle() as HANDLE,
+            child.as_raw_handle() as HANDLE,
+        )
+    } == 0
+    {
         let error = io::Error::last_os_error();
         let _ = stop_child(&mut child);
-        return Err(format!("Cannot attach Flowseal process to its job: {error}"));
+        return Err(format!(
+            "Cannot attach Flowseal process to its job: {error}"
+        ));
     }
 
     let log = Arc::new(Mutex::new(log_file));
@@ -240,7 +246,11 @@ pub fn start(
     }
     {
         let mut file = log.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-        let _ = writeln!(file, "[{}][flowseal] Started winws.exe PID {pid}", unix_timestamp());
+        let _ = writeln!(
+            file,
+            "[{}][flowseal] Started winws.exe PID {pid}",
+            unix_timestamp()
+        );
         let _ = file.flush();
     }
 
@@ -344,11 +354,7 @@ fn prepare_log_path(root: &Path) -> Result<PathBuf, String> {
     Ok(path)
 }
 
-fn spawn_log_reader<R>(
-    stream: &'static str,
-    reader: R,
-    log: Arc<Mutex<File>>,
-) -> io::Result<()>
+fn spawn_log_reader<R>(stream: &'static str, reader: R, log: Arc<Mutex<File>>) -> io::Result<()>
 where
     R: Read + Send + 'static,
 {
@@ -372,7 +378,11 @@ where
                     }
                     Err(error) => {
                         let mut file = log.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-                        let _ = writeln!(file, "[{}][{stream}] log read error: {error}", unix_timestamp());
+                        let _ = writeln!(
+                            file,
+                            "[{}][{stream}] log read error: {error}",
+                            unix_timestamp()
+                        );
                         break;
                     }
                 }
@@ -400,7 +410,11 @@ fn split_windows_arguments(input: &str) -> Result<Vec<String>, String> {
     let mut started = false;
 
     while characters.peek().is_some() {
-        if characters.peek().is_some_and(|character| character.is_whitespace()) && !quoted {
+        if characters
+            .peek()
+            .is_some_and(|character| character.is_whitespace())
+            && !quoted
+        {
             characters.next();
             if started {
                 arguments.push(std::mem::take(&mut current));
@@ -460,9 +474,7 @@ fn validate_argument_paths(arguments: &[String], root: &Path) -> Result<(), Stri
         if let Some((flag, value)) = argument.split_once('=') {
             if is_required_path_option(flag) {
                 validate_path_value(value, root)?;
-            } else if flag.starts_with("--dpi-desync-fake-")
-                && is_path_value(value)
-            {
+            } else if flag.starts_with("--dpi-desync-fake-") && is_path_value(value) {
                 validate_path_value(value, root)?;
             } else if is_path_value(argument) {
                 validate_path_value(argument, root)?;
@@ -506,7 +518,9 @@ fn validate_path_value(value: &str, root: &Path) -> Result<(), String> {
     }
     let path = PathBuf::from(value);
     if !path.is_absolute() {
-        return Err(format!("Flowseal strategy contains a relative file path: {value}"));
+        return Err(format!(
+            "Flowseal strategy contains a relative file path: {value}"
+        ));
     }
     let resolved = canonicalize_with_missing_tail(&path)?;
     if !resolved.starts_with(root) {
@@ -523,24 +537,31 @@ fn canonicalize_with_missing_tail(path: &Path) -> Result<PathBuf, String> {
     loop {
         match fs::symlink_metadata(cursor) {
             Ok(_) => {
-                let mut resolved = fs::canonicalize(cursor)
-                    .map_err(|error| format!("Cannot resolve Flowseal strategy path {}: {error}", cursor.display()))?;
+                let mut resolved = fs::canonicalize(cursor).map_err(|error| {
+                    format!(
+                        "Cannot resolve Flowseal strategy path {}: {error}",
+                        cursor.display()
+                    )
+                })?;
                 for component in missing.iter().rev() {
                     resolved.push(component);
                 }
                 return Ok(resolved);
             }
             Err(error) if error.kind() == io::ErrorKind::NotFound => {
-                let name = cursor
-                    .file_name()
-                    .ok_or_else(|| format!("Cannot resolve Flowseal strategy path {}", path.display()))?;
+                let name = cursor.file_name().ok_or_else(|| {
+                    format!("Cannot resolve Flowseal strategy path {}", path.display())
+                })?;
                 missing.push(name.to_os_string());
-                cursor = cursor
-                    .parent()
-                    .ok_or_else(|| format!("Cannot resolve Flowseal strategy path {}", path.display()))?;
+                cursor = cursor.parent().ok_or_else(|| {
+                    format!("Cannot resolve Flowseal strategy path {}", path.display())
+                })?;
             }
             Err(error) => {
-                return Err(format!("Cannot inspect Flowseal strategy path {}: {error}", cursor.display()))
+                return Err(format!(
+                    "Cannot inspect Flowseal strategy path {}: {error}",
+                    cursor.display()
+                ))
             }
         }
     }

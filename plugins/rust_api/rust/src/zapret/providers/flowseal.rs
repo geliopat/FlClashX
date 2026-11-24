@@ -879,8 +879,11 @@ mod tests {
         let root = temp().join("Flowseal install with spaces");
         let lists = root.join("lists");
         fs::create_dir_all(&lists).unwrap();
-        fs::write(lists.join(crate::zapret::ipset::USER_INCLUDE_FILE), "192.0.2.1/32\n")
-            .unwrap();
+        fs::write(
+            lists.join(crate::zapret::ipset::USER_INCLUDE_FILE),
+            "192.0.2.1/32\n",
+        )
+        .unwrap();
         fs::write(lists.join("ipset-all.txt"), "198.51.100.0/24\n").unwrap();
 
         let provider = FlowsealProvider::new(&root);
