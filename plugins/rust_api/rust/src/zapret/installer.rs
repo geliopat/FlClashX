@@ -125,7 +125,28 @@ fn write_legacy_manifest(root: &Path, provider: &FlowsealProvider) -> Result<Str
     Ok(version)
 }
 
+fn ensure_optional_real_directory(path: &Path, description: &str) -> Result<bool, String> {
+    match fs::symlink_metadata(path) {
+        Ok(metadata) if metadata.file_type().is_symlink() => Err(format!(
+            "{description} must not be a symbolic link: {}",
+            path.display()
+        )),
+        Ok(metadata) if metadata.is_dir() => Ok(true),
+        Ok(_) => Err(format!(
+            "{description} is not a directory: {}",
+            path.display()
+        )),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(false),
+        Err(error) => Err(format!(
+            "Cannot inspect {description} {}: {error}",
+            path.display()
+        )),
+    }
+}
+
 fn preserve_user_files(from: &Path, to: &Path) -> Result<(), String> {
+    ensure_optional_real_directory(&from.join("lists"), "Flowseal lists directory")?;
+    ensure_optional_real_directory(&from.join("bin"), "Flowseal bin directory")?;
     let destination_lists = to.join("lists");
     fs::create_dir_all(&destination_lists)
         .map_err(|error| format!("Cannot create Flowseal lists directory: {error}"))?;
@@ -169,13 +190,8 @@ fn preserve_user_files(from: &Path, to: &Path) -> Result<(), String> {
     }
 
     let custom_source = from.join(CUSTOM_STRATEGIES_DIR);
-    if !custom_source.exists() {
+    if !ensure_optional_real_directory(&custom_source, "Flowseal custom strategies directory")? {
         return Ok(());
-    }
-    let metadata = fs::symlink_metadata(&custom_source)
-        .map_err(|error| format!("Cannot inspect custom strategies directory: {error}"))?;
-    if metadata.file_type().is_symlink() || !metadata.is_dir() {
-        return Err("Flowseal custom strategies path must be a real directory".into());
     }
     let custom_destination = to.join(CUSTOM_STRATEGIES_DIR);
     fs::create_dir_all(&custom_destination)
@@ -258,7 +274,11 @@ async fn download_and_verify(
     }
     file.sync_all()
         .map_err(|error| format!("Cannot flush Flowseal archive: {error}"))?;
-    let actual = format!("{:x}", hasher.finalize());
+    let actual = hasher
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
     if actual != expected_sha256 {
         let _ = fs::remove_file(destination);
         return Err("Flowseal archive SHA-256 does not match the signed channel".into());
@@ -300,7 +320,7 @@ fn extract_zip_safely(zip_path: &Path, destination: &Path) -> Result<(), String>
             .map_err(|error| format!("Cannot read Flowseal archive entry: {error}"))?;
         let relative = entry
             .enclosed_name()
-            .ok_or_else(|| format!("Unsafe path in Flowseal archive: {}", entry.name()))?;
+            .ok_or_else(|| "Flowseal archive contains an unsafe path".to_string())?;
         let relative = safe_archive_path(&relative.to_string_lossy())?;
         if entry
             .unix_mode()
