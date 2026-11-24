@@ -153,7 +153,7 @@ class _FlowsealViewState extends State<FlowsealView> {
     );
     if (file == null || !mounted) return;
     await _withBusy(() async {
-      if ((file.lengthSync() ?? await file.length()) > 1024 * 1024) {
+      if (file.size > 1024 * 1024) {
         throw Exception('Размер BAT-файла превышает 1 МБ.');
       }
       final content = utf8.decode(await file.readAsBytes());
@@ -505,7 +505,7 @@ class _FlowsealViewState extends State<FlowsealView> {
                       labelText: 'TCP-порты',
                       border: OutlineInputBorder(),
                     ),
-                    onChanged: (_) => _preview = null,
+                    onChanged: (_) => setState(() => _preview = null),
                   ),
                 ),
                 const SizedBox(width: 10),
