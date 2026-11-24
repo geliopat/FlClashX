@@ -183,17 +183,17 @@ pub struct FlowsealIpSetUpdateResult {
 }
 
 #[frb]
-pub fn flowseal_ipset_status(root: String) -> Result<String, String> {
+pub fn flowseal_ip_set_status(root: String) -> Result<String, String> {
     crate::zapret::ipset_control::status(&PathBuf::from(root))
 }
 
 #[frb]
-pub fn flowseal_set_ipset_filter(root: String, mode: String) -> Result<String, String> {
+pub fn flowseal_set_ip_set_filter(root: String, mode: String) -> Result<String, String> {
     crate::zapret::ipset_control::set_mode(&PathBuf::from(root), &mode)
 }
 
 #[frb]
-pub async fn flowseal_update_ipset(root: String) -> Result<FlowsealIpSetUpdateResult, String> {
+pub async fn flowseal_update_ip_set(root: String) -> Result<FlowsealIpSetUpdateResult, String> {
     let result = crate::zapret::ipset_control::update(&PathBuf::from(root)).await?;
     Ok(FlowsealIpSetUpdateResult {
         changed: result.changed,
