@@ -894,7 +894,8 @@ class _FlowsealViewState extends State<FlowsealView> {
     final progressValue = progress == null || progress.total == BigInt.zero
         ? null
         : (progress.current.toDouble() / progress.total.toDouble())
-            .clamp(0.0, 1.0);
+            .clamp(0.0, 1.0)
+            .toDouble();
 
     return CommonScaffold(
       title: 'Zapret / Flowseal',
