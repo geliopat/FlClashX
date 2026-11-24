@@ -149,6 +149,9 @@ async fn download_limited(
             response.status()
         ));
     }
+    if response.url().scheme() != "https" {
+        return Err("Flowseal channel redirected away from HTTPS".into());
+    }
     if response
         .content_length()
         .is_some_and(|length| length > limit as u64)
