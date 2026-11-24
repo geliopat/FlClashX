@@ -35,21 +35,23 @@ void main() {
       announcement: false,
       platform: SupportPlatform.Windows,
     );
-    expect(result, contains(DashboardWidget.vpnButton));
-    expect(result, contains(DashboardWidget.zapretDiagnostics));
+    expect(result, contains(DashboardWidget.zapret));
+    expect(result, isNot(contains(DashboardWidget.vpnButton)));
     expect(
-      DashboardWidget.vpnButton.removable(
+      DashboardWidget.zapret.removable(
         providerMode: false,
         platform: SupportPlatform.Windows,
       ),
       isFalse,
     );
     expect(
-      DashboardWidget.zapretDiagnostics.removable(
-        providerMode: false,
+      withFixedCards(
+        const [speed, profiles],
+        announcement: false,
+        providerMode: true,
         platform: SupportPlatform.Windows,
       ),
-      isFalse,
+      isNot(contains(DashboardWidget.zapret)),
     );
   });
 

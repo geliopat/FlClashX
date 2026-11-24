@@ -17,6 +17,7 @@ import 'wide.dart';
 import 'widget_registry.dart';
 import 'widgets/core_status_button.dart';
 import 'widgets/zapret_status_button.dart';
+import 'widgets/zapret_diagnostics.dart';
 import 'widgets/profile_detail.dart';
 
 class DashboardView extends ConsumerStatefulWidget {
@@ -72,7 +73,8 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
           : appLocalizations.dashboard,
       actions: [
         if (!editing) const CoreStatusButton(),
-        if (!editing && system.isWindows) const ZapretStatusButton(),
+        if (!editing && providerMode && platform == SupportPlatform.Windows)
+          const ZapretStatusButton(),
       ],
       confirmationAction: editing
           ? IconButtonData(
@@ -248,6 +250,8 @@ class _MobileDashboard extends ConsumerWidget {
                         padding: EdgeInsets.only(bottom: 4),
                         child: ProviderHeader(),
                       ),
+                    if (providerMode && platform == SupportPlatform.Windows)
+                      const ZapretDiagnosticsCard(),
                     for (final widget in widgets)
                       RepaintBoundary(
                         key: cardKeyOf(widget),
@@ -289,7 +293,15 @@ class _MobileDashboard extends ConsumerWidget {
         Expanded(child: content),
         Padding(
           padding: EdgeInsets.fromLTRB(side, 0, side, 16 + context.bottomInset),
-          child: const ProviderConnectButton(),
+          child: platform == SupportPlatform.Windows
+              ? const Row(
+                  spacing: 8,
+                  children: [
+                    Expanded(child: ProviderConnectButton()),
+                    Expanded(child: ProviderZapretButton()),
+                  ],
+                )
+              : const ProviderConnectButton(),
         ),
       ],
     );

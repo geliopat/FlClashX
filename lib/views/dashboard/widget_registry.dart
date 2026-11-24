@@ -20,7 +20,7 @@ extension DashboardWidgetView on DashboardWidget {
     DashboardWidget.connectionStats => const ConnectionStatsCard(),
     DashboardWidget.intranetIp => const IntranetIpCard(),
     DashboardWidget.memoryInfo => const MemoryInfo(),
-    DashboardWidget.zapretDiagnostics => const ZapretDiagnosticsCard(),
+    DashboardWidget.zapret => const ZapretTile(),
   };
 
   Glyph get glyph => switch (this) {
@@ -36,7 +36,7 @@ extension DashboardWidgetView on DashboardWidget {
     DashboardWidget.connectionStats => AppGlyphs.connections,
     DashboardWidget.intranetIp => AppGlyphs.devices,
     DashboardWidget.memoryInfo => AppGlyphs.memory,
-    DashboardWidget.zapretDiagnostics => AppGlyphs.speed,
+    DashboardWidget.zapret => AppGlyphs.filter,
   };
 
   String label(BuildContext context) {
@@ -54,7 +54,7 @@ extension DashboardWidgetView on DashboardWidget {
       DashboardWidget.connectionStats => appLocalizations.connectionStats,
       DashboardWidget.intranetIp => appLocalizations.intranetIP,
       DashboardWidget.memoryInfo => appLocalizations.memoryInfo,
-      DashboardWidget.zapretDiagnostics => 'Сетевые задержки',
+      DashboardWidget.zapret => 'Zapret',
     };
   }
 
@@ -75,8 +75,7 @@ extension DashboardWidgetView on DashboardWidget {
       (providerMode || this != DashboardWidget.currentOutbound) &&
       this != DashboardWidget.announcement &&
       !(platform == SupportPlatform.Windows &&
-          (this == DashboardWidget.vpnButton ||
-              this == DashboardWidget.zapretDiagnostics));
+          this == DashboardWidget.zapret);
 }
 
 /// The status card, or under `providermode` the server's location.
@@ -105,16 +104,16 @@ List<DashboardWidget> withFixedCards(
     if (!providerMode && !saved.contains(DashboardWidget.currentOutbound))
       DashboardWidget.currentOutbound,
     for (final card in saved)
-      if (announcement || card != DashboardWidget.announcement) card,
+      if ((announcement || card != DashboardWidget.announcement) &&
+          !(providerMode &&
+              platform == SupportPlatform.Windows &&
+              card == DashboardWidget.zapret))
+        card,
   ];
-  // Keep the Windows Zapret controls visible in layouts saved by older builds.
-  if (platform == SupportPlatform.Windows) {
-    if (!result.contains(DashboardWidget.vpnButton)) {
-      result.add(DashboardWidget.vpnButton);
-    }
-    if (!result.contains(DashboardWidget.zapretDiagnostics)) {
-      result.add(DashboardWidget.zapretDiagnostics);
-    }
+  // Older card layouts did not know about the standalone Windows Zapret card.
+  if (!providerMode && platform == SupportPlatform.Windows &&
+      !result.contains(DashboardWidget.zapret)) {
+    result.add(DashboardWidget.zapret);
   }
   return result;
 }

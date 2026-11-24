@@ -18,7 +18,7 @@ const _servicePairColumnMin = 290.0;
 const _maxColumnWidth = 440.0;
 
 /// The rows of the wide dashboard; cards share a row only with their kind.
-enum WideRowKind { announcement, top, control, middle, diagnostics, bottom }
+enum WideRowKind { announcement, top, control, middle, bottom }
 
 class WideRow {
   const WideRow(this.kind, this.cards);
@@ -39,7 +39,7 @@ extension DashboardWidgetWide on DashboardWidget {
     DashboardWidget.profiles ||
     DashboardWidget.serviceStatus ||
     DashboardWidget.memoryInfo => WideRowKind.middle,
-    DashboardWidget.zapretDiagnostics => WideRowKind.diagnostics,
+    DashboardWidget.zapret => WideRowKind.control,
     DashboardWidget.connectionStats ||
     DashboardWidget.proxyGroups => WideRowKind.bottom,
   };
@@ -48,7 +48,6 @@ extension DashboardWidgetWide on DashboardWidget {
     WideRowKind.announcement => columns,
     WideRowKind.bottom => columns ~/ 2,
     WideRowKind.middle => 1,
-    WideRowKind.diagnostics => columns,
     WideRowKind.top || WideRowKind.control => math.min(2, columns),
   };
 }
@@ -84,7 +83,7 @@ List<DashboardWidget> wideDashboardWidgetsOf(SupportPlatform platform) => [
     DashboardWidget.intranetIp,
     DashboardWidget.profiles,
     DashboardWidget.serviceStatus,
-    DashboardWidget.zapretDiagnostics,
+    DashboardWidget.zapret,
     DashboardWidget.memoryInfo,
     DashboardWidget.connectionStats,
     DashboardWidget.proxyGroups,
@@ -142,7 +141,6 @@ class _WideDashboardState extends ConsumerState<WideDashboard> {
       WideRowKind.top => (compact ? 176 : 208) * scale,
       WideRowKind.control => (compact ? 56 : 64) * scale,
       WideRowKind.middle => ((compact ? 152 : 176) + (offers ? 44 : 0)) * scale,
-      WideRowKind.diagnostics => (compact ? 176 : 184) * scale,
       WideRowKind.bottom => (compact ? 112 : 120) * scale,
     };
     final tablesHeight = connectionsTableMinHeight(density, scale);

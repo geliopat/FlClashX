@@ -76,9 +76,10 @@ class ZapretStatusButton extends ConsumerWidget {
 
 /// The Zapret mark uses the same compact footprint as the Core heartbeat.
 class ZapretMark extends StatelessWidget {
-  const ZapretMark({super.key, required this.running});
+  const ZapretMark({super.key, required this.running, this.color});
 
   final bool running;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
@@ -92,9 +93,99 @@ class ZapretMark extends StatelessWidget {
             fontSize: 18,
             height: 1,
             fontWeight: FontWeight.w800,
-            color: running
+            color: color ?? (running
                 ? context.colorScheme.primary
-                : context.colorScheme.onSurfaceVariant,
+                : context.colorScheme.onSurfaceVariant),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
+/// The Zapret on/off control beside ProviderConnectButton on ProviderMode.
+class ProviderZapretButton extends ConsumerWidget {
+  const ProviderZapretButton({super.key});
+
+  static const _duration = Duration(milliseconds: 300);
+
+  Future<void> _toggle(WidgetRef ref, ZapretState state) async {
+    if (state.busy || !state.available) return;
+    try {
+      await ref
+          .read(zapretControllerProvider.notifier)
+          .setEnabled(!state.running);
+    } catch (error) {
+      dialogs.showNotifier(
+        error is HelperException ? error.message : error.toString(),
+        level: MessageLevel.error,
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(zapretControllerProvider);
+    final scheme = context.colorScheme;
+    final duration = context.motionDuration(_duration);
+    final label = state.running ? 'Остановить Zapret' : 'Запустить Zapret';
+    return Tooltip(
+      message: state.error ?? label,
+      child: Semantics(
+        button: true,
+        label: label,
+        child: SizedBox(
+          width: double.infinity,
+          height: 56,
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(end: state.running ? 1 : 0),
+            duration: duration,
+            curve: Curves.easeInOut,
+            builder: (context, progress, _) {
+              final ink = Color.lerp(
+                scheme.onPrimary,
+                scheme.primary,
+                progress,
+              )!;
+              return FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: scheme.primary.withValues(
+                    alpha: 1 - progress,
+                  ),
+                  foregroundColor: ink,
+                  side: BorderSide(
+                    color: scheme.primary.withValues(alpha: progress),
+                    width: 1.5,
+                  ),
+                ),
+                onPressed: state.busy || !state.available
+                    ? null
+                    : () => _toggle(ref, state),
+                child: state.busy
+                    ? SizedBox.square(
+                        dimension: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: ink,
+                        ),
+                      )
+                    : Row(
+                        mainAxisSize: MainAxisSize.min,
+                        spacing: 8,
+                        children: [
+                          ZapretMark(running: state.running, color: ink),
+                          Text(
+                            'Zapret',
+                            style: AppTextStyle.subheadline.of(
+                              context,
+                              emphasized: true,
+                            ),
+                          ),
+                        ],
+                      ),
+              );
+            },
           ),
         ),
       ),

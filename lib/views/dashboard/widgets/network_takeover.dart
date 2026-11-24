@@ -310,16 +310,6 @@ class VpnCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (system.isWindows) {
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        spacing: 8,
-        children: const [
-          Expanded(child: VpnTile()),
-          Expanded(child: ZapretTile()),
-        ],
-      );
-    }
     final appLocalizations = context.appLocalizations;
     final colorScheme = context.colorScheme;
     final colors = DashboardColors.of(context);
