@@ -5,4 +5,5 @@ mod hotkey;
 mod ipc;
 mod script;
 
+#[cfg(target_os = "windows")]
 mod zapret;
