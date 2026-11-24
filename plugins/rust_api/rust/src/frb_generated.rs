@@ -41,7 +41,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.13.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 851820837;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 954485961;
 
 // Section: executor
 
@@ -1198,6 +1198,38 @@ fn wire__crate__api__zapret__flowseal_import_strategy_impl(
         },
     )
 }
+fn wire__crate__api__zapret__flowseal_is_elevated_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "flowseal_is_elevated",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok = Ok::<_, ()>(crate::api::zapret::flowseal_is_elevated())?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
 fn wire__crate__api__zapret__flowseal_list_strategies_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -1274,6 +1306,82 @@ fn wire__crate__api__zapret__flowseal_parse_strategy_impl(
         },
     )
 }
+fn wire__crate__api__zapret__flowseal_process_status_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "flowseal_process_status",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_root = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let output_ok = crate::api::zapret::flowseal_process_status(api_root)?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__zapret__flowseal_start_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "flowseal_start",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_root = <String>::sse_decode(&mut deserializer);
+            let api_strategy = <String>::sse_decode(&mut deserializer);
+            let api_game_filter_mode = <String>::sse_decode(&mut deserializer);
+            let api_game_filter_tcp = <String>::sse_decode(&mut deserializer);
+            let api_game_filter_udp = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let output_ok = crate::api::zapret::flowseal_start(
+                        api_root,
+                        api_strategy,
+                        api_game_filter_mode,
+                        api_game_filter_tcp,
+                        api_game_filter_udp,
+                    )?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
 fn wire__crate__api__zapret__flowseal_status_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -1301,6 +1409,39 @@ fn wire__crate__api__zapret__flowseal_status_impl(
             move |context| {
                 transform_result_sse::<_, ()>((move || {
                     let output_ok = Ok::<_, ()>(crate::api::zapret::flowseal_status(api_root))?;
+                    std::result::Result::Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__zapret__flowseal_stop_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "flowseal_stop",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_root = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, String>((move || {
+                    let output_ok = crate::api::zapret::flowseal_stop(api_root)?;
                     std::result::Result::Ok(output_ok)
                 })())
             }
@@ -1791,6 +1932,24 @@ impl SseDecode for crate::api::editor::EditorOpenErrorKind {
     }
 }
 
+impl SseDecode for crate::api::zapret::FlowsealRuntimeStatus {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_running = <bool>::sse_decode(deserializer);
+        let mut var_pid = <Option<u32>>::sse_decode(deserializer);
+        let mut var_strategy = <Option<String>>::sse_decode(deserializer);
+        let mut var_logPath = <String>::sse_decode(deserializer);
+        let mut var_elevated = <bool>::sse_decode(deserializer);
+        return crate::api::zapret::FlowsealRuntimeStatus {
+            running: var_running,
+            pid: var_pid,
+            strategy: var_strategy,
+            log_path: var_logPath,
+            elevated: var_elevated,
+        };
+    }
+}
+
 impl SseDecode for crate::api::zapret::FlowsealStatus {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -2089,30 +2248,41 @@ fn pde_ffi_dispatcher_primary_impl(
             rust_vec_len,
             data_len,
         ),
-        26 => wire__crate__api__zapret__flowseal_list_strategies_impl(
+        26 => {
+            wire__crate__api__zapret__flowseal_is_elevated_impl(port, ptr, rust_vec_len, data_len)
+        }
+        27 => wire__crate__api__zapret__flowseal_list_strategies_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        27 => wire__crate__api__zapret__flowseal_parse_strategy_impl(
+        28 => wire__crate__api__zapret__flowseal_parse_strategy_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        28 => wire__crate__api__zapret__flowseal_status_impl(port, ptr, rust_vec_len, data_len),
-        29 => wire__crate__api__zapret__flowseal_validate_installation_impl(
+        29 => wire__crate__api__zapret__flowseal_process_status_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        30 => wire__crate__api__editor__folds_compute_all_impl(port, ptr, rust_vec_len, data_len),
-        33 => wire__crate__api__hotkey__hot_key_events_impl(port, ptr, rust_vec_len, data_len),
-        34 => wire__crate__api__init__init_app_impl(port, ptr, rust_vec_len, data_len),
-        35 => wire__crate__api__hotkey__set_hot_keys_impl(port, ptr, rust_vec_len, data_len),
-        36 => wire__crate__api__editor__words_extract_impl(port, ptr, rust_vec_len, data_len),
+        30 => wire__crate__api__zapret__flowseal_start_impl(port, ptr, rust_vec_len, data_len),
+        31 => wire__crate__api__zapret__flowseal_status_impl(port, ptr, rust_vec_len, data_len),
+        32 => wire__crate__api__zapret__flowseal_stop_impl(port, ptr, rust_vec_len, data_len),
+        33 => wire__crate__api__zapret__flowseal_validate_installation_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        34 => wire__crate__api__editor__folds_compute_all_impl(port, ptr, rust_vec_len, data_len),
+        37 => wire__crate__api__hotkey__hot_key_events_impl(port, ptr, rust_vec_len, data_len),
+        38 => wire__crate__api__init__init_app_impl(port, ptr, rust_vec_len, data_len),
+        39 => wire__crate__api__hotkey__set_hot_keys_impl(port, ptr, rust_vec_len, data_len),
+        40 => wire__crate__api__editor__words_extract_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -2144,10 +2314,10 @@ fn pde_ffi_dispatcher_sync_impl(
         18 => wire__crate__api__editor__RopeBridge_slice_impl(ptr, rust_vec_len, data_len),
         19 => wire__crate__api__editor__RopeBridge_snapshot_impl(ptr, rust_vec_len, data_len),
         22 => wire__crate__api__editor__RopeUpload_new_impl(ptr, rust_vec_len, data_len),
-        31 => {
+        35 => {
             wire__crate__api__editor__folds_find_matching_bracket_impl(ptr, rust_vec_len, data_len)
         }
-        32 => wire__crate__api__editor__guides_compute_viewport_impl(ptr, rust_vec_len, data_len),
+        36 => wire__crate__api__editor__guides_compute_viewport_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -2239,6 +2409,30 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::editor::EditorOpenErrorKind>
     for crate::api::editor::EditorOpenErrorKind
 {
     fn into_into_dart(self) -> crate::api::editor::EditorOpenErrorKind {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::zapret::FlowsealRuntimeStatus {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.running.into_into_dart().into_dart(),
+            self.pid.into_into_dart().into_dart(),
+            self.strategy.into_into_dart().into_dart(),
+            self.log_path.into_into_dart().into_dart(),
+            self.elevated.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::zapret::FlowsealRuntimeStatus
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::zapret::FlowsealRuntimeStatus>
+    for crate::api::zapret::FlowsealRuntimeStatus
+{
+    fn into_into_dart(self) -> crate::api::zapret::FlowsealRuntimeStatus {
         self
     }
 }
@@ -2528,6 +2722,17 @@ impl SseEncode for crate::api::editor::EditorOpenErrorKind {
             },
             serializer,
         );
+    }
+}
+
+impl SseEncode for crate::api::zapret::FlowsealRuntimeStatus {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.running, serializer);
+        <Option<u32>>::sse_encode(self.pid, serializer);
+        <Option<String>>::sse_encode(self.strategy, serializer);
+        <String>::sse_encode(self.log_path, serializer);
+        <bool>::sse_encode(self.elevated, serializer);
     }
 }
 

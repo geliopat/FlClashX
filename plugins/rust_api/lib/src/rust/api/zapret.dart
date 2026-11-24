@@ -6,7 +6,7 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `provider`
+// These functions are ignored because they are not marked as `pub`: `provider`, `runtime_status`
 
 Future<FlowsealStatus> flowsealStatus({required String root}) =>
     RustLib.instance.api.crateApiZapretFlowsealStatus(root: root);
@@ -40,6 +40,64 @@ Future<void> flowsealImportStrategy({
 
 Future<String> flowsealValidateInstallation({required String root}) =>
     RustLib.instance.api.crateApiZapretFlowsealValidateInstallation(root: root);
+
+Future<bool> flowsealIsElevated() =>
+    RustLib.instance.api.crateApiZapretFlowsealIsElevated();
+
+Future<FlowsealRuntimeStatus> flowsealProcessStatus({required String root}) =>
+    RustLib.instance.api.crateApiZapretFlowsealProcessStatus(root: root);
+
+Future<FlowsealRuntimeStatus> flowsealStart({
+  required String root,
+  required String strategy,
+  required String gameFilterMode,
+  required String gameFilterTcp,
+  required String gameFilterUdp,
+}) => RustLib.instance.api.crateApiZapretFlowsealStart(
+  root: root,
+  strategy: strategy,
+  gameFilterMode: gameFilterMode,
+  gameFilterTcp: gameFilterTcp,
+  gameFilterUdp: gameFilterUdp,
+);
+
+Future<FlowsealRuntimeStatus> flowsealStop({required String root}) =>
+    RustLib.instance.api.crateApiZapretFlowsealStop(root: root);
+
+class FlowsealRuntimeStatus {
+  final bool running;
+  final int? pid;
+  final String? strategy;
+  final String logPath;
+  final bool elevated;
+
+  const FlowsealRuntimeStatus({
+    required this.running,
+    this.pid,
+    this.strategy,
+    required this.logPath,
+    required this.elevated,
+  });
+
+  @override
+  int get hashCode =>
+      running.hashCode ^
+      pid.hashCode ^
+      strategy.hashCode ^
+      logPath.hashCode ^
+      elevated.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FlowsealRuntimeStatus &&
+          runtimeType == other.runtimeType &&
+          running == other.running &&
+          pid == other.pid &&
+          strategy == other.strategy &&
+          logPath == other.logPath &&
+          elevated == other.elevated;
+}
 
 class FlowsealStatus {
   final bool installed;

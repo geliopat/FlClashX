@@ -116,6 +116,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   EditorOpenErrorKind dco_decode_editor_open_error_kind(dynamic raw);
 
   @protected
+  FlowsealRuntimeStatus dco_decode_flowseal_runtime_status(dynamic raw);
+
+  @protected
   FlowsealStatus dco_decode_flowseal_status(dynamic raw);
 
   @protected
@@ -271,6 +274,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   EditorOpenErrorKind sse_decode_editor_open_error_kind(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  FlowsealRuntimeStatus sse_decode_flowseal_runtime_status(
     SseDeserializer deserializer,
   );
 
@@ -454,6 +462,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_editor_open_error_kind(
     EditorOpenErrorKind self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_flowseal_runtime_status(
+    FlowsealRuntimeStatus self,
     SseSerializer serializer,
   );
 

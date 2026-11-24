@@ -70,7 +70,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => 851820837;
+  int get rustContentHash => 954485961;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -180,6 +180,8 @@ abstract class RustLibApi extends BaseApi {
     required String content,
   });
 
+  Future<bool> crateApiZapretFlowsealIsElevated();
+
   Future<List<String>> crateApiZapretFlowsealListStrategies({
     required String root,
   });
@@ -192,7 +194,23 @@ abstract class RustLibApi extends BaseApi {
     required String gameFilterUdp,
   });
 
+  Future<FlowsealRuntimeStatus> crateApiZapretFlowsealProcessStatus({
+    required String root,
+  });
+
+  Future<FlowsealRuntimeStatus> crateApiZapretFlowsealStart({
+    required String root,
+    required String strategy,
+    required String gameFilterMode,
+    required String gameFilterTcp,
+    required String gameFilterUdp,
+  });
+
   Future<FlowsealStatus> crateApiZapretFlowsealStatus({required String root});
+
+  Future<FlowsealRuntimeStatus> crateApiZapretFlowsealStop({
+    required String root,
+  });
 
   Future<String> crateApiZapretFlowsealValidateInstallation({
     required String root,
@@ -1084,6 +1102,33 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<bool> crateApiZapretFlowsealIsElevated() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 26,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_bool,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiZapretFlowsealIsElevatedConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiZapretFlowsealIsElevatedConstMeta =>
+      const TaskConstMeta(debugName: "flowseal_is_elevated", argNames: []);
+
+  @override
   Future<List<String>> crateApiZapretFlowsealListStrategies({
     required String root,
   }) {
@@ -1095,7 +1140,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 26,
+            funcId: 27,
             port: port_,
           );
         },
@@ -1136,7 +1181,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 27,
+            funcId: 28,
             port: port_,
           );
         },
@@ -1170,6 +1215,92 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<FlowsealRuntimeStatus> crateApiZapretFlowsealProcessStatus({
+    required String root,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(root, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 29,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_flowseal_runtime_status,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiZapretFlowsealProcessStatusConstMeta,
+        argValues: [root],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiZapretFlowsealProcessStatusConstMeta =>
+      const TaskConstMeta(
+        debugName: "flowseal_process_status",
+        argNames: ["root"],
+      );
+
+  @override
+  Future<FlowsealRuntimeStatus> crateApiZapretFlowsealStart({
+    required String root,
+    required String strategy,
+    required String gameFilterMode,
+    required String gameFilterTcp,
+    required String gameFilterUdp,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(root, serializer);
+          sse_encode_String(strategy, serializer);
+          sse_encode_String(gameFilterMode, serializer);
+          sse_encode_String(gameFilterTcp, serializer);
+          sse_encode_String(gameFilterUdp, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 30,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_flowseal_runtime_status,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiZapretFlowsealStartConstMeta,
+        argValues: [
+          root,
+          strategy,
+          gameFilterMode,
+          gameFilterTcp,
+          gameFilterUdp,
+        ],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiZapretFlowsealStartConstMeta =>
+      const TaskConstMeta(
+        debugName: "flowseal_start",
+        argNames: [
+          "root",
+          "strategy",
+          "gameFilterMode",
+          "gameFilterTcp",
+          "gameFilterUdp",
+        ],
+      );
+
+  @override
   Future<FlowsealStatus> crateApiZapretFlowsealStatus({required String root}) {
     return handler.executeNormal(
       NormalTask(
@@ -1179,7 +1310,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 28,
+            funcId: 31,
             port: port_,
           );
         },
@@ -1198,6 +1329,36 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "flowseal_status", argNames: ["root"]);
 
   @override
+  Future<FlowsealRuntimeStatus> crateApiZapretFlowsealStop({
+    required String root,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(root, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 32,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_flowseal_runtime_status,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiZapretFlowsealStopConstMeta,
+        argValues: [root],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiZapretFlowsealStopConstMeta =>
+      const TaskConstMeta(debugName: "flowseal_stop", argNames: ["root"]);
+
+  @override
   Future<String> crateApiZapretFlowsealValidateInstallation({
     required String root,
   }) {
@@ -1209,7 +1370,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 29,
+            funcId: 33,
             port: port_,
           );
         },
@@ -1247,7 +1408,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 30,
+            funcId: 34,
             port: port_,
           );
         },
@@ -1282,7 +1443,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             serializer,
           );
           sse_encode_usize(targetOffset, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 31)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 35)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_opt_box_autoadd_usize,
@@ -1319,7 +1480,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_usize(firstVisible, serializer);
           sse_encode_usize(lastVisible, serializer);
           sse_encode_usize(tabSize, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 32)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 36)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_list_guide_block,
@@ -1350,7 +1511,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 33,
+              funcId: 37,
               port: port_,
             );
           },
@@ -1379,7 +1540,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 34,
+            funcId: 38,
             port: port_,
           );
         },
@@ -1409,7 +1570,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 35,
+            funcId: 39,
             port: port_,
           );
         },
@@ -1440,7 +1601,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 36,
+            funcId: 40,
             port: port_,
           );
         },
@@ -1621,6 +1782,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   EditorOpenErrorKind dco_decode_editor_open_error_kind(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return EditorOpenErrorKind.values[raw as int];
+  }
+
+  @protected
+  FlowsealRuntimeStatus dco_decode_flowseal_runtime_status(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return FlowsealRuntimeStatus(
+      running: dco_decode_bool(arr[0]),
+      pid: dco_decode_opt_box_autoadd_u_32(arr[1]),
+      strategy: dco_decode_opt_String(arr[2]),
+      logPath: dco_decode_String(arr[3]),
+      elevated: dco_decode_bool(arr[4]),
+    );
   }
 
   @protected
@@ -1980,6 +2156,25 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var inner = sse_decode_i_32(deserializer);
     return EditorOpenErrorKind.values[inner];
+  }
+
+  @protected
+  FlowsealRuntimeStatus sse_decode_flowseal_runtime_status(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_running = sse_decode_bool(deserializer);
+    var var_pid = sse_decode_opt_box_autoadd_u_32(deserializer);
+    var var_strategy = sse_decode_opt_String(deserializer);
+    var var_logPath = sse_decode_String(deserializer);
+    var var_elevated = sse_decode_bool(deserializer);
+    return FlowsealRuntimeStatus(
+      running: var_running,
+      pid: var_pid,
+      strategy: var_strategy,
+      logPath: var_logPath,
+      elevated: var_elevated,
+    );
   }
 
   @protected
@@ -2419,6 +2614,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_flowseal_runtime_status(
+    FlowsealRuntimeStatus self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_bool(self.running, serializer);
+    sse_encode_opt_box_autoadd_u_32(self.pid, serializer);
+    sse_encode_opt_String(self.strategy, serializer);
+    sse_encode_String(self.logPath, serializer);
+    sse_encode_bool(self.elevated, serializer);
   }
 
   @protected
