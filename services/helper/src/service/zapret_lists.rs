@@ -3,7 +3,7 @@
 
 use serde::Serialize;
 use std::io::{Error, ErrorKind, Write};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 const LIST_FILES: &[&str] = &[
     "list-general.txt",
