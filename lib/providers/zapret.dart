@@ -8,6 +8,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 final zapretControllerProvider =
     NotifierProvider<ZapretController, ZapretState>(ZapretController.new);
 
+enum ZapretMode { strictSplit, fullBypass }
+
 class ZapretState {
   final bool available;
   final bool running;
@@ -18,6 +20,7 @@ class ZapretState {
   final String? activeEngine;
   final List<HelperZapretStrategy> strategies;
   final String selectedStrategyId;
+  final ZapretMode mode;
   final String? error;
 
   const ZapretState({
@@ -30,6 +33,7 @@ class ZapretState {
     this.activeEngine,
     this.strategies = const [],
     this.selectedStrategyId = ZapretController.defaultStrategyId,
+    this.mode = ZapretMode.fullBypass,
     this.error,
   });
 
@@ -46,6 +50,7 @@ class ZapretState {
     bool clearActiveEngine = false,
     List<HelperZapretStrategy>? strategies,
     String? selectedStrategyId,
+    ZapretMode? mode,
     String? error,
     bool clearError = false,
   }) {
@@ -61,14 +66,27 @@ class ZapretState {
       activeEngine: clearActiveEngine ? null : activeEngine ?? this.activeEngine,
       strategies: strategies ?? this.strategies,
       selectedStrategyId: selectedStrategyId ?? this.selectedStrategyId,
+      mode: mode ?? this.mode,
       error: clearError ? null : error ?? this.error,
     );
+  }
+
+  bool get supportsSplitMode {
+    for (final strategy in strategies) {
+      if (strategy.id != selectedStrategyId) continue;
+      return strategy.engine == 'winws' ||
+          (strategy.engine == 'winws2' &&
+              strategy.id != 'zapret2-ru-ultimate' &&
+              !strategy.id.startsWith('kinlay0-'));
+    }
+    return false;
   }
 }
 
 class ZapretController extends Notifier<ZapretState> {
   static const defaultStrategyId = 'flowseal-alt';
   static const _selectedStrategyPreferenceKey = 'zapret.strategyId';
+  static const _modePreferenceKey = 'zapret.mode';
   static const _pollInterval = Duration(seconds: 3);
   static const _readinessTimeout = Duration(seconds: 3);
 
@@ -100,6 +118,11 @@ class ZapretController extends Notifier<ZapretState> {
       final strategies = await _client.zapretStrategies();
       final preferences = await SharedPreferences.getInstance();
       final savedId = preferences.getString(_selectedStrategyPreferenceKey);
+      final savedMode = preferences.getString(_modePreferenceKey);
+      final selectedMode = ZapretMode.values.firstWhere(
+        (item) => item.name == savedMode,
+        orElse: () => ZapretMode.fullBypass,
+      );
       final currentId = state.selectedStrategyId;
       final selectedId = strategies.isEmpty
           ? currentId
@@ -115,10 +138,14 @@ class ZapretController extends Notifier<ZapretState> {
         available: strategies.isNotEmpty,
         strategies: strategies,
         selectedStrategyId: selectedId,
+        mode: selectedMode,
         clearError: strategies.isNotEmpty,
       );
       if (strategies.isNotEmpty && savedId != selectedId) {
         await preferences.setString(_selectedStrategyPreferenceKey, selectedId);
+      }
+      if (savedMode != selectedMode.name) {
+        await preferences.setString(_modePreferenceKey, selectedMode.name);
       }
     } catch (error) {
       if (!ref.mounted) return;
@@ -136,6 +163,13 @@ class ZapretController extends Notifier<ZapretState> {
     state = state.copyWith(selectedStrategyId: strategyId, clearError: true);
     final preferences = await SharedPreferences.getInstance();
     await preferences.setString(_selectedStrategyPreferenceKey, strategyId);
+  }
+
+  Future<void> setMode(ZapretMode mode) async {
+    if (!state.supportsSplitMode) return;
+    state = state.copyWith(mode: mode, clearError: true);
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(_modePreferenceKey, mode.name);
   }
 
   Future<void> refresh() async {
@@ -182,7 +216,10 @@ class ZapretController extends Notifier<ZapretState> {
     try {
       await _requireHelper();
       final response = enabled
-          ? await _client.startZapret(strategyId: state.selectedStrategyId)
+          ? await _client.startZapret(
+              strategyId: state.selectedStrategyId,
+              mode: (state.supportsSplitMode ? state.mode : ZapretMode.fullBypass).name,
+            )
           : await _client.stopZapret();
       if (!ref.mounted) return;
       state = state.copyWith(
@@ -217,6 +254,7 @@ class ZapretController extends Notifier<ZapretState> {
       await _requireHelper();
       final response = await _client.restartZapret(
         strategyId: state.selectedStrategyId,
+        mode: (state.supportsSplitMode ? state.mode : ZapretMode.fullBypass).name,
       );
       if (!ref.mounted) return;
       state = state.copyWith(
