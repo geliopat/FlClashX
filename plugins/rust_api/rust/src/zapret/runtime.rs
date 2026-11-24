@@ -115,10 +115,11 @@ fn launch_elevated(
     arguments: &[String],
     working_directory: &Path,
 ) -> io::Result<(OwnedHandle, u32)> {
-    let verb = wide("runas");
+    let verb = wide(OsStr::new("runas"));
     let file = wide(executable.as_os_str());
     let directory = wide(working_directory.as_os_str());
-    let parameters = wide(&build_windows_command_line(arguments));
+    let parameter_text = build_windows_command_line(arguments);
+    let parameters = wide(OsStr::new(&parameter_text));
 
     let mut info: SHELLEXECUTEINFOW = unsafe { std::mem::zeroed() };
     info.cbSize = std::mem::size_of::<SHELLEXECUTEINFOW>() as u32;
@@ -735,6 +736,19 @@ fn canonicalize_with_missing_tail(path: &Path) -> Result<PathBuf, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn elevated_command_line_round_trips_windows_quoting() {
+        let arguments = vec![
+            r#"--hostlist=C:\Program Files\Flowseal\lists\all.txt"#.to_owned(),
+            "--fake=a b".to_owned(),
+            String::new(),
+            r#"--quoted=a\"b"#.to_owned(),
+            r#"--trailing=C:\path with spaces\\"#.to_owned(),
+        ];
+        let command_line = build_windows_command_line(&arguments);
+        assert_eq!(split_windows_arguments(&command_line).unwrap(), arguments);
+    }
 
     #[test]
     fn splits_quoted_arguments_with_spaces_and_windows_escapes() {
