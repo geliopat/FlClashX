@@ -489,7 +489,7 @@ class _FlowsealViewState extends State<FlowsealView> {
     });
   }
 
-  Future<void> _importUserList(BuildContext context) async {
+  Future<void> _importUserList() async {
     if (!_installed || _busy || _testing) return;
     final file = await FilePicker.pickFile(
       type: FileType.custom,
@@ -498,25 +498,27 @@ class _FlowsealViewState extends State<FlowsealView> {
     if (file == null || !mounted) return;
 
     final append = await dialogs.showCommonDialog<bool>(
-      child: CommonDialog(
-        title: 'Импорт пользовательского списка',
-        child: const Text(
-          'Добавить записи к существующему списку или полностью заменить его?',
+      child: Builder(
+        builder: (dialogContext) => CommonDialog(
+          title: 'Импорт пользовательского списка',
+          child: const Text(
+            'Добавить записи к существующему списку или полностью заменить его?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(null),
+              child: const Text('Отмена'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Заменить'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Добавить'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(null),
-            child: const Text('Отмена'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Заменить'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Добавить'),
-          ),
-        ],
       ),
     );
     if (append == null || !mounted) return;
@@ -714,6 +716,10 @@ class _FlowsealViewState extends State<FlowsealView> {
       );
       return;
     }
+    if (!_elevated) {
+      await _requestElevationForTest();
+      return;
+    }
     final ready = await dialogs.showMessage(
       title: 'Проверка Zapret напрямую',
       message: const TextSpan(
@@ -724,10 +730,6 @@ class _FlowsealViewState extends State<FlowsealView> {
       confirmText: 'Продолжить',
     );
     if (ready != true || !mounted) return;
-    if (!_elevated) {
-      await _requestElevationForTest();
-      return;
-    }
 
     setState(() {
       _testing = true;
@@ -1319,7 +1321,7 @@ class _FlowsealViewState extends State<FlowsealView> {
                 ListItem(
                   leading: const Icon(Icons.file_upload_outlined),
                   title: const Text('Импортировать TXT'),
-                  onTap: _busy || _testing ? null : () => _importUserList(context),
+                  onTap: _busy || _testing ? null : _importUserList,
                 ),
                 ListItem(
                   leading: const Icon(Icons.file_download_outlined),
