@@ -54,7 +54,13 @@ class _FlowsealViewState extends State<FlowsealView> {
   Future<void> _restoreSettings() async {
     try {
       final preferences = await SharedPreferences.getInstance();
-      final root = preferences.getString(_flowsealRootPreference) ?? '';
+      final savedRoot = preferences.getString(_flowsealRootPreference);
+      final root = savedRoot == null || savedRoot.trim().isEmpty
+          ? p.join(await appPath.homeDirPath, 'Flowseal')
+          : savedRoot;
+      if (savedRoot == null || savedRoot.trim().isEmpty) {
+        await preferences.setString(_flowsealRootPreference, root);
+      }
       if (!mounted) return;
       setState(() {
         _root = root;
@@ -139,6 +145,15 @@ class _FlowsealViewState extends State<FlowsealView> {
   Future<void> _validate() async {
     await _withBusy(() async {
       final result = await flowsealValidateInstallation(root: _root);
+      if (!mounted) return;
+      setState(() => _validation = result);
+      await _refresh();
+    });
+  }
+
+  Future<void> _installOrUpdate() async {
+    await _withBusy(() async {
+      final result = await flowsealInstallOrUpdate(root: _root);
       if (!mounted) return;
       setState(() => _validation = result);
       await _refresh();
@@ -235,7 +250,9 @@ class _FlowsealViewState extends State<FlowsealView> {
                   const SizedBox(height: 8),
                   Text(
                     'FlClashX читает BAT-файлы как описания стратегий. '
-                    'Сами BAT/CMD и сценарии установки не запускаются.',
+                    'Сами BAT/CMD и сценарии установки не запускаются. '
+                    'Установка выполняется в выбранный каталог без SYSTEM; '
+                    'для записи в него нужны права текущего пользователя.',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                     ),
@@ -357,10 +374,21 @@ class _FlowsealViewState extends State<FlowsealView> {
               ),
             ],
             const SizedBox(height: 10),
-            OutlinedButton.icon(
-              onPressed: _busy || !_installed ? null : _validate,
-              icon: const Icon(Icons.fact_check_outlined),
-              label: const Text('Проверить установку'),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                FilledButton.icon(
+                  onPressed: _busy ? null : _installOrUpdate,
+                  icon: const Icon(Icons.download),
+                  label: Text(_installed ? 'Установить обновление' : 'Установить Flowseal'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _busy || !_installed ? null : _validate,
+                  icon: const Icon(Icons.fact_check_outlined),
+                  label: const Text('Проверить установку'),
+                ),
+              ],
             ),
           ],
         ),
