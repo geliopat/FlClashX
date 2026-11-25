@@ -26,6 +26,7 @@ const _forkAuthors = [
     link: 'https://github.com/pluralplay',
   ),
   Person(
+    avatar: 'https://avatars.githubusercontent.com/u/267946799?v=4&s=128',
     name: 'geliopat',
     link: 'https://github.com/geliopat',
   ),
@@ -374,17 +375,28 @@ class _Avatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final link = person.link;
+    final avatar = person.avatar;
+    final initial = Text(person.name.substring(0, 1).toUpperCase());
+    final remote = avatar?.startsWith('https://') == true;
     final column = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         CircleAvatar(
           radius: size / 2,
-          foregroundImage: person.avatar == null
-              ? null
-              : AssetImage(person.avatar!),
-          child: person.avatar == null
-              ? Text(person.name.substring(0, 1).toUpperCase())
-              : null,
+          foregroundImage: avatar == null || remote ? null : AssetImage(avatar),
+          child: remote
+              ? ClipOval(
+                  child: Image.network(
+                    avatar!,
+                    width: size,
+                    height: size,
+                    fit: BoxFit.cover,
+                    frameBuilder: (context, child, frame, wasSynchronouslyLoaded) =>
+                        frame == null && !wasSynchronouslyLoaded ? initial : child,
+                    errorBuilder: (context, error, stackTrace) => initial,
+                  ),
+                )
+              : avatar == null ? initial : null,
         ),
         const SizedBox(height: 4),
         Text(
