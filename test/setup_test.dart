@@ -8,6 +8,19 @@ import '../setup.dart' as setup;
 
 void main() {
   group('setup.dart', () {
+    test('Windows Helper build, runtime and installer names agree', () {
+      const name = 'FlClashZHelperService';
+      expect(setup.windowsHelperName, name);
+      expect(File('build_config.yaml').readAsStringSync(),
+          contains('windows_helper_name: $name'));
+      expect(File('windows/CMakeLists.txt').readAsStringSync(),
+          contains('$name.exe'));
+      expect(File('windows/CMakeLists.txt').readAsStringSync(),
+          isNot(contains('FlClashXHelperService.exe')));
+      final rust = File('services/helper/src/service/identity.rs').readAsStringSync();
+      expect(rust, contains('const WINDOWS_HELPER: &str = "$name";'));
+    });
+
     test('Windows stable and pre apps resolve to the same Helper service', () {
       expect(
         helperServiceFor(pre: false, isWindows: true),
