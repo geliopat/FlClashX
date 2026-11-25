@@ -232,13 +232,13 @@ class SetupAction extends _$SetupAction {
       globalState.needInitStatus = false;
     }
     if (!running) return _stop(request);
-    return _start(request).then((success) {
+    return _start(request).then((success) async {
       if (success && system.isWindows && _isCurrent(request) &&
           request.previousStartTime == null && !request.resume &&
           !ref.read(safeModeProvider)) {
-        unawaited(ref.read(zapretControllerProvider.notifier).startAlongsideMihomo().catchError((Object error) {
+        await ref.read(zapretControllerProvider.notifier).startAlongsideMihomo().catchError((Object error) {
           commonPrint.log('Linked Zapret start failed: $error', logLevel: LogLevel.warning);
-        }));
+        });
       }
       return success;
     });
@@ -319,6 +319,14 @@ class SetupAction extends _$SetupAction {
       if (ref.read(safeModeProvider)) {
         return true;
       }
+      if (!request.running && system.isWindows) {
+        try {
+          await ref.read(zapretControllerProvider.notifier).stopAlongsideMihomo();
+        } catch (error) {
+          commonPrint.log('Linked Zapret stop failed: $error', logLevel: LogLevel.warning);
+        }
+        if (!_isCurrent(request)) return true;
+      }
       return _setListening(request.running);
     });
   }
@@ -371,9 +379,23 @@ class SetupAction extends _$SetupAction {
           return null;
         }
         final vpnOptions = await ref.read(vpnOptionsProvider.future);
+        var restartZapret = false;
+        if (system.isWindows) {
+          try {
+            restartZapret = await ref.read(zapretControllerProvider.notifier).stopAlongsideMihomo();
+          } catch (error) {
+            commonPrint.log('Linked Zapret stop failed: $error', logLevel: LogLevel.warning);
+          }
+        }
+        if (!_isCurrent(request)) return null;
         final answered = await restartCoreRunning();
         if (answered) {
           ref.read(runningVpnOptionsProvider.notifier).value = vpnOptions;
+          if (system.isWindows && _isCurrent(request)) {
+            await ref.read(zapretControllerProvider.notifier).startAlongsideMihomo(force: restartZapret).catchError((Object error) {
+              commonPrint.log('Linked Zapret restart failed: $error', logLevel: LogLevel.warning);
+            });
+          }
         }
         return answered;
       });
