@@ -18,12 +18,12 @@ class SmartHostsView extends ConsumerWidget {
       title: Text(label),
       subtitle: Text([
         description,
-        'Записей: ${state.sourceCounts[id] ?? 0}',
+        '${AppLocalizations.of(context).forkReceivedHosts}: ${state.sourceCounts[id] ?? 0}',
         if (state.cachedSources.contains(id))
           AppLocalizations.of(context).forkUseCache
         else if (state.fallbackSources.contains(id))
           AppLocalizations.of(context).forkFallbackDownloaded,
-        if (state.errors[id] != null) 'Ошибка: ${state.errors[id]}',
+        if (state.errors[id] != null) '${AppLocalizations.of(context).error}: ${state.errors[id]}',
         if (state.errors[id] != null && state.enabled && state.autoUpdate && state.sources.contains(id))
           AppLocalizations.of(context).forkRetryInterval,
       ].join('\n')),
@@ -45,7 +45,7 @@ class SmartHostsView extends ConsumerWidget {
             items: [
               ListItem(
                 title: Text(AppLocalizations.of(context).forkEnableSmartHosts),
-                subtitle: Text('Автоматических записей: ${state.entries.length}'),
+                subtitle: Text('${AppLocalizations.of(context).forkReceivedHosts}: ${state.entries.length}'),
                 trailing: Switch(
                   value: state.enabled,
                   onChanged: state.updating ? null : (value) => controller.configure(enabled: value),
@@ -67,7 +67,7 @@ class SmartHostsView extends ConsumerWidget {
               ),
               ListItem(
                 title: Text(AppLocalizations.of(context).forkUpdateNow),
-                subtitle: Text(state.lastUpdate == null ? AppLocalizations.of(context).forkNoUpdate : 'Последняя успешная загрузка: ${state.lastUpdate!.toLocal().toString().split('.').first}'),
+                subtitle: Text(state.lastUpdate == null ? AppLocalizations.of(context).forkNoUpdate : '${AppLocalizations.of(context).lastUpdated}: ${state.lastUpdate!.toLocal().toString().split('.').first}'),
                 onTap: state.updating || !state.enabled ? null : controller.refresh,
                 trailing: state.updating ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2)) : null,
               ),
@@ -236,7 +236,7 @@ class _AppliedHostsViewState extends ConsumerState<_AppliedHostsView> {
               : Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text('Не удалось получить применённые Hosts: ${snapshot.error}'),
+                    Text('${AppLocalizations.of(context).forkAppliedHosts} · ${AppLocalizations.of(context).error}: ${snapshot.error}'),
                     TextButton(
                       onPressed: () => setState(() => _entries = _load()),
                       child: Text(AppLocalizations.of(context).retry),
