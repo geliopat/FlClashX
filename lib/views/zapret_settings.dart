@@ -361,8 +361,8 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
         title: const Text('Переустановить службу Helper?'),
         content: const Text(
           'Служба будет заменена версией из текущей папки FlClashX. '
-          'Во время переустановки текущий Mihomo Core может быть остановлен, '
-          'а VPN-подключение прервётся. После обновления запусти VPN снова. '
+          'Во время переустановки Helper остановит Mihomo Core и Zapret, '
+          'поэтому VPN и обход временно прервутся. После обновления запусти их снова. '
           'Не перемещай и не удаляй папку FlClashX после переустановки службы.',
         ),
         actions: [
@@ -580,7 +580,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
           ),
         ],
       ),
-      ListSectionGap(),
+      const ListSectionGap(),
       generateSection(
         title: 'Компоненты Zapret',
         items: [
@@ -610,7 +610,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
         footer:
             'Проверка новых версий выполняется отдельно. Замена winws/winws2, DLL, драйверов WinDivert и Lua/BAT пока не автоматизирована: обновление требует остановки движка, проверки SHA256 и возможности отката.',
       ),
-      ListSectionGap(),
+      const ListSectionGap(),
       generateSection(
         title: 'Списки Zapret',
         items: [
