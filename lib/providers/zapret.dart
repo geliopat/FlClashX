@@ -4,6 +4,9 @@ import 'dart:io';
 
 import 'package:fl_clash/common/system.dart';
 import 'package:fl_clash/providers/app.dart';
+import 'package:fl_clash/providers/action.dart';
+import 'package:fl_clash/providers/config.dart';
+import 'package:fl_clash/providers/zapret_infrastructure.dart';
 import 'package:fl_clash/providers/zapret_diagnostics.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/core/desktop/helper_client.dart';
@@ -34,6 +37,8 @@ class ZapretState {
   final String? activeMode;
   final List<String> winDivertFilters;
   final List<String> processingLists;
+  final List<String> protectedDomains;
+  final List<String> protectedIps;
   final List<HelperZapretStrategy> strategies;
   final String selectedStrategyId;
   final ZapretMode mode;
@@ -58,6 +63,8 @@ class ZapretState {
     this.activeMode,
     this.winDivertFilters = const [],
     this.processingLists = const [],
+    this.protectedDomains = const [],
+    this.protectedIps = const [],
     this.strategies = const [],
     this.selectedStrategyId = ZapretController.defaultStrategyId,
     this.mode = ZapretMode.fullBypass,
@@ -89,6 +96,8 @@ class ZapretState {
     bool clearActiveMode = false,
     List<String>? winDivertFilters,
     List<String>? processingLists,
+    List<String>? protectedDomains,
+    List<String>? protectedIps,
     List<HelperZapretStrategy>? strategies,
     String? selectedStrategyId,
     ZapretMode? mode,
@@ -116,6 +125,8 @@ class ZapretState {
       activeMode: clearActiveMode ? null : activeMode ?? this.activeMode,
       winDivertFilters: winDivertFilters ?? this.winDivertFilters,
       processingLists: processingLists ?? this.processingLists,
+      protectedDomains: protectedDomains ?? this.protectedDomains,
+      protectedIps: protectedIps ?? this.protectedIps,
       strategies: strategies ?? this.strategies,
       selectedStrategyId: selectedStrategyId ?? this.selectedStrategyId,
       mode: mode ?? this.mode,
@@ -179,6 +190,69 @@ class ZapretController extends Notifier<ZapretState> {
   int _failedChecks = 0;
   DateTime? _fallbackAfter;
   bool _checkingFallback = false;
+  ZapretInfrastructure? _infrastructure;
+  int? _infrastructureProfileId;
+  bool _pendingInfrastructureRestart = false;
+
+  /// Called after Mihomo accepts a new effective profile. Keep the original
+  /// configuration untouched, and reconcile a running Zapret only if changed.
+  void updateInfrastructureFromYaml(String yaml, int? profileId) {
+    if (!Platform.isWindows || !ref.mounted) return;
+    final next = ZapretInfrastructure.fromYaml(yaml);
+    final previous = _infrastructure;
+    final changed = previous?.fingerprint != next.fingerprint;
+    _infrastructure = next;
+    _infrastructureProfileId = profileId;
+    state = state.copyWith(
+      protectedDomains: next.domains,
+      protectedIps: next.ips,
+    );
+    if (changed) {
+      _pendingInfrastructureRestart = true;
+      if (previous != null && state.testProgress != null) _cancelTrial = true;
+    }
+  }
+
+  Future<ZapretInfrastructure> _readInfrastructure() async {
+    final id = ref.read(currentProfileIdProvider);
+    final known = _infrastructure;
+    if (known != null && _infrastructureProfileId == id) return known;
+    if (id == null) {
+      return const ZapretInfrastructure([], []);
+    }
+    final yaml = await ref.read(setupActionProvider.notifier).getProfileWithId(id);
+    if (yaml.trim().isEmpty) {
+      throw StateError('Не удалось прочитать конфигурацию Mihomo для защиты Zapret');
+    }
+    if (id != ref.read(currentProfileIdProvider)) {
+      throw StateError('Профиль Mihomo изменился во время подготовки Zapret');
+    }
+    updateInfrastructureFromYaml(yaml, id);
+    return _infrastructure!;
+  }
+
+  Future<void> refreshInfrastructure() async {
+    final id = ref.read(currentProfileIdProvider);
+    if (id == null || state.busy) return;
+    final yaml = await ref.read(setupActionProvider.notifier).getProfileWithId(id);
+    if (yaml.trim().isEmpty) {
+      throw StateError('Не удалось прочитать конфигурацию Mihomo');
+    }
+    if (id != ref.read(currentProfileIdProvider)) return;
+    updateInfrastructureFromYaml(yaml, id);
+    await _reconcileInfrastructure();
+  }
+
+  Future<void> _reconcileInfrastructure() async {
+    if (!_pendingInfrastructureRestart || _lifecycleStopping ||
+        !state.running || state.busy || _refreshing) return;
+    _pendingInfrastructureRestart = false;
+    try {
+      await restart();
+    } catch (_) {
+      // restart() already exposes its error; never loop on a failed restart.
+    }
+  }
 
   @override
   ZapretState build() {
@@ -198,7 +272,11 @@ class ZapretController extends Notifier<ZapretState> {
         unawaited(refresh());
       });
       _poller = Timer.periodic(_pollInterval, (_) {
-        if (ref.mounted) unawaited(refresh());
+        if (ref.mounted) {
+          unawaited(refresh().then((_) {
+            if (ref.mounted) return _reconcileInfrastructure();
+          }));
+        }
       });
     }
     return const ZapretState();
@@ -438,8 +516,11 @@ class ZapretController extends Notifier<ZapretState> {
     state = state.copyWith(busy: true, clearError: true);
     try {
       await _requireHelper();
+      final protection = enabled ? await _readInfrastructure() : null;
+      if (enabled && _lifecycleStopping) return;
       final response = enabled
           ? await _client.startZapret(
+              infrastructure: protection!.toJson(),
               strategyId: state.selectedStrategyId,
               debug: state.debugLogs,
               watchdog: state.watchdog,
@@ -447,6 +528,9 @@ class ZapretController extends Notifier<ZapretState> {
             )
           : await _client.stopZapret();
       if (!ref.mounted) return;
+      if (enabled && protection?.fingerprint == _infrastructure?.fingerprint) {
+        _pendingInfrastructureRestart = false;
+      }
       state = state.copyWith(
         available: true,
         running: response.running,
@@ -483,13 +567,19 @@ class ZapretController extends Notifier<ZapretState> {
     state = state.copyWith(busy: true, clearError: true);
     try {
       await _requireHelper();
+      final protection = await _readInfrastructure();
+      if (_lifecycleStopping) return;
       final response = await _client.restartZapret(
+        infrastructure: protection.toJson(),
         strategyId: state.selectedStrategyId,
               debug: state.debugLogs,
               watchdog: state.watchdog,
         mode: (state.supportsSplitMode ? state.mode : ZapretMode.fullBypass).name,
       );
       if (!ref.mounted) return;
+      if (protection.fingerprint == _infrastructure?.fingerprint) {
+        _pendingInfrastructureRestart = false;
+      }
       state = state.copyWith(
         available: true,
         running: response.running,
@@ -567,19 +657,25 @@ class ZapretController extends Notifier<ZapretState> {
     state = state.copyWith(busy: true, trials: const [], testProgress: 'Подготовка', clearTestSummary: true, clearError: true);
     final results = <ZapretTrial>[];
     HelperZapretStatus? original;
+    var trialStarted = false;
     var attempted = 0;
     var launchFailures = 0;
     String? lastLaunchFailure;
     String? failure;
     try {
       original = await _client.zapretStatus();
+      final protection = await _readInfrastructure();
       for (var i = 0; i < strategies.length && !_cancelTrial; i++) {
         final item = strategies[i];
         final mode = item.supportsSplitMode ? selectedMode : ZapretMode.fullBypass;
         attempted++;
         state = state.copyWith(testProgress: '${i + 1}/${strategies.length}: ${item.name}');
         try {
-          final started = await _client.restartZapret(strategyId: item.id, mode: mode.name, watchdog: false);
+          trialStarted = true;
+          final started = await _client.restartZapret(
+            strategyId: item.id, mode: mode.name, watchdog: false,
+            infrastructure: protection.toJson(),
+          );
           if (!started.running || started.strategyId != item.id) throw StateError('Стратегия не запустилась');
           await Future<void>.delayed(const Duration(milliseconds: 1500));
           if (_cancelTrial) break;
@@ -612,11 +708,22 @@ class ZapretController extends Notifier<ZapretState> {
       failure = _errorMessage(error);
     } finally {
       try {
-        if (_lifecycleStopping || original == null || !original.running || original.strategyId == null) {
+        if (_lifecycleStopping) {
           await _client.stopZapret();
-        } else {
-          await _client.restartZapret(strategyId: original.strategyId!,
-              mode: original.mode ?? 'fullBypass', debug: state.debugLogs, watchdog: state.watchdog);
+        } else if (trialStarted) {
+          if (original == null || !original.running || original.strategyId == null) {
+            await _client.stopZapret();
+          } else {
+            final protection = await _readInfrastructure();
+            if (!_lifecycleStopping) {
+              await _client.restartZapret(strategyId: original.strategyId!,
+                mode: original.mode ?? 'fullBypass', debug: state.debugLogs,
+                watchdog: state.watchdog, infrastructure: protection.toJson());
+              if (protection.fingerprint == _infrastructure?.fingerprint) {
+                _pendingInfrastructureRestart = false;
+              }
+            }
+          }
         }
       } catch (error) {
         failure = 'Не удалось восстановить исходное состояние: ${_errorMessage(error)}';
@@ -673,7 +780,10 @@ class ZapretController extends Notifier<ZapretState> {
       state = state.copyWith(busy: true);
       var accepted = false;
       try {
-        await _client.restartZapret(strategyId: backup.id, mode: backup.mode.name, debug: state.debugLogs, watchdog: false);
+        final protection = await _readInfrastructure();
+        if (_lifecycleStopping) return;
+        await _client.restartZapret(strategyId: backup.id, mode: backup.mode.name,
+          debug: state.debugLogs, watchdog: false, infrastructure: protection.toJson());
         await Future<void>.delayed(const Duration(seconds: 1));
         accepted = (await _verify(backup.id, backup.mode)).confirmed;
         if (accepted && !_lifecycleStopping) {
@@ -688,7 +798,11 @@ class ZapretController extends Notifier<ZapretState> {
           if (_lifecycleStopping) {
             await _client.stopZapret();
           } else if (!accepted) {
-            await _client.restartZapret(strategyId: originalId, mode: originalMode.name, debug: state.debugLogs, watchdog: state.watchdog);
+            final protection = await _readInfrastructure();
+            if (!_lifecycleStopping) {
+              await _client.restartZapret(strategyId: originalId, mode: originalMode.name,
+                debug: state.debugLogs, watchdog: state.watchdog, infrastructure: protection.toJson());
+            }
           }
         } finally {
           if (ref.mounted) {
