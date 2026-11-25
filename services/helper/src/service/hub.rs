@@ -134,6 +134,8 @@ struct ZapretStartRequest {
     #[serde(default)]
     watchdog: Option<bool>,
     #[serde(default)]
+    infrastructure: super::zapret::ZapretInfrastructure,
+    #[serde(default)]
     mode: super::zapret::ZapretLaunchMode,
 }
 
@@ -493,6 +495,7 @@ struct ManagedZapret {
     strategy_id: String,
     engine: String,
     mode: super::zapret::ZapretLaunchMode,
+    infrastructure: super::zapret::ZapretInfrastructure,
     args: Vec<String>,
 }
 
@@ -513,6 +516,7 @@ struct ZapretIntent {
     strategy_id: String,
     mode: super::zapret::ZapretLaunchMode,
     debug: bool,
+    infrastructure: super::zapret::ZapretInfrastructure,
     attempts: u8,
     retry_at: Option<Instant>,
 }
@@ -581,6 +585,7 @@ fn ensure_zapret_watchdog() {
                 intent.strategy_id.clone(),
                 intent.mode,
                 intent.debug,
+                &intent.infrastructure,
             );
             if response.status() != StatusCode::OK {
                 zapret_log(
@@ -603,6 +608,7 @@ fn launch_zapret_with_intent(restart: bool, request: ZapretStartRequest) -> warp
         request.strategy_id.clone(),
         request.mode,
         request.debug,
+        &request.infrastructure,
     );
     if response.status() == StatusCode::OK {
         if let Some(enabled) = request.watchdog {
@@ -612,6 +618,7 @@ fn launch_zapret_with_intent(restart: bool, request: ZapretStartRequest) -> warp
             strategy_id: request.strategy_id,
             mode: request.mode,
             debug: request.debug,
+            infrastructure: request.infrastructure,
             attempts: 0,
             retry_at: None,
         });
@@ -623,7 +630,13 @@ fn launch_zapret_with_intent(restart: bool, request: ZapretStartRequest) -> warp
 #[cfg(not(windows))]
 fn launch_zapret_with_intent(restart: bool, request: ZapretStartRequest) -> warp::reply::Response {
     let _ = request.watchdog;
-    launch_zapret(restart, request.strategy_id, request.mode, request.debug)
+    launch_zapret(
+        restart,
+        request.strategy_id,
+        request.mode,
+        request.debug,
+        &request.infrastructure,
+    )
 }
 
 #[cfg(windows)]
@@ -908,6 +921,7 @@ fn launch_zapret(
     strategy_id: String,
     mode: super::zapret::ZapretLaunchMode,
     debug: bool,
+    infrastructure: &super::zapret::ZapretInfrastructure,
 ) -> warp::reply::Response {
     if SHUTTING_DOWN.load(Ordering::SeqCst) {
         return error_response(
@@ -916,13 +930,24 @@ fn launch_zapret(
             StatusCode::SERVICE_UNAVAILABLE,
         );
     }
+    if let Err(error) = infrastructure.validate() {
+        return error_response(
+            "invalidZapretInfrastructure",
+            error.to_string(),
+            StatusCode::BAD_REQUEST,
+        );
+    }
     let mut managed = lock_surviving_poison(&MANAGED_ZAPRET);
     if !restart {
         match zapret_status_response(&mut managed, 0) {
             Ok(status) => {
                 let same_strategy = managed
                     .as_ref()
-                    .is_some_and(|active| active.strategy_id == strategy_id && active.mode == mode);
+                    .is_some_and(|active| {
+                        active.strategy_id == strategy_id
+                            && active.mode == mode
+                            && &active.infrastructure == infrastructure
+                    });
                 if same_strategy {
                     return status;
                 }
@@ -1007,6 +1032,14 @@ fn launch_zapret(
         );
     }
 
+    if let Err(error) = infrastructure.prepare() {
+        return error_response(
+            "zapretInfrastructureFailed",
+            error.to_string(),
+            StatusCode::INTERNAL_SERVER_ERROR,
+        );
+    }
+    infrastructure.apply(&mut args);
     if let Err(error) = stop_managed_zapret(&mut managed) {
         return error_response(
             "zapretStopFailed",
@@ -1088,6 +1121,7 @@ fn launch_zapret(
         strategy_id: strategy_id.clone(),
         engine: engine.clone(),
         mode,
+        infrastructure: infrastructure.clone(),
         args: args.clone(),
     });
     json_response(
@@ -1246,6 +1280,7 @@ fn launch_zapret(
     _strategy_id: String,
     _mode: super::zapret::ZapretLaunchMode,
     _debug: bool,
+    _infrastructure: &super::zapret::ZapretInfrastructure,
 ) -> warp::reply::Response {
     error_response(
         "unsupportedPlatform",
@@ -1822,7 +1857,7 @@ pub(super) fn routes() -> impl Filter<Extract = (impl Reply,), Error = Infallibl
         .and(warp::path("start"))
         .and(warp::path::end())
         .and(warp::post())
-        .and(warp::body::content_length_limit(MAX_REQUEST_BODY_BYTES))
+        .and(warp::body::content_length_limit(MAX_ZAPRET_LIST_BODY_BYTES))
         .and(warp::body::json())
         .and_then(|request| launch_zapret_request(false, request));
 
@@ -1830,7 +1865,7 @@ pub(super) fn routes() -> impl Filter<Extract = (impl Reply,), Error = Infallibl
         .and(warp::path("restart"))
         .and(warp::path::end())
         .and(warp::post())
-        .and(warp::body::content_length_limit(MAX_REQUEST_BODY_BYTES))
+        .and(warp::body::content_length_limit(MAX_ZAPRET_LIST_BODY_BYTES))
         .and(warp::body::json())
         .and_then(|request| launch_zapret_request(true, request));
 
