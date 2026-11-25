@@ -56,6 +56,9 @@ class ProxiesAction extends _$ProxiesAction {
   final Set<int> _firstGroupToUnfold = {};
 
   Timer? _delayFlushTimer;
+  Timer? _autoDelayTimer;
+  bool _autoDelaysRunning = false;
+  final _lastDelayTest = <String, DateTime>{};
 
   final Map<(int?, String), String> _pendingSelectedRollback = {};
 
@@ -72,10 +75,21 @@ class ProxiesAction extends _$ProxiesAction {
 
   @override
   void build() {
-    ref.onDispose(() => _delayFlushTimer?.cancel());
+    ref.onDispose(() {
+      _delayFlushTimer?.cancel();
+      _autoDelayTimer?.cancel();
+    });
+    if (system.isWindows) {
+      _autoDelayTimer = Timer.periodic(const Duration(seconds: 5), (_) => unawaited(_autoDelayTick()));
+      ref.listen(autoDelayProvider, (_, _) => unawaited(_autoDelayTick()));
+      ref.listen(selectedMapProvider, (_, _) => unawaited(_autoDelayTick()));
+    }
     ref.listen(coreStatusProvider, (_, next) {
       if (next != CoreStatus.connected) {
         cancelDelayTests();
+        _lastDelayTest.clear();
+      } else if (system.isWindows) {
+        unawaited(_autoDelayTick());
       }
     });
   }
@@ -305,6 +319,7 @@ class ProxiesAction extends _$ProxiesAction {
   }
 
   void setDelay(Delay delay) {
+    _lastDelayTest[delayTestKey(delay.url, delay.name)] = DateTime.now();
     _bufferedDelays.add(delay);
     _scheduleDelayFlush();
   }
@@ -641,6 +656,55 @@ class ProxiesAction extends _$ProxiesAction {
       }
     }
     return targets;
+  }
+
+  Future<void> _autoDelayTick() async {
+    if (_autoDelaysRunning || !ref.mounted || !ref.read(initProvider) ||
+        ref.read(coreStatusProvider) != CoreStatus.connected ||
+        ref.read(safeModeProvider) || ref.read(zapretControllerProvider).busy ||
+        ref.read(smartHostsProvider).cdnChecking || _delayTestJobs.isNotEmpty) return;
+    final intervals = ref.read(autoDelayProvider);
+    if (intervals.active == 0 && intervals.others == 0) return;
+    final groups = ref.read(groupsProvider);
+    final selected = ref.read(selectedMapProvider);
+    final automatic = <String>{
+      for (final group in groups)
+        if (group.type.isComputedSelected || group.type == GroupType.LoadBalance)
+          for (final proxy in group.all) proxy.name,
+    };
+    final active = <String>{
+      for (final group in groups)
+        computeRealSelectedProxyState(group.name, groups: groups, selectedMap: selected).proxyName,
+    };
+    final now = DateTime.now();
+    final batches = <_DelayTestBatch>[];
+    for (final group in groups) {
+      if (group.type != GroupType.Selector) continue;
+      final candidates = <Proxy>[];
+      for (final proxy in group.all) {
+        // Do not duplicate native URLTest/fallback or provider-managed checks.
+        if (automatic.contains(proxy.name) || proxy.providerName?.isNotEmpty == true ||
+            isBuiltinOutbound(proxy.name) || groups.getGroup(proxy.name) != null) continue;
+        final seconds = active.contains(proxy.name) ? intervals.active : intervals.others;
+        if (seconds == 0) continue;
+        final url = ref.read(realTestUrlProvider(group.testUrl));
+        final key = delayTestKey(url, proxy.name);
+        final last = _lastDelayTest[key];
+        if (last == null || now.difference(last) >= Duration(seconds: seconds)) {
+          candidates.add(proxy);
+        }
+      }
+      if (candidates.isNotEmpty) batches.add((proxies: candidates, testUrl: group.testUrl));
+    }
+    if (batches.isEmpty) return;
+    _autoDelaysRunning = true;
+    try {
+      await _runDelayTests(batches);
+    } catch (error) {
+      commonPrint.log('Automatic delay check: $error', logLevel: LogLevel.debug);
+    } finally {
+      _autoDelaysRunning = false;
+    }
   }
 
   Future<void> _runDelayTests(List<_DelayTestBatch> batches) async {

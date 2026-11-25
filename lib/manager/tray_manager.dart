@@ -9,6 +9,7 @@ import 'package:fl_clash/providers/action.dart';
 import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/providers/state.dart';
 import 'package:fl_clash/providers/zapret.dart';
+import 'package:fl_clash/providers/auto_delay.dart';
 import 'package:fl_clash/providers/smart_hosts.dart';
 import 'package:fl_clash/providers/zapret_diagnostics.dart';
 import 'package:material_ui/material_ui.dart';
@@ -44,6 +45,8 @@ class _TrayManagerState extends ConsumerState<TrayManager> {
       }
     });
     if (system.isWindows) {
+      ref.read(proxiesActionProvider.notifier);
+      ref.read(autoDelayProvider);
       ref.listenManual(zapretControllerProvider.select((state) => (
         state.running, state.busy, state.available, state.selectedStrategyId,
         state.mode, state.startWithMihomo, state.strategies,

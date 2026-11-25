@@ -484,7 +484,7 @@ class GeneralView extends ConsumerWidget {
     return [
       const TestUrlItem(),
       const DelayTestTimeoutItem(),
-      if (system.isWindows) const ZapretProbeIntervalItem(),
+      if (system.isWindows) ...const [AutoDelayIntervalItem(active: true), AutoDelayIntervalItem(active: false), ZapretProbeIntervalItem()],
       _clashToggle(
         title: (l) => l.unifiedDelay,
         managedKey: 'clash.unified-delay',
@@ -687,6 +687,24 @@ class MihomoWatchdogItem extends ConsumerWidget {
         value: ref.watch(mihomoWatchdogProvider),
         onChanged: ref.read(mihomoWatchdogProvider.notifier).setEnabled,
       ),
+    );
+  }
+}
+
+class AutoDelayIntervalItem extends ConsumerWidget {
+  const AutoDelayIntervalItem({super.key, required this.active});
+  final bool active;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final intervals = ref.watch(autoDelayProvider);
+    return ListItem<int>.options(
+      title: Text(active ? 'Интервал проверки выбранных серверов' : 'Интервал проверки остальных серверов'),
+      options: AutoDelayController.values,
+      value: active ? intervals.active : intervals.others,
+      textBuilder: (value) => value == 0 ? 'Отключено' : '$value сек.',
+      onChanged: (value) => ref.read(autoDelayProvider.notifier).set(
+        active: active ? value : null, others: active ? null : value),
     );
   }
 }
