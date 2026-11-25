@@ -70,6 +70,8 @@ void main() {
       expect(options.method, 'POST');
       expect(options.path, endsWith('/zapret/start'));
       expect(options.data, {'strategyId': 'flowseal-alt', 'mode': 'fullBypass'});
+      expect(int.tryParse(options.headers['x-zapret-owner-pid'].toString()), greaterThan(0));
+      expect(int.tryParse(options.headers['x-zapret-command'].toString()), greaterThan(0));
       return _jsonResponse({
         'running': true,
         'pid': 3210,
@@ -93,6 +95,30 @@ void main() {
     expect(result.winDivertFilters, ['--wf-tcp=80,443']);
     expect(result.processingLists, ['--hostlist=lists/list-general.txt']);
     expect(result.cleanedProcesses, 2);
+  });
+
+  test('Zapret operations carry increasing sequence numbers from one owner', () async {
+    final commands = <int>[];
+    final owners = <String>{};
+    final adapter = _ResponseAdapter((options) {
+      commands.add(int.parse(options.headers['x-zapret-command'].toString()));
+      owners.add(options.headers['x-zapret-owner-pid'].toString());
+      if (options.path.endsWith('/watchdog')) return _jsonResponse(true);
+      return _jsonResponse({
+        'running': false,
+        'winDivertFilters': <String>[],
+        'processingLists': <String>[],
+        'cleanedProcesses': 0,
+      });
+    });
+    final client = _client(adapter);
+    await client.stopZapret();
+    await client.setZapretWatchdog(false);
+    await client.stopZapret();
+    expect(owners, hasLength(1));
+    expect(commands, hasLength(3));
+    expect(commands[1], greaterThan(commands[0]));
+    expect(commands[2], greaterThan(commands[1]));
   });
 
   test('Zapret refuses a running status without a known strategy engine', () async {
