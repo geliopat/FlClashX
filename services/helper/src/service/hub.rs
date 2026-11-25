@@ -687,11 +687,17 @@ fn process_image_path(handle: HANDLE) -> Option<String> {
 
 #[cfg(windows)]
 fn process_path_is_in_zapret_root(image_path: &str, zapret_root: &Path) -> bool {
+    // QueryFullProcessImageNameW returns a DOS path; canonicalize returns
+    // a verbatim path. Normalize both before checking process ownership.
+    let Ok(image_path) = fs::canonicalize(image_path) else {
+        return false;
+    };
     let root = zapret_root
         .to_string_lossy()
         .trim_end_matches(|ch| ch == '\\' || ch == '/')
         .to_ascii_lowercase();
     image_path
+        .to_string_lossy()
         .to_ascii_lowercase()
         .starts_with(&format!("{root}\\"))
 }
