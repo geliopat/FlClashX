@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:fl_clash/common/app_ports.dart';
 import 'package:fl_clash/views/zapret.dart';
+import 'package:fl_clash/views/zapret_logs.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/ui/icons/app_glyphs.dart';
@@ -78,6 +79,13 @@ class Navigation implements NavigationPort {
             ? [NavigationItemMode.desktop, NavigationItemMode.more]
             : [],
       ),
+      if (Platform.isWindows)
+        NavigationItem(
+          glyph: AppGlyphs.logs,
+          label: PageLabel.zapretLogs,
+          builder: (_) => const ZapretLogsView(key: GlobalObjectKey(PageLabel.zapretLogs)),
+          modes: [NavigationItemMode.desktop],
+        ),
       NavigationItem(
         glyph: AppGlyphs.settings,
         label: PageLabel.tools,

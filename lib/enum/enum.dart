@@ -530,6 +530,7 @@ enum PageLabel {
   connections,
   dns,
   zapret,
+  zapretLogs,
 }
 
 enum RuleAction {

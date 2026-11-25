@@ -16,6 +16,7 @@ class ZapretState {
   final bool available;
   final bool running;
   final bool busy;
+  final bool debugLogs;
   final int? pid;
   final Duration elapsed;
   final int cleanedProcesses;
@@ -33,6 +34,7 @@ class ZapretState {
     this.available = false,
     this.running = false,
     this.busy = false,
+    this.debugLogs = false,
     this.pid,
     this.elapsed = Duration.zero,
     this.cleanedProcesses = 0,
@@ -51,6 +53,7 @@ class ZapretState {
     bool? available,
     bool? running,
     bool? busy,
+    bool? debugLogs,
     int? pid,
     Duration? elapsed,
     bool clearPid = false,
@@ -73,6 +76,7 @@ class ZapretState {
       available: available ?? this.available,
       running: running ?? this.running,
       busy: busy ?? this.busy,
+      debugLogs: debugLogs ?? this.debugLogs,
       pid: clearPid ? null : pid ?? this.pid,
       elapsed: elapsed ?? this.elapsed,
       cleanedProcesses: cleanedProcesses ?? this.cleanedProcesses,
@@ -102,6 +106,7 @@ class ZapretController extends Notifier<ZapretState> {
   static const defaultStrategyId = 'flowseal-alt';
   static const _selectedStrategyPreferenceKey = 'zapret.strategyId';
   static const _modePreferenceKey = 'zapret.mode';
+  static const _debugPreferenceKey = 'zapret.debugLogs';
   static const _pollInterval = Duration(seconds: 3);
   static const _readinessTimeout = Duration(seconds: 3);
 
@@ -178,6 +183,7 @@ class ZapretController extends Notifier<ZapretState> {
         strategies: strategies,
         selectedStrategyId: selectedId,
         mode: selectedMode,
+        debugLogs: preferences.getBool(_debugPreferenceKey) ?? false,
         clearError: strategies.isNotEmpty,
       );
       if (strategies.isNotEmpty && savedId != selectedId) {
@@ -209,6 +215,12 @@ class ZapretController extends Notifier<ZapretState> {
     state = state.copyWith(mode: mode, clearError: true);
     final preferences = await SharedPreferences.getInstance();
     await preferences.setString(_modePreferenceKey, mode.name);
+  }
+
+  Future<void> setDebugLogs(bool enabled) async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setBool(_debugPreferenceKey, enabled);
+    if (ref.mounted) state = state.copyWith(debugLogs: enabled);
   }
 
   Future<void> refresh() async {
@@ -274,6 +286,7 @@ class ZapretController extends Notifier<ZapretState> {
       final response = enabled
           ? await _client.startZapret(
               strategyId: state.selectedStrategyId,
+              debug: state.debugLogs,
               mode: (state.supportsSplitMode ? state.mode : ZapretMode.fullBypass).name,
             )
           : await _client.stopZapret();
@@ -315,6 +328,7 @@ class ZapretController extends Notifier<ZapretState> {
       await _requireHelper();
       final response = await _client.restartZapret(
         strategyId: state.selectedStrategyId,
+              debug: state.debugLogs,
         mode: (state.supportsSplitMode ? state.mode : ZapretMode.fullBypass).name,
       );
       if (!ref.mounted) return;

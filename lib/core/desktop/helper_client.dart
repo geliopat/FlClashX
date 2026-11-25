@@ -126,6 +126,26 @@ final class HelperZapretListContent {
   const HelperZapretListContent({required this.filename, required this.content});
 }
 
+final class HelperZapretLog {
+  final DateTime time;
+  final String level;
+  final String message;
+
+  const HelperZapretLog(this.time, this.level, this.message);
+
+  factory HelperZapretLog.fromJson(Object? value) {
+    if (value is! Map || value['timestampMs'] is! int ||
+        value['level'] is! String || value['message'] is! String) {
+      throw const FormatException('Invalid Zapret log entry');
+    }
+    return HelperZapretLog(
+      DateTime.fromMillisecondsSinceEpoch(value['timestampMs'] as int),
+      value['level'] as String,
+      value['message'] as String,
+    );
+  }
+}
+
 final class HelperZapretStatus {
   final bool running;
   final int? pid;
@@ -605,6 +625,23 @@ final class HelperClient {
     }
   }
 
+  Future<List<HelperZapretLog>> zapretLogs() async {
+    final response = await _dio.get<Object?>(
+      '$baseUrl/zapret/logs',
+      options: _options(ResponseType.json, receiveTimeout: const Duration(seconds: 3)),
+    );
+    final data = response.data;
+    if (data is! List) throw const FormatException('Invalid Zapret log list');
+    return data.map(HelperZapretLog.fromJson).toList(growable: false);
+  }
+
+  Future<void> clearZapretLogs() async {
+    await _dio.delete<Object?>(
+      '$baseUrl/zapret/logs',
+      options: _options(ResponseType.json, receiveTimeout: const Duration(seconds: 3)),
+    );
+  }
+
   /// Reads the Helper-owned Zapret process, regardless of which engine the
   /// selected profile uses. The Helper keeps it in a kill-on-close Job Object.
   Future<HelperZapretStatus> zapretStatus() async {
@@ -627,27 +664,28 @@ final class HelperClient {
     }
   }
 
-  Future<HelperZapretStatus> startZapret({required String strategyId, required String mode}) =>
-      _zapretAction('start', operation: 'start', strategyId: strategyId, mode: mode);
+  Future<HelperZapretStatus> startZapret({required String strategyId, required String mode, bool debug = false}) =>
+      _zapretAction('start', operation: 'start', strategyId: strategyId, mode: mode, debug: debug);
 
   Future<HelperZapretStatus> stopZapret() =>
       _zapretAction('stop', operation: 'stop');
 
-  Future<HelperZapretStatus> restartZapret({required String strategyId, required String mode}) =>
-      _zapretAction('restart', operation: 'restart', strategyId: strategyId, mode: mode);
+  Future<HelperZapretStatus> restartZapret({required String strategyId, required String mode, bool debug = false}) =>
+      _zapretAction('restart', operation: 'restart', strategyId: strategyId, mode: mode, debug: debug);
 
   Future<HelperZapretStatus> _zapretAction(
     String route, {
     required String operation,
     String? strategyId,
     String? mode,
+    bool debug = false,
   }) async {
     try {
       final response = await _dio.post<Object?>(
         '$baseUrl/zapret/$route',
         data: strategyId == null
             ? null
-            : {'strategyId': strategyId, 'mode': mode ?? 'fullBypass'},
+            : {'strategyId': strategyId, 'mode': mode ?? 'fullBypass', if (debug) 'debug': true},
         options: _options(
           ResponseType.json,
           receiveTimeout: operation == 'stop'

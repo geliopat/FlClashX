@@ -129,6 +129,8 @@ struct ZapretStatusResponse {
 struct ZapretStartRequest {
     strategy_id: String,
     #[serde(default)]
+    debug: bool,
+    #[serde(default)]
     mode: super::zapret::ZapretLaunchMode,
 }
 
@@ -693,7 +695,7 @@ fn zapret_status_response(
         None => (None, None, None, None, None, Vec::new()),
     };
     if let Some(status) = exited_status {
-        log_message(format!("Zapret engine exited: {status}"));
+        zapret_log("error", format!("Zapret engine exited: {status}"));
         *managed = None;
     }
     let win_divert_filters = zapret_win_divert_filters(&args);
@@ -737,6 +739,7 @@ fn launch_zapret(
     restart: bool,
     strategy_id: String,
     mode: super::zapret::ZapretLaunchMode,
+    debug: bool,
 ) -> warp::reply::Response {
     if SHUTTING_DOWN.load(Ordering::SeqCst) {
         return error_response(
@@ -815,7 +818,12 @@ fn launch_zapret(
             )
         }
     };
-    let args = launch.args;
+    let mut args = launch.args;
+    if debug {
+        if let Some(arg) = args.iter_mut().find(|arg| arg.as_str() == "--debug=0") {
+            *arg = "--debug=1".to_string();
+        }
+    }
     let engine = launch.strategy.engine.to_string();
     let strategy_id = launch.strategy.id.to_string();
 
@@ -841,9 +849,10 @@ fn launch_zapret(
 
     let cleaned = kill_stray_winws2_processes(None);
     if cleaned > 0 {
-        log_message(format!(
-            "Zapret cleanup terminated {cleaned} orphaned winws processes"
-        ));
+        zapret_log(
+            "info",
+            format!("Zapret cleanup terminated {cleaned} orphaned winws processes"),
+        );
     }
 
     let mut command = Command::new(&executable);
@@ -851,21 +860,34 @@ fn launch_zapret(
         .args(&args)
         .current_dir(&bin_dir)
         .stdin(Stdio::null())
-        .stdout(Stdio::null())
+        .stdout(if debug { Stdio::piped() } else { Stdio::null() })
         .stderr(Stdio::piped())
         .creation_flags(ZAPRET_CREATE_NO_WINDOW);
     let mut child = match command.spawn() {
         Ok(child) => child,
-        Err(error) => return launch_failure_response(&error),
+        Err(error) => {
+            zapret_log("error", format!("Zapret launch failed: {error}"));
+            return launch_failure_response(&error);
+        }
     };
     let pid = child.id();
 
+    if let Some(stdout) = child.stdout.take() {
+        thread::spawn(move || {
+            for line in io::BufReader::new(stdout).lines() {
+                match line {
+                    Ok(output) => zapret_log("debug", format!("[PID {pid}] {output}")),
+                    Err(_) => break,
+                }
+            }
+        });
+    }
     if let Some(stderr) = child.stderr.take() {
         let log_strategy = strategy_id.clone();
         thread::spawn(move || {
             for line in io::BufReader::new(stderr).lines() {
                 match line {
-                    Ok(output) => log_message(format!("[zapret:{log_strategy}] {output}")),
+                    Ok(output) => zapret_log("stderr", format!("[{log_strategy}] {output}")),
                     Err(_) => break,
                 }
             }
@@ -887,6 +909,10 @@ fn launch_zapret(
             );
         }
     };
+    zapret_log(
+        "info",
+        format!("Started {engine}, strategy {strategy_id}, mode {mode:?}, PID {pid}"),
+    );
     *managed = Some(ManagedZapret {
         child,
         _job: job,
@@ -922,10 +948,12 @@ fn stop_zapret() -> warp::reply::Response {
     }
     let cleaned = kill_stray_winws2_processes(None);
     if cleaned > 0 {
-        log_message(format!(
-            "Zapret stop cleaned {cleaned} orphaned winws processes"
-        ));
+        zapret_log(
+            "info",
+            format!("Zapret stop cleaned {cleaned} orphaned winws processes"),
+        );
     }
+    zapret_log("info", "Zapret stopped".to_string());
     json_response(
         &ZapretStatusResponse {
             running: false,
@@ -1044,6 +1072,7 @@ fn launch_zapret(
     _restart: bool,
     _strategy_id: String,
     _mode: super::zapret::ZapretLaunchMode,
+    _debug: bool,
 ) -> warp::reply::Response {
     error_response(
         "unsupportedPlatform",
@@ -1073,7 +1102,7 @@ async fn launch_zapret_request(
     request: ZapretStartRequest,
 ) -> Result<warp::reply::Response, Rejection> {
     match tokio::task::spawn_blocking(move || {
-        launch_zapret(restart, request.strategy_id, request.mode)
+        launch_zapret(restart, request.strategy_id, request.mode, request.debug)
     })
     .await
     {
@@ -1291,6 +1320,45 @@ pub(super) fn log_message(message: String) {
         log_buffer.pop_front();
     }
     log_buffer.push_back(message);
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ZapretLogEntry {
+    timestamp_ms: u64,
+    level: &'static str,
+    message: String,
+}
+
+static ZAPRET_LOGS: Lazy<Mutex<VecDeque<ZapretLogEntry>>> =
+    Lazy::new(|| Mutex::new(VecDeque::new()));
+
+#[cfg(windows)]
+fn zapret_log(level: &'static str, message: String) {
+    let timestamp_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64;
+    let mut logs = lock_surviving_poison(&ZAPRET_LOGS);
+    while logs.len() >= 500 {
+        logs.pop_front();
+    }
+    logs.push_back(ZapretLogEntry {
+        timestamp_ms,
+        level,
+        message: message.chars().take(2048).collect(),
+    });
+}
+
+fn get_zapret_logs() -> warp::reply::Response {
+    let logs = lock_surviving_poison(&ZAPRET_LOGS);
+    let snapshot: Vec<_> = logs.iter().cloned().collect();
+    json_response(&snapshot, StatusCode::OK)
+}
+
+fn clear_zapret_logs() -> warp::reply::Response {
+    lock_surviving_poison(&ZAPRET_LOGS).clear();
+    json_response(&true, StatusCode::OK)
 }
 
 fn get_logs() -> impl Reply {
@@ -1519,6 +1587,17 @@ pub(super) fn routes() -> impl Filter<Extract = (impl Reply,), Error = Infallibl
         .and(warp::get())
         .map(get_logs);
 
+    let zapret_logs_path = warp::path("zapret")
+        .and(warp::path("logs"))
+        .and(warp::path::end());
+    let api_zapret_logs = zapret_logs_path
+        .clone()
+        .and(warp::get())
+        .map(get_zapret_logs);
+    let api_zapret_logs_clear = zapret_logs_path
+        .and(warp::delete())
+        .map(clear_zapret_logs);
+
     let api_zapret_strategies = warp::path("zapret")
         .and(warp::path("strategies"))
         .and(warp::path::end())
@@ -1588,6 +1667,8 @@ pub(super) fn routes() -> impl Filter<Extract = (impl Reply,), Error = Infallibl
                 .or(api_start)
                 .or(api_stop)
                 .or(api_logs)
+                .or(api_zapret_logs)
+                .or(api_zapret_logs_clear)
                 .or(api_zapret_strategies)
                 .or(api_zapret_status)
                 .or(api_zapret_lists)
