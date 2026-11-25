@@ -16,6 +16,9 @@ class ZapretSettingsView extends ConsumerStatefulWidget {
 }
 
 class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
+  static const _installedZapret2 = 'v1.0.7';
+  static const _installedFlowseal = '1.10.4';
+  static const _installedStrategyCommit = '8dd17fcbcca405a50f497a6e2346ca263901d775';
   static const _sources = <String, String>{
     'list-general.txt': 'https://raw.githubusercontent.com/Flowseal/zapret-discord-youtube/main/lists/list-general.txt',
     'list-google.txt': 'https://raw.githubusercontent.com/Flowseal/zapret-discord-youtube/main/lists/list-google.txt',
@@ -292,10 +295,10 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
       if (!mounted) return;
       setState(() {
         _componentUpdates = {
-          'Zapret2': (zapret2['tag_name'] as String?) ?? 'неизвестно',
-          'Flowseal': (flowseal['tag_name'] as String?) ?? 'неизвестно',
-          'Lua/BAT source': ((strategies['sha'] as String?) ?? 'неизвестно').substring(0, 12),
-        };
+          'Zapret2': 'установлено $_installedZapret2 · upstream ${(zapret2['tag_name'] as String?) ?? 'неизвестно'}',
+          'Flowseal': 'установлено $_installedFlowseal · upstream ${(flowseal['tag_name'] as String?) ?? 'неизвестно'}',
+          'Lua/BAT source': 'установлено ${_installedStrategyCommit.substring(0, 12)} · upstream ${((strategies['sha'] as String?) ?? 'неизвестно').substring(0, 12)}',
+        }
         _checkingComponents = false;
       });
     } catch (error) {
