@@ -120,6 +120,16 @@ void main() {
     expect(result.engine, 'winws');
   });
 
+  test('reads persistent service journal through its fixed endpoint', () async {
+    const content = '{"timestampMs":1,"level":"info","component":"Zapret","message":"started"}\n';
+    final client = _client(_ResponseAdapter((options) {
+      expect(options.method, 'GET');
+      expect(options.path, endsWith('/zapret/logs/archive'));
+      return _jsonResponse({'content': content});
+    }));
+    expect(await client.zapretLogArchive(), content);
+  });
+
   test('Zapret operations carry increasing sequence numbers from one owner', () async {
     final commands = <int>[];
     final owners = <String>{};

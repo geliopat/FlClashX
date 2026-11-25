@@ -101,12 +101,18 @@ class _ZapretLogsViewState extends ConsumerState<ZapretLogsView> {
                 onTap: () async {
                   try {
                     final temp = await appPath.shareDirPath;
+                    await Directory(temp).create(recursive: true);
                     final archive = await zapretFileLogger.archiveToday(temp);
                     if (!context.mounted) return;
                     if (archive == null) {
                       dialogs.showNotifier(AppLocalizations.of(context).forkNoTodayLogs);
                     } else {
-                      final target = File(p.join(await appPath.downloadDirPath, p.basename(archive)));
+                      final folder = await appPath.downloadDirPath;
+                      final name = p.basenameWithoutExtension(archive);
+                      var target = File(p.join(folder, '$name.zip'));
+                      for (var suffix = 2; await target.exists(); suffix++) {
+                        target = File(p.join(folder, '${name}_$suffix.zip'));
+                      }
                       await File(archive).copy(target.path);
                       if (context.mounted) dialogs.showNotifier('${AppLocalizations.of(context).forkArchiveSaved}: ${target.path}');
                     }

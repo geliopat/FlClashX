@@ -1841,6 +1841,7 @@ fn zapret_log(level: &'static str, message: String) {
 
 #[cfg(all(feature = "windows-service", target_os = "windows"))]
 fn persist_service_event(entry: &ZapretLogEntry, component: &str) {
+    static JOURNAL_FAILED: AtomicBool = AtomicBool::new(false);
     let value = serde_json::json!({
         "timestampMs": entry.timestamp_ms,
         "level": entry.level,
@@ -1848,8 +1849,13 @@ fn persist_service_event(entry: &ZapretLogEntry, component: &str) {
         "message": entry.message,
     });
     if let Ok(bytes) = serde_json::to_vec(&value) {
-        if let Err(error) = super::journal::append(&bytes) {
-            log_message(format!("Persistent journal write failed: {error}"));
+        match super::journal::append(&bytes) {
+            Ok(()) => JOURNAL_FAILED.store(false, Ordering::Relaxed),
+            Err(error) => {
+                if !JOURNAL_FAILED.swap(true, Ordering::Relaxed) {
+                    log_message(format!("Persistent journal write failed: {error}"));
+                }
+            }
         }
     }
 }
