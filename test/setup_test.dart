@@ -1,10 +1,10 @@
 import 'dart:io';
 
+import 'package:fl_clash/common/desktop_channel.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
 import '../setup.dart' as setup;
-import 'package:fl_clash/common/desktop_channel.dart';
 
 void main() {
   group('setup.dart', () {
