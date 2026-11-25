@@ -40,7 +40,7 @@ use windows_sys::Win32::System::JobObjects::{
 #[cfg(windows)]
 use windows_sys::Win32::System::Threading::{
     OpenProcess, QueryFullProcessImageNameW, TerminateProcess, PROCESS_QUERY_LIMITED_INFORMATION,
-    PROCESS_TERMINATE,
+    PROCESS_TERMINATE, WaitForSingleObject,
 };
 
 #[cfg(not(any(
@@ -56,7 +56,7 @@ const CORE_SOCKET_PREFIX: &str = "/tmp/FlClashSocket_";
 const CORE_SOCKET_SUFFIX: &str = ".sock";
 const PROTOCOL_VERSION_HEADER: &str = "x-flclashx-helper-protocol";
 #[cfg(windows)]
-const PROTOCOL_VERSION: &str = "10";
+const PROTOCOL_VERSION: &str = "11";
 #[cfg(not(windows))]
 const PROTOCOL_VERSION: &str = "6";
 const EXPECTED_CORE_SHA256: &str = env!("CORE_SHA256");
@@ -511,6 +511,85 @@ static ZAPRET_INTENT: Mutex<Option<ZapretIntent>> = Mutex::new(None);
 #[cfg(windows)]
 static ZAPRET_WATCHDOG_THREAD: std::sync::Once = std::sync::Once::new();
 
+// A process handle, unlike a PID lookup, remains bound to the exact
+// process even after Windows reuses its PID. Keep it after an explicit stop
+// as well, so delayed requests cannot resurrect a stopped engine.
+#[cfg(windows)]
+static ZAPRET_OWNER: Mutex<Option<ZapretOwner>> = Mutex::new(None);
+
+#[cfg(windows)]
+struct ZapretOwner {
+    pid: u32,
+    process: HANDLE,
+    sequence: u64,
+}
+
+#[cfg(windows)]
+impl Drop for ZapretOwner {
+    fn drop(&mut self) {
+        unsafe { CloseHandle(self.process); }
+    }
+}
+
+#[cfg(windows)]
+impl ZapretOwner {
+    fn alive(&self) -> bool {
+        // WAIT_TIMEOUT: the process handle is not signaled.
+        unsafe { WaitForSingleObject(self.process, 0) == 258 }
+    }
+
+    fn open(pid: u32, sequence: u64) -> Result<Self, Error> {
+        // SYNCHRONIZE is required to wait on a process handle.
+        let process = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | 0x00100000, 0, pid) };
+        if process == 0 {
+            return Err(Error::last_os_error());
+        }
+        let owner = Self { pid, process, sequence };
+        let expected = std::env::current_exe()?.with_file_name("FlClashZ.exe");
+        let actual = process_image_path(process)
+            .ok_or_else(|| Error::other("Cannot identify Zapret owner"))?;
+        if !owner.alive()
+            || !fs::canonicalize(actual)?.to_string_lossy().eq_ignore_ascii_case(
+                &fs::canonicalize(expected)?.to_string_lossy())
+        {
+            return Err(Error::other("Zapret owner is not the running FlClashZ client"));
+        }
+        Ok(owner)
+    }
+}
+
+// Caller holds ZAPRET_OPERATION. Do not re-arm watchdog after owner death.
+#[cfg(windows)]
+fn reap_dead_zapret_owner() -> Result<(), Error> {
+    let mut owner = lock_surviving_poison(&ZAPRET_OWNER);
+    if owner.as_ref().is_some_and(|owner| !owner.alive()) {
+        *lock_surviving_poison(&ZAPRET_INTENT) = None;
+        let mut managed = lock_surviving_poison(&MANAGED_ZAPRET);
+        stop_managed_zapret(&mut managed)?;
+        *owner = None;
+        zapret_log("info", "Zapret stopped: FlClashZ owner exited".into());
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn accept_zapret_command(pid: u32, sequence: u64) -> Result<(), Error> {
+    reap_dead_zapret_owner()?;
+    let mut owner = lock_surviving_poison(&ZAPRET_OWNER);
+    if let Some(current) = owner.as_mut() {
+        if current.pid != pid || !current.alive() {
+            return Err(Error::other("Another FlClashZ process owns Zapret"));
+        }
+        if sequence <= current.sequence {
+            return Err(Error::other("Stale Zapret operation rejected"));
+        }
+        current.sequence = sequence;
+    } else {
+        *owner = Some(ZapretOwner::open(pid, sequence)?);
+    }
+    Ok(())
+}
+
 #[cfg(windows)]
 struct ZapretIntent {
     strategy_id: String,
@@ -527,13 +606,20 @@ struct ZapretIntent {
 fn ensure_zapret_watchdog() {
     ZAPRET_WATCHDOG_THREAD.call_once(|| {
         thread::spawn(|| loop {
-            thread::sleep(Duration::from_secs(3));
+            thread::sleep(Duration::from_secs(1));
             if SHUTTING_DOWN.load(Ordering::SeqCst) {
                 break;
             }
             let _operation = lock_surviving_poison(&ZAPRET_OPERATION);
             if SHUTTING_DOWN.load(Ordering::SeqCst) {
                 break;
+            }
+            if let Err(error) = reap_dead_zapret_owner() {
+                zapret_log("error", format!("Zapret owner cleanup failed: {error}"));
+                continue;
+            }
+            if lock_surviving_poison(&ZAPRET_OWNER).is_none() {
+                continue;
             }
             if !*lock_surviving_poison(&ZAPRET_WATCHDOG) {
                 continue;
@@ -601,8 +687,13 @@ fn ensure_zapret_watchdog() {
 }
 
 #[cfg(windows)]
-fn launch_zapret_with_intent(restart: bool, request: ZapretStartRequest) -> warp::reply::Response {
+fn launch_zapret_with_intent(restart: bool, pid: u32, sequence: u64, request: ZapretStartRequest) -> warp::reply::Response {
     let _operation = lock_surviving_poison(&ZAPRET_OPERATION);
+    if let Err(error) = accept_zapret_command(pid, sequence) {
+        return error_response("zapretOwnerConflict", error.to_string(), StatusCode::CONFLICT);
+    }
+    // Owner monitoring must run even when the recovery watchdog is disabled.
+    ensure_zapret_watchdog();
     let response = launch_zapret(
         restart,
         request.strategy_id.clone(),
@@ -628,7 +719,7 @@ fn launch_zapret_with_intent(restart: bool, request: ZapretStartRequest) -> warp
 }
 
 #[cfg(not(windows))]
-fn launch_zapret_with_intent(restart: bool, request: ZapretStartRequest) -> warp::reply::Response {
+fn launch_zapret_with_intent(restart: bool, _pid: u32, _sequence: u64, request: ZapretStartRequest) -> warp::reply::Response {
     let _ = request.watchdog;
     launch_zapret(
         restart,
@@ -1141,8 +1232,11 @@ fn launch_zapret(
 }
 
 #[cfg(windows)]
-fn stop_zapret() -> warp::reply::Response {
+fn stop_zapret(pid: u32, sequence: u64) -> warp::reply::Response {
     let _operation = lock_surviving_poison(&ZAPRET_OPERATION);
+    if let Err(error) = accept_zapret_command(pid, sequence) {
+        return error_response("zapretOwnerConflict", error.to_string(), StatusCode::CONFLICT);
+    }
     *lock_surviving_poison(&ZAPRET_INTENT) = None;
     let mut managed = lock_surviving_poison(&MANAGED_ZAPRET);
     if let Err(error) = stop_managed_zapret(&mut managed) {
@@ -1289,7 +1383,7 @@ fn launch_zapret(
     )
 }
 #[cfg(not(windows))]
-fn stop_zapret() -> warp::reply::Response {
+fn stop_zapret(_pid: u32, _sequence: u64) -> warp::reply::Response {
     error_response(
         "unsupportedPlatform",
         "Zapret is available only on Windows",
@@ -1307,9 +1401,11 @@ fn get_zapret_status() -> warp::reply::Response {
 
 async fn launch_zapret_request(
     restart: bool,
+    pid: u32,
+    sequence: u64,
     request: ZapretStartRequest,
 ) -> Result<warp::reply::Response, Rejection> {
-    match tokio::task::spawn_blocking(move || launch_zapret_with_intent(restart, request))
+    match tokio::task::spawn_blocking(move || launch_zapret_with_intent(restart, pid, sequence, request))
     .await
     {
         Ok(response) => Ok(response),
@@ -1321,8 +1417,8 @@ async fn launch_zapret_request(
     }
 }
 
-async fn stop_zapret_request() -> Result<warp::reply::Response, Rejection> {
-    match tokio::task::spawn_blocking(stop_zapret).await {
+async fn stop_zapret_request(pid: u32, sequence: u64) -> Result<warp::reply::Response, Rejection> {
+    match tokio::task::spawn_blocking(move || stop_zapret(pid, sequence)).await {
         Ok(response) => Ok(response),
         Err(error) => Ok(error_response(
             "zapretTaskFailed",
@@ -1859,7 +1955,9 @@ pub(super) fn routes() -> impl Filter<Extract = (impl Reply,), Error = Infallibl
         .and(warp::post())
         .and(warp::body::content_length_limit(MAX_ZAPRET_LIST_BODY_BYTES))
         .and(warp::body::json())
-        .and_then(|request| launch_zapret_request(false, request));
+        .and(warp::header::<u32>("x-zapret-owner-pid"))
+        .and(warp::header::<u64>("x-zapret-command"))
+        .and_then(|request, pid, sequence| launch_zapret_request(false, pid, sequence, request));
 
     let api_zapret_restart = warp::path("zapret")
         .and(warp::path("restart"))
@@ -1867,12 +1965,16 @@ pub(super) fn routes() -> impl Filter<Extract = (impl Reply,), Error = Infallibl
         .and(warp::post())
         .and(warp::body::content_length_limit(MAX_ZAPRET_LIST_BODY_BYTES))
         .and(warp::body::json())
-        .and_then(|request| launch_zapret_request(true, request));
+        .and(warp::header::<u32>("x-zapret-owner-pid"))
+        .and(warp::header::<u64>("x-zapret-command"))
+        .and_then(|request, pid, sequence| launch_zapret_request(true, pid, sequence, request));
 
     let api_zapret_stop = warp::path("zapret")
         .and(warp::path("stop"))
         .and(warp::path::end())
         .and(warp::post())
+        .and(warp::header::<u32>("x-zapret-owner-pid"))
+        .and(warp::header::<u64>("x-zapret-command"))
         .and_then(stop_zapret_request);
 
     native_client
@@ -2099,7 +2201,7 @@ mod tests {
 
     #[test]
     fn protocol_uses_lowercase_session_ownership() {
-        assert_eq!(PROTOCOL_VERSION, if cfg!(windows) { "10" } else { "6" });
+        assert_eq!(PROTOCOL_VERSION, if cfg!(windows) { "11" } else { "6" });
         assert!(is_valid_session_id("0123456789abcdef0123456789abcdef"));
         assert!(!is_valid_session_id("ABCDEF0123456789abcdef0123456789"));
         assert!(!is_valid_session_id("0123456789abcdef"));
