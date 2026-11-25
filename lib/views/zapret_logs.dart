@@ -14,7 +14,6 @@ class ZapretLogsView extends ConsumerStatefulWidget {
 
 class _ZapretLogsViewState extends ConsumerState<ZapretLogsView> {
   Timer? _timer;
-  bool _paused = false;
   bool _loading = false;
   String _query = '';
   String _filter = 'all';
@@ -35,7 +34,7 @@ class _ZapretLogsViewState extends ConsumerState<ZapretLogsView> {
   }
 
   Future<void> _refresh() async {
-    if (_paused || _loading || !mounted) return;
+    if (_loading || !mounted) return;
     _loading = true;
     try {
       final logs = await helperClient.zapretLogs();
@@ -44,15 +43,6 @@ class _ZapretLogsViewState extends ConsumerState<ZapretLogsView> {
       if (mounted) setState(() => _error = error.toString());
     } finally {
       _loading = false;
-    }
-  }
-
-  Future<void> _clear() async {
-    try {
-      await helperClient.clearZapretLogs();
-      if (mounted) setState(() => _logs = const []);
-    } catch (error) {
-      if (mounted) setState(() => _error = error.toString());
     }
   }
 
@@ -87,14 +77,6 @@ class _ZapretLogsViewState extends ConsumerState<ZapretLogsView> {
                 },
                 onChanged: (value) => setState(() => _filter = value),
               ),
-              ListItem(
-                title: Text(_paused ? 'Продолжить' : 'Приостановить'),
-                onTap: () {
-                  setState(() => _paused = !_paused);
-                  if (!_paused) unawaited(_refresh());
-                },
-              ),
-              ListItem(title: const Text('Очистить журнал'), onTap: _clear),
               if (_error != null)
                 ListItem(title: const Text('Ошибка чтения журнала'), subtitle: Text(_error!)),
             ],
