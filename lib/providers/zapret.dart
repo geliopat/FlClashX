@@ -151,6 +151,21 @@ class ZapretTrial {
 }
 
 
+/// Rank fully reachable candidates first, then partially reachable ones.
+List<ZapretTrial> shortlistZapretTrials(Iterable<ZapretTrial> trials, {int limit = 10}) {
+  final candidates = trials.toList()
+    ..sort((a, b) {
+      final reachable = (b.confirmed ? 1 : 0).compareTo(a.confirmed ? 1 : 0);
+      if (reachable != 0) return reachable;
+      final score = b.score.compareTo(a.score);
+      if (!a.confirmed && score != 0) return score;
+      final delay = (a.delay > 0 ? a.delay : 1 << 30)
+          .compareTo(b.delay > 0 ? b.delay : 1 << 30);
+      return delay != 0 ? delay : a.id.compareTo(b.id);
+    });
+  return candidates.take(limit).toList();
+}
+
 class ZapretController extends Notifier<ZapretState> {
   static const defaultStrategyId = 'flowseal-alt';
   static const _selectedStrategyPreferenceKey = 'zapret.strategyId';
@@ -705,13 +720,17 @@ class ZapretController extends Notifier<ZapretState> {
 
   void cancelTrials() => _cancelTrial = true;
 
-  Future<ZapretTrial> _verify(String id, ZapretMode mode) async {
+  Future<ZapretTrial> _verify(String id, ZapretMode mode, {
+    int timeoutMs = 3500,
+    int? expectedPid,
+  }) async {
     const targets = [ZapretProbeTarget.youtube, ZapretProbeTarget.discordGateway, ZapretProbeTarget.discordVoice];
     final before = await _client.zapretStatus();
-    if (!before.running || before.strategyId != id || before.pid == null) {
+    if (!before.running || before.strategyId != id || before.pid == null ||
+        (expectedPid != null && before.pid != expectedPid)) {
       throw StateError('Движок стратегии не запущен: $id');
     }
-    final items = await measureZapretTargets(ref, targets);
+    final items = await measureZapretTargets(ref, targets, timeoutMs: timeoutMs);
     final good = items.values.where((item) => item.message == 'DIRECT · HTTP 2xx' && item.latencyMs != null && item.latencyMs! > 0).toList();
     final score = good.fold<int>(0, (sum, item) => sum + (item.latencyMs! <= 450 ? 2 : 1));
     final delay = good.isEmpty ? 0 : (good.fold<int>(0, (sum, item) => sum + item.latencyMs!) / good.length).round();
@@ -735,42 +754,84 @@ class ZapretController extends Notifier<ZapretState> {
     final selectedMode = state.mode;
     state = state.copyWith(busy: true, trials: const [], testProgress: 'Подготовка', clearTestSummary: true, clearError: true);
     final results = <ZapretTrial>[];
+    final preliminary = <ZapretTrial>[];
     HelperZapretStatus? original;
     var trialStarted = false;
     var attempted = 0;
+    var finalists = 0;
+    var verified = 0;
     var launchFailures = 0;
     String? lastLaunchFailure;
     String? failure;
     try {
+      await _requireHelper();
       original = await _client.zapretStatus();
       final protection = await _readInfrastructure();
       for (var i = 0; i < strategies.length && !_cancelTrial && !_launchBlocked; i++) {
         final item = strategies[i];
         final mode = item.supportsSplitMode ? selectedMode : ZapretMode.fullBypass;
         attempted++;
-        state = state.copyWith(testProgress: '${i + 1}/${strategies.length}: ${item.name}');
+        state = state.copyWith(testProgress: '1/2 · ${i + 1}/${strategies.length}: ${item.name}');
         try {
           trialStarted = true;
           final started = await _client.restartZapret(
             strategyId: item.id, mode: mode.name, watchdog: false,
             infrastructure: protection.toJson(),
           );
-          if (!started.running || started.strategyId != item.id) throw StateError('Стратегия не запустилась');
-          await Future<void>.delayed(const Duration(milliseconds: 1500));
-          if (_cancelTrial) break;
-          final first = await _verify(item.id, mode);
-          if (_cancelTrial) break;
-          if (!first.confirmed) {
-            results.add(first);
-            continue;
+          if (!started.running || started.strategyId != item.id || started.pid == null) {
+            throw StateError('Стратегия не запустилась');
           }
-          final second = await _verify(item.id, mode);
-          results.add(ZapretTrial(item.id, mode, ((first.score + second.score) / 2).round(),
-              ((first.delay + second.delay) / 2).round(), confirmed: second.confirmed));
+          await Future<void>.delayed(const Duration(milliseconds: 1000));
+          if (_cancelTrial || _launchBlocked) break;
+          final first = await _verify(item.id, mode, timeoutMs: 2000, expectedPid: started.pid);
+          if (_cancelTrial || _launchBlocked) break;
+          preliminary.add(first);
+          // Screening alone never makes a strategy eligible for activation.
+          results.add(ZapretTrial(item.id, mode, first.score, first.delay));
         } catch (error) {
           launchFailures++;
           lastLaunchFailure = _errorMessage(error);
           results.add(ZapretTrial(item.id, mode, 0, 0));
+          if (error is HelperException && error.code == 'zapretConflict') {
+            failure = lastLaunchFailure;
+            break;
+          }
+        }
+      }
+      final candidates = shortlistZapretTrials(preliminary);
+      finalists = candidates.length;
+      for (final candidate in candidates) {
+        if (_cancelTrial || _launchBlocked || failure != null) break;
+        final item = strategies.firstWhere((s) => s.id == candidate.id);
+        verified++;
+        state = state.copyWith(testProgress: '2/2 · $verified/$finalists: ${item.name}');
+        try {
+          final started = await _client.restartZapret(
+            strategyId: candidate.id, mode: candidate.mode.name,
+            watchdog: false, infrastructure: protection.toJson(),
+          );
+          if (!started.running || started.strategyId != candidate.id || started.pid == null) {
+            throw StateError('Стратегия не запустилась');
+          }
+          await Future<void>.delayed(const Duration(milliseconds: 1500));
+          if (_cancelTrial || _launchBlocked) break;
+          final first = await _verify(candidate.id, candidate.mode, expectedPid: started.pid);
+          if (_cancelTrial || _launchBlocked) break;
+          var result = first;
+          if (first.confirmed) {
+            final second = await _verify(candidate.id, candidate.mode, expectedPid: started.pid);
+            if (_cancelTrial || _launchBlocked) break;
+            result = ZapretTrial(candidate.id, candidate.mode,
+              ((first.score + second.score) / 2).round(),
+              ((first.delay + second.delay) / 2).round(), confirmed: second.confirmed);
+          }
+          results.removeWhere((trial) => trial.id == candidate.id);
+          results.add(result);
+        } catch (error) {
+          launchFailures++;
+          lastLaunchFailure = _errorMessage(error);
+          results.removeWhere((trial) => trial.id == candidate.id);
+          results.add(ZapretTrial(candidate.id, candidate.mode, 0, 0));
           if (error is HelperException && error.code == 'zapretConflict') {
             failure = lastLaunchFailure;
             break;
@@ -810,7 +871,7 @@ class ZapretController extends Notifier<ZapretState> {
       if (ref.mounted) {
         final confirmed = results.where((item) => item.confirmed).length;
         final summary = _cancelTrial ? 'Тест отменён' :
-            'Проверено $attempted/${strategies.length} · подтверждено $confirmed · ошибок запуска/проверки $launchFailures'
+            'Отбор $attempted/${strategies.length} · контроль $verified/$finalists · подтверждено $confirmed · ошибок запуска/проверки $launchFailures'
             '${lastLaunchFailure == null ? '' : '\nПоследняя ошибка: $lastLaunchFailure'}';
         state = state.copyWith(busy: false, clearTestProgress: true,
             testSummary: summary, trials: _cancelTrial ? previousTrials : List.unmodifiable(results), error: failure);

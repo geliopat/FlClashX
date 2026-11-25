@@ -122,8 +122,9 @@ class ZapretDiagnosticsState {
 /// Never use the Windows resolver or system HTTP proxy for these tests:
 /// the existing service-check RPC explicitly dials the Mihomo DIRECT adapter.
 Future<Map<ZapretProbeTarget, ZapretProbeResult>> measureZapretTargets(
-  Ref ref, Iterable<ZapretProbeTarget> targets,
-) async {
+  Ref ref, Iterable<ZapretProbeTarget> targets, {
+  int timeoutMs = 3500,
+}) async {
   final wanted = targets.toList();
   if (ref.read(coreStatusProvider) != CoreStatus.connected) {
     return {for (final target in wanted) target: const ZapretProbeResult(message: 'Ядро Mihomo недоступно')};
@@ -132,7 +133,7 @@ Future<Map<ZapretProbeTarget, ZapretProbeResult>> measureZapretTargets(
     final items = await ref.read(coreHandlerProvider).serviceCheck(ServiceCheckParams(
       proxyName: 'DIRECT',
       names: wanted.map((target) => 'zapret-${target.name}').toList(),
-      timeout: 3500,
+      timeout: timeoutMs,
     ));
     return {
       for (final target in wanted)
