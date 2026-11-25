@@ -1,3 +1,4 @@
+import 'package:fl_clash/l10n/l10n.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -404,7 +405,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
     final listsBusy = _loading || _saving || _updating || _updatingHelper;
     final sections = <Widget>[
       generateSection(
-        title: 'Служба Helper',
+        title: AppLocalizations.of(context).forkHelperService,
         items: [
           ListItem(
             title: const Text('Watchdog Zapret'),
@@ -421,7 +422,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
           ),
             ListItem(
               leading: const Icon(Icons.admin_panel_settings_outlined),
-              title: const Text('Переустановить Helper'),
+              title: Text(AppLocalizations.of(context).forkReinstallHelper),
               subtitle: const Text(
                 'Обновить единую службу Mihomo и Zapret из текущей папки FlClashZ',
               ),
@@ -439,17 +440,17 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
       ),
       const ListSectionGap(),
       generateSection(
-        title: 'Защита соединений Mihomo',
+        title: AppLocalizations.of(context).forkMihomoProtection,
         items: [
           ListItem(
-            title: const Text('Исключённые IP и подсети'),
+            title: Text(AppLocalizations.of(context).forkExcludedIps),
             subtitle: Text('${zapret.protectedIps.length} · автоматически из профиля'),
             onTap: zapret.protectedIps.isEmpty ? null : () => _showProtectionList(
               'Исключённые IP и подсети', zapret.protectedIps,
             ),
           ),
           ListItem(
-            title: const Text('Исключённые домены'),
+            title: Text(AppLocalizations.of(context).forkExcludedDomains),
             subtitle: Text('${zapret.protectedDomains.length} · автоматически из профиля'),
             onTap: zapret.protectedDomains.isEmpty ? null : () => _showProtectionList(
               'Исключённые домены', zapret.protectedDomains,
@@ -457,7 +458,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
           ),
           ListItem(
             leading: const Icon(Icons.refresh),
-            title: const Text('Обновить исключения'),
+            title: Text(AppLocalizations.of(context).forkRefreshExclusions),
             onTap: zapret.busy ? null : () async {
               try {
                 await ref.read(zapretControllerProvider.notifier).refreshInfrastructure();
@@ -472,7 +473,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
       ),
       const ListSectionGap(),
       generateSection(
-        title: 'Списки Zapret',
+        title: AppLocalizations.of(context).forkZapretLists,
         items: [
           if (_error != null)
             ListItem(
@@ -499,7 +500,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
             ),
           if (_lists.isNotEmpty && _selected != null)
             ListItem<String>.options(
-              title: const Text('Файл списка'),
+              title: Text(AppLocalizations.of(context).forkListFile),
               options: _lists.map((item) => item.filename).toList(),
               value: _selected!,
               textBuilder: (filename) {
@@ -516,7 +517,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
           if (_selected != null)
             ListItem(
               leading: const Icon(Icons.edit_outlined),
-              title: const Text('Редактировать список'),
+              title: Text(AppLocalizations.of(context).forkEditList),
               subtitle: Text(_selected!),
               trailing: const Icon(Icons.chevron_right),
               onTap: !_listLoaded || listsBusy
@@ -542,7 +543,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
             ),
           ListItem(
             leading: const Icon(Icons.cloud_download_outlined),
-            title: const Text('Обновить списки'),
+            title: Text(AppLocalizations.of(context).forkUpdateLists),
             subtitle: const Text('Загрузить актуальные списки с сохранением локальных записей'),
             trailing: _updating
                 ? const SizedBox.square(
@@ -554,7 +555,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
           ),
           ListItem(
             leading: const Icon(Icons.refresh),
-            title: const Text('Перечитать списки'),
+            title: Text(AppLocalizations.of(context).forkReloadLists),
             subtitle: const Text('Повторно загрузить файлы с диска'),
             trailing: _loading && _lists.isNotEmpty
                 ? const SizedBox.square(
@@ -567,7 +568,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
           if (_selected != null)
             ListItem(
               leading: const Icon(Icons.restore),
-              title: const Text('Восстановить резервную копию'),
+              title: Text(AppLocalizations.of(context).forkRestoreBackup),
               subtitle: Text('${_selected!}.bak'),
               trailing: _saving
                   ? const SizedBox.square(

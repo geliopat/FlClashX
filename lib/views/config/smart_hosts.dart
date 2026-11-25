@@ -1,3 +1,4 @@
+import 'package:fl_clash/l10n/l10n.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/features/form/form.dart';
 import 'package:fl_clash/enum/enum.dart';
@@ -32,7 +33,7 @@ class SmartHostsView extends ConsumerWidget {
       ),
     );
     return CommonScaffold(
-      title: 'Умный Hosts',
+      title: AppLocalizations.of(context).forkSmartHosts,
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16).copyWith(
           top: context.sectionsTopPadding,
@@ -40,10 +41,10 @@ class SmartHostsView extends ConsumerWidget {
         ),
         children: [
           generateSection(
-            title: 'Управление',
+            title: AppLocalizations.of(context).forkManagement,
             items: [
               ListItem(
-                title: const Text('Включить умный Hosts'),
+                title: Text(AppLocalizations.of(context).forkEnableSmartHosts),
                 subtitle: Text('Автоматических записей: ${state.entries.length}'),
                 trailing: Switch(
                   value: state.enabled,
@@ -51,21 +52,21 @@ class SmartHostsView extends ConsumerWidget {
                 ),
               ),
               ListItem(
-                title: const Text('Автоматическое обновление'),
+                title: Text(AppLocalizations.of(context).forkAutoUpdate),
                 trailing: Switch(
                   value: state.autoUpdate,
                   onChanged: state.updating ? null : (value) => controller.configure(autoUpdate: value),
                 ),
               ),
               ListItem<int>.options(
-                title: const Text('Интервал обновления'),
+                title: Text(AppLocalizations.of(context).forkUpdateInterval),
                 options: const [6, 12, 24, 48, 168],
                 value: state.intervalHours,
                 textBuilder: (value) => '$value ч.',
                 onChanged: (value) => controller.configure(intervalHours: value),
               ),
               ListItem(
-                title: const Text('Обновить сейчас'),
+                title: Text(AppLocalizations.of(context).forkUpdateNow),
                 subtitle: Text(state.lastUpdate == null ? 'Ещё не обновлялись' : 'Последняя успешная загрузка: ${state.lastUpdate!.toLocal().toString().split('.').first}'),
                 onTap: state.updating || !state.enabled ? null : controller.refresh,
                 trailing: state.updating ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2)) : null,
@@ -75,21 +76,21 @@ class SmartHostsView extends ConsumerWidget {
           ),
           const ListSectionGap(),
           generateSection(
-            title: 'Источники',
+            title: AppLocalizations.of(context).forkSources,
             items: [
               source('malw', 'MALW.link', 'DNS + SNI-прокси: обход IP-блокировок сервисов (ChatGPT, Spotify, Twitch и др.)'),
               source('geohide', 'GeoHide', 'Hosts GeoHide: рабочие IP и прокси для заблокированных сервисов'),
               ListItem(
-                title: const Text('Блокировка рекламы'),
+                title: Text(AppLocalizations.of(context).forkAdBlock),
                 trailing: Switch(
                   value: state.includeAdblock,
                   onChanged: state.updating ? null : (value) => controller.configure(includeAdblock: value),
                 ),
               ),
               ListItem.open(
-                title: const Text('Пользовательские HTTPS-источники'),
+                title: Text(AppLocalizations.of(context).forkCustomHttpsSources),
                 widget: MapEditView(
-                  title: 'Источники',
+                  title: AppLocalizations.of(context).forkSources,
                   entries: state.customSources,
                   keyMaxLength: 100,
                   valueMaxLength: 2048,
@@ -101,7 +102,7 @@ class SmartHostsView extends ConsumerWidget {
                   try {
                     await controller.configure(customSources: value);
                   } catch (error) {
-                    if (context.mounted) await dialogs.showAlert(title: 'Источники', message: TextSpan(text: error.toString()));
+                    if (context.mounted) await dialogs.showAlert(title: AppLocalizations.of(context).forkSources, message: TextSpan(text: error.toString()));
                   }
                 },
               ),
@@ -111,36 +112,36 @@ class SmartHostsView extends ConsumerWidget {
           ),
           const ListSectionGap(),
           generateSection(
-            title: 'Оптимизация YouTube',
+            title: AppLocalizations.of(context).forkYouTubeOptimization,
             items: [
               source('youtube', 'Использовать общественный список', 'Проблемные CDN из списка Zapret2 GUI перенаправляются на 127.0.0.2'),
               ListItem(
-                title: const Text('Блокировать измеренные медленные CDN'),
+                title: Text(AppLocalizations.of(context).forkSlowCdn),
                 trailing: Switch(value: state.blockSlowCdn,
                     onChanged: state.cdnChecking ? null : (value) => controller.configure(blockSlowCdn: value)),
               ),
               ListItem(
-                title: const Text('Автоматическая проверка скорости CDN'),
+                title: Text(AppLocalizations.of(context).forkAutoCdn),
                 subtitle: const Text('Раз в сутки, по умолчанию выключено'),
                 trailing: Switch(value: state.autoCdn,
                     onChanged: state.cdnChecking ? null : (value) => controller.configure(autoCdn: value)),
               ),
               ListItem<double>.options(
-                title: const Text('Порог скорости'),
+                title: Text(AppLocalizations.of(context).forkSpeedThreshold),
                 options: const [0.5, 1.0, 1.5, 2.0, 3.0, 5.0],
                 value: state.cdnThreshold,
                 textBuilder: (value) => '$value Мбит/с',
                 onChanged: (value) => controller.configure(cdnThreshold: value),
               ),
               ListItem<int>.options(
-                title: const Text('Срок хранения измерений'),
+                title: Text(AppLocalizations.of(context).forkRetention),
                 options: const [1, 3, 7, 14, 30],
                 value: state.cdnTtlDays,
                 textBuilder: (value) => '$value дн.',
                 onChanged: (value) => controller.configure(cdnTtlDays: value),
               ),
               ListItem(
-                title: const Text('Проверить скорость CDN'),
+                title: Text(AppLocalizations.of(context).forkCheckCdn),
                 subtitle: Text(state.cdnMessage ?? 'Реальный видеопоток через DIRECT'),
                 onTap: state.cdnChecking || state.updating ? null : controller.checkCdn,
                 trailing: state.cdnChecking ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2)) : null,
@@ -148,19 +149,19 @@ class SmartHostsView extends ConsumerWidget {
               for (final record in state.cdnMeasurements)
                 ListItem(title: Text(record.host),
                     subtitle: Text('${record.fast ? "Быстрый" : "Медленный"} · ${record.mbps.toStringAsFixed(2)} Мбит/с')),
-              ListItem(title: const Text('Сбросить измерения'),
+              ListItem(title: Text(AppLocalizations.of(context).forkResetMeasurements),
                   onTap: state.cdnChecking ? null : controller.resetCdn),
             ],
             footer: 'Измерение использует подписанные ссылки видеопотоков и до 3 МиБ на узел. Неизвестный результат не создаёт блокировок. Старые измерения истекают автоматически.',
           ),
           const ListSectionGap(),
           generateSection(
-            title: 'Полученные Hosts',
+            title: AppLocalizations.of(context).forkReceivedHosts,
             items: [
               ListItem.open(
-                title: const Text('Исключения'),
+                title: Text(AppLocalizations.of(context).forkExclusions),
                 widget: MapEditView(
-                  title: 'Исключения',
+                  title: AppLocalizations.of(context).forkExclusions,
                   entries: {for (final host in state.exclusions) host: 'exclude'},
                   keyMaxLength: 253,
                   valueMaxLength: 64,
@@ -172,12 +173,12 @@ class SmartHostsView extends ConsumerWidget {
                 },
               ),
               ListItem.open(
-                title: const Text('Просмотр автоматических записей'),
+                title: Text(AppLocalizations.of(context).forkViewAutoHosts),
                 subtitle: Text('${state.entries.length}'),
                 widget: _SmartHostsEntries(entries: state.entries, candidates: state.candidates),
               ),
               ListItem.open(
-                title: const Text('Просмотр итогового Hosts'),
+                title: Text(AppLocalizations.of(context).forkViewAppliedHosts),
                 subtitle: const Text('Все записи, применённые в Mihomo'),
                 widget: const _AppliedHostsView(),
               ),
@@ -224,11 +225,11 @@ class _AppliedHostsViewState extends ConsumerState<_AppliedHostsView> {
         return _SmartHostsEntries(
           entries: snapshot.data!.entries,
           candidates: snapshot.data!.candidates,
-          title: 'Итоговый Hosts',
+          title: AppLocalizations.of(context).forkAppliedHosts,
         );
       }
       return CommonScaffold(
-        title: 'Итоговый Hosts',
+        title: AppLocalizations.of(context).forkAppliedHosts,
         body: Center(
           child: snapshot.connectionState != ConnectionState.done
               ? const CircularProgressIndicator()
@@ -249,10 +250,10 @@ class _AppliedHostsViewState extends ConsumerState<_AppliedHostsView> {
 }
 
 class _SmartHostsEntries extends StatefulWidget {
-  const _SmartHostsEntries({required this.entries, this.title = 'Полученные Hosts', this.candidates = const {}});
+  const _SmartHostsEntries({required this.entries, this.title, this.candidates = const {}});
   final HostCandidates candidates;
   final Map<String, String> entries;
-  final String title;
+  final String? title;
   @override
   State<_SmartHostsEntries> createState() => _SmartHostsEntriesState();
 }
@@ -261,8 +262,8 @@ class _SmartHostsEntriesState extends State<_SmartHostsEntries> {
   String _query = '';
   bool _conflictsOnly = false;
   String _source(String source) => switch (source) {
-    'profile' => 'Профиль / скрипт',
-    'manual' => 'Ручные Hosts',
+    'profile' => AppLocalizations.of(context).forkProfileScript,
+    'manual' => AppLocalizations.of(context).forkManualHosts,
     _ => smartHostLabel(source.startsWith('auto:') ? source.substring(5) : source),
   };
   Map<String, String> _candidates(String domain) => widget.candidates[normalizedHostKey(domain)] ?? const {};
@@ -276,7 +277,7 @@ class _SmartHostsEntriesState extends State<_SmartHostsEntries> {
       _candidates(entry.key).keys.any((source) => _source(source).toLowerCase().contains(_query.toLowerCase())))
     ).toList()..sort((a, b) => a.key.compareTo(b.key));
     return CommonScaffold(
-      title: '${widget.title} (${widget.entries.length})',
+      title: '${widget.title ?? AppLocalizations.of(context).forkReceivedHosts} (${widget.entries.length})',
       searchState: AppBarSearchState(onSearch: (query) => setState(() => _query = query)),
       body: ListView.builder(
         padding: EdgeInsets.fromLTRB(16, context.contentTopPadding, 16, 16 + context.bottomInset),
@@ -284,7 +285,7 @@ class _SmartHostsEntriesState extends State<_SmartHostsEntries> {
         itemBuilder: (context, index) {
           if (index == 0) {
             return ListItem(
-              title: const Text('Только конфликты'),
+              title: Text(AppLocalizations.of(context).forkOnlyConflicts),
               subtitle: Text('Конфликтов: ${widget.entries.keys.where(_conflict).length}'),
               trailing: Switch(value: _conflictsOnly, onChanged: (value) => setState(() => _conflictsOnly = value)),
             );
@@ -296,7 +297,7 @@ class _SmartHostsEntriesState extends State<_SmartHostsEntries> {
             title: Text(entry.key),
             subtitle: Text([
               entry.value,
-              matching.isEmpty ? 'Источник не подтверждён' : 'Совпадает с: ${matching.join(', ')}',
+              matching.isEmpty ? AppLocalizations.of(context).forkUnknownSource : 'Совпадает с: ${matching.join(', ')}',
               if (_conflict(entry.key)) 'Конфликт:',
               if (_conflict(entry.key))
                 for (final item in candidates.entries) '${_source(item.key)}: ${item.value}',

@@ -1,3 +1,4 @@
+import 'package:fl_clash/l10n/l10n.dart';
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -77,12 +78,12 @@ class _CoreStatusButtonState extends ConsumerState<CoreStatusButton> {
     setState(() => _requesting = true);
     try {
       final tip = restartAll
-          ? 'Проверить Helper и перезапустить Mihomo и Zapret? VPN и Zapret будут восстановлены согласно предыдущему состоянию и настройке совместного запуска.'
+          ? AppLocalizations.of(context).forkRestartAllTip
           : coreStatus == CoreStatus.connected
               ? context.appLocalizations.forceRestartCoreTip
               : context.appLocalizations.restartCoreTip;
       final res = await dialogs.showMessage(
-        title: restartAll ? 'Перезапустить всё' : null,
+        title: restartAll ? AppLocalizations.of(context).forkRestartAll : null,
         message: TextSpan(text: tip),
       );
       if (res != true || !mounted ||
@@ -113,7 +114,7 @@ class _CoreStatusButtonState extends ConsumerState<CoreStatusButton> {
         coreStatus == CoreStatus.connected || ViewScope.isMobileOf(context);
     final icon = CorePulse(status: coreStatus);
     return Tooltip(
-      message: restartAll ? 'Перезапустить всё' : appLocalizations.coreStatus,
+      message: restartAll ? AppLocalizations.of(context).forkRestartAll : appLocalizations.coreStatus,
       child: FadeScaleBox(
         alignment: Alignment.centerRight,
         child: iconOnly

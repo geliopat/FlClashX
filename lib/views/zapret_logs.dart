@@ -1,3 +1,4 @@
+import 'package:fl_clash/l10n/l10n.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:path/path.dart' as p;
@@ -57,7 +58,7 @@ class _ZapretLogsViewState extends ConsumerState<ZapretLogsView> {
       entry.message.toLowerCase().contains(_query.toLowerCase())
     ).toList();
     return CommonScaffold(
-      title: 'Логи Zapret',
+      title: AppLocalizations.of(context).forkZapretLogs,
       searchState: AppBarSearchState(onSearch: (query) => setState(() => _query = query)),
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16).copyWith(
@@ -66,36 +67,36 @@ class _ZapretLogsViewState extends ConsumerState<ZapretLogsView> {
         ),
         children: [
           generateSection(
-            title: 'Журнал Helper',
+            title: AppLocalizations.of(context).forkHelperJournal,
             items: [
               ListItem<String>.options(
-                title: const Text('Фильтр'),
+                title: Text(AppLocalizations.of(context).forkFilter),
                 options: const ['all', 'info', 'error', 'stderr', 'debug'],
                 value: _filter,
                 textBuilder: (value) => switch (value) {
-                  'all' => 'Все события',
-                  'info' => 'Информация',
-                  'error' => 'Ошибки',
-                  'stderr' => 'Вывод stderr',
-                  _ => 'Отладка',
+                  'all' => AppLocalizations.of(context).forkAllEvents,
+                  'info' => AppLocalizations.of(context).forkInfo,
+                  'error' => AppLocalizations.of(context).forkErrors,
+                  'stderr' => AppLocalizations.of(context).forkStderr,
+                  _ => AppLocalizations.of(context).forkDebug,
                 },
                 onChanged: (value) => setState(() => _filter = value),
               ),
               if (_error != null)
-                ListItem(title: const Text('Ошибка чтения журнала'), subtitle: Text(_error!)),
+                ListItem(title: Text(AppLocalizations.of(context).forkLogReadError), subtitle: Text(_error!)),
             ],
             footer: 'Последние 500 событий. Локальный архив собирается в фоне во время работы приложения.',
           ),
           const ListSectionGap(),
           generateSection(
-            title: 'Локальные журналы',
+            title: AppLocalizations.of(context).forkLocalLogs,
             items: [
               ListItem(
-                title: const Text('Открыть папку логов Zapret'),
+                title: Text(AppLocalizations.of(context).forkOpenZapretLogs),
                 onTap: () async => system.openDirectory(await zapretFileLogger.directoryPath),
               ),
               ListItem(
-                title: const Text('Экспорт сегодняшних логов (ZIP)'),
+                title: Text(AppLocalizations.of(context).forkExportTodayLogs),
                 onTap: () async {
                   try {
                     final archive = await zapretFileLogger.archiveToday(await appPath.downloadDirPath);
@@ -111,7 +112,7 @@ class _ZapretLogsViewState extends ConsumerState<ZapretLogsView> {
                 },
               ),
               ListItem(
-                title: const Text('История аварий и Watchdog'),
+                title: Text(AppLocalizations.of(context).forkCrashHistory),
                 onTap: () async => system.openDirectory(await crashFileLogger.directoryPath),
               ),
             ],
@@ -137,9 +138,9 @@ class _ZapretLogsViewState extends ConsumerState<ZapretLogsView> {
           ),
           const ListSectionGap(),
           generateSection(
-            title: 'События',
+            title: AppLocalizations.of(context).forkEvents,
             items: [
-              if (logs.isEmpty) const ListItem(title: Text('Нет событий')),
+              if (logs.isEmpty) ListItem(title: Text(AppLocalizations.of(context).forkNoEvents)),
               for (final entry in logs)
                 RecordListItem(
                   onTap: () {},

@@ -1,3 +1,4 @@
+import 'package:fl_clash/l10n/l10n.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/providers/providers.dart';
@@ -27,7 +28,7 @@ class ZapretStrategySheet extends ConsumerWidget {
       'kinlay0': state.strategies.where((s) => s.id.startsWith('kinlay0-')),
     };
     return CommonScaffold(
-      title: 'Стратегии Zapret',
+      title: AppLocalizations.of(context).forkZapretStrategies,
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16).copyWith(
           top: context.sectionsTopPadding,
@@ -36,10 +37,10 @@ class ZapretStrategySheet extends ConsumerWidget {
         children: [
           if (state.supportsSplitMode)
             generateSection(
-              title: 'Режим',
+              title: AppLocalizations.of(context).forkMode,
               items: [
                 ListItem<ZapretMode>.options(
-                  title: const Text('Режим обработки'),
+                  title: Text(AppLocalizations.of(context).forkProcessingMode),
                   options: ZapretMode.values,
                   value: state.mode,
                   textBuilder: (mode) => mode == ZapretMode.strictSplit
@@ -58,10 +59,10 @@ class ZapretStrategySheet extends ConsumerWidget {
             ),
           if (state.strategies.isEmpty)
             generateSection(
-              title: 'Стратегии',
+              title: AppLocalizations.of(context).forkStrategies,
               items: [
                 ListItem(
-                  title: const Text('Каталог стратегий недоступен'),
+                  title: Text(AppLocalizations.of(context).forkCatalogUnavailable),
                   subtitle: Text(state.error ?? 'Загрузка…'),
                   onTap: controller.loadStrategies,
                 ),

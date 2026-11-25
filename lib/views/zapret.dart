@@ -1,3 +1,4 @@
+import 'package:fl_clash/l10n/l10n.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:fl_clash/views/dashboard/widgets/zapret_strategy_sheet.dart';
@@ -35,7 +36,7 @@ class ZapretView extends ConsumerWidget {
       final mode = await showDialog<ZapretAutoTuneMode>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('Режим автоподбора'),
+          title: Text(AppLocalizations.of(context).forkAutoTuneMode),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -74,7 +75,7 @@ class ZapretView extends ConsumerWidget {
 
     final sections = <Widget>[
       generateSection(
-        title: 'Состояние',
+        title: AppLocalizations.of(context).forkState,
         items: [
           ListItem(
             leading: Icon(
@@ -84,20 +85,20 @@ class ZapretView extends ConsumerWidget {
                   : context.colorScheme.onSurfaceVariant,
             ),
             title: const Text('Zapret'),
-            subtitle: Text(zapret.running ? 'Запущен' : 'Остановлен'),
+            subtitle: Text(zapret.running ? AppLocalizations.of(context).forkStarted : AppLocalizations.of(context).forkStopped),
           ),
           ListItem(
-            title: Text(zapret.running ? 'Остановить Zapret' : 'Запустить Zapret'),
+            title: Text(zapret.running ? AppLocalizations.of(context).forkStopZapret : AppLocalizations.of(context).forkStartZapret),
             leading: Icon(zapret.running ? Icons.stop_circle_outlined : Icons.play_circle_outline),
             onTap: zapret.busy || !zapret.available ? null : () => ref.read(zapretControllerProvider.notifier).setEnabled(!zapret.running),
           ),
           if (zapret.running)
             ListItem(
-              title: const Text('Перезапустить Zapret'),
+              title: Text(AppLocalizations.of(context).forkRestartZapret),
               onTap: zapret.busy ? null : () => ref.read(zapretControllerProvider.notifier).restart(),
             ),
           ListItem(
-            title: const Text('Стратегия'),
+            title: Text(AppLocalizations.of(context).forkStrategy),
             onTap: zapret.busy ? null : () => showZapretStrategiesSheet(context),
             subtitle: Text(
               zapret.running && zapret.activeStrategyId != zapret.selectedStrategyId
@@ -108,7 +109,7 @@ class ZapretView extends ConsumerWidget {
           ),
           if (zapret.supportsSplitMode)
             ListItem<ZapretMode>.options(
-              title: const Text('Выбранный режим'),
+              title: Text(AppLocalizations.of(context).forkSelectedMode),
               options: ZapretMode.values,
               value: zapret.mode,
               textBuilder: (mode) => mode == ZapretMode.strictSplit ? 'STRICT SPLIT' : 'FULL BYPASS',
@@ -116,7 +117,7 @@ class ZapretView extends ConsumerWidget {
             ),
           if (zapret.running) ...[
             ListItem(
-              title: const Text('Движок и процесс'),
+              title: Text(AppLocalizations.of(context).forkEngineProcess),
               subtitle: Text(
                 '${zapret.activeEngine ?? '—'} · PID ${zapret.pid ?? '—'}',
               ),
@@ -127,7 +128,7 @@ class ZapretView extends ConsumerWidget {
           if (zapret.error != null)
             ListItem(
               leading: Icon(Icons.error_outline, color: context.colorScheme.error),
-              title: const Text('Ошибка Helper'),
+              title: Text(AppLocalizations.of(context).forkHelperError),
               subtitle: Text(
                 zapret.error!,
                 style: TextStyle(color: context.colorScheme.error),
@@ -135,7 +136,7 @@ class ZapretView extends ConsumerWidget {
             ),
           ListItem(
             leading: const Icon(Icons.refresh),
-            title: const Text('Обновить состояние'),
+            title: Text(AppLocalizations.of(context).forkRefreshStatus),
             onTap: zapret.busy
                 ? null
                 : () => ref
@@ -146,18 +147,18 @@ class ZapretView extends ConsumerWidget {
       ),
       const ListSectionGap(),
       generateSection(
-        title: 'Автоподбор стратегий',
+        title: AppLocalizations.of(context).forkAutoTune,
         items: [
           ListItem(
-            title: Text(zapret.testProgress ?? 'Запустить автоподбор'),
+            title: Text(zapret.testProgress ?? AppLocalizations.of(context).forkStartAutoTune),
             subtitle: const Text('Очень быстрый, быстрый или полный · Mihomo DIRECT'),
             onTap: zapret.busy ? null : chooseTestMode,
           ),
           if (zapret.testProgress != null)
-            ListItem(title: const Text('Отменить тестирование'), onTap: ref.read(zapretControllerProvider.notifier).cancelTrials),
+            ListItem(title: Text(AppLocalizations.of(context).forkCancelTest), onTap: ref.read(zapretControllerProvider.notifier).cancelTrials),
           if (zapret.testSummary != null || zapret.trials.isNotEmpty)
             ListItem(
-              title: const Text('Результат проверки'),
+              title: Text(AppLocalizations.of(context).forkTestResult),
               subtitle: Text([
                 if (zapret.testSummary != null) zapret.testSummary!,
                 'Успешно: $confirmedTrials · частично: $partial',
@@ -170,13 +171,13 @@ class ZapretView extends ConsumerWidget {
             ),
           ListItem(
             leading: const Icon(Icons.history),
-            title: const Text('История автоподбора'),
-            subtitle: const Text('Последние 30 завершённых проверок'),
+            title: Text(AppLocalizations.of(context).forkAutoTuneHistory),
+            subtitle: Text(AppLocalizations.of(context).forkLastThirtyRuns),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => BaseNavigator.push<void>(context, const _ZapretHistoryView()),
           ),
           ListItem(
-            title: const Text('Автоматический переход на резервную стратегию'),
+            title: Text(AppLocalizations.of(context).forkAutoFallback),
             subtitle: const Text('Три неудачные проверки, только подтверждённые кандидаты, откат при неудаче'),
             trailing: Switch(value: zapret.autoFallback,
               onChanged: ref.read(zapretControllerProvider.notifier).setAutoFallback),
@@ -185,7 +186,7 @@ class ZapretView extends ConsumerWidget {
       ),
       const ListSectionGap(),
       generateSection(
-        title: 'Сетевые проверки',
+        title: AppLocalizations.of(context).forkNetworkChecks,
         items: [
           for (final target in ZapretProbeTarget.values)
             ListItem(
@@ -204,7 +205,7 @@ class ZapretView extends ConsumerWidget {
             ),
           ListItem(
             leading: const Icon(Icons.speed),
-            title: const Text('Проверить сейчас'),
+            title: Text(AppLocalizations.of(context).forkCheckNow),
             onTap: () => ref
                 .read(zapretDiagnosticsProvider.notifier)
                 .refresh(),
@@ -240,7 +241,7 @@ class _ZapretHistoryViewState extends State<_ZapretHistoryView> {
 
   @override
   Widget build(BuildContext context) => CommonScaffold(
-    title: 'История автоподбора',
+    title: AppLocalizations.of(context).forkAutoTuneHistory,
     body: FutureBuilder<List<ZapretTuneRun>>(
       future: _runs,
       builder: (context, snapshot) {
@@ -254,12 +255,12 @@ class _ZapretHistoryViewState extends State<_ZapretHistoryView> {
         return ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            if (runs.isEmpty) const Center(child: Text('История пока пуста')),
+            if (runs.isEmpty) Center(child: Text(AppLocalizations.of(context).forkEmptyHistory)),
             for (final run in runs)
               Card(child: ListItem(
                 title: Text(_runDate(run.at)),
                 subtitle: Text([
-                  run.tuneMode?.label ?? 'Предыдущий сохранённый тест',
+                  run.tuneMode?.label ?? AppLocalizations.of(context).forkPreviousRun,
                   if (run.duration != null) 'Длительность: ${run.duration!.inSeconds} с',
                   'Проверено: ${run.trials.length}${run.totalStrategies == null ? '' : '/${run.totalStrategies}'} · успешно: ${run.trials.where((trial) => trial.confirmed).length}',
                   if (run.failure != null) 'Завершено с ошибкой',
@@ -294,7 +295,7 @@ class ZapretResultsView extends ConsumerWidget {
       final accepted = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('Применить стратегию?'),
+          title: Text(AppLocalizations.of(context).forkApplyStrategy),
           content: Text('${nameOf(trial)} · ${trial.delay} мс'),
           actions: [
             TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Отмена')),
@@ -313,7 +314,7 @@ class ZapretResultsView extends ConsumerWidget {
     }
 
     return CommonScaffold(
-      title: 'Результаты автоподбора',
+      title: AppLocalizations.of(context).forkTuneResults,
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16).copyWith(
           top: context.sectionsTopPadding,

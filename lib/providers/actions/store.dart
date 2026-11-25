@@ -38,7 +38,7 @@ class StoreAction extends _$StoreAction {
         }
       } catch (error) {
         commonPrint.log('Settings save failed: ${error.runtimeType}', logLevel: LogLevel.error);
-        dialogs.showNotifier('Не удалось сохранить настройки', level: MessageLevel.error);
+        dialogs.showNotifier(currentAppLocalizations.forkSaveSettingsFailed, level: MessageLevel.error);
       }
     });
   }

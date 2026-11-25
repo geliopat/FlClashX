@@ -547,7 +547,7 @@ class GeneralView extends ConsumerWidget {
       if (system.isWindows) const MihomoWatchdogItem(),
       if (system.isWindows)
         ListItem.open(
-          title: const Text('Умный Hosts'),
+          title: Text(AppLocalizations.of(context).forkSmartHosts),
           widget: const SmartHostsView(),
         ),
       ConfigToggleItem(
@@ -659,7 +659,7 @@ class GeneralView extends ConsumerWidget {
               title: '${appLocalizations.logs} Zapret',
               items: [
                 ListItem(
-                  title: const Text('Подробный вывод движка'),
+                  title: Text(AppLocalizations.of(context).forkVerboseEngine),
                   subtitle: const Text('Применяется при следующем запуске Zapret'),
                   trailing: Switch(
                     value: ref.watch(
@@ -669,18 +669,18 @@ class GeneralView extends ConsumerWidget {
                   ),
                 ),
                 ListItem(
-                  title: const Text('Открыть папку логов Zapret'),
+                  title: Text(AppLocalizations.of(context).forkOpenZapretLogs),
                   onTap: () async => system.openDirectory(await zapretFileLogger.directoryPath),
                 ),
                 ListItem(
-                  title: const Text('История аварий и Watchdog'),
+                  title: Text(AppLocalizations.of(context).forkCrashHistory),
                   onTap: () async => system.openDirectory(await crashFileLogger.directoryPath),
                 ),
               ],
               footer: 'Отладка показывает необработанный вывод winws/winws2.',
             ),
           generateSection(
-            title: 'Сброс настроек',
+            title: AppLocalizations.of(context).forkResetSettings,
             items: const [
               ReturnToProviderItem(),
               ResetAppItem(),

@@ -262,7 +262,7 @@ class _DiagnosticsItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ListItem.open(
     leading: const Icon(Icons.health_and_safety_outlined),
-    title: Text(Localizations.localeOf(context).languageCode == 'ru' ? 'Диагностика' : 'Diagnostics'),
+    title: Text(AppLocalizations.of(context).forkDiagnostics),
     widget: const DiagnosticsView(),
   );
 }

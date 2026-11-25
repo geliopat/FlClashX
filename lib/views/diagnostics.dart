@@ -1,3 +1,4 @@
+import 'package:fl_clash/l10n/l10n.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:fl_clash/common/common.dart';
@@ -35,12 +36,12 @@ class _DiagnosticsViewState extends ConsumerState<DiagnosticsView> {
       try {
         result = await task();
       } catch (_) {
-        result = _t('Ошибка проверки', 'Check failed');
+        result = AppLocalizations.of(context).forkCheckFailed;
       }
       if (mounted) setState(() => _results[name] = result);
     }
-    final ok = _t('Проверено', 'Passed');
-    final unavailable = _t('Недоступно', 'Unavailable');
+    final ok = AppLocalizations.of(context).forkPassed;
+    final unavailable = AppLocalizations.of(context).forkUnavailable;
     try {
       await check('Mihomo', () async {
         if (ref.read(coreStatusProvider) != CoreStatus.connected) return unavailable;
@@ -54,13 +55,13 @@ class _DiagnosticsViewState extends ConsumerState<DiagnosticsView> {
       await check('Zapret', () async {
         final status = await helperClient.zapretStatus();
         final catalog = await helperClient.zapretStrategies();
-        return '${status.running ? _t('Работает', 'Running') : _t('Остановлен', 'Stopped')} · ${catalog.length} ${_t('стратегий', 'strategies')}';
+        return '${status.running ? AppLocalizations.of(context).forkRunning : AppLocalizations.of(context).forkStopped} · ${catalog.length} ${_t('стратегий', 'strategies')}';
       });
-      await check(_t('Целостность компонентов / WinDivert', 'Component integrity / WinDivert'), () async {
+      await check(AppLocalizations.of(context).forkComponentIntegrity, () async {
         final failures = await checkWindowsComponents();
-        return failures.isEmpty ? ok : '${_t('Повреждены или отсутствуют', 'Missing or damaged')}: ${failures.length}';
+        return failures.isEmpty ? ok : '${AppLocalizations.of(context).forkMissingDamaged}: ${failures.length}';
       });
-      await check(_t('Настройки (JSON)', 'Settings (JSON)'), () async {
+      await check(AppLocalizations.of(context).forkSettingsJson, () async {
         final saved = await preferences.getConfigMap();
         if (saved == null) return unavailable;
         Config.strictFromJson(saved);
@@ -77,15 +78,15 @@ class _DiagnosticsViewState extends ConsumerState<DiagnosticsView> {
           ? _t('Ядро сообщает об ошибке TUN', 'Core reports TUN failure')
           : _t('Ядро не сообщает об ошибке TUN (не тест трафика)', 'No TUN failure reported by core (not a traffic test)');
       });
-      await check(_t('Системный прокси', 'System proxy'), () async {
+      await check(AppLocalizations.of(context).forkSystemProxy, () async {
         final proxy = ref.read(networkSettingProvider).systemProxy;
         return 'Proxy: $proxy · ${_t('настройка приложения', 'configured state')}';
       });
-      await check(_t('Журнал службы', 'Service journal'), () async {
+      await check(AppLocalizations.of(context).forkServiceJournal, () async {
         await helperClient.zapretLogArchive();
         return ok;
       });
-      await check(_t('Сетевые проверки', 'Network checks'), () async {
+      await check(AppLocalizations.of(context).forkNetworkChecks, () async {
         final results = ref.read(zapretDiagnosticsProvider);
         final accepted = ZapretProbeTarget.values.where((target) => results.resultOf(target).accepted).length;
         return '$accepted/${ZapretProbeTarget.values.length} HTTPS · ${_t('последние результаты DIRECT, не доказательство перехвата WinDivert', 'latest DIRECT results, not proof of WinDivert interception')}';
@@ -97,15 +98,15 @@ class _DiagnosticsViewState extends ConsumerState<DiagnosticsView> {
 
   @override
   Widget build(BuildContext context) => CommonScaffold(
-    title: _t('Диагностика', 'Diagnostics'),
+    title: AppLocalizations.of(context).forkDiagnostics,
     body: ListView(
       padding: const EdgeInsets.all(16),
       children: [
         generateSection(items: [
-          ListItem(title: Text(_t('Запустить диагностику', 'Run diagnostics')),
+          ListItem(title: Text(AppLocalizations.of(context).forkRunDiagnostics),
             onTap: _busy ? null : _run,
             trailing: _busy ? const CircularProgressIndicator() : const Icon(Icons.play_arrow)),
-          ListItem(title: Text(_t('Копировать отчёт', 'Copy report')),
+          ListItem(title: Text(AppLocalizations.of(context).forkCopyReport),
             onTap: _busy || _results.isEmpty ? null : () async {
               await Clipboard.setData(ClipboardData(text: _results.entries.map((entry) => '${entry.key}: ${entry.value}').join('\n')));
             }),
@@ -125,7 +126,7 @@ class _DiagnosticsViewState extends ConsumerState<DiagnosticsView> {
           ),
         ]),
         const ListSectionGap(),
-        generateSection(title: _t('Результаты', 'Results'), items: [
+        generateSection(title: AppLocalizations.of(context).forkResults, items: [
           for (final entry in _results.entries)
             ListItem(title: Text(entry.key), subtitle: Text(entry.value)),
         ]),
