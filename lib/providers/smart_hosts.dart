@@ -17,6 +17,70 @@ const smartHostSourceUrls = {
   'geohide': 'https://dns.geohide.ru:8443/static/hosts/ru/hosts',
   'youtube': 'https://raw.githubusercontent.com/mqclass/zapret2-gui/main/lists/youtube-bad-nodes.txt',
 };
+// Use only alternative delivery endpoints for the original lists.
+const smartHostFallbackUrls = <String, List<String>>{
+  'malw': [
+    'https://api.github.com/repos/ImMALWARE/dns.malw.link/contents/hosts?ref=master',
+  ],
+  'geohide': [
+    'https://raw.githubusercontent.com/Internet-Helper/GeoHideDNS/main/hosts/hosts',
+    'https://api.github.com/repos/Internet-Helper/GeoHideDNS/contents/hosts/hosts?ref=main',
+  ],
+  'youtube': [
+    'https://api.github.com/repos/mqclass/zapret2-gui/contents/lists/youtube-bad-nodes.txt?ref=main',
+  ],
+};
+const smartHostsRetryInterval = Duration(minutes: 15);
+
+bool smartHostUpdateDue({
+  required DateTime now,
+  required Duration interval,
+  required DateTime? lastSuccess,
+  required DateTime? lastFailure,
+}) {
+  if (lastFailure != null) {
+    return now.difference(lastFailure) >= smartHostsRetryInterval;
+  }
+  return lastSuccess == null || now.difference(lastSuccess) >= interval;
+}
+
+Future<({String raw, bool fallback})> fetchSmartHostSource(
+  String id,
+  String url,
+  Future<String> Function(String url) download,
+) async {
+  final failures = <String>[];
+  final candidates = [url, ...?smartHostFallbackUrls[id]];
+  for (var index = 0; index < candidates.length; index++) {
+    try {
+      var raw = await download(candidates[index])
+          .timeout(const Duration(seconds: 90));
+      // The GitHub contents API may return JSON instead of raw media.
+      if (Uri.parse(candidates[index]).host == 'api.github.com' &&
+          raw.trimLeft().startsWith('{')) {
+        final data = jsonDecode(raw);
+        if (data is! Map || data['encoding'] != 'base64' ||
+            data['content'] is! String) {
+          throw const FormatException('Некорректный ответ GitHub');
+        }
+        raw = utf8.decode(base64Decode(
+          (data['content'] as String).replaceAll(RegExp(r'\s'), ''),
+        ));
+      }
+      final valid = id == 'youtube'
+          ? parseYoutubeNodes(raw)
+          : parseSmartHosts(raw, includeAdblock: true);
+      if (valid.isEmpty) {
+        throw StateError('Источник не содержит корректных записей');
+      }
+      return (raw: raw, fallback: index > 0);
+    } catch (error) {
+      failures.add('${index == 0 ? "Основной" : "Резервный $index"}: $error');
+    }
+  }
+  throw StateError(failures.join('; '));
+}
+
 const _maxBytes = 10 * 1024 * 1024;
 const _maxEntries = 60000;
 final _domain = RegExp(r'^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$');
@@ -122,6 +186,8 @@ class SmartHostsState {
     this.entries = const {},
     this.sourceCounts = const {},
     this.errors = const {},
+    this.fallbackSources = const {},
+    this.cachedSources = const {},
     this.lastUpdate,
     this.updating = false,
     this.revision = 0,
@@ -143,6 +209,8 @@ class SmartHostsState {
   final Map<String, String> entries;
   final Map<String, int> sourceCounts;
   final Map<String, String> errors;
+  final Set<String> fallbackSources;
+  final Set<String> cachedSources;
   final DateTime? lastUpdate;
   final bool updating;
   final int revision;
@@ -161,6 +229,9 @@ class SmartHostsController extends Notifier<SmartHostsState> {
   static const _key = 'zapret.smartHosts.settings';
   final _rawCache = <String, String>{};
   final _errors = <String, String>{};
+  final _lastSuccess = <String, DateTime>{};
+  final _lastFailure = <String, DateTime>{};
+  final _fallbackSources = <String>{};
   final _client = Dio(BaseOptions(
     connectTimeout: const Duration(seconds: 15),
     receiveTimeout: const Duration(seconds: 30),
@@ -239,10 +310,32 @@ class SmartHostsController extends Notifier<SmartHostsState> {
       }
       final last = json['last'];
       _last = last is int ? DateTime.fromMillisecondsSinceEpoch(last) : null;
+      for (final (key, target) in [
+        ('sourceSuccess', _lastSuccess),
+        ('sourceFailure', _lastFailure),
+      ]) {
+        final values = json[key];
+        if (values is Map) {
+          for (final entry in values.entries) {
+            if (entry.key is String && entry.value is int) {
+              target[entry.key as String] =
+                  DateTime.fromMillisecondsSinceEpoch(entry.value as int);
+            }
+          }
+        }
+      }
+      _fallbackSources.addAll(
+        (json['fallbackSources'] as List? ?? []).whereType<String>(),
+      );
       for (final id in _urls.keys) {
         final file = await _cacheFile(id);
         if (await file.exists() && await file.length() <= _maxBytes) {
-          _rawCache[id] = await file.readAsString();
+          final raw = await file.readAsString();
+          final valid = id == 'youtube' ? parseYoutubeNodes(raw) : parseSmartHosts(raw, includeAdblock: true);
+          if (valid.isNotEmpty) _rawCache[id] = raw;
+        }
+        if (_rawCache.containsKey(id) && !_lastSuccess.containsKey(id)) {
+          _lastSuccess[id] = await file.lastModified();
         }
       }
     } catch (error) {
@@ -266,6 +359,9 @@ class SmartHostsController extends Notifier<SmartHostsState> {
       'custom': _custom,
       'exclusions': _exclusions.toList(),
       'last': _last?.millisecondsSinceEpoch,
+      'sourceSuccess': _lastSuccess.map((key, value) => MapEntry(key, value.millisecondsSinceEpoch)),
+      'sourceFailure': _lastFailure.map((key, value) => MapEntry(key, value.millisecondsSinceEpoch)),
+      'fallbackSources': _fallbackSources.toList(),
       'blockSlowCdn': _blockSlow,
       'autoCdn': _autoCdn,
       'cdnThreshold': _threshold,
@@ -319,6 +415,8 @@ class SmartHostsController extends Notifier<SmartHostsState> {
       entries: Map.unmodifiable(entries),
       sourceCounts: Map.unmodifiable(counts),
       errors: Map.unmodifiable(_errors),
+      fallbackSources: Set.unmodifiable(_fallbackSources.where(_rawCache.containsKey)),
+      cachedSources: Set.unmodifiable(_urls.keys.where((id) => _lastFailure.containsKey(id) && (_rawCache.containsKey(id) || id == 'youtube'))),
       lastUpdate: _last,
       updating: _updating,
       revision: _revision,
@@ -381,6 +479,10 @@ class SmartHostsController extends Notifier<SmartHostsState> {
       for (final id in _custom.keys) {
         if (_custom[id] != validated[id]) {
           _rawCache.remove(id);
+          _lastSuccess.remove(id);
+          _lastFailure.remove(id);
+          _fallbackSources.remove(id);
+          _errors.remove(id);
           _sources.remove(id);
           final file = await _cacheFile(id);
           if (await file.exists()) await file.delete();
@@ -466,9 +568,15 @@ class SmartHostsController extends Notifier<SmartHostsState> {
 
   Future<void> _refreshIfDue() async {
     if (!_loaded || !_enabled || !_auto || _updating) return;
-    if (_last == null || DateTime.now().difference(_last!) >= Duration(hours: _hours)) {
-      await refresh();
-    }
+    final now = DateTime.now();
+    final due = _sources.where((id) => _urls.containsKey(id) &&
+        smartHostUpdateDue(
+          now: now,
+          interval: Duration(hours: _hours),
+          lastSuccess: _rawCache.containsKey(id) ? _lastSuccess[id] : null,
+          lastFailure: _lastFailure[id],
+        )).toSet();
+    if (due.isNotEmpty) await _refreshSources(due);
   }
 
   Future<String> _download(String url) async {
@@ -479,7 +587,12 @@ class SmartHostsController extends Notifier<SmartHostsState> {
       }
       final response = await _client.getUri<ResponseBody>(
         uri,
-        options: Options(validateStatus: (_) => true),
+        options: Options(
+          validateStatus: (_) => true,
+          headers: uri.host == 'api.github.com'
+              ? {'Accept': 'application/vnd.github.raw+json'}
+              : null,
+        ),
       );
       final body = response.data;
       if (body == null) throw const FormatException('Пустой ответ');
@@ -507,30 +620,40 @@ class SmartHostsController extends Notifier<SmartHostsState> {
     throw StateError('Слишком много перенаправлений');
   }
 
-  Future<void> refresh() async {
-    if (!_loaded || !_enabled || _updating || _cdnChecking || _sources.isEmpty) return;
+  Future<void> refresh() => _refreshSources(Set.of(_sources));
+
+  Future<void> _refreshSources(Set<String> wanted) async {
+    if (!_loaded || !_enabled || _updating || _cdnChecking || wanted.isEmpty) return;
     _updating = true;
     _publish();
     try {
       for (final entry in _urls.entries) {
-        if (!_sources.contains(entry.key)) continue;
+        if (!wanted.contains(entry.key) || !_sources.contains(entry.key)) continue;
         try {
-          final raw = await _download(entry.value).timeout(const Duration(seconds: 90));
-          final valid = entry.key == 'youtube'
-              ? parseYoutubeNodes(raw)
-              : parseSmartHosts(raw, includeAdblock: true);
-          if (valid.isEmpty) throw StateError('Источник не содержит корректных записей');
+          final result = await fetchSmartHostSource(entry.key, entry.value, _download);
           final file = await _cacheFile(entry.key);
           final temp = File('${file.path}.tmp');
-          await temp.writeAsString(raw, flush: true);
-          await temp.rename(file.path);
-          _rawCache[entry.key] = raw;
+          try {
+            await temp.writeAsString(result.raw, flush: true);
+            await temp.rename(file.path);
+          } finally {
+            if (await temp.exists()) await temp.delete();
+          }
+          _rawCache[entry.key] = result.raw;
+          _lastSuccess[entry.key] = DateTime.now();
+          _last = _lastSuccess[entry.key];
+          _lastFailure.remove(entry.key);
+          if (result.fallback) {
+            _fallbackSources.add(entry.key);
+          } else {
+            _fallbackSources.remove(entry.key);
+          }
           _errors.remove(entry.key);
         } catch (error) {
+          _lastFailure[entry.key] = DateTime.now();
           _errors[entry.key] = error.toString();
         }
       }
-      _last = DateTime.now();
       await _save();
     } finally {
       _updating = false;

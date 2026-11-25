@@ -14,7 +14,17 @@ class SmartHostsView extends ConsumerWidget {
     final controller = ref.read(smartHostsProvider.notifier);
     Widget source(String id, String label, String description) => ListItem(
       title: Text(label),
-      subtitle: Text('$description\nЗаписей: ${state.sourceCounts[id] ?? 0}${state.errors[id] == null ? '' : '\nОшибка: ${state.errors[id]}'}'),
+      subtitle: Text([
+        description,
+        'Записей: ${state.sourceCounts[id] ?? 0}',
+        if (state.cachedSources.contains(id))
+          'Используется сохранённый или встроенный список'
+        else if (state.fallbackSources.contains(id))
+          'Загружено с резервного источника',
+        if (state.errors[id] != null) 'Ошибка: ${state.errors[id]}',
+        if (state.errors[id] != null && state.autoUpdate && state.sources.contains(id))
+          'Повторная попытка через 15 минут',
+      ].join('\n')),
       trailing: Switch(
         value: state.sources.contains(id),
         onChanged: state.updating ? null : (value) => controller.configure(source: id, sourceEnabled: value),
@@ -55,7 +65,7 @@ class SmartHostsView extends ConsumerWidget {
               ),
               ListItem(
                 title: const Text('Обновить сейчас'),
-                subtitle: Text(state.lastUpdate?.toLocal().toString().split('.').first ?? 'Ещё не обновлялись'),
+                subtitle: Text(state.lastUpdate == null ? 'Ещё не обновлялись' : 'Последняя успешная загрузка: ${state.lastUpdate!.toLocal().toString().split('.').first}'),
                 onTap: state.updating || !state.enabled ? null : controller.refresh,
                 trailing: state.updating ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2)) : null,
               ),
@@ -67,7 +77,7 @@ class SmartHostsView extends ConsumerWidget {
             title: 'Источники',
             items: [
               source('malw', 'MALW.link', 'DNS + SNI-прокси: обход IP-блокировок сервисов (ChatGPT, Spotify, Twitch и др.)'),
-              source('geohide', 'GeoHide', 'Ежедневно обновляемый hosts: рабочие IP и прокси GeoHide для заблокированных сервисов'),
+              source('geohide', 'GeoHide', 'Hosts GeoHide: рабочие IP и прокси для заблокированных сервисов'),
               ListItem(
                 title: const Text('Блокировка рекламы'),
                 trailing: Switch(
