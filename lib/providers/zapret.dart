@@ -194,7 +194,7 @@ class ZapretController extends Notifier<ZapretState> {
   static const _modePreferenceKey = 'zapret.mode';
   static const _debugPreferenceKey = 'zapret.debugLogs';
   static const _linkedStartPreferenceKey = 'zapret.startWithMihomo';
-  static const _trialHistoryKey = 'zapret.trialHistory.v3';
+  static const _trialHistoryKey = 'zapret.trialHistory.v4';
   static const _pollInterval = Duration(seconds: 3);
   static const _readinessTimeout = Duration(seconds: 3);
 
@@ -792,7 +792,7 @@ class ZapretController extends Notifier<ZapretState> {
       throw StateError('Движок стратегии не запущен: $id');
     }
     final items = await measureZapretTargets(ref, targets, timeoutMs: timeoutMs);
-    final good = items.values.where((item) => item.message == 'DIRECT · HTTP 2xx' && item.latencyMs != null && item.latencyMs! > 0).toList();
+    final good = items.values.where((item) => item.accepted && item.latencyMs != null && item.latencyMs! > 0).toList();
     final score = good.fold<int>(0, (sum, item) => sum + (item.latencyMs! <= 450 ? 2 : 1));
     final delay = good.isEmpty ? 0 : (good.fold<int>(0, (sum, item) => sum + item.latencyMs!) / good.length).round();
     final status = await _client.zapretStatus();
@@ -864,7 +864,7 @@ class ZapretController extends Notifier<ZapretState> {
           // Screening alone never makes a strategy eligible for activation.
           results.add(ZapretTrial(item.id, mode, first.score, first.delay,
             passedTargets: first.passedTargets, screenedOnly: true,
-            error: first.error, details: first.details));
+            error: first.error, details: ['Предварительный отбор:', ...first.details]));
         } catch (error) {
           launchFailures++;
           lastLaunchFailure = _errorMessage(error);
@@ -910,12 +910,16 @@ class ZapretController extends Notifier<ZapretState> {
             lastLaunchFailure = result.error;
           }
           results.removeWhere((trial) => trial.id == candidate.id);
-          results.add(result);
+          results.add(ZapretTrial(result.id, result.mode, result.score, result.delay,
+            confirmed: result.confirmed, passedTargets: result.passedTargets,
+            error: result.error,
+            details: ['Предварительный отбор:', ...candidate.details,
+              if (!first.confirmed) 'Контроль 1:', ...result.details]));
         } catch (error) {
           launchFailures++;
           lastLaunchFailure = _errorMessage(error);
           results.removeWhere((trial) => trial.id == candidate.id);
-          results.add(ZapretTrial(candidate.id, candidate.mode, 0, 0, error: lastLaunchFailure, details: candidate.details));
+          results.add(ZapretTrial(candidate.id, candidate.mode, 0, 0, error: lastLaunchFailure, details: ['Предварительный отбор:', ...candidate.details, 'Ошибка контрольной проверки: $lastLaunchFailure']));
           if (error is HelperException && error.code == 'zapretConflict') {
             failure = lastLaunchFailure;
             break;
@@ -991,7 +995,7 @@ class ZapretController extends Notifier<ZapretState> {
       }
       if (state.busy || state.activeStrategyId != originalId || !state.running) return;
       if (!state.autoFallback || ref.read(coreStatusProvider) != CoreStatus.connected) return;
-      if (current.every((item) => item?.message == 'DIRECT · HTTP 2xx')) {
+      if (current.every((item) => item?.accepted == true)) {
         _failedChecks = 0;
         return;
       }

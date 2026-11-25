@@ -27,77 +27,8 @@ class ZapretView extends ConsumerWidget {
     final partial = zapret.trials.where((trial) =>
         !trial.confirmed && !trial.screenedOnly && trial.error == null && trial.passedTargets > 0).length;
     final failed = zapret.trials.length - confirmedTrials - errors - screened - partial;
-    final top = shortlistZapretTrials(zapret.trials.where((trial) =>
-        trial.error == null && (trial.confirmed || trial.passedTargets > 0)), limit: 5);
-
-    String trialName(ZapretTrial trial) => zapret.strategies
-        .where((item) => item.id == trial.id).firstOrNull?.name ?? trial.id;
-    String trialDescription(ZapretTrial trial) =>
-        '${trial.resultLabel} · ${trial.passedTargets}/3 сервисов'
-        '${trial.delay > 0 ? ' · ${trial.delay} мс' : ''}';
-    Future<void> showTrialDetails(ZapretTrial trial) async {
-      await showDialog<void>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(trialName(trial)),
-          content: SingleChildScrollView(
-            child: SelectableText([
-              trialDescription(trial),
-              if (trial.error != null) trial.error!,
-              ...trial.details,
-            ].join('\n')),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Закрыть')),
-          ],
-        ),
-      );
-    }
     Future<void> showAllTrials() async {
-      await showDialog<void>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text('Все результаты (${zapret.trials.length})'),
-          content: SizedBox(
-            width: 650,
-            height: 400,
-            child: ListView(
-              children: [
-                for (final trial in zapret.trials)
-                  ListItem(
-                    title: Text(trialName(trial)),
-                    subtitle: Text(trialDescription(trial)),
-                    onTap: () => showTrialDetails(trial),
-                  ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Закрыть')),
-          ],
-        ),
-      );
-    }
-    Future<void> confirmTrial(ZapretTrial trial) async {
-      final name = zapret.strategies.where((item) => item.id == trial.id).firstOrNull?.name ?? trial.id;
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Применить стратегию?'),
-          content: Text('$name · ${trial.delay} мс'),
-          actions: [
-            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Отмена')),
-            TextButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Применить')),
-          ],
-        ),
-      );
-      if (confirmed == true && context.mounted) {
-        try {
-          await ref.read(zapretControllerProvider.notifier).applyTrial(trial);
-        } catch (error) {
-          if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.toString())));
-        }
-      }
+      await BaseNavigator.push<void>(context, const ZapretResultsView());
     }
 
     Widget details(String title, List<String> values) => ListItem(
@@ -198,36 +129,19 @@ class ZapretView extends ConsumerWidget {
           ),
           if (zapret.testProgress != null)
             ListItem(title: const Text('Отменить тестирование'), onTap: ref.read(zapretControllerProvider.notifier).cancelTrials),
-          if (zapret.testSummary != null)
-            ListItem(title: const Text('Результат проверки'), subtitle: Text(zapret.testSummary!, maxLines: 5)),
-          if (zapret.trials.isNotEmpty || zapret.testSummary != null) ...[
+          if (zapret.testSummary != null || zapret.trials.isNotEmpty)
             ListItem(
-              title: const Text('Статистика стратегий'),
-              subtitle: Text('Успешно: $confirmedTrials · частично: $partial\n'
-                  'Не прошли: $failed · ошибки: $errors\n'
-                  'Только отбор: $screened · без результата: ${(zapret.strategies.length - zapret.trials.length).clamp(0, zapret.strategies.length)}'),
-              onTap: zapret.trials.isEmpty ? null : showAllTrials,
+              title: const Text('Результат проверки'),
+              subtitle: Text([
+                if (zapret.testSummary != null) zapret.testSummary!,
+                'Успешно: $confirmedTrials · частично: $partial',
+                'Не прошли: $failed · ошибки: $errors',
+                'Только отбор: $screened · без результата: ${(zapret.strategies.length - zapret.trials.length).clamp(0, zapret.strategies.length)}',
+                'Нажми для просмотра всех стратегий и топ-5',
+              ].join('\n'), maxLines: 8),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: showAllTrials,
             ),
-            ListItem(
-              title: const Text('Все результаты проверки'),
-              subtitle: Text('${zapret.trials.length} стратегий · детали по каждому сервису'),
-              onTap: zapret.trials.isEmpty ? null : showAllTrials,
-            ),
-            ListItem(
-              title: const Text('Топ-5 стратегий'),
-              subtitle: Text(top.isEmpty
-                  ? 'Ни одного подтверждённого кандидата или успешного запроса. Смотри все результаты.'
-                  : 'Подтверждённые первыми. Неподтверждённые — только просмотр.'),
-            ),
-            for (final (index, trial) in top.indexed)
-              ListItem(
-                title: Text('${index + 1}. ${trialName(trial)}'),
-                subtitle: Text(trialDescription(trial)),
-                trailing: zapret.activeStrategyId == trial.id ? const Icon(Icons.check_circle_outline) : null,
-                onTap: zapret.busy ? null : () => trial.confirmed
-                    ? confirmTrial(trial) : showTrialDetails(trial),
-              ),
-          ],
           ListItem(
             title: const Text('Автоматический переход на резервную стратегию'),
             subtitle: const Text('Три неудачные проверки, только подтверждённые кандидаты, откат при неудаче'),
@@ -274,6 +188,94 @@ class ZapretView extends ConsumerWidget {
           bottom: 16 + context.bottomInset,
         ),
         children: sections,
+      ),
+    );
+  }
+}
+
+class ZapretResultsView extends ConsumerWidget {
+  const ZapretResultsView({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final zapret = ref.watch(zapretControllerProvider);
+    final ranked = shortlistZapretTrials(zapret.trials, limit: zapret.trials.length);
+    final top = shortlistZapretTrials(ranked.where((trial) =>
+        trial.error == null && (trial.confirmed || trial.passedTargets > 0)), limit: 5);
+    final ranks = {for (final (index, trial) in top.indexed) trial.id: index + 1};
+
+    String nameOf(ZapretTrial trial) => zapret.strategies
+        .where((item) => item.id == trial.id).firstOrNull?.name ?? trial.id;
+
+    Future<void> apply(ZapretTrial trial) async {
+      final accepted = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Применить стратегию?'),
+          content: Text('${nameOf(trial)} · ${trial.delay} мс'),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Отмена')),
+            TextButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Применить')),
+          ],
+        ),
+      );
+      if (accepted != true || !context.mounted) return;
+      try {
+        await ref.read(zapretControllerProvider.notifier).applyTrial(trial);
+      } catch (error) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.toString())));
+        }
+      }
+    }
+
+    return CommonScaffold(
+      title: 'Результаты автоподбора',
+      body: ListView(
+        padding: const EdgeInsets.symmetric(horizontal: 16).copyWith(
+          top: context.sectionsTopPadding,
+          bottom: 16 + context.bottomInset,
+        ),
+        children: [
+          Text('Проверено: ${ranked.length}/${zapret.strategies.length}',
+            style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          Text(top.isEmpty
+              ? 'Нет стратегий с успешными запросами.'
+              : 'Топ-5 выделены цветом и номером. Подтверждённые можно применить.'),
+          const Text('Задержки HTTPS, не ICMP. Discord Voice API: restricted означает доступность HTTPS, а не проверку голосового UDP.'),
+          const SizedBox(height: 12),
+          for (final trial in ranked)
+            Card(
+              color: ranks.containsKey(trial.id) ? context.colorScheme.primaryContainer : null,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [
+                      Expanded(child: Text(
+                        '${ranks.containsKey(trial.id) ? 'ТОП ${ranks[trial.id]} · ' : ''}${nameOf(trial)}',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      )),
+                      if (zapret.activeStrategyId == trial.id)
+                        const Icon(Icons.check_circle_outline),
+                      if (trial.confirmed)
+                        TextButton(onPressed: zapret.busy ? null : () => apply(trial), child: const Text('Применить')),
+                    ]),
+                    Text('${trial.resultLabel} · ${trial.passedTargets}/3 · '
+                        '${trial.delay > 0 ? '${trial.delay} мс (среднее)' : 'Нет задержки'}'),
+                    if (trial.error != null)
+                      Text(trial.error!, style: TextStyle(color: context.colorScheme.error)),
+                    for (final detail in trial.details)
+                      SelectableText(detail),
+                    if (trial.details.isEmpty)
+                      const Text('Измерения не получены'),
+                  ],
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

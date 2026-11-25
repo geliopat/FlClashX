@@ -74,12 +74,15 @@ class ZapretProbeResult {
     this.latencyMs,
     this.httpStatus,
     this.message,
+    this.accepted = false,
   });
 
   final ZapretProbeStatus status;
   final int? latencyMs;
   final int? httpStatus;
   final String? message;
+  // Endpoint-specific reachability, independent of the display label.
+  final bool accepted;
 }
 
 /// Uses the same 450 ms threshold and HTTP success handling as zapret2-gui.
@@ -107,6 +110,7 @@ ZapretProbeResult classifyZapretProbe({
     latencyMs: latencyMs,
     httpStatus: statusCode,
     message: message,
+    accepted: accepted,
   );
 }
 
@@ -137,18 +141,19 @@ Future<Map<ZapretProbeTarget, ZapretProbeResult>> measureZapretTargets(
     ));
     return {
       for (final target in wanted)
-        target: _fromService(items.where((item) => item.name == 'zapret-${target.name}').firstOrNull),
+        target: classifyZapretService(target, items.where((item) => item.name == 'zapret-${target.name}').firstOrNull),
     };
   } catch (error) {
     return {for (final target in wanted) target: ZapretProbeResult(message: 'Проверка DIRECT недоступна: $error')};
   }
 }
 
-ZapretProbeResult _fromService(ServiceCheckItem? item) {
+ZapretProbeResult classifyZapretService(ZapretProbeTarget target, ServiceCheckItem? item) {
   if (item == null) return const ZapretProbeResult(message: 'Ответ ядра отсутствует');
   if (item.delay > 0) {
     if (item.chains.isEmpty || item.chains.any((chain) => chain != 'DIRECT')) {
       return ZapretProbeResult(
+        latencyMs: item.delay,
         message: 'DIRECT не подтверждён · цепочка: ${item.chains.isEmpty ? 'не передана' : item.chains.join(' → ')}',
       );
     }
@@ -157,6 +162,19 @@ ZapretProbeResult _fromService(ServiceCheckItem? item) {
         status: item.delay <= 450 ? ZapretProbeStatus.operational : ZapretProbeStatus.degraded,
         latencyMs: item.delay,
         message: 'DIRECT · HTTP 2xx',
+        accepted: true,
+      );
+    }
+    // Voice regions is an authenticated API. The existing core collapses
+    // HTTP 401/403/429/451 into "restricted"; it does not expose the code.
+    // Accept this only as HTTPS reachability for this particular endpoint,
+    // not authentication, actual voice transport or unrestricted access.
+    if (target == ZapretProbeTarget.discordVoice && item.status == 'restricted') {
+      return ZapretProbeResult(
+        status: ZapretProbeStatus.degraded,
+        latencyMs: item.delay,
+        accepted: true,
+        message: 'DIRECT · restricted · HTTPS доступен, API ограничен',
       );
     }
     return ZapretProbeResult(

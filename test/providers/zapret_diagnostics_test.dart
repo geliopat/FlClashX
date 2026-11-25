@@ -1,8 +1,25 @@
+import 'package:fl_clash/models/core.dart';
 import 'package:fl_clash/providers/zapret_diagnostics.dart';
 import 'package:fl_clash/providers/zapret.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('restricted Voice API counts as DIRECT HTTPS reachability only', () {
+    const item = ServiceCheckItem(status: 'restricted', delay: 348, chains: ['DIRECT']);
+    final voice = classifyZapretService(ZapretProbeTarget.discordVoice, item);
+    expect(voice.accepted, isTrue);
+    expect(voice.status, ZapretProbeStatus.degraded);
+    expect(voice.latencyMs, 348);
+    expect(classifyZapretService(ZapretProbeTarget.discordGateway, item).accepted, isFalse);
+    expect(classifyZapretService(ZapretProbeTarget.youtube, item).accepted, isFalse);
+    expect(classifyZapretService(ZapretProbeTarget.discordVoice,
+        const ServiceCheckItem(status: 'restricted', delay: 348, chains: ['PROXY'])).accepted, isFalse);
+    expect(classifyZapretService(ZapretProbeTarget.discordVoice,
+        const ServiceCheckItem(status: 'restricted', delay: 348)).accepted, isFalse);
+    expect(classifyZapretService(ZapretProbeTarget.discordVoice,
+        const ServiceCheckItem(status: 'timeout', chains: ['DIRECT'])).accepted, isFalse);
+  });
+
   test('shortlist favors complete reachability then latency, bounded to ten', () {
     const mode = ZapretMode.fullBypass;
     final trials = [
