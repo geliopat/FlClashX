@@ -583,7 +583,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Обновляются только list-general.txt, list-google.txt, list-exclude.txt и ipset-all.txt из Flowseal. Локальные записи сохраняются; файлы *-user.txt не перезаписываются. Перед каждой записью Helper создаёт .bak. После изменения списков перезапусти Zapret, чтобы движок перечитал их.',
+                    'Обновляются только list-general.txt, list-google.txt, list-exclude.txt и ipset-all.txt из Flowseal. Локальные записи сохраняются; файлы *-user.txt не перезаписываются. Перед каждой записью Helper создаёт .bak. После изменения списков перезапусти Zapret, чтобы движок перечитал их.\n\nНе подключены: youtube-bad-nodes.txt — исходный GUI применяет его через Windows hosts, а FlClashX не меняет hosts/DNS; list-auto.txt — auto-hostlist пока не активирован в текущем запускателе.',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],
