@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:fl_clash/core/desktop/helper_client.dart';
-import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
@@ -59,7 +58,6 @@ class _ZapretLogsViewState extends ConsumerState<ZapretLogsView> {
 
   @override
   Widget build(BuildContext context) {
-    final debug = ref.watch(zapretControllerProvider.select((state) => state.debugLogs));
     final logs = _logs.reversed.where((entry) =>
       (_filter == 'all' || entry.level == _filter) &&
       entry.message.toLowerCase().contains(_query.toLowerCase())
@@ -90,14 +88,6 @@ class _ZapretLogsViewState extends ConsumerState<ZapretLogsView> {
                 onChanged: (value) => setState(() => _filter = value),
               ),
               ListItem(
-                title: const Text('Подробный вывод движка'),
-                subtitle: const Text('Применяется при следующем запуске Zapret'),
-                trailing: Switch(
-                  value: debug,
-                  onChanged: ref.read(zapretControllerProvider.notifier).setDebugLogs,
-                ),
-              ),
-              ListItem(
                 title: Text(_paused ? 'Продолжить' : 'Приостановить'),
                 onTap: () {
                   setState(() => _paused = !_paused);
@@ -108,7 +98,7 @@ class _ZapretLogsViewState extends ConsumerState<ZapretLogsView> {
               if (_error != null)
                 ListItem(title: const Text('Ошибка чтения журнала'), subtitle: Text(_error!)),
             ],
-            footer: 'Последние 500 событий. Отладка показывает необработанный вывод winws/winws2; это не таблица соединений.',
+            footer: 'Последние 500 событий. Подробный вывод движка настраивается в общих настройках.',
           ),
           const ListSectionGap(),
           generateSection(

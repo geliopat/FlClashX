@@ -582,8 +582,6 @@ class GeneralView extends ConsumerWidget {
       ),
       if (system.isDesktop) const OpenLogsFolderItem(),
       if (system.isAndroid) const ShareLogsItem(),
-      const ReturnToProviderItem(),
-      const ResetAppItem(),
     ];
   }
 
@@ -651,9 +649,33 @@ class GeneralView extends ConsumerWidget {
             ),
           ],
           generateSection(
-            title: appLocalizations.logsAndDiagnostics,
+            title: '${appLocalizations.logs} Mihomo',
             items: _logItems(simple: simple),
             footer: appLocalizations.logcatDesc,
+          ),
+          if (system.isWindows)
+            generateSection(
+              title: '${appLocalizations.logs} Zapret',
+              items: [
+                ListItem(
+                  title: const Text('Подробный вывод движка'),
+                  subtitle: const Text('Применяется при следующем запуске Zapret'),
+                  trailing: Switch(
+                    value: ref.watch(
+                      zapretControllerProvider.select((state) => state.debugLogs),
+                    ),
+                    onChanged: ref.read(zapretControllerProvider.notifier).setDebugLogs,
+                  ),
+                ),
+              ],
+              footer: 'Отладка показывает необработанный вывод winws/winws2.',
+            ),
+          generateSection(
+            title: 'Сброс настроек',
+            items: const [
+              ReturnToProviderItem(),
+              ResetAppItem(),
+            ],
           ),
         ],
       ),

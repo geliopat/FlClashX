@@ -40,13 +40,6 @@ class Navigation implements NavigationPort {
         builder: (_) =>
             const ProfilesView(key: GlobalObjectKey(PageLabel.profiles)),
       ),
-      if (Platform.isWindows)
-        NavigationItem(
-          glyph: AppGlyphs.resources,
-          label: PageLabel.zapret,
-          builder: (_) => const ZapretView(key: GlobalObjectKey(PageLabel.zapret)),
-          modes: [NavigationItemMode.desktop],
-        ),
       NavigationItem(
         glyph: AppGlyphs.connections,
         label: PageLabel.connections,
@@ -79,6 +72,13 @@ class Navigation implements NavigationPort {
             ? [NavigationItemMode.desktop, NavigationItemMode.more]
             : [],
       ),
+      if (Platform.isWindows)
+        NavigationItem(
+          glyph: AppGlyphs.resources,
+          label: PageLabel.zapret,
+          builder: (_) => const ZapretView(key: GlobalObjectKey(PageLabel.zapret)),
+          modes: [NavigationItemMode.desktop],
+        ),
       if (Platform.isWindows)
         NavigationItem(
           glyph: AppGlyphs.logs,
