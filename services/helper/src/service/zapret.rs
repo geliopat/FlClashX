@@ -1271,22 +1271,52 @@ mod tests {
 
     #[test]
     fn strict_split_flowseal_keeps_only_specialized_list_sections() {
-        let args = StrategyBuilder::build_flowseal_args_inner(
-            "flowseal-alt",
-            Path::new("."),
-            Path::new("./lists"),
-            TunnelMode::Strict,
-            "1024-65535",
-            "1024-65535",
-            None,
-        );
+        for strategy in FLOWSEAL {
+            let args = StrategyBuilder::build_flowseal_args_inner(
+                strategy.id,
+                Path::new("."),
+                Path::new("./lists"),
+                TunnelMode::Strict,
+                "1024-65535",
+                "1024-65535",
+                None,
+            );
 
-        assert!(args.iter().any(|arg| arg.contains("list-google.txt")));
-        assert!(args.iter().any(|arg| arg.contains("--hostlist-domains=")));
-        assert!(!args.iter().any(|arg| arg.contains("list-general")));
-        assert!(!args.iter().any(|arg| arg.contains("ipset-all.txt")));
-        assert!(!args.iter().any(|arg| arg == "--filter-udp=443"));
-        assert!(args.iter().any(|arg| arg == "--filter-udp=19294-19344,50000-65535"));
+            assert!(
+                !args.iter().any(|arg| arg.contains("list-general")),
+                "{} retained the general hostlist in STRICT SPLIT",
+                strategy.id,
+            );
+            assert!(
+                !args.iter().any(|arg| arg.contains("ipset-all.txt")),
+                "{} retained ipset-all in STRICT SPLIT",
+                strategy.id,
+            );
+            assert!(args.iter().any(|arg| arg.starts_with("--wf-tcp=")));
+            assert!(args.iter().any(|arg| arg.starts_with("--wf-udp=")));
+        }
+    }
+
+    #[test]
+    fn split_mode_capabilities_are_limited_to_flowseal_and_builtin_lua() {
+        let metadata = strategy_info();
+        for strategy in FLOWSEAL.iter().chain(LUA_STRATEGIES.iter()) {
+            assert!(
+                metadata.iter().any(|item| item.id == strategy.id && item.supports_split_mode),
+                "{} should support split modes",
+                strategy.id,
+            );
+        }
+        assert!(
+            metadata.iter().any(|item| item.id == "zapret2-ru-ultimate" && !item.supports_split_mode)
+        );
+        for strategy in imported_strategies::all() {
+            assert!(
+                metadata.iter().any(|item| item.id == strategy.id && !item.supports_split_mode),
+                "{} must keep its own rules",
+                strategy.id,
+            );
+        }
     }
 
     #[test]
