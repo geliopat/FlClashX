@@ -192,11 +192,22 @@ class ZapretController extends Notifier<ZapretState> {
   ZapretInfrastructure? _infrastructure;
   int? _infrastructureProfileId;
   bool _pendingInfrastructureRestart = false;
+  bool _coreRestarting = false;
   bool _profileApplying = false;
   bool _profileBlocked = false;
   bool _desiredRunning = false;
 
-  bool get _launchBlocked => _lifecycleStopping || _profileApplying || _profileBlocked;
+  bool get _launchBlocked => _lifecycleStopping || _coreRestarting ||
+      _profileApplying || _profileBlocked;
+
+  Future<bool> beginCoreRestart() {
+    _coreRestarting = true;
+    return stopAlongsideMihomo();
+  }
+
+  void endCoreRestart() {
+    _coreRestarting = false;
+  }
 
   /// Pause processing BEFORE the core can start using newly introduced
   /// infrastructure addresses. Keep the launch gate closed during the apply.
@@ -468,10 +479,10 @@ class ZapretController extends Notifier<ZapretState> {
 
   /// Start only after the new Mihomo run is ready. A later stop supersedes this.
   Future<void> startAlongsideMihomo({bool force = false}) async {
-    if (!Platform.isWindows || !ref.mounted) return;
+    if (!Platform.isWindows || !ref.mounted || _coreRestarting) return;
     final revision = ++_lifecycleRevision;
     final preferences = await SharedPreferences.getInstance();
-    if (!ref.mounted || revision != _lifecycleRevision) return;
+    if (!ref.mounted || revision != _lifecycleRevision || _coreRestarting) return;
     _lifecycleStopping = false;
     if (_launchBlocked || (!force && preferences.getBool(_linkedStartPreferenceKey) != true)) return;
     if (state.strategies.isEmpty) await loadStrategies();
