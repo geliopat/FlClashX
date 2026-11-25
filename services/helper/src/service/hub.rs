@@ -731,8 +731,11 @@ fn launch_zapret_with_intent(restart: bool, _pid: u32, _sequence: u64, request: 
 }
 
 #[cfg(windows)]
-fn update_zapret_watchdog(request: ZapretWatchdogRequest) -> warp::reply::Response {
+fn update_zapret_watchdog(request: ZapretWatchdogRequest, pid: u32, sequence: u64) -> warp::reply::Response {
     let _operation = lock_surviving_poison(&ZAPRET_OPERATION);
+    if let Err(error) = accept_zapret_command(pid, sequence) {
+        return error_response("zapretOwnerConflict", error.to_string(), StatusCode::CONFLICT);
+    }
     *lock_surviving_poison(&ZAPRET_WATCHDOG) = request.enabled;
     if let Some(intent) = lock_surviving_poison(&ZAPRET_INTENT).as_mut() {
         intent.retry_at = None;
@@ -743,7 +746,7 @@ fn update_zapret_watchdog(request: ZapretWatchdogRequest) -> warp::reply::Respon
 }
 
 #[cfg(not(windows))]
-fn update_zapret_watchdog(request: ZapretWatchdogRequest) -> warp::reply::Response {
+fn update_zapret_watchdog(request: ZapretWatchdogRequest, _pid: u32, _sequence: u64) -> warp::reply::Response {
     let _ = request.enabled;
     error_response(
         "unsupportedPlatform",
@@ -822,13 +825,13 @@ fn process_image_matches(handle: HANDLE, expected_exe_name: &str, zapret_root: &
 }
 
 #[cfg(windows)]
-fn find_external_winws_processes(zapret_root: &Path) -> Vec<String> {
+fn find_external_winws_processes(zapret_root: &Path, include_local: bool) -> Vec<String> {
     let targets = ["winws2.exe", "winws.exe", "winws2-split.exe"];
     let mut conflicts = Vec::new();
     unsafe {
         let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
         if snapshot == 0 || snapshot == -1isize {
-            return conflicts;
+            return vec![format!("Cannot enumerate winws processes: {}", Error::last_os_error())];
         }
         let mut entry: PROCESSENTRY32W = std::mem::zeroed();
         entry.dwSize = std::mem::size_of::<PROCESSENTRY32W>() as u32;
@@ -848,12 +851,17 @@ fn find_external_winws_processes(zapret_root: &Path) -> Vec<String> {
                         OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, entry.th32ProcessID);
                     if process != 0 {
                         if let Some(image_path) = process_image_path(process) {
-                            if !process_path_is_in_zapret_root(&image_path, zapret_root) {
+                            if include_local || !process_path_is_in_zapret_root(&image_path, zapret_root) {
                                 conflicts
                                     .push(format!("{image_path} (PID {})", entry.th32ProcessID));
                             }
+                        } else {
+                            conflicts.push(format!("{name} (PID {}, image path unavailable)", entry.th32ProcessID));
                         }
                         let _ = CloseHandle(process);
+                    } else {
+                        // The process may have exited; a fresh launch can retry.
+                        conflicts.push(format!("{name} (PID {}, cannot inspect)", entry.th32ProcessID));
                     }
                 }
                 if Process32NextW(snapshot, &mut entry) == 0 {
@@ -898,7 +906,7 @@ fn kill_stray_winws2_processes(exclude_pid: Option<u32>) -> usize {
                     let pid = entry.th32ProcessID;
                     if Some(pid) != exclude_pid {
                         let process = OpenProcess(
-                            PROCESS_TERMINATE | PROCESS_QUERY_LIMITED_INFORMATION,
+                            PROCESS_TERMINATE | PROCESS_QUERY_LIMITED_INFORMATION | 0x00100000,
                             0,
                             pid,
                         );
@@ -906,7 +914,9 @@ fn kill_stray_winws2_processes(exclude_pid: Option<u32>) -> usize {
                             let confirmed = targets
                                 .iter()
                                 .any(|target| process_image_matches(process, target, &zapret_root));
-                            if confirmed && TerminateProcess(process, 1) != 0 {
+                            if confirmed && TerminateProcess(process, 1) != 0
+                                && WaitForSingleObject(process, CORE_EXIT_TIMEOUT.as_millis() as u32) == 0
+                            {
                                 terminated += 1;
                             }
                             let _ = CloseHandle(process);
@@ -1111,7 +1121,7 @@ fn launch_zapret(
     let engine = launch.strategy.engine.to_string();
     let strategy_id = launch.strategy.id.to_string();
 
-    let external_processes = find_external_winws_processes(&bin_dir);
+    let external_processes = find_external_winws_processes(&bin_dir, false);
     if !external_processes.is_empty() {
         return error_response(
             "zapretConflict",
@@ -1144,6 +1154,17 @@ fn launch_zapret(
         zapret_log(
             "info",
             format!("Zapret cleanup terminated {cleaned} orphaned winws processes"),
+        );
+    }
+
+    // Never start another engine until cleanup is confirmed. External
+    // processes that appeared after the initial scan also block this launch.
+    let remaining = find_external_winws_processes(&bin_dir, true);
+    if !remaining.is_empty() {
+        return error_response(
+            "zapretConflict",
+            format!("Zapret process still running: {}", remaining.join("; ")),
+            StatusCode::CONFLICT,
         );
     }
 
@@ -1252,6 +1273,16 @@ fn stop_zapret(pid: u32, sequence: u64) -> warp::reply::Response {
             "info",
             format!("Zapret stop cleaned {cleaned} orphaned winws processes"),
         );
+    }
+    if let Ok(bin_dir) = zapret_bin_dir() {
+        // Do not terminate or treat an unrelated external installation as
+        // ours. A remaining local process, however, is not a successful stop.
+        let remaining = find_external_winws_processes(&bin_dir, true);
+        if remaining.iter().any(|entry| {
+            entry.to_ascii_lowercase().starts_with(&bin_dir.to_string_lossy().to_ascii_lowercase())
+        }) {
+            return error_response("zapretStopFailed", "A local Zapret engine did not exit", StatusCode::CONFLICT);
+        }
     }
     zapret_log("info", "Zapret stopped".to_string());
     json_response(
@@ -1947,6 +1978,8 @@ pub(super) fn routes() -> impl Filter<Extract = (impl Reply,), Error = Infallibl
         .and(warp::put())
         .and(warp::body::content_length_limit(MAX_REQUEST_BODY_BYTES))
         .and(warp::body::json())
+        .and(warp::header::<u32>("x-zapret-owner-pid"))
+        .and(warp::header::<u64>("x-zapret-command"))
         .map(update_zapret_watchdog);
 
     let api_zapret_start = warp::path("zapret")
