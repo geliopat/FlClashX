@@ -80,11 +80,6 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
           : appLocalizations.dashboard,
       actions: [
         if (!editing) const CoreStatusButton(),
-        if (!editing &&
-            providerMode &&
-            zapretWidgetEnabled &&
-            platform == SupportPlatform.Windows)
-          const ZapretStatusButton(),
       ],
       confirmationAction: editing
           ? IconButtonData(

@@ -759,12 +759,13 @@ class ZapretController extends Notifier<ZapretState> {
   /// Explicit dashboard recovery is allowed even when the Helper catalog
   /// could not be loaded. Do not replace a service outside the coordinated
   /// core restart: it may own both processes.
-  Future<void> restartFromDashboard() async {
+  Future<void> restartFromDashboard({bool restartAll = false}) async {
     if (!Platform.isWindows || !ref.mounted || state.busy ||
         state.dashboardRestarting || _coreRestarting || _profileApplying ||
         ref.read(safeModeProvider)) {
       return;
     }
+    final expectedZapret = state.running || _desiredRunning || state.startWithMihomo;
     state = state.copyWith(dashboardRestarting: true, clearError: true);
     try {
       // Keep other strategy operations out of the read-only preflight,
@@ -780,7 +781,7 @@ class ZapretController extends Notifier<ZapretState> {
       if (_coreRestarting || _profileApplying || ref.read(safeModeProvider)) {
         throw StateError('Дождись завершения текущей операции Mihomo');
       }
-      if (needsRepair || ref.read(coreStatusProvider) != CoreStatus.connected) {
+      if (restartAll || needsRepair || ref.read(coreStatusProvider) != CoreStatus.connected) {
         final restored = await ref.read(coreActionProvider.notifier)
             .restartCore(repairHelper: needsRepair);
         if (!ref.mounted) return;
@@ -789,6 +790,17 @@ class ZapretController extends Notifier<ZapretState> {
             code: 'helperUpdateFailed',
             message: 'Не удалось восстановить Mihomo после проверки Helper',
           );
+        }
+        if (restartAll) {
+          // The shared restart worker already restored the running intent.
+          // Do not launch an explicitly disabled engine a second time.
+          if (expectedZapret && ref.read(isStartProvider) && !state.running) {
+            await refresh();
+            if (ref.mounted && ref.read(isStartProvider) && !state.running) {
+              throw StateError(state.error ?? 'Mihomo восстановлен, но Zapret не запущен');
+            }
+          }
+          return;
         }
         await loadStrategies();
         await refresh();

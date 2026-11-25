@@ -22,6 +22,7 @@ class _CoreStatusButtonState extends ConsumerState<CoreStatusButton> {
 
   Timer? _holdTimer;
   CoreStatus _status = CoreStatus.disconnected;
+  bool _requesting = false;
 
   @override
   void initState() {
@@ -62,38 +63,57 @@ class _CoreStatusButtonState extends ConsumerState<CoreStatusButton> {
   }
 
   Future<void> _handleConnection() async {
-    if (_holdTimer != null || (system.isWindows && !ref.read(initProvider))) {
+    if (_requesting || _holdTimer != null ||
+        (system.isWindows && !ref.read(initProvider))) {
       return;
     }
     final coreStatus = ref.read(coreStatusProvider);
-    if (coreStatus == CoreStatus.connecting) {
-      return;
+    if (coreStatus == CoreStatus.connecting) return;
+    final restartAll = system.isWindows && !ref.read(safeModeProvider);
+    if (restartAll) {
+      final zapret = ref.read(zapretControllerProvider);
+      if (zapret.busy || zapret.dashboardRestarting) return;
     }
-    final tip = coreStatus == CoreStatus.connected
-        ? context.appLocalizations.forceRestartCoreTip
-        : context.appLocalizations.restartCoreTip;
-    final res = await dialogs.showMessage(message: TextSpan(text: tip));
-    if (res != true || !mounted || (system.isWindows && !ref.read(initProvider))) {
-      return;
-    }
+    setState(() => _requesting = true);
     try {
-      await ref.read(coreActionProvider.notifier).restartCore();
+      final tip = restartAll
+          ? 'Проверить Helper и перезапустить Mihomo и Zapret? VPN и Zapret будут восстановлены согласно предыдущему состоянию и настройке совместного запуска.'
+          : coreStatus == CoreStatus.connected
+              ? context.appLocalizations.forceRestartCoreTip
+              : context.appLocalizations.restartCoreTip;
+      final res = await dialogs.showMessage(
+        title: restartAll ? 'Перезапустить всё' : null,
+        message: TextSpan(text: tip),
+      );
+      if (res != true || !mounted ||
+          (system.isWindows && !ref.read(initProvider))) return;
+      if (restartAll) {
+        if (ref.read(safeModeProvider)) return;
+        await ref.read(zapretControllerProvider.notifier)
+            .restartFromDashboard(restartAll: true);
+      } else {
+        await ref.read(coreActionProvider.notifier).restartCore();
+      }
     } catch (error) {
-      dialogs.showNotifier(error.toString(), level: MessageLevel.error);
+      if (mounted) dialogs.showNotifier(error.toString(), level: MessageLevel.error);
+    } finally {
+      if (mounted) setState(() => _requesting = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final coreStatus = _holdTimer != null ? CoreStatus.connecting : _status;
+    final restartAll = system.isWindows && !ref.watch(safeModeProvider);
+    final zapretBusy = restartAll && ref.watch(zapretControllerProvider.select((state) => state.busy || state.dashboardRestarting));
+    final coreStatus = _holdTimer != null || _requesting ? CoreStatus.connecting : _status;
     final appLocalizations = context.appLocalizations;
-    final canRestart = !system.isWindows || ref.watch(initProvider);
+    final canRestart = (!_requesting && !zapretBusy) && (!system.isWindows || ref.watch(initProvider));
     const style = ElasticPress.buttonStyle;
     final iconOnly =
         coreStatus == CoreStatus.connected || ViewScope.isMobileOf(context);
     final icon = CorePulse(status: coreStatus);
     return Tooltip(
-      message: appLocalizations.coreStatus,
+      message: restartAll ? 'Перезапустить всё' : appLocalizations.coreStatus,
       child: FadeScaleBox(
         alignment: Alignment.centerRight,
         child: iconOnly
