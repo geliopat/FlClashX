@@ -168,6 +168,97 @@ pub fn strategies() -> Vec<ZapretStrategy> {
     result
 }
 
+/// Validated, read-only infrastructure exclusions sent by the desktop host.
+#[derive(Debug, Clone, Default, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ZapretInfrastructure {
+    #[serde(default)]
+    pub domains: Vec<String>,
+    #[serde(default)]
+    pub ips: Vec<String>,
+}
+
+#[cfg(windows)]
+impl ZapretInfrastructure {
+    pub fn validate(&self) -> Result<(), Error> {
+        if self.domains.len() > 8192 || self.ips.len() > 8192 {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "Too many Mihomo infrastructure exclusions",
+            ));
+        }
+        for domain in &self.domains {
+            let valid = !domain.is_empty()
+                && domain.len() <= 253
+                && domain.split('.').all(|label| {
+                    !label.is_empty()
+                        && label.len() <= 63
+                        && !label.starts_with('-')
+                        && !label.ends_with('-')
+                        && label.bytes().all(|ch| ch.is_ascii_alphanumeric() || ch == b'-')
+                });
+            if !valid {
+                return Err(Error::new(
+                    ErrorKind::InvalidInput,
+                    "Invalid Mihomo infrastructure hostname",
+                ));
+            }
+        }
+        for value in &self.ips {
+            let (address, prefix) = match value.split_once('/') {
+                Some((address, prefix)) => (address, Some(prefix)),
+                None => (value.as_str(), None),
+            };
+            let ip: std::net::IpAddr = address.parse().map_err(|_| {
+                Error::new(ErrorKind::InvalidInput, "Invalid infrastructure IP address")
+            })?;
+            if let Some(prefix) = prefix {
+                let maximum = if ip.is_ipv4() { 32 } else { 128 };
+                if prefix.parse::<u8>().map_or(true, |n| n > maximum) {
+                    return Err(Error::new(
+                        ErrorKind::InvalidInput,
+                        "Invalid infrastructure CIDR prefix",
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn prepare(&self) -> Result<(), Error> {
+        self.validate()?;
+        super::zapret_lists::write_infrastructure(
+            "mihomo-hostlist-exclude.txt",
+            self.domains.join("\n"),
+        )?;
+        super::zapret_lists::write_infrastructure(
+            "mihomo-ipset-exclude.txt",
+            self.ips.join("\n"),
+        )?;
+        Ok(())
+    }
+
+    /// Every registered strategy has an explicit TCP/UDP filter in each
+    /// processing profile. Apply both exclusions even to previously
+    /// ungated voice, QUIC, game and imported profiles.
+    pub fn apply(&self, args: &mut Vec<String>) {
+        let mut protected = Vec::with_capacity(args.len());
+        for arg in args.drain(..) {
+            let profile = arg.starts_with("--filter-tcp=") || arg.starts_with("--filter-udp=");
+            protected.push(arg);
+            if profile {
+                if !self.domains.is_empty() {
+                    protected.push("--hostlist-exclude=lists/mihomo-hostlist-exclude.txt".into());
+                }
+                if !self.ips.is_empty() {
+                    protected.push("--ipset-exclude=lists/mihomo-ipset-exclude.txt".into());
+                }
+            }
+        }
+        *args = protected;
+    }
+}
+
 pub fn build_launch(
     bin_dir: &Path,
     strategy_id: &str,
