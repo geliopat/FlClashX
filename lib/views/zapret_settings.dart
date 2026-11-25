@@ -301,6 +301,9 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
           rollbackFailures.add('$filename: $rollbackError');
         }
       }
+      if (applied.isNotEmpty && rollbackFailures.isEmpty && mounted) {
+        await _loadLists(select: _selected);
+      }
       if (!mounted) return;
       setState(() {
         _updating = false;
@@ -311,9 +314,6 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
                 ? 'Обновление не завершилось. Изменённые файлы автоматически возвращены из .bak.'
                 : 'Не удалось полностью откатить изменения: ${rollbackFailures.join('; ')}';
       });
-      if (applied.isNotEmpty && rollbackFailures.isEmpty) {
-        await _loadLists(select: _selected);
-      }
     }
   }
 
