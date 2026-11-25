@@ -9,3 +9,15 @@ func TestZapretCDNURLs(t *testing.T) {
 		t.Fatalf("unexpected stream URLs: %v", urls)
 	}
 }
+
+func TestZapretCDNRedirect(t *testing.T) {
+	base := "https://rr1---sn-test.googlevideo.com/videoplayback?x=1"
+	if got, ok := cdnRedirect(base, "https://rr2---sn-test.googlevideo.com/videoplayback?x=2"); !ok || got != "https://rr2---sn-test.googlevideo.com/videoplayback?x=2" {
+		t.Fatalf("valid redirect rejected: %s", got)
+	}
+	for _, target := range []string{"http://rr2---sn-test.googlevideo.com/videoplayback", "https://example.com/videoplayback", "https://rr2---sn-test.googlevideo.com/other", "https://rr2---sn-test.googlevideo.com:8443/videoplayback"} {
+		if _, ok := cdnRedirect(base, target); ok {
+			t.Fatalf("unsafe redirect accepted: %s", target)
+		}
+	}
+}

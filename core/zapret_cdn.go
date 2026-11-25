@@ -28,6 +28,8 @@ type ZapretCdnSample struct {
 	Bytes   int     `json:"bytes"`
 	Mbps    float64 `json:"mbps"`
 	Verdict string  `json:"verdict"`
+	Reason  string  `json:"reason,omitempty"`
+	HTTP    int     `json:"httpStatus,omitempty"`
 }
 
 func cdnURLs(html string) []string {
@@ -65,48 +67,113 @@ func zapretDirect(result *ProbeResult) bool {
 	return true
 }
 
+// Never expose signed playback URLs or raw network errors to the UI.
+func cdnProbeReason(result *ProbeResult) string {
+	if result == nil {
+		return "probe_busy_or_timeout"
+	}
+	if result.Error != "" {
+		if result.Error == probeErrorTimeout {
+			return "timeout"
+		}
+		return "network_error"
+	}
+	if !zapretDirect(result) {
+		return "direct_unconfirmed"
+	}
+	return ""
+}
+
+func cdnRedirect(current, location string) (string, bool) {
+	base, err := url.Parse(current)
+	if err != nil || location == "" {
+		return "", false
+	}
+	target, err := base.Parse(location)
+	if err != nil || target.Scheme != "https" || target.User != nil ||
+		target.Port() != "" || target.Path != "/videoplayback" ||
+		!zapretCdnHost.MatchString(target.Hostname()) || len(target.String()) > 4096 {
+		return "", false
+	}
+	return target.String(), true
+}
+
+func cdnMappedLocally(host string) bool {
+	if node, ok := resolver.DefaultHosts.Search(host, false); ok {
+		ip, _ := node.RandIP()
+		return ip.IsLoopback() || ip.IsUnspecified()
+	}
+	return false
+}
+
 func handleZapretCdnCheck() []ZapretCdnSample {
 	if !zapretCdnMutex.TryLock() {
-		return []ZapretCdnSample{}
+		return []ZapretCdnSample{{Verdict: "diagnostic", Reason: "check_busy"}}
 	}
 	defer zapretCdnMutex.Unlock()
 	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
 	defer cancel()
 	var urls []string
+	seen := map[string]bool{}
+	samples := []ZapretCdnSample{}
 	for _, id := range []string{"aqz-KE-bpKQ", "dQw4w9WgXcQ", "LXb3EKWsInQ"} {
-		if ctx.Err() != nil {
+		if ctx.Err() != nil || len(urls) >= 6 {
 			break
 		}
 		page := runProbe(ctx, probeRequest{
 			url:        "https://www.youtube.com/watch?v=" + id,
 			proxyName:  "DIRECT",
 			timeout:    12 * time.Second,
-			maxBody:    4 * 1024 * 1024,
+			maxBody:    8 * 1024 * 1024,
 			noRedirect: true,
-			headers: map[string]string{"User-Agent": browserUserAgent, "Accept-Language": "ru-RU,ru;q=0.9,en;q=0.8"},
+			headers:    map[string]string{"User-Agent": browserUserAgent, "Accept-Language": "ru-RU,ru;q=0.9,en;q=0.8"},
 		})
-		if zapretDirect(page) && page.StatusCode == 200 {
-			urls = cdnURLs(page.Body)
-			if len(urls) != 0 {
-				break
+		diagnostic := ZapretCdnSample{Host: "www.youtube.com", Verdict: "diagnostic", Reason: cdnProbeReason(page)}
+		if page != nil {
+			diagnostic.HTTP = page.StatusCode
+		}
+		if diagnostic.Reason == "" {
+			switch {
+			case page.StatusCode != 200:
+				diagnostic.Reason = "watch_http"
+			default:
+				found := cdnURLs(page.Body)
+				if len(found) == 0 {
+					diagnostic.Reason = "no_stream_urls"
+				} else {
+					diagnostic.Reason = "stream_urls_found"
+				}
+				for _, raw := range found {
+					u, _ := url.Parse(raw)
+					if !seen[u.Hostname()] && len(urls) < 6 {
+						seen[u.Hostname()] = true
+						urls = append(urls, raw)
+					}
+				}
 			}
 		}
+		samples = append(samples, diagnostic)
 	}
-	samples := make([]ZapretCdnSample, 0, len(urls))
 	for _, raw := range urls {
 		if ctx.Err() != nil {
+			samples = append(samples, ZapretCdnSample{Verdict: "diagnostic", Reason: "budget_exhausted"})
 			break
 		}
+		samples = append(samples, measureZapretCDN(ctx, raw))
+	}
+	return samples
+}
+
+func measureZapretCDN(ctx context.Context, raw string) ZapretCdnSample {
+	ctx, cancel := context.WithTimeout(ctx, 25*time.Second)
+	defer cancel()
+	for hop := 0; hop <= 3; hop++ {
 		u, _ := url.Parse(raw)
 		host := u.Hostname()
 		sample := ZapretCdnSample{Host: host, Verdict: "unknown"}
-		// Do not mistake a deliberate local loopback mapping for throttling.
-		if node, ok := resolver.DefaultHosts.Search(host, false); ok {
-			ip, _ := node.RandIP()
-			if ip.IsLoopback() || ip.IsUnspecified() {
-				samples = append(samples, sample)
-				continue
-			}
+		if cdnMappedLocally(host) {
+			sample.Reason = "local_hosts_mapping"
+			return sample
 		}
 		result := runProbe(ctx, probeRequest{
 			url:        raw,
@@ -114,19 +181,43 @@ func handleZapretCdnCheck() []ZapretCdnSample {
 			timeout:    25 * time.Second,
 			maxBody:    zapretCdnBytes,
 			noRedirect: true,
-			headers: map[string]string{"User-Agent": browserUserAgent, "Range": fmt.Sprintf("bytes=0-%d", zapretCdnBytes-1), "Accept-Encoding": "identity"},
+			headers:    map[string]string{"User-Agent": browserUserAgent, "Range": fmt.Sprintf("bytes=0-%d", zapretCdnBytes-1), "Accept-Encoding": "identity"},
 		})
-		if zapretDirect(result) && (result.StatusCode == 200 || result.StatusCode == 206) {
-			contentType := strings.ToLower(result.header.Get("Content-Type"))
-			if strings.HasPrefix(contentType, "video/") || strings.HasPrefix(contentType, "audio/") || strings.HasPrefix(contentType, "application/octet-stream") {
-				sample.Bytes = len(result.Body)
-				if sample.Bytes >= zapretCdnMin && result.sampleMicros > 0 {
-					sample.Mbps = float64(sample.Bytes) * 8 / float64(result.sampleMicros)
-					sample.Verdict = "measured"
-				}
-			}
+		sample.Reason = cdnProbeReason(result)
+		if result != nil {
+			sample.HTTP = result.StatusCode
 		}
-		samples = append(samples, sample)
+		if sample.Reason != "" {
+			return sample
+		}
+		if result.StatusCode >= 300 && result.StatusCode < 400 {
+			next, ok := cdnRedirect(raw, result.header.Get("Location"))
+			if !ok || hop == 3 {
+				sample.Reason = "redirect_rejected"
+				return sample
+			}
+			raw = next
+			continue
+		}
+		if result.StatusCode != 200 && result.StatusCode != 206 {
+			sample.Reason = "stream_http"
+			return sample
+		}
+		contentType := strings.ToLower(result.header.Get("Content-Type"))
+		if !strings.HasPrefix(contentType, "video/") &&
+			!strings.HasPrefix(contentType, "audio/") &&
+			!strings.HasPrefix(contentType, "application/octet-stream") {
+			sample.Reason = "not_media"
+			return sample
+		}
+		sample.Bytes = len(result.Body)
+		if sample.Bytes < zapretCdnMin || result.sampleMicros <= 0 {
+			sample.Reason = "insufficient_sample"
+			return sample
+		}
+		sample.Mbps = float64(sample.Bytes) * 8 / float64(result.sampleMicros)
+		sample.Verdict = "measured"
+		return sample
 	}
-	return samples
+	return ZapretCdnSample{Verdict: "unknown", Reason: "redirect_rejected"}
 }

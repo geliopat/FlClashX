@@ -550,8 +550,31 @@ class SmartHostsController extends Notifier<SmartHostsState> {
         return;
       }
       final measured = <CdnMeasurement>[];
+      final diagnostics = <String, int>{};
       final now = DateTime.now();
+      const reasons = {
+        'check_busy': 'Проверка уже выполняется',
+        'probe_busy_or_timeout': 'Нет свободного слота или истёк тайм-аут',
+        'timeout': 'Тайм-аут',
+        'network_error': 'Ошибка сети',
+        'direct_unconfirmed': 'Маршрут DIRECT не подтверждён',
+        'watch_http': 'Ошибка страницы YouTube',
+        'no_stream_urls': 'YouTube не выдал прямые ссылки на видео',
+        'stream_urls_found': 'Получены ссылки на видео',
+        'local_hosts_mapping': 'Узел уже перенаправлен на локальный адрес',
+        'redirect_rejected': 'Недопустимое перенаправление CDN',
+        'stream_http': 'Ошибка ответа CDN',
+        'not_media': 'CDN вернул не видеопоток',
+        'insufficient_sample': 'Недостаточно данных для измерения',
+        'budget_exhausted': 'Истекло общее время проверки',
+      };
       for (final item in results) {
+        final reason = reasons[item['reason']];
+        if (reason != null) {
+          final status = item['httpStatus'];
+          final label = status is int && status >= 300 ? '$reason (HTTP $status)' : reason;
+          diagnostics.update(label, (count) => count + 1, ifAbsent: () => 1);
+        }
         final host = item['host'];
         final mbps = item['mbps'];
         if (host is! String || youtubeCluster(host) == null || mbps is! num ||
@@ -572,6 +595,9 @@ class SmartHostsController extends Notifier<SmartHostsState> {
       _cdnMessage = measured.isEmpty
           ? 'Нет достоверных измерений; списки не изменены'
           : 'Измерено: ${measured.length}; быстрых: ${measured.where((record) => record.fast).length}';
+      if (diagnostics.isNotEmpty) {
+        _cdnMessage = '$_cdnMessage\n${diagnostics.entries.map((entry) => '${entry.key}: ${entry.value}').join('\n')}';
+      }
       await _save();
     } catch (error) {
       _cdnMessage = 'Ошибка измерения: $error';
