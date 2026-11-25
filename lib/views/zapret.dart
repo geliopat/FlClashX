@@ -124,7 +124,7 @@ class ZapretView extends ConsumerWidget {
         items: [
           ListItem(
             title: Text(zapret.testProgress ?? 'Проверить все стратегии'),
-            subtitle: const Text('Быстрый отбор всех стратегий и контроль лучших кандидатов через Mihomo DIRECT. YouTube и два HTTPS API Discord.'),
+            subtitle: const Text('Быстрый отбор всех стратегий и контроль лучших кандидатов через Mihomo DIRECT. YouTube, GoogleVideo и два HTTPS API Discord.'),
             onTap: zapret.busy ? null : () => ref.read(zapretControllerProvider.notifier).testStrategies(),
           ),
           if (zapret.testProgress != null)
@@ -243,7 +243,7 @@ class ZapretResultsView extends ConsumerWidget {
           Text(top.isEmpty
               ? 'Нет стратегий с успешными запросами.'
               : 'Топ-5 выделены цветом и номером. Подтверждённые можно применить.'),
-          const Text('Задержки HTTPS, не ICMP. Discord Voice API: restricted означает доступность HTTPS, а не проверку голосового UDP.'),
+          const Text('Задержки HTTPS, не ICMP. Три обязательных проверки; GoogleVideo — дополнительная. Discord Voice API: restricted означает доступность HTTPS, а не проверку голосового UDP.'),
           const SizedBox(height: 12),
           for (final trial in ranked)
             Card(
@@ -263,7 +263,7 @@ class ZapretResultsView extends ConsumerWidget {
                       if (trial.confirmed)
                         TextButton(onPressed: zapret.busy ? null : () => apply(trial), child: const Text('Применить')),
                     ]),
-                    Text('${trial.resultLabel} · ${trial.passedTargets}/3 · '
+                    Text('${trial.resultLabel} · ${trial.passedTargets}/3 обязательных · '
                         '${trial.delay > 0 ? '${trial.delay} мс (среднее)' : 'Нет задержки'}'),
                     if (trial.error != null)
                       Text(trial.error!, style: TextStyle(color: context.colorScheme.error)),
