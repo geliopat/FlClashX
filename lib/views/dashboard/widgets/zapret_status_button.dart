@@ -13,7 +13,9 @@ class ZapretStatusButton extends ConsumerWidget {
   Future<void> _restart(BuildContext context, WidgetRef ref) async {
     final status = ref.read(zapretControllerProvider);
     if (!ref.read(initProvider) || status.busy || status.dashboardRestarting ||
-        ref.read(safeModeProvider)) return;
+        ref.read(safeModeProvider)) {
+      return;
+    }
     final message = status.running
         ? 'Перезапустить выбранную стратегию Zapret? Helper будет проверен и при необходимости переустановлен с восстановлением Mihomo. Зависшие процессы нашего Zapret будут завершены.'
         : 'Запустить выбранную стратегию Zapret? Helper будет проверен и при необходимости переустановлен с восстановлением Mihomo. Зависшие процессы нашего Zapret будут завершены.';

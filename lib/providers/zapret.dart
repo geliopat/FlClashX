@@ -183,9 +183,11 @@ class ZapretTrial {
   String get resultLabel {
     if (error != null) return 'Ошибка запуска/проверки';
     if (confirmed) return 'Успешно';
-    if (screenedOnly) return passedTargets == 0
-        ? 'Не прошла предварительный отбор'
-        : 'Только предварительный отбор';
+    if (screenedOnly) {
+      return passedTargets == 0
+          ? 'Не прошла предварительный отбор'
+          : 'Только предварительный отбор';
+    }
     return score > 0 ? 'Частично успешно' : 'Не прошла проверку';
   }
 }
@@ -916,8 +918,7 @@ class ZapretController extends Notifier<ZapretState> {
     final sameProcess = status.running && status.strategyId == id && status.pid == before.pid;
     final details = [
       for (final target in targets)
-        '${target.label}${target == ZapretProbeTarget.googleVideo ? ' (доп.)' : ''}: ${items[target]?.statusLabel ?? 'Не проверен'} · ${items[target]?.message ?? 'Нет результата'}'
-        '${items[target]?.latencyMs == null ? '' : ' · ${items[target]!.latencyMs} мс'}',
+        '${target.label}${target == ZapretProbeTarget.googleVideo ? ' (доп.)' : ''}: ${items[target]?.statusLabel ?? 'Не проверен'} · ${items[target]?.message ?? 'Нет результата'}${items[target]?.latencyMs == null ? '' : ' · ${items[target]!.latencyMs} мс'}',
       if (!sameProcess) 'Движок остановился или сменил PID во время проверки',
     ];
     return ZapretTrial(id, mode, sameProcess ? score : 0,
