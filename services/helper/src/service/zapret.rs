@@ -1527,7 +1527,9 @@ mod tests {
         let auto_positions: Vec<usize> = result
             .iter()
             .enumerate()
-            .filter_map(|(index, arg)| (arg == "--hostlist-auto=lists/list-auto.txt").then_some(index))
+            .filter_map(|(index, arg)| {
+                (arg == "--hostlist-auto=lists/list-auto.txt").then_some(index)
+            })
             .collect();
 
         assert_eq!(auto_positions.len(), 1);
