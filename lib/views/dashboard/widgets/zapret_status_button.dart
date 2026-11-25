@@ -2,7 +2,6 @@ import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/core/desktop/helper_client.dart';
 import 'package:fl_clash/providers/providers.dart';
-import 'package:fl_clash/state.dart';
 import 'package:fl_clash/ui/ui.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter/material.dart';
@@ -42,7 +41,6 @@ class ZapretStatusButton extends ConsumerWidget {
             child: CircularProgressIndicator(strokeWidth: 2),
           )
         : ZapretMark(running: state.running);
-    const style = ElasticPress.buttonStyle;
     final iconOnly = state.running || ViewScope.isMobileOf(context);
     return Tooltip(
       message: state.error ?? 'Zapret',
@@ -50,7 +48,6 @@ class ZapretStatusButton extends ConsumerWidget {
         alignment: Alignment.centerRight,
         child: iconOnly
             ? IconButton.filled(
-                style: style,
                 onPressed: state.busy || !state.available
                     ? null
                     : () => _restart(context, ref),
@@ -60,7 +57,6 @@ class ZapretStatusButton extends ConsumerWidget {
                 onPressed: state.busy || !state.available
                     ? null
                     : () => _restart(context, ref),
-                style: style,
                 icon: icon,
                 label: Text(state.busy
                     ? 'Запуск...'

@@ -69,7 +69,7 @@ class ZapretStrategySheet extends ConsumerWidget {
                   ],
                 ),
                 const SizedBox(height: 14),
-                TabBar(
+                const TabBar(
                   isScrollable: false,
                   tabs: const [
                     Tab(text: 'Flowseal'),

@@ -521,7 +521,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
                   const Center(child: CircularProgressIndicator())
                 else ...[
                   DropdownButtonFormField<String>(
-                    value: _selected,
+                    initialValue: _selected,
                     isExpanded: true,
                     decoration: const InputDecoration(labelText: 'Файл списка'),
                     items: [
