@@ -744,7 +744,7 @@ impl StrategyBuilder {
                 }
             }
             if !current_block.is_empty() {
-                let has_general = current_block.iter().any(|a: &String| a.contains("list-general.txt") || a.contains("ipset-all.txt"));
+                let has_general = current_block.iter().any(|a: &String| a.contains("list-general") || a.contains("ipset-all.txt"));
                 if !has_general {
                     if !filtered.is_empty() {
                         filtered.push("--new".to_string());
