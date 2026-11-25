@@ -785,27 +785,29 @@ class ZapretController extends Notifier<ZapretState> {
     int timeoutMs = 3500,
     int? expectedPid,
   }) async {
-    const targets = [ZapretProbeTarget.youtube, ZapretProbeTarget.discordGateway, ZapretProbeTarget.discordVoice];
+    const required = [ZapretProbeTarget.youtube, ZapretProbeTarget.discordGateway, ZapretProbeTarget.discordVoice];
+    const targets = ZapretProbeTarget.values;
     final before = await _client.zapretStatus();
     if (!before.running || before.strategyId != id || before.pid == null ||
         (expectedPid != null && before.pid != expectedPid)) {
       throw StateError('Движок стратегии не запущен: $id');
     }
     final items = await measureZapretTargets(ref, targets, timeoutMs: timeoutMs);
-    final good = items.values.where((item) => item.accepted && item.latencyMs != null && item.latencyMs! > 0).toList();
+    final good = required.map((target) => items[target]).whereType<ZapretProbeResult>()
+        .where((item) => item.accepted && item.latencyMs != null && item.latencyMs! > 0).toList();
     final score = good.fold<int>(0, (sum, item) => sum + (item.latencyMs! <= 450 ? 2 : 1));
     final delay = good.isEmpty ? 0 : (good.fold<int>(0, (sum, item) => sum + item.latencyMs!) / good.length).round();
     final status = await _client.zapretStatus();
     final sameProcess = status.running && status.strategyId == id && status.pid == before.pid;
     final details = [
       for (final target in targets)
-        '${target.label}: ${items[target]?.message ?? 'Нет результата'}'
+        '${target.label}${target == ZapretProbeTarget.googleVideo ? ' (доп.)' : ''}: ${items[target]?.message ?? 'Нет результата'}'
         '${items[target]?.latencyMs == null ? '' : ' · ${items[target]!.latencyMs} мс'}',
       if (!sameProcess) 'Движок остановился или сменил PID во время проверки',
     ];
     return ZapretTrial(id, mode, sameProcess ? score : 0,
         sameProcess ? delay : 0,
-        confirmed: sameProcess && good.length == targets.length,
+        confirmed: sameProcess && good.length == required.length,
         passedTargets: sameProcess ? good.length : 0,
         error: sameProcess ? null : 'Движок завершился во время проверки',
         details: details);
