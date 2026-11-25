@@ -11,6 +11,9 @@ on:
       - 'windows/**'
       - 'scripts/setup_zapret.ps1'
       - '.github/workflows/zapret-windows-validation.yml'
+      - '.github/workflows/build.yaml'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
   workflow_dispatch:
 
 permissions:
