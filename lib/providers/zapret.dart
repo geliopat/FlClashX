@@ -209,6 +209,11 @@ class ZapretController extends Notifier<ZapretState> {
         available: error.code != 'zapretUnsupported',
         running: false,
         clearPid: true,
+        clearActiveStrategy: true,
+        clearActiveEngine: true,
+        clearActiveMode: true,
+        winDivertFilters: const [],
+        processingLists: const [],
         error: error.message,
       );
     } catch (error) {
@@ -216,6 +221,11 @@ class ZapretController extends Notifier<ZapretState> {
       state = state.copyWith(
         running: false,
         clearPid: true,
+        clearActiveStrategy: true,
+        clearActiveEngine: true,
+        clearActiveMode: true,
+        winDivertFilters: const [],
+        processingLists: const [],
         error: error.toString(),
       );
     } finally {
