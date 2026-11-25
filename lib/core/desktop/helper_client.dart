@@ -719,7 +719,7 @@ final class HelperClient {
         '$baseUrl/zapret/$route',
         data: strategyId == null
             ? null
-            : {'strategyId': strategyId, 'mode': mode ?? 'fullBypass', if (debug) 'debug': true, 'watchdog': ?watchdog, 'infrastructure': ?infrastructure, if (reason != null) 'reason': reason},
+            : {'strategyId': strategyId, 'mode': mode ?? 'fullBypass', if (debug) 'debug': true, 'watchdog': ?watchdog, 'infrastructure': ?infrastructure, 'reason': ?reason},
         options: _options(
           ResponseType.json,
           receiveTimeout: operation == 'stop'
