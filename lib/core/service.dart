@@ -38,7 +38,10 @@ class CoreService extends CoreHandlerInterface {
         hasHelper: system.hasHelperService && !safeModeBuild,
         directLauncher: directLauncher,
         helperLauncher: HelperLauncher(helperClient),
-        helperReady: () => helperClient.readiness(),
+        requireHelper: system.isWindows && !safeModeBuild,
+        helperReady: () => system.isWindows && !safeModeBuild
+            ? windows!.ensureHelperReady()
+            : helperClient.readiness(),
       ),
       verifyPeerPid: system.isWindows,
     );

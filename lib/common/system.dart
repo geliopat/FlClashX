@@ -436,8 +436,31 @@ class Windows {
   ];
 
   Future<AuthorizeCode>? _registration;
+  String? _registrationError;
+
+  Future<HelperReadiness> ensureHelperReady({bool forceReinstall = false}) async {
+    final result = await registerService(forceReinstall: forceReinstall);
+    if (result == AuthorizeCode.error) {
+      throw HelperException(
+        code: 'helperUpdateFailed',
+        message: _registrationError ?? 'Не удалось проверить или обновить Helper',
+      );
+    }
+    return HelperReadiness.ready;
+  }
+
+  void _recordRegistrationError(String message) {
+    _registrationError = message;
+    commonPrint.log(message, logLevel: LogLevel.error);
+  }
 
   Future<AuthorizeCode> registerService({bool forceReinstall = false}) {
+    final active = _registration;
+    if (active != null) {
+      return forceReinstall
+          ? active.then((_) => registerService(forceReinstall: true))
+          : active;
+    }
     return _registration ??= _registerService(forceReinstall).whenComplete(() {
       _registration = null;
     });
@@ -473,14 +496,17 @@ class Windows {
   // to answer a ping. This also detects UAC cancellation and installer errors.
   Future<bool> _installAndWait() async {
     final helper = File(appPath.helperPath);
-    if (!await helper.exists()) return false;
+    if (!await helper.exists()) {
+      _recordRegistrationError('Helper executable not found: ${helper.path}');
+      return false;
+    }
     final root = Platform.environment['SystemRoot'] ?? r'C:\Windows';
     final escaped = helper.path.replaceAll("'", "''");
     final command = 'try { '
         "\$p = Start-Process -FilePath '$escaped' "
         "-ArgumentList '${installArguments(pid)}' "
         '-Verb RunAs -Wait -PassThru -ErrorAction Stop; '
-        'exit \$p.ExitCode } catch { exit 1 }';
+        'exit \$p.ExitCode } catch { [Console]::Error.WriteLine(\$_.Exception.Message); exit 1 }';
     final bytes = <int>[
       for (final unit in command.codeUnits) ...[unit & 0xff, unit >> 8],
     ];
@@ -490,13 +516,13 @@ class Windows {
        '-EncodedCommand', base64Encode(bytes)],
     );
     if (result.exitCode != 0) {
-      commonPrint.log('Helper installation failed: ${result.exitCode}',
-          logLevel: LogLevel.error);
+      _recordRegistrationError('Helper installer failed (exit ${result.exitCode}): ${result.stderr.toString().trim()} ${result.stdout.toString().trim()}');
     }
     return result.exitCode == 0;
   }
 
   Future<AuthorizeCode> _registerService(bool forceReinstall) async {
+    _registrationError = null;
     try {
       final retired = await _hasRetiredHelper();
       final result = await registerHelperService(
@@ -504,16 +530,16 @@ class Windows {
         forceReinstall: forceReinstall || retired,
         verifyBundledCore: _verifyBundledCore,
         verifyHelperBinary: true,
+        onFailure: (message) { _registrationError ??= message; },
+        startupTimeout: const Duration(seconds: 30),
       );
       if (result == AuthorizeCode.success && await _hasRetiredHelper()) {
-        commonPrint.log('Legacy Helper services remain after installation',
-            logLevel: LogLevel.error);
+        _recordRegistrationError('Legacy Helper services remain after installation');
         return AuthorizeCode.error;
       }
       return result;
     } catch (error) {
-      commonPrint.log('Helper startup verification failed: $error',
-          logLevel: LogLevel.error);
+      _recordRegistrationError('Helper startup verification failed: $error');
       return AuthorizeCode.error;
     }
   }
@@ -527,6 +553,8 @@ Future<AuthorizeCode> registerHelperService(
   bool forceReinstall = false,
   Future<bool> Function()? verifyBundledCore,
   bool verifyHelperBinary = false,
+  void Function(String)? onFailure,
+  Duration startupTimeout = const Duration(seconds: 6),
 }) async {
   final readiness = await helperClient.readiness(verifyHelperBinary: verifyHelperBinary);
   switch (readiness) {
@@ -541,6 +569,7 @@ Future<AuthorizeCode> registerHelperService(
       );
       break;
     case HelperReadiness.manifestMissing:
+      onFailure?.call('Core manifest is missing or invalid');
       commonPrint.log(
         'Core manifest is missing or invalid; Helper service unavailable, '
         'falling back to direct Core',
@@ -557,6 +586,7 @@ Future<AuthorizeCode> registerHelperService(
             logLevel: LogLevel.warning);
         break;
       }
+      onFailure?.call('Core SHA256 does not match the bundled manifest');
       commonPrint.log(
         'the Core on disk does not match the bundled manifest, so the Helper '
         'refuses it; a package build may have stripped the binary',
@@ -572,6 +602,7 @@ Future<AuthorizeCode> registerHelperService(
   }
 
   if (verifyBundledCore != null && !await verifyBundledCore()) {
+    onFailure?.call('Bundled Core SHA256 verification failed');
     commonPrint.log('Bundled Core verification failed; installed services were not changed',
         logLevel: LogLevel.error);
     dialogs.showNotifier(currentAppLocalizations.helperCorruptTip,
@@ -583,6 +614,7 @@ Future<AuthorizeCode> registerHelperService(
     logLevel: LogLevel.warning,
   );
   if (!await install()) {
+    onFailure?.call('Elevated Helper installation failed or was cancelled');
     commonPrint.log(
       'failed to launch elevated helper installation',
       logLevel: LogLevel.error,
@@ -592,7 +624,11 @@ Future<AuthorizeCode> registerHelperService(
 
   final isRunning = await _waitForHelperService(
     verifyHelperBinary: verifyHelperBinary,
+    timeout: startupTimeout,
   );
+  if (!isRunning) {
+    onFailure?.call('Helper did not become ready after installation: protocol, path or binary mismatch');
+  }
   commonPrint.log(
     isRunning
         ? 'helper service installation completed'

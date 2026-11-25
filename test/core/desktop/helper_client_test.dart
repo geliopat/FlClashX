@@ -973,6 +973,39 @@ void main() {
     expect(await resolver.resolve(), same(direct));
   });
 
+  test('required Helper never falls back to direct Core', () async {
+    final direct = FakeLauncher(owner: CoreProcessOwner.direct, pid: 1);
+    final helper = FakeLauncher(owner: CoreProcessOwner.helper, pid: 2);
+    var readiness = HelperReadiness.notReady;
+    final resolver = HelperLauncherResolver(
+      hasHelper: true,
+      requireHelper: true,
+      directLauncher: direct,
+      helperLauncher: helper,
+      helperReady: () async => readiness,
+    );
+    for (final unavailable in [
+      HelperReadiness.notReady,
+      HelperReadiness.manifestMissing,
+      HelperReadiness.coreMismatch,
+    ]) {
+      readiness = unavailable;
+      await expectLater(resolver.resolve(), throwsA(isA<HelperException>()));
+    }
+    readiness = HelperReadiness.ready;
+    final resolved = await resolver.resolve();
+    expect(resolved, same(helper));
+    helper.startError = const HelperException(
+      code: 'processLaunchFailed',
+      message: 'cannot spawn Core',
+    );
+    await expectLater(
+      resolved.start(sessionId: _sessionId, address: 'test-address'),
+      throwsA(isA<HelperException>()),
+    );
+    expect(direct.startCount, 0);
+  });
+
   test('launcher resolver never probes Helper without one installed', () async {
     final direct = FakeLauncher(owner: CoreProcessOwner.direct, pid: 1);
     final helper = FakeLauncher(owner: CoreProcessOwner.helper, pid: 2);

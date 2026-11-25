@@ -974,18 +974,38 @@ final class HelperLauncherResolver implements DesktopCoreLauncherResolver {
   final CoreProcessLauncher directLauncher;
   final CoreProcessLauncher helperLauncher;
   final HelperReadinessProbe helperReady;
+  final bool requireHelper;
 
   const HelperLauncherResolver({
     required this.hasHelper,
     required this.directLauncher,
     required this.helperLauncher,
     required this.helperReady,
+    this.requireHelper = false,
   });
 
   @override
   Future<CoreProcessLauncher> resolve() async {
-    if (!hasHelper) return directLauncher;
+    if (!hasHelper) {
+      if (requireHelper) {
+        throw const HelperException(
+          code: 'helperUnavailable',
+          message: 'Windows Helper is required',
+        );
+      }
+      return directLauncher;
+    }
     final readiness = await helperReady();
+    if (requireHelper) {
+      if (readiness != HelperReadiness.ready) {
+        throw HelperException(
+          code: 'helperUnavailable',
+          message: 'Windows Helper verification failed: ${readiness.name}',
+        );
+      }
+      // Do not bypass Helper if it fails to spawn the Core.
+      return helperLauncher;
+    }
     if (readiness == HelperReadiness.ready) {
       return FallbackCoreLauncher(
         primary: helperLauncher,
