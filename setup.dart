@@ -255,12 +255,18 @@ List<String> channelScripts(List<String> scripts, DesktopIdentity identity) => [
     line.replaceAll(stableDesktop.helperUnit, identity.helperUnit),
 ];
 
-void renameForChannel(String dir, DesktopIdentity identity, {String ext = ''}) {
+void renameForChannel(
+  String dir,
+  DesktopIdentity identity, {
+  String ext = '',
+  bool renameHelper = true,
+}) {
   if (!identity.pre) return;
   for (final (from, to) in [
     (stableDesktop.executable, identity.executable),
     (stableDesktop.helper, identity.helper),
   ]) {
+    if (!renameHelper && from == stableDesktop.helper) continue;
     final file = File(p.join(dir, '$from$ext'));
     if (file.existsSync()) file.renameSync(p.join(dir, '$to$ext'));
   }
@@ -656,7 +662,7 @@ Future<void> _packageWindows(
       Directory(bundle).deleteSync(recursive: true);
     }
     await build.copyTree(built, bundle);
-    renameForChannel(bundle, identity, ext: '.exe');
+    renameForChannel(bundle, identity, ext: '.exe', renameHelper: false);
   }
   if (targets.contains('zip')) {
     final zip = build.dist(artifactName('windows', build.arch, '.zip'));
@@ -762,7 +768,7 @@ String renderInnoSetup(
     'EXECUTABLE_NAME': identity.pre
         ? '${identity.executable}.exe'
         : (config['executable_name'] ?? '$_appName.exe') as String,
-    'HELPER_SERVICE': identity.helper,
+    'HELPER_SERVICE': stableDesktop.helper,
     'USER_DATA_DIR': identity.windowsDataDir,
     'ADOPT_LEGACY': identity.pre ? 'False' : 'True',
     'LANGUAGES': languages.join('\n'),
