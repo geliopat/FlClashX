@@ -706,6 +706,9 @@ class SetupAction extends _$SetupAction {
     if (hasScript) {
       rawConfig = await handleEvaluate(scriptContent!, rawConfig);
     }
+    if (system.isWindows && !ref.read(safeModeProvider)) {
+      rawConfig = mergeSmartHosts(rawConfig, patchConfig.hosts, ref.read(smartHostsProvider).entries);
+    }
     final directory = await appPath.profilesPath;
     final injected = await _resolveInjectedProviders(
       setupState,

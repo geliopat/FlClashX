@@ -10,6 +10,7 @@ import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/views/config/on_demand.dart';
+import 'package:fl_clash/views/config/smart_hosts.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -542,6 +543,11 @@ class GeneralView extends ConsumerWidget {
         update: (state, value) => state.copyWith(ipv6: value),
       ),
       const HostsItem(),
+      if (system.isWindows)
+        ListItem.open(
+          title: const Text('Умный Hosts'),
+          widget: const SmartHostsView(),
+        ),
       ConfigToggleItem(
         title: (l) => l.appendSystemDns,
         selector: networkSettingProvider.select(

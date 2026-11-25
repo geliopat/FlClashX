@@ -9,6 +9,7 @@ import 'package:fl_clash/providers/action.dart';
 import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/providers/state.dart';
 import 'package:fl_clash/providers/zapret.dart';
+import 'package:fl_clash/providers/smart_hosts.dart';
 import 'package:fl_clash/providers/zapret_diagnostics.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -48,6 +49,11 @@ class _TrayManagerState extends ConsumerState<TrayManager> {
         state.mode, state.startWithMihomo, state.strategies,
       )), (_, _) => _requestUpdate());
       ref.listenManual(zapretDiagnosticsProvider, (_, _) {});
+      ref.listenManual(smartHostsProvider.select((state) => state.revision), (_, _) {
+        if (ref.read(initProvider)) {
+          ref.read(setupActionProvider.notifier).applyProfileDebounce(force: true, silence: true);
+        }
+      });
     }
     if (system.isMacOS) {
       ref.listenManual(trayDelaysProvider, (prev, next) {
