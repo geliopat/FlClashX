@@ -358,9 +358,19 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
       final backupPath = transaction.backup?.path ?? '';
       setState(() => _componentResult = 'Компоненты установлены. Резервная копия: '+backupPath);
       if (component == ZapretComponent.all) {
+        if (_lists.isEmpty) await _loadLists();
+        if (!mounted) return;
+        if (_lists.isEmpty) {
+          setState(() => _componentResult = 'Компоненты установлены, но списки недоступны.');
+          return;
+        }
         await _updateLists();
-        if (mounted && _error != null) {
+        if (!mounted) return;
+        if (_error != null) {
           setState(() => _componentResult = 'Компоненты установлены, но списки не обновлены: '+_error!);
+        } else if (ref.read(zapretControllerProvider).running) {
+          // List edits require a fresh process; do not enable an idle engine.
+          await ref.read(zapretControllerProvider.notifier).restart();
         }
       }
     } catch (error) {
@@ -544,6 +554,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
             ListItem(
               leading: const Icon(Icons.cloud_download),
               title: Text(item.value),
+              subtitle: item.key == ZapretComponent.strategies ? const Text('Lua и бинарные payload; BAT-каталог встроен в Helper') : null,
               onTap: componentBusy ? null : () => _updateComponents(item.key),
             ),
           ListItem(

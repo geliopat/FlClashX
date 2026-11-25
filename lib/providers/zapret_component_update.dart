@@ -15,7 +15,7 @@ const _versionFile = 'component-versions.json';
 const bundledZapretVersions = {
   'Zapret2': 'v1.0.8',
   'Flowseal': '1.10.4',
-  'Lua/BAT source': '8dd17fcbcca4',
+  'Lua/payload': '8dd17fcbcca4',
 };
 const _luaNames = {
   'zapret-antidpi.lua',
@@ -208,7 +208,7 @@ class ZapretComponentUpdater {
         if (seen.length != _luaNames.length + _blobNames.length) {
           throw StateError('Неполный комплект стратегий');
         }
-        versions['Lua/BAT source'] = revision.substring(0, 12);
+        versions['Lua/payload'] = revision.substring(0, 12);
       }
       transaction.stageFile(_versionFile, utf8.encode(jsonEncode(versions)));
       return transaction;
@@ -254,6 +254,13 @@ class ZapretComponentTransaction {
   ZapretComponentTransaction(this.root, this.staging);
 
   void stageFile(String relative, List<int> data) {
+    // Defense in depth: even callers outside the catalog must not write
+    // arbitrary paths or user-owned files.
+    final allowed = _zapret2Files.contains(relative) ||
+        relative == 'winws.exe' || relative == _versionFile ||
+        _luaNames.contains(relative) || _blobNames.contains(relative) ||
+        _luaNames.any((name) => relative == 'strategies/'+name);
+    if (!allowed || data.isEmpty) throw ArgumentError('Недопустимый файл: '+relative);
     if (_files.containsKey(relative)) throw StateError('Повтор файла: '+relative);
     final file = File(p.join(staging.path, 'new', relative));
     file.parent.createSync(recursive: true);

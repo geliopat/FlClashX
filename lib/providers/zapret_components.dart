@@ -21,7 +21,7 @@ class ZapretComponentsController extends Notifier<ZapretComponentState> {
   static const _urls = {
     'Zapret2': 'https://api.github.com/repos/bol-van/zapret2/releases/latest',
     'Flowseal': 'https://api.github.com/repos/Flowseal/zapret-discord-youtube/releases/latest',
-    'Lua/BAT source': 'https://api.github.com/repos/geliopat/zapret2-gui/commits/main',
+    'Lua/payload': 'https://api.github.com/repos/geliopat/zapret2-gui/commits/main',
   };
 
   @override
@@ -47,9 +47,9 @@ class ZapretComponentsController extends Notifier<ZapretComponentState> {
         try {
           final response = await dio.get<Map<String, dynamic>>(entry.value,
               options: Options(headers: const {'Accept': 'application/vnd.github+json'}));
-          final value = response.data?[entry.key == 'Lua/BAT source' ? 'sha' : 'tag_name'];
+          final value = response.data?[entry.key == 'Lua/payload' ? 'sha' : 'tag_name'];
           final upstream = value is String
-              ? (entry.key == 'Lua/BAT source' && value.length >= 12 ? value.substring(0, 12) : value)
+              ? (entry.key == 'Lua/payload' && value.length >= 12 ? value.substring(0, 12) : value)
               : 'неизвестно';
           versions[entry.key] = 'установлено ${installed[entry.key]} · upstream $upstream';
         } catch (_) {
