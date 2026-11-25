@@ -256,6 +256,16 @@ class System {
     return "'${value.replaceAll("'", "'\\''")}'";
   }
 
+  /// Reinstalls the Windows Helper from the currently running app bundle.
+  /// Unlike the normal authorization check, this deliberately replaces an
+  /// already-running service so newly added Helper endpoints become available.
+  Future<AuthorizeCode> updateHelperService() async {
+    if (!isWindows || windows == null) {
+      return AuthorizeCode.error;
+    }
+    return windows!.registerService(forceReinstall: true);
+  }
+
   Future<AuthorizeCode> authorizeCore() async {
     if (system.isAndroid) {
       return AuthorizeCode.error;
@@ -412,10 +422,11 @@ class Windows {
   static String installArguments(int ownerPid) =>
       'install --owner-pid $ownerPid';
 
-  Future<AuthorizeCode> registerService() {
+  Future<AuthorizeCode> registerService({bool forceReinstall = false}) {
     return registerHelperService(
       () async =>
           runas(appPath.helperPath, installArguments(pid), showWindow: false),
+      forceReinstall: forceReinstall,
     );
   }
 }
@@ -424,13 +435,21 @@ typedef ElevatedHelperInstaller = Future<bool> Function();
 
 @visibleForTesting
 Future<AuthorizeCode> registerHelperService(
-  ElevatedHelperInstaller install,
-) async {
+  ElevatedHelperInstaller install, {
+  bool forceReinstall = false,
+}) async {
   final readiness = await helperClient.readiness();
   switch (readiness) {
     case HelperReadiness.ready:
-      commonPrint.log('helper service is ready');
-      return AuthorizeCode.none;
+      if (!forceReinstall) {
+        commonPrint.log('helper service is ready');
+        return AuthorizeCode.none;
+      }
+      commonPrint.log(
+        'forced Helper service reinstall requested',
+        logLevel: LogLevel.warning,
+      );
+      break;
     case HelperReadiness.manifestMissing:
       commonPrint.log(
         'Core manifest is missing or invalid; Helper service unavailable, '
