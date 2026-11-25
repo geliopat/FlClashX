@@ -28,6 +28,7 @@ void main() {
             'description': 'Flowseal strategy',
             'engine': 'winws',
             'category': 'flowseal',
+            'supportsSplitMode': true,
           },
           {
             'id': 'zapret2-ru-ultimate',
@@ -36,6 +37,7 @@ void main() {
             'description': 'Lua strategy',
             'engine': 'winws2',
             'category': 'zapret2',
+            'supportsSplitMode': false,
           },
           {
             'id': 'kinlay0-alt14',
@@ -44,6 +46,7 @@ void main() {
             'description': 'Imported BAT translated to winws2',
             'engine': 'winws2',
             'category': 'zapret2',
+            'supportsSplitMode': false,
           },
         ]),
       ),
@@ -60,22 +63,25 @@ void main() {
     expect(result.last.engine, 'winws2');
   });
 
-  test('Zapret start sends only a strategy identifier and parses the active engine', () async {
+  test('Zapret start sends launch mode and parses active diagnostics', () async {
     final adapter = _ResponseAdapter((options) {
       expect(options.method, 'POST');
       expect(options.path, endsWith('/zapret/start'));
-      expect(options.data, {'strategyId': 'flowseal-alt'});
+      expect(options.data, {'strategyId': 'flowseal-alt', 'mode': 'fullBypass'});
       return _jsonResponse({
         'running': true,
         'pid': 3210,
         'strategyId': 'flowseal-alt',
         'engine': 'winws',
+        'mode': 'fullBypass',
+        'winDivertFilters': ['--wf-tcp=80,443'],
+        'processingLists': ['--hostlist=lists/list-general.txt'],
         'cleanedProcesses': 2,
       });
     });
     final client = _client(adapter);
 
-    final result = await client.startZapret(strategyId: 'flowseal-alt');
+    final result = await client.startZapret(strategyId: 'flowseal-alt', mode: 'fullBypass');
 
     expect(result.running, isTrue);
     expect(result.pid, 3210);
@@ -132,6 +138,7 @@ void main() {
       'description': 'Flowseal strategy',
       'engine': 'winws',
       'category': 'flowseal',
+            'supportsSplitMode': true,
     };
     final client = _client(
       _ResponseAdapter(
