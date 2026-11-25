@@ -151,6 +151,12 @@ fn install_service(owner_pid: u32) -> Result<()> {
         ServiceManagerAccess::CONNECT | ServiceManagerAccess::CREATE_SERVICE,
     )
     .context("open Windows service manager")?;
+    // Remove the legacy pre-release service first. Older builds registered
+    // a second Windows service and port, so simply installing the shared
+    // service would otherwise leave two Helper processes running.
+    for retired_name in super::identity::retired_windows_helper_names() {
+        remove_named_service(&manager, retired_name)?;
+    }
     remove_existing_service(&manager)?;
 
     let executable_path = std::env::current_exe().context("resolve helper executable path")?;
@@ -200,18 +206,27 @@ fn crash_recovery() -> ServiceFailureActions {
 fn uninstall_service() -> Result<()> {
     let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)
         .context("open Windows service manager")?;
+    for retired_name in super::identity::retired_windows_helper_names() {
+        remove_named_service(&manager, retired_name)?;
+    }
     remove_existing_service(&manager)
 }
 
 fn remove_existing_service(manager: &ServiceManager) -> Result<()> {
+    remove_named_service(manager, super::identity::helper_name())
+}
+
+fn remove_named_service(manager: &ServiceManager, service_name: &str) -> Result<()> {
     let access = ServiceAccess::QUERY_STATUS | ServiceAccess::STOP | ServiceAccess::DELETE;
-    let service = match manager.open_service(super::identity::helper_name(), access) {
+    let service = match manager.open_service(service_name, access) {
         Ok(service) => service,
         Err(error) if has_error_code(&error, ERROR_SERVICE_DOES_NOT_EXIST) => return Ok(()),
         Err(error) if has_error_code(&error, ERROR_SERVICE_MARKED_FOR_DELETE) => {
-            return wait_for_deletion(manager)
+            return wait_for_deletion(manager, service_name)
         }
-        Err(error) => return Err(error).context("open existing helper service"),
+        Err(error) => {
+            return Err(error).with_context(|| format!("open existing helper service {service_name}"))
+        }
     };
 
     stop_service(&service)?;
@@ -223,7 +238,7 @@ fn remove_existing_service(manager: &ServiceManager) -> Result<()> {
         }
     }
     drop(service);
-    wait_for_deletion(manager)
+    wait_for_deletion(manager, service_name)
 }
 
 fn stop_service(service: &Service) -> Result<()> {
@@ -253,10 +268,10 @@ fn stop_service(service: &Service) -> Result<()> {
     }
 }
 
-fn wait_for_deletion(manager: &ServiceManager) -> Result<()> {
+fn wait_for_deletion(manager: &ServiceManager, service_name: &str) -> Result<()> {
     let started_at = Instant::now();
     loop {
-        match manager.open_service(super::identity::helper_name(), ServiceAccess::QUERY_STATUS) {
+        match manager.open_service(service_name, ServiceAccess::QUERY_STATUS) {
             Err(error) if has_error_code(&error, ERROR_SERVICE_DOES_NOT_EXIST) => return Ok(()),
             Err(error) if !has_error_code(&error, ERROR_SERVICE_MARKED_FOR_DELETE) => {
                 return Err(error).context("check helper service deletion")
