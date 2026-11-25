@@ -885,6 +885,20 @@ fn get_zapret_lists() -> warp::reply::Response {
     }
 }
 
+async fn restore_zapret_list(filename: String) -> Result<warp::reply::Response, Rejection> {
+    match tokio::task::spawn_blocking(move || super::zapret_lists::restore(&filename)).await {
+        Ok(Ok(list)) => Ok(json_response(&list, StatusCode::OK)),
+        Ok(Err(error)) if error.kind() == std::io::ErrorKind::InvalidInput => {
+            Ok(error_response("invalidZapretList", error.to_string(), StatusCode::BAD_REQUEST))
+        }
+        Ok(Err(error)) if error.kind() == std::io::ErrorKind::NotFound => {
+            Ok(error_response("zapretBackupMissing", error.to_string(), StatusCode::NOT_FOUND))
+        }
+        Ok(Err(error)) => Ok(error_response("zapretListRestoreFailed", error.to_string(), StatusCode::CONFLICT)),
+        Err(error) => Ok(error_response("zapretListTaskFailed", error.to_string(), StatusCode::INTERNAL_SERVER_ERROR)),
+    }
+}
+
 fn get_zapret_list(filename: String) -> warp::reply::Response {
     match super::zapret_lists::read(&filename) {
         Ok(list) => json_response(&list, StatusCode::OK),
@@ -1404,6 +1418,14 @@ pub(super) fn routes() -> impl Filter<Extract = (impl Reply,), Error = Infallibl
         .and(warp::body::json())
         .and_then(put_zapret_list);
 
+    let api_zapret_list_restore = warp::path("zapret")
+        .and(warp::path("lists"))
+        .and(warp::path::param::<String>())
+        .and(warp::path("restore"))
+        .and(warp::path::end())
+        .and(warp::post())
+        .and_then(restore_zapret_list);
+
     let api_zapret_start = warp::path("zapret")
         .and(warp::path("start"))
         .and(warp::path::end())
@@ -1437,6 +1459,7 @@ pub(super) fn routes() -> impl Filter<Extract = (impl Reply,), Error = Infallibl
                 .or(api_zapret_lists)
                 .or(api_zapret_list_get)
                 .or(api_zapret_list_put)
+                .or(api_zapret_list_restore)
                 .or(api_zapret_start)
                 .or(api_zapret_restart)
                 .or(api_zapret_stop),
