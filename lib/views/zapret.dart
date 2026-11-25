@@ -84,9 +84,14 @@ class ZapretView extends ConsumerWidget {
               onTap: zapret.busy ? null : () => ref.read(zapretControllerProvider.notifier).restart(),
             ),
           ListItem(
-            title: const Text('Выбранная стратегия'),
-            onTap: () => showZapretStrategiesSheet(context),
-            subtitle: Text(selectedName ?? 'Не выбрана'),
+            title: const Text('Стратегия'),
+            onTap: zapret.busy ? null : () => showZapretStrategiesSheet(context),
+            subtitle: Text(
+              zapret.running && zapret.activeStrategyId != zapret.selectedStrategyId
+                  ? 'Выбрана: ${selectedName ?? zapret.selectedStrategyId}\nРаботает: ${activeName ?? zapret.activeStrategyId ?? 'Не определена'}'
+                  : selectedName ?? 'Не выбрана',
+              maxLines: 3,
+            ),
           ),
           if (zapret.supportsSplitMode)
             ListItem<ZapretMode>.options(
@@ -97,7 +102,6 @@ class ZapretView extends ConsumerWidget {
               onChanged: (mode) => ref.read(zapretControllerProvider.notifier).setMode(mode),
             ),
           if (zapret.running) ...[
-            ListItem(title: const Text('Активная стратегия'), subtitle: Text(activeName ?? 'Не определена')),
             ListItem(
               title: const Text('Движок и процесс'),
               subtitle: Text(
