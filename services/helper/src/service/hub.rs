@@ -573,16 +573,34 @@ fn reap_dead_zapret_owner() -> Result<(), Error> {
 }
 
 #[cfg(windows)]
+fn validate_zapret_command(owner_pid: u32, last: u64, pid: u32, sequence: u64) -> Result<(), Error> {
+    if owner_pid != pid {
+        return Err(Error::other("Another FlClashZ process owns Zapret"));
+    }
+    if sequence <= last {
+        return Err(Error::other("Stale Zapret operation rejected"));
+    }
+    Ok(())
+}
+
+#[cfg(all(windows, test))]
+#[test]
+fn zapret_rejects_competing_owner_and_out_of_order_commands() {
+    assert!(validate_zapret_command(10, 7, 10, 8).is_ok());
+    assert!(validate_zapret_command(10, 7, 10, 7).is_err());
+    assert!(validate_zapret_command(10, 7, 10, 6).is_err());
+    assert!(validate_zapret_command(10, 7, 11, 8).is_err());
+}
+
+#[cfg(windows)]
 fn accept_zapret_command(pid: u32, sequence: u64) -> Result<(), Error> {
     reap_dead_zapret_owner()?;
     let mut owner = lock_surviving_poison(&ZAPRET_OWNER);
     if let Some(current) = owner.as_mut() {
-        if current.pid != pid || !current.alive() {
-            return Err(Error::other("Another FlClashZ process owns Zapret"));
+        if !current.alive() {
+            return Err(Error::other("Zapret owner exited during command"));
         }
-        if sequence <= current.sequence {
-            return Err(Error::other("Stale Zapret operation rejected"));
-        }
+        validate_zapret_command(current.pid, current.sequence, pid, sequence)?;
         current.sequence = sequence;
     } else {
         *owner = Some(ZapretOwner::open(pid, sequence)?);
@@ -713,7 +731,12 @@ fn launch_zapret_with_intent(restart: bool, pid: u32, sequence: u64, request: Za
             attempts: 0,
             retry_at: None,
         });
-        ensure_zapret_watchdog();
+    } else {
+        // If replacement already stopped the previous engine, its stale
+        // recovery intent must not resurrect it after a failed launch.
+        if lock_surviving_poison(&MANAGED_ZAPRET).is_none() {
+            *lock_surviving_poison(&ZAPRET_INTENT) = None;
+        }
     }
     response
 }
@@ -825,7 +848,7 @@ fn process_image_matches(handle: HANDLE, expected_exe_name: &str, zapret_root: &
 }
 
 #[cfg(windows)]
-fn find_external_winws_processes(zapret_root: &Path, include_local: bool) -> Vec<String> {
+fn find_winws_processes(zapret_root: &Path, include_local: bool, include_external: bool) -> Vec<String> {
     let targets = ["winws2.exe", "winws.exe", "winws2-split.exe"];
     let mut conflicts = Vec::new();
     unsafe {
@@ -851,7 +874,8 @@ fn find_external_winws_processes(zapret_root: &Path, include_local: bool) -> Vec
                         OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, entry.th32ProcessID);
                     if process != 0 {
                         if let Some(image_path) = process_image_path(process) {
-                            if include_local || !process_path_is_in_zapret_root(&image_path, zapret_root) {
+                            let local = process_path_is_in_zapret_root(&image_path, zapret_root);
+                            if (local && include_local) || (!local && include_external) {
                                 conflicts
                                     .push(format!("{image_path} (PID {})", entry.th32ProcessID));
                             }
@@ -1121,7 +1145,7 @@ fn launch_zapret(
     let engine = launch.strategy.engine.to_string();
     let strategy_id = launch.strategy.id.to_string();
 
-    let external_processes = find_external_winws_processes(&bin_dir, false);
+    let external_processes = find_winws_processes(&bin_dir, false, true);
     if !external_processes.is_empty() {
         return error_response(
             "zapretConflict",
@@ -1159,7 +1183,7 @@ fn launch_zapret(
 
     // Never start another engine until cleanup is confirmed. External
     // processes that appeared after the initial scan also block this launch.
-    let remaining = find_external_winws_processes(&bin_dir, true);
+    let remaining = find_winws_processes(&bin_dir, true, true);
     if !remaining.is_empty() {
         return error_response(
             "zapretConflict",
@@ -1277,11 +1301,9 @@ fn stop_zapret(pid: u32, sequence: u64) -> warp::reply::Response {
     if let Ok(bin_dir) = zapret_bin_dir() {
         // Do not terminate or treat an unrelated external installation as
         // ours. A remaining local process, however, is not a successful stop.
-        let remaining = find_external_winws_processes(&bin_dir, true);
-        if remaining.iter().any(|entry| {
-            entry.to_ascii_lowercase().starts_with(&bin_dir.to_string_lossy().to_ascii_lowercase())
-        }) {
-            return error_response("zapretStopFailed", "A local Zapret engine did not exit", StatusCode::CONFLICT);
+        let remaining = find_winws_processes(&bin_dir, true, false);
+        if !remaining.is_empty() {
+            return error_response("zapretStopFailed", format!("Cannot confirm local Zapret exit: {}", remaining.join("; ")), StatusCode::CONFLICT);
         }
     }
     zapret_log("info", "Zapret stopped".to_string());
