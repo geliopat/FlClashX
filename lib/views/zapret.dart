@@ -169,6 +169,13 @@ class ZapretView extends ConsumerWidget {
               onTap: showAllTrials,
             ),
           ListItem(
+            leading: const Icon(Icons.history),
+            title: const Text('История автоподбора'),
+            subtitle: const Text('Последние 30 завершённых проверок'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => BaseNavigator.push<void>(context, const _ZapretHistoryView()),
+          ),
+          ListItem(
             title: const Text('Автоматический переход на резервную стратегию'),
             subtitle: const Text('Три неудачные проверки, только подтверждённые кандидаты, откат при неудаче'),
             trailing: Switch(value: zapret.autoFallback,
@@ -219,13 +226,63 @@ class ZapretView extends ConsumerWidget {
   }
 }
 
+String _runDate(DateTime at) => at.toLocal().toString().split('.').first;
+
+class _ZapretHistoryView extends StatefulWidget {
+  const _ZapretHistoryView();
+
+  @override
+  State<_ZapretHistoryView> createState() => _ZapretHistoryViewState();
+}
+
+class _ZapretHistoryViewState extends State<_ZapretHistoryView> {
+  late final Future<List<ZapretTuneRun>> _runs = loadZapretTuneHistory();
+
+  @override
+  Widget build(BuildContext context) => CommonScaffold(
+    title: 'История автоподбора',
+    body: FutureBuilder<List<ZapretTuneRun>>(
+      future: _runs,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(child: Text('Не удалось прочитать историю: ${snapshot.error}'));
+        }
+        final runs = snapshot.data ?? const <ZapretTuneRun>[];
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            if (runs.isEmpty) const Center(child: Text('История пока пуста')),
+            for (final run in runs)
+              Card(child: ListItem(
+                title: Text(_runDate(run.at)),
+                subtitle: Text([
+                  run.tuneMode?.label ?? 'Предыдущий сохранённый тест',
+                  if (run.duration != null) 'Длительность: ${run.duration!.inSeconds} с',
+                  'Проверено: ${run.trials.length}${run.totalStrategies == null ? '' : '/${run.totalStrategies}'} · успешно: ${run.trials.where((trial) => trial.confirmed).length}',
+                  if (run.failure != null) 'Завершено с ошибкой',
+                ].join('\n')),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => BaseNavigator.push<void>(context, ZapretResultsView(run: run)),
+              )),
+          ],
+        );
+      },
+    ),
+  );
+}
+
 class ZapretResultsView extends ConsumerWidget {
-  const ZapretResultsView({super.key});
+  const ZapretResultsView({super.key, this.run});
+  final ZapretTuneRun? run;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final zapret = ref.watch(zapretControllerProvider);
-    final ranked = shortlistZapretTrials(zapret.trials, limit: zapret.trials.length);
+    final trials = run?.trials ?? zapret.trials;
+    final ranked = shortlistZapretTrials(trials, limit: trials.length);
     final top = shortlistZapretTrials(ranked.where((trial) =>
         !trial.screenedOnly && trial.error == null && trial.score > 0), limit: 5);
     final ranks = {for (final (index, trial) in top.indexed) trial.id: index + 1};
@@ -263,12 +320,17 @@ class ZapretResultsView extends ConsumerWidget {
           bottom: 16 + context.bottomInset,
         ),
         children: [
-          Text('Проверено: ${ranked.length}/${zapret.strategies.length}',
+          if (run != null) ...[
+            Text(_runDate(run!.at)),
+            if (run!.summary != null) Text(run!.summary!),
+            if (run!.failure != null) Text(run!.failure!, style: TextStyle(color: context.colorScheme.error)),
+          ],
+          Text('Проверено: ${ranked.length}/${run == null ? zapret.strategies.length : run!.totalStrategies ?? '—'}',
             style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           Text(top.isEmpty
               ? 'Нет финалистов с положительной оценкой. Предварительный отбор показан отдельно.'
-              : 'Топ-5 выделены цветом и номером. Подтверждённые можно применить.'),
+              : run == null ? 'Топ-5 выделены цветом и номером. Подтверждённые можно применить.' : 'Топ-5 выделены цветом и номером. История доступна только для просмотра.'),
           const Text('Баллы: работает — 2, с ограничениями — 1, нет ответа — 0. Полный тест: 0–6; отбор: только YouTube, 0–2. GoogleVideo — дополнительный. Discord Voice API не проверяет голосовой UDP.'),
           const SizedBox(height: 12),
           for (final trial in ranked)
@@ -284,9 +346,9 @@ class ZapretResultsView extends ConsumerWidget {
                         '${ranks.containsKey(trial.id) ? 'ТОП ${ranks[trial.id]} · ' : ''}${nameOf(trial)}',
                         style: Theme.of(context).textTheme.titleMedium,
                       )),
-                      if (zapret.activeStrategyId == trial.id)
+                      if (run == null && zapret.activeStrategyId == trial.id)
                         const Icon(Icons.check_circle_outline),
-                      if (trial.confirmed)
+                      if (run == null && trial.confirmed)
                         TextButton(onPressed: zapret.busy ? null : () => apply(trial), child: const Text('Применить')),
                     ]),
                     Text('${trial.resultLabel} · ${trial.score}/${trial.screenedOnly ? 2 : 6} баллов · '

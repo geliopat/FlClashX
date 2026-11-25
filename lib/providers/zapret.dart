@@ -180,6 +180,30 @@ class ZapretTrial {
   final String? error;
   final List<String> details;
 
+  Map<String, Object?> toHistoryJson() => {
+    'id': id,
+    'mode': mode.name,
+    'score': score,
+    'delay': delay,
+    'confirmed': confirmed,
+    'passedTargets': passedTargets,
+    'screenedOnly': screenedOnly,
+    'error': error,
+    'details': details,
+  };
+
+  factory ZapretTrial.fromHistoryJson(Map<String, dynamic> item) => ZapretTrial(
+    item['id'] as String,
+    ZapretMode.values.byName(item['mode'] as String),
+    item['score'] as int,
+    item['delay'] as int,
+    confirmed: item['confirmed'] == true,
+    passedTargets: item['passedTargets'] as int? ?? 0,
+    screenedOnly: item['screenedOnly'] == true,
+    error: item['error'] as String?,
+    details: List<String>.from(item['details'] as List? ?? const []),
+  );
+
   String get resultLabel {
     if (error != null) return 'Ошибка запуска/проверки';
     if (confirmed) return 'Успешно';
@@ -192,6 +216,95 @@ class ZapretTrial {
   }
 }
 
+
+const zapretHistoryLimit = 30;
+const _zapretArchiveKey = 'zapret.completedRuns.v1';
+const _zapretLatestKey = 'zapret.trialHistory.v5';
+
+class ZapretTuneRun {
+  const ZapretTuneRun({
+    required this.at,
+    required this.trials,
+    this.tuneMode,
+    this.duration,
+    this.totalStrategies,
+    this.summary,
+    this.failure,
+  });
+
+  final DateTime at;
+  final List<ZapretTrial> trials;
+  final ZapretAutoTuneMode? tuneMode;
+  final Duration? duration;
+  final int? totalStrategies;
+  final String? summary;
+  final String? failure;
+
+  Map<String, Object?> toJson() => {
+    'at': at.toIso8601String(),
+    'tuneMode': tuneMode?.name,
+    'durationMs': duration?.inMilliseconds,
+    'totalStrategies': totalStrategies,
+    'summary': summary,
+    'failure': failure,
+    'trials': trials.map((trial) => trial.toHistoryJson()).toList(),
+  };
+
+  factory ZapretTuneRun.fromJson(Map<String, dynamic> json) {
+    final mode = json['tuneMode'] as String?;
+    final millis = json['durationMs'] as int?;
+    return ZapretTuneRun(
+      at: DateTime.parse(json['at'] as String),
+      trials: List.unmodifiable(
+        (json['trials'] as List).map((item) =>
+          ZapretTrial.fromHistoryJson(Map<String, dynamic>.from(item as Map))),
+      ),
+      tuneMode: ZapretAutoTuneMode.values.where((value) => value.name == mode).firstOrNull,
+      duration: millis == null ? null : Duration(milliseconds: millis),
+      totalStrategies: json['totalStrategies'] as int?,
+      summary: json['summary'] as String?,
+      failure: json['failure'] as String?,
+    );
+  }
+}
+
+List<ZapretTuneRun> decodeZapretHistory(String? archive, String? legacy) {
+  final runs = <ZapretTuneRun>[];
+  try {
+    final data = archive == null
+        ? (legacy == null ? <Object>[] : [jsonDecode(legacy)])
+        : jsonDecode(archive) as List;
+    for (final item in data) {
+      try {
+        runs.add(ZapretTuneRun.fromJson(Map<String, dynamic>.from(item as Map)));
+      } catch (_) {
+        // Preserve other valid runs even if one entry is obsolete or damaged.
+      }
+    }
+  } catch (_) {
+    // Corrupt history is not allowed to break the engine or latest results.
+  }
+  runs.sort((a, b) => b.at.compareTo(a.at));
+  return runs.take(zapretHistoryLimit).toList();
+}
+
+Future<List<ZapretTuneRun>> loadZapretTuneHistory() async {
+  final prefs = await SharedPreferences.getInstance();
+  return decodeZapretHistory(
+    prefs.getString(_zapretArchiveKey), prefs.getString(_zapretLatestKey),
+  );
+}
+
+Future<void> saveZapretTuneRun(ZapretTuneRun run) async {
+  final prefs = await SharedPreferences.getInstance();
+  final previous = decodeZapretHistory(
+    prefs.getString(_zapretArchiveKey), prefs.getString(_zapretLatestKey),
+  );
+  final history = [run, ...previous].take(zapretHistoryLimit).toList();
+  if (!await prefs.setString(_zapretArchiveKey, jsonEncode(history.map((item) => item.toJson()).toList()))) {
+    throw StateError('Не удалось сохранить историю автоподбора');
+  }
+}
 
 /// Full results are ranked by original points, then HTTPS latency.
 /// YouTube-only screening has a different scale, so it follows full results.
@@ -234,7 +347,7 @@ class ZapretController extends Notifier<ZapretState> {
   static const _modePreferenceKey = 'zapret.mode';
   static const _debugPreferenceKey = 'zapret.debugLogs';
   static const _linkedStartPreferenceKey = 'zapret.startWithMihomo';
-  static const _trialHistoryKey = 'zapret.trialHistory.v5';
+  static const _trialHistoryKey = _zapretLatestKey;
   static const _pollInterval = Duration(seconds: 3);
   static const _readinessTimeout = Duration(seconds: 3);
 
@@ -954,6 +1067,7 @@ class ZapretController extends Notifier<ZapretState> {
     }
     _cancelTrial = false;
     final previousTrials = state.trials;
+    final runClock = Stopwatch()..start();
     final strategies = state.strategies.toList();
     final selectedMode = state.mode;
     state = state.copyWith(busy: true, trials: const [], testProgress: 'Подготовка', clearTestSummary: true, clearError: true);
@@ -1100,11 +1214,31 @@ class ZapretController extends Notifier<ZapretState> {
             'Контроль $verified/$finalists · операций с ошибками $launchFailures'
             '${earlyStop ? ' · найдено 6/6, тест завершён досрочно' : ''}'
             '${lastLaunchFailure == null ? '' : '\nПоследняя ошибка: $lastLaunchFailure'}';
-        state = state.copyWith(busy: false, clearTestProgress: true,
-            testSummary: summary, trials: interrupted ? previousTrials : List.unmodifiable(ranked), error: failure);
-        if (!interrupted && failure == null) {
-          try { await _saveTrials(ranked); } catch (_) { /* History is optional. */ }
+        String? historyError;
+        if (!interrupted) {
+          try {
+            await saveZapretTuneRun(ZapretTuneRun(
+              at: DateTime.now(),
+              trials: List.unmodifiable(ranked),
+              tuneMode: tuneMode,
+              duration: runClock.elapsed,
+              totalStrategies: strategies.length,
+              summary: summary,
+              failure: failure,
+            ));
+          } catch (_) {
+            historyError = 'Не удалось сохранить историю автоподбора';
+          }
+          if (failure == null) {
+            try { await _saveTrials(ranked); } catch (_) {
+              historyError = 'Не удалось сохранить результаты автоподбора';
+            }
+          }
         }
+        if (!ref.mounted) return;
+        state = state.copyWith(busy: false, clearTestProgress: true,
+            testSummary: historyError == null ? summary : '$summary\n$historyError',
+            trials: interrupted ? previousTrials : List.unmodifiable(ranked), error: failure);
         await refresh();
       }
     }
