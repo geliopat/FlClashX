@@ -138,6 +138,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
@@ -304,6 +307,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
@@ -329,6 +335,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
