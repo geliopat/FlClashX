@@ -1499,7 +1499,9 @@ mod tests {
         );
 
         assert!(args.iter().any(|arg| arg == "--new=quic"));
-        assert!(args.iter().any(|arg| arg == "--filter-tcp=80,443,2053,2083,2087,2096,8443"));
+        assert!(args
+            .iter()
+            .any(|arg| arg == "--filter-tcp=80,443,2053,2083,2087,2096,8443"));
         assert!(!args.iter().any(|arg| arg.contains("list-general.txt")));
         assert!(!args.iter().any(|arg| arg.starts_with("--hostlist-auto=")));
     }
