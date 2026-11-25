@@ -146,6 +146,13 @@ void main() {
       }
     });
 
+    test('corrupted settings JSON restores last successful configuration', () async {
+      const config = Config(themeProps: defaultThemeProps, currentProfileId: 42);
+      expect(await preferences.saveConfig(config), isTrue);
+      await store.setString(configKey, 'broken');
+      expect(Config.strictFromJson((await preferences.getConfigMap())!), config);
+    });
+
     test('getConfigMap returns null for malformed JSON', () async {
       await store.setString(configKey, 'not-json');
 

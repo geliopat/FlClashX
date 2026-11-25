@@ -12,6 +12,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 class Preferences {
   static Preferences? _instance;
   var _store = ResolveOnce(_open);
+  static const _lastGoodConfigKey = 'config.lastGood.v1';
+  Future<bool> _configWrite = Future.value(true);
 
   Future<bool> get isInit async => await _store.value != null;
 
@@ -102,14 +104,22 @@ class Preferences {
       final preferences = await _store.value;
       final configString = preferences?.getString(configKey);
       if (configString == null) return null;
-      final Map<String, Object?>? configMap = json.decode(configString);
-      return configMap;
-    } catch (e) {
-      commonPrint.log(
-        'getConfigMap error ${e.toString()}',
-        logLevel: LogLevel.warning,
-      );
-      return null;
+      final decoded = json.decode(configString);
+      if (decoded is! Map<String, Object?>) throw const FormatException('config');
+      return decoded;
+    } catch (_) {
+      commonPrint.log('Invalid settings JSON; checking last known good copy', logLevel: LogLevel.warning);
+      try {
+        final store = await _store.value;
+        final raw = store?.getString(_lastGoodConfigKey);
+        if (raw == null) return null;
+        final map = jsonDecode(raw) as Map<String, Object?>;
+        Config.strictFromJson(map);
+        commonPrint.log('Recovered last known good settings', logLevel: LogLevel.warning);
+        return map;
+      } catch (_) {
+        return null;
+      }
     }
   }
 
@@ -142,9 +152,17 @@ class Preferences {
     }
   }
 
-  Future<bool> saveConfig(Config config) async {
-    final preferences = await _store.value;
-    return preferences?.setString(configKey, json.encode(config)) ?? false;
+  Future<bool> saveConfig(Config config) {
+    final operation = _configWrite.catchError((_) => false).then((_) async {
+      final store = await _store.value;
+      if (store == null) return false;
+      final encoded = jsonEncode(config);
+      Config.strictFromJson(jsonDecode(encoded) as Map<String, Object?>);
+      if (!await store.setString(configKey, encoded)) return false;
+      return store.setString(_lastGoodConfigKey, encoded);
+    });
+    _configWrite = operation;
+    return operation;
   }
 
   Future<SystemDnsRecord?> getSystemDnsRecord() async {

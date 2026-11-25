@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/common/file_logger.dart';
 
 import 'package:fl_clash/core/desktop/helper_client.dart';
 import 'package:fl_clash/widgets/widgets.dart';
@@ -80,7 +82,37 @@ class _ZapretLogsViewState extends ConsumerState<ZapretLogsView> {
               if (_error != null)
                 ListItem(title: const Text('Ошибка чтения журнала'), subtitle: Text(_error!)),
             ],
-            footer: 'Последние 500 событий. Подробный вывод движка настраивается в общих настройках.',
+            footer: 'Последние 500 событий. Локальный архив собирается в фоне во время работы приложения.',
+          ),
+          const ListSectionGap(),
+          generateSection(
+            title: 'Локальные журналы',
+            items: [
+              ListItem(
+                title: const Text('Открыть папку логов Zapret'),
+                onTap: () async => system.openDirectory(await zapretFileLogger.directoryPath),
+              ),
+              ListItem(
+                title: const Text('Экспорт сегодняшних логов (ZIP)'),
+                onTap: () async {
+                  try {
+                    final archive = await zapretFileLogger.archiveToday(await appPath.downloadDirPath);
+                    if (!context.mounted) return;
+                    if (archive == null) {
+                      dialogs.showNotifier('Нет сохранённых логов за сегодня');
+                    } else {
+                      dialogs.showNotifier('Архив сохранён: $archive');
+                    }
+                  } catch (_) {
+                    if (context.mounted) dialogs.showNotifier('Не удалось экспортировать логи');
+                  }
+                },
+              ),
+              ListItem(
+                title: const Text('История аварий и Watchdog'),
+                onTap: () async => system.openDirectory(await crashFileLogger.directoryPath),
+              ),
+            ],
           ),
           const ListSectionGap(),
           generateSection(
@@ -89,7 +121,12 @@ class _ZapretLogsViewState extends ConsumerState<ZapretLogsView> {
               if (logs.isEmpty) const ListItem(title: Text('Нет событий')),
               for (final entry in logs)
                 ListItem(
-                  title: Text(entry.message, style: TextStyle(color: context.colorScheme.onSurface)),
+                  title: Text(entry.message, style: TextStyle(color: switch (entry.level) {
+                    'error' => context.colorScheme.error,
+                    'stderr' => context.colorScheme.tertiary,
+                    'debug' => context.colorScheme.onSurfaceVariant,
+                    _ => context.colorScheme.onSurface,
+                  })),
                   subtitle: Text('${entry.time.toLocal().toString().split(".").first} · ${entry.level}'),
                 ),
             ],

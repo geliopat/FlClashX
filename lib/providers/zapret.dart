@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:fl_clash/common/system.dart';
+import 'package:fl_clash/common/file_logger.dart';
+import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/providers/action.dart';
 import 'package:fl_clash/providers/config.dart';
@@ -354,6 +356,37 @@ class ZapretController extends Notifier<ZapretState> {
   final HelperClient _client = helperClient;
   Timer? _poller;
   Timer? _clock;
+  bool _collectingLogs = false;
+  final _seenLogEvents = <String>{};
+
+  Future<void> collectPersistentLogs() async {
+    if (_collectingLogs || !Platform.isWindows) return;
+    _collectingLogs = true;
+    try {
+      final logs = await _client.zapretLogs();
+      zapretFileLogger.enable();
+      crashFileLogger.enable();
+      for (final entry in logs) {
+        final key = '${entry.time.millisecondsSinceEpoch}|${entry.level}|${entry.message}';
+        if (!_seenLogEvents.add(key)) continue;
+        final log = Log(dateTime: entry.time.toLocal().toIso8601String(),
+          logLevel: entry.level == 'error' ? LogLevel.error : entry.level == 'debug' ? LogLevel.debug : LogLevel.info,
+          payload: '[${entry.level}] ${entry.message}');
+        zapretFileLogger.write(log);
+        if (entry.message.toLowerCase().contains('watchdog') ||
+            entry.message.toLowerCase().contains('exited unexpectedly')) {
+          crashFileLogger.write(log.copyWith(payload: '[Zapret] ${log.payload}'));
+        }
+      }
+      while (_seenLogEvents.length > 2000) {
+        _seenLogEvents.remove(_seenLogEvents.first);
+      }
+    } catch (_) {
+      // A stopped or replacing Helper is not a log event.
+    } finally {
+      _collectingLogs = false;
+    }
+  }
   final Stopwatch _uptime = Stopwatch();
   int? _observedPid;
   Duration _baseUptime = Duration.zero;
@@ -549,9 +582,11 @@ class ZapretController extends Notifier<ZapretState> {
         if (!ref.mounted) return;
         unawaited(loadStrategies());
         unawaited(refresh());
+        unawaited(collectPersistentLogs());
       });
       _poller = Timer.periodic(_pollInterval, (_) {
         if (ref.mounted) {
+          unawaited(collectPersistentLogs());
           unawaited(refresh().then((_) {
             if (ref.mounted) return _reconcileInfrastructure();
           }));

@@ -99,6 +99,8 @@ class CoreAction extends _$CoreAction {
 
   /// Restarting a Core that keeps falling would only hide why it falls.
   Future<void> restartAfterCrash(String reason) async {
+    crashFileLogger.enable();
+    crashFileLogger.write(Log.app('[Mihomo] $reason').copyWith(logLevel: LogLevel.error));
     if (system.isWindows && !ref.read(mihomoWatchdogProvider)) {
       return;
     }
