@@ -4,9 +4,24 @@ import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
 import '../setup.dart' as setup;
+import 'package:fl_clash/common/desktop_channel.dart';
 
 void main() {
   group('setup.dart', () {
+    test('Windows stable and pre apps resolve to the same Helper service', () {
+      expect(
+        helperServiceFor(pre: false, isWindows: true),
+        'FlClashXHelperService',
+      );
+      expect(
+        helperServiceFor(pre: true, isWindows: true),
+        'FlClashXHelperService',
+      );
+      expect(
+        helperServiceFor(pre: true, isWindows: false),
+        'FlClashXPreHelperService',
+      );
+    });
     test('a pre build of macOS takes its own bundle id and name', () {
       final config = setup.macosChannelConfig('pre')!;
 
