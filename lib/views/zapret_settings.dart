@@ -355,6 +355,29 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
 
   Future<void> _updateHelperService() async {
     if (_updatingHelper) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Переустановить службу Helper?'),
+        content: const Text(
+          'Служба будет заменена версией из текущей папки FlClashX. '
+          'Во время переустановки текущий Mihomo Core может быть остановлен, '
+          'а VPN-подключение прервётся. После обновления запусти VPN снова. '
+          'Не перемещай и не удаляй папку FlClashX после переустановки службы.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Продолжить'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
     setState(() {
       _updatingHelper = true;
       _error = null;
