@@ -7,7 +7,6 @@ import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:material_ui/material_ui.dart';
 
 class ZapretSettingsView extends ConsumerStatefulWidget {
   const ZapretSettingsView({super.key});
