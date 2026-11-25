@@ -42,6 +42,7 @@ final class HelperZapretStrategy {
   final String description;
   final String engine;
   final String category;
+  final bool supportsSplitMode;
 
   const HelperZapretStrategy({
     required this.id,
@@ -50,6 +51,7 @@ final class HelperZapretStrategy {
     required this.description,
     required this.engine,
     required this.category,
+    required this.supportsSplitMode,
   });
 
   factory HelperZapretStrategy.fromJson(Object? value) {
@@ -65,8 +67,12 @@ final class HelperZapretStrategy {
       return item;
     }
     final engine = field('engine');
+    final supportsSplitMode = map['supportsSplitMode'];
     if (engine != 'winws' && engine != 'winws2') {
       throw const FormatException('Unsupported Zapret engine');
+    }
+    if (supportsSplitMode is! bool) {
+      throw const FormatException('Zapret strategy split-mode capability is invalid');
     }
     return HelperZapretStrategy(
       id: field('id'),
@@ -75,6 +81,7 @@ final class HelperZapretStrategy {
       description: field('description'),
       engine: engine,
       category: field('category'),
+      supportsSplitMode: supportsSplitMode,
     );
   }
 }
