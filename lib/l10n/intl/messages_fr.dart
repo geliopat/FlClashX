@@ -725,17 +725,17 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "disclaimer": MessageLookupByLibrary.simpleMessage("Avertissement"),
     "disclaimerDesc": MessageLookupByLibrary.simpleMessage(
-      "FlClashX est un client gratuit et open source basé sur le cœur Mihomo. Voici en bref ce qu’il fait, ce qu’il ne fait pas et quelles données il collecte. En appuyant sur « J’accepte », vous acceptez ces conditions.",
+      "FlClashZ est un client gratuit et open source basé sur FlClashX, utilisant le moteur Mihomo et les composants Zapret2 et Flowseal. Voici une brève description de ce qu’il fait, de ce qu’il ne fait pas et de la manière dont il traite les données. En sélectionnant « J’accepte », vous acceptez ces conditions.",
     ),
     "disclaimerLicenseContent": MessageLookupByLibrary.simpleMessage(
-      "Le code source est ouvert sous licence GPL-3.0. Le cœur Mihomo et les autres composants tiers ont leurs propres licences. Les auteurs ne répondent pas des versions modifiées ou distribuées par des tiers.",
+      "Le code source de FlClashZ est ouvert et distribué sous licence GPL-3.0. L’application est un fork de FlClashX.\n\nLe moteur Mihomo, Zapret2, Flowseal et les autres composants tiers sont distribués conformément à leurs licences respectives. Les auteurs ne sont pas responsables des versions modifiées ou distribuées par des tiers.",
     ),
     "disclaimerLicenseTitle": MessageLookupByLibrary.simpleMessage("Licence"),
     "disclaimerPrivacyContent": MessageLookupByLibrary.simpleMessage(
-      "Pour trouver les bugs, l’application collecte des données techniques via Google Firebase : rapports de plantage, versions de l’application et du système, modèle de l’appareil et statistiques anonymisées d’utilisation des fonctions.\n\nLes liens d’abonnement, le contenu des configurations, les serveurs, les sites visités, les connexions, le trafic et les journaux ne sont jamais collectés ni envoyés. Ils restent uniquement sur votre appareil.",
+      "L’application ne contient aucun système intégré d’analyse, de télémétrie, de publicité ou d’envoi automatique de rapports de plantage aux développeurs.\n\nLes développeurs de l’application ne collectent pas les URL d’abonnement, le contenu des configurations, les informations sur les serveurs, les sites visités, les connexions, le trafic ni les journaux.",
     ),
     "disclaimerPrivacyTitle": MessageLookupByLibrary.simpleMessage(
-      "Vos données",
+      "Confidentialité et données",
     ),
     "disclaimerResponsibilityContent": MessageLookupByLibrary.simpleMessage(
       "C’est à vous de juger si l’utilisation de l’application est légale dans votre pays, et vous êtes responsable de ce que vous en faites.\n\nL’application est fournie « telle quelle », sans aucune garantie. Les développeurs ne sont pas responsables des dommages liés à son utilisation ou à l’impossibilité de l’utiliser, ni des abonnements, configurations et liens tiers.",
@@ -744,7 +744,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Responsabilité",
     ),
     "disclaimerSoftwareContent": MessageLookupByLibrary.simpleMessage(
-      "L’application ne fait que gérer des configurations et router le trafic selon des règles sur votre appareil.\n\nNous ne vendons rien et ne fournissons ni serveurs proxy, ni nœuds, ni abonnements, ni accès au réseau. Chaque serveur et abonnement provient d’un fournisseur tiers ; leur légalité, leur sécurité et leur qualité se règlent entre vous et ce fournisseur. L’application n’est pas liée à ces fournisseurs et n’en répond pas.",
+      "L’application gère les configurations, achemine le trafic réseau selon les règles définies et fournit des outils pour contourner les restrictions DPI sur votre appareil.\n\nNous ne vendons rien et ne fournissons ni serveurs proxy, ni nœuds, ni abonnements, ni accès au réseau. Tous les serveurs et abonnements proviennent de fournisseurs tiers ; leur légalité, leur sécurité et leur qualité relèvent de vos relations avec ces fournisseurs. L’application n’est pas affiliée à ces fournisseurs et n’en est pas responsable.",
     ),
     "disclaimerSoftwareTitle": MessageLookupByLibrary.simpleMessage(
       "Ce que c’est, et ce que ce n’est pas",

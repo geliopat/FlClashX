@@ -41,7 +41,7 @@ const appVersionDefine = String.fromEnvironment('APP_VERSION');
 /// The mihomo release the core was linked with, for when it cannot be asked.
 const coreVersionDefine = String.fromEnvironment('CORE_VERSION');
 
-const disclaimerVersion = 2;
+const disclaimerVersion = 3;
 
 String _randomPipeId() {
   final random = Random.secure();

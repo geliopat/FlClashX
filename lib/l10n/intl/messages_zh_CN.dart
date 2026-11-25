@@ -529,22 +529,22 @@ class MessageLookup extends MessageLookupByLibrary {
     "discardChanges": MessageLookupByLibrary.simpleMessage("是否放弃更改？"),
     "disclaimer": MessageLookupByLibrary.simpleMessage("免责声明"),
     "disclaimerDesc": MessageLookupByLibrary.simpleMessage(
-      "FlClashX 是基于 Mihomo 内核的免费开源客户端。下面简要说明它做什么、不做什么以及收集哪些数据。点击“我同意”即表示接受这些条款。",
+      "FlClashZ 是基于 FlClashX 的免费开源客户端，使用 Mihomo 内核以及 Zapret2 和 Flowseal 组件。以下简要说明其功能、不提供的服务及数据处理方式。选择“我同意”即表示接受这些条款。",
     ),
     "disclaimerLicenseContent": MessageLookupByLibrary.simpleMessage(
-      "源代码以 GPL-3.0 许可证开放。Mihomo 内核及其他第三方组件使用各自的许可证。作者不对经修改或由第三方分发的版本负责。",
+      "FlClashZ 的源代码开放，并根据 GPL-3.0 许可证分发。本程序是 FlClashX 的分支项目。\n\nMihomo 内核、Zapret2、Flowseal 和其他第三方组件按照各自的许可证分发。作者不对修改后的构建版本或第三方分发的构建版本负责。",
     ),
     "disclaimerLicenseTitle": MessageLookupByLibrary.simpleMessage("许可证"),
     "disclaimerPrivacyContent": MessageLookupByLibrary.simpleMessage(
-      "为排查问题，本程序通过 Google Firebase 收集技术数据：崩溃报告、程序和系统版本、设备型号以及匿名的功能使用统计。\n\n订阅链接、配置内容、服务器、访问过的网站、连接、流量和日志不会被收集，也不会发送到任何地方，它们只保存在您的设备上。",
+      "本程序不包含内置分析系统、遥测、广告模块，也不会自动向开发者发送崩溃报告。\n\n程序开发者不收集订阅地址、配置内容、服务器、访问的网站、连接、流量相关信息及日志。",
     ),
-    "disclaimerPrivacyTitle": MessageLookupByLibrary.simpleMessage("数据"),
+    "disclaimerPrivacyTitle": MessageLookupByLibrary.simpleMessage("隐私与数据"),
     "disclaimerResponsibilityContent": MessageLookupByLibrary.simpleMessage(
       "在您所在国家或地区使用本程序是否合法由您自行判断，您对自己的使用行为负责。\n\n本程序按“现状”提供，不作任何保证。开发者不对因使用或无法使用本程序造成的损失负责，也不对第三方订阅、配置和链接负责。",
     ),
     "disclaimerResponsibilityTitle": MessageLookupByLibrary.simpleMessage("责任"),
     "disclaimerSoftwareContent": MessageLookupByLibrary.simpleMessage(
-      "本程序只在您的设备上管理配置并按规则转发流量。\n\n我们不出售任何东西，也不提供代理服务器、节点、订阅或网络接入。所有服务器和订阅均来自第三方提供者，其合法性、安全性和质量由您与提供者自行解决。本程序与此类提供者无关，也不为其负责。",
+      "本程序管理配置，按照指定规则转发网络流量，并提供在您的设备上绕过 DPI 限制的工具。\n\n我们不销售任何产品，也不提供代理服务器、节点、订阅或网络接入服务。所有服务器和订阅均来自第三方提供商，其合法性、安全性和质量问题由您与相关提供商解决。本程序与这些提供商无关联，也不对其负责。",
     ),
     "disclaimerSoftwareTitle": MessageLookupByLibrary.simpleMessage(
       "它是什么，不是什么",

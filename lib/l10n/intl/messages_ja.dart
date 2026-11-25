@@ -576,22 +576,22 @@ class MessageLookup extends MessageLookupByLibrary {
     "discardChanges": MessageLookupByLibrary.simpleMessage("変更を破棄しますか？"),
     "disclaimer": MessageLookupByLibrary.simpleMessage("免責事項"),
     "disclaimerDesc": MessageLookupByLibrary.simpleMessage(
-      "FlClashX は Mihomo コアを基にした無料のオープンソースクライアントです。何をするか、何をしないか、どのデータを収集するかを簡潔に説明します。「同意する」を押すと、これらの条件に同意したことになります。",
+      "FlClashZ は FlClashX をベースとし、Mihomo コアと Zapret2、Flowseal を使用する無料のオープンソースクライアントです。以下では、機能、提供しないもの、データの取り扱いについて簡潔に説明します。「同意する」を選択すると、これらの条件に同意したことになります。",
     ),
     "disclaimerLicenseContent": MessageLookupByLibrary.simpleMessage(
-      "ソースコードは GPL-3.0 ライセンスで公開されています。Mihomo コアとその他のサードパーティ製コンポーネントには、それぞれのライセンスが適用されます。改変されたビルドや第三者が配布するビルドについて、作者は責任を負いません。",
+      "FlClashZ のソースコードは公開されており、GPL-3.0 ライセンスに基づいて配布されます。本アプリは FlClashX のフォークです。\n\nMihomo コア、Zapret2、Flowseal およびその他の第三者コンポーネントは、それぞれのライセンスに従って配布されます。改変されたビルドや第三者が配布するビルドについて、作者は責任を負いません。",
     ),
     "disclaimerLicenseTitle": MessageLookupByLibrary.simpleMessage("ライセンス"),
     "disclaimerPrivacyContent": MessageLookupByLibrary.simpleMessage(
-      "不具合の調査のため、本アプリは Google Firebase を通じて技術データを収集します。クラッシュレポート、アプリとシステムのバージョン、端末のモデル、匿名化した機能の利用統計です。\n\nサブスクリプションのリンク、設定の内容、サーバー、閲覧したサイト、接続、トラフィック、ログは収集も送信もしません。端末の中にのみ残ります。",
+      "本アプリには、組み込みの分析システム、テレメトリ、広告モジュール、開発者へのクラッシュレポートの自動送信機能は含まれていません。\n\nサブスクリプション URL、設定の内容、サーバー、閲覧サイト、接続、通信量に関する情報およびログは、本アプリの開発者によって収集されません。",
     ),
-    "disclaimerPrivacyTitle": MessageLookupByLibrary.simpleMessage("データ"),
+    "disclaimerPrivacyTitle": MessageLookupByLibrary.simpleMessage("プライバシーとデータ"),
     "disclaimerResponsibilityContent": MessageLookupByLibrary.simpleMessage(
       "お住まいの国で本アプリの利用が合法かどうかはご自身で判断し、その利用についてはご自身が責任を負います。\n\n本アプリは「現状のまま」提供され、いかなる保証もありません。開発者は、利用または利用不能による損害、ならびに第三者のサブスクリプション、設定、リンクについて責任を負いません。",
     ),
     "disclaimerResponsibilityTitle": MessageLookupByLibrary.simpleMessage("責任"),
     "disclaimerSoftwareContent": MessageLookupByLibrary.simpleMessage(
-      "本アプリはお使いの端末上で設定を管理し、ルールに従ってトラフィックを転送するだけです。\n\n私たちは何も販売せず、プロキシサーバー、ノード、サブスクリプション、ネットワーク接続も提供しません。サーバーとサブスクリプションはすべて第三者の提供者から入手するものであり、その合法性、安全性、品質は利用者と提供者の間の問題です。本アプリはそうした提供者と関係がなく、責任も負いません。",
+      "本アプリは設定を管理し、指定されたルールに従ってネットワーク通信をルーティングし、お使いの端末で DPI による制限を回避するためのツールを提供します。\n\n当方は何も販売せず、プロキシサーバー、ノード、サブスクリプション、ネットワークアクセスも提供しません。すべてのサーバーとサブスクリプションは第三者の提供元から取得するものであり、その合法性、安全性、品質については利用者と提供元の間で解決してください。本アプリはこれらの提供元と提携しておらず、責任を負いません。",
     ),
     "disclaimerSoftwareTitle": MessageLookupByLibrary.simpleMessage(
       "できること、含まれないもの",

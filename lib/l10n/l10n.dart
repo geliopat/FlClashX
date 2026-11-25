@@ -2586,10 +2586,10 @@ class AppLocalizations {
     return Intl.message('Disclaimer', name: 'disclaimer', desc: '', args: []);
   }
 
-  /// `FlClashX is a free, open-source client built on the Mihomo core. Here is a short note on what it does, what it does not do and what data it collects. By tapping “I agree” you accept these terms.`
+  /// `FlClashZ is a free, open-source client based on FlClashX, using the Mihomo core and the Zapret2 and Flowseal components. Below is a brief description of what it does, what it does not do and how it handles data. By selecting “I agree”, you accept these terms.`
   String get disclaimerDesc {
     return Intl.message(
-      'FlClashX is a free, open-source client built on the Mihomo core. Here is a short note on what it does, what it does not do and what data it collects. By tapping “I agree” you accept these terms.',
+      'FlClashZ is a free, open-source client based on FlClashX, using the Mihomo core and the Zapret2 and Flowseal components. Below is a brief description of what it does, what it does not do and how it handles data. By selecting “I agree”, you accept these terms.',
       name: 'disclaimerDesc',
       desc: '',
       args: [],
@@ -2606,10 +2606,10 @@ class AppLocalizations {
     );
   }
 
-  /// `The app only manages configurations and routes traffic by rules on your device.\n\nWe sell nothing and provide no proxy servers, nodes, subscriptions or network access. Every server and subscription comes from a third-party provider, and their legality, safety and quality are between you and that provider. The app is not affiliated with such providers and is not responsible for them.`
+  /// `The app manages configurations, routes network traffic according to specified rules and provides tools for bypassing DPI restrictions on your device.\n\nWe sell nothing and provide no proxy servers, nodes, subscriptions or network access. Every server and subscription comes from a third-party provider, and their legality, safety and quality are between you and that provider. The app is not affiliated with such providers and is not responsible for them.`
   String get disclaimerSoftwareContent {
     return Intl.message(
-      'The app only manages configurations and routes traffic by rules on your device.\n\nWe sell nothing and provide no proxy servers, nodes, subscriptions or network access. Every server and subscription comes from a third-party provider, and their legality, safety and quality are between you and that provider. The app is not affiliated with such providers and is not responsible for them.',
+      'The app manages configurations, routes network traffic according to specified rules and provides tools for bypassing DPI restrictions on your device.\n\nWe sell nothing and provide no proxy servers, nodes, subscriptions or network access. Every server and subscription comes from a third-party provider, and their legality, safety and quality are between you and that provider. The app is not affiliated with such providers and is not responsible for them.',
       name: 'disclaimerSoftwareContent',
       desc: '',
       args: [],
@@ -2636,20 +2636,20 @@ class AppLocalizations {
     );
   }
 
-  /// `Your data`
+  /// `Privacy and data`
   String get disclaimerPrivacyTitle {
     return Intl.message(
-      'Your data',
+      'Privacy and data',
       name: 'disclaimerPrivacyTitle',
       desc: '',
       args: [],
     );
   }
 
-  /// `To find bugs the app collects technical data through Google Firebase: crash reports, the app and system versions, the device model and anonymised statistics on feature use.\n\nSubscription links, configuration contents, servers, visited sites, connections, traffic and logs are never collected or sent anywhere. They stay on your device only.`
+  /// `The app contains no built-in analytics, telemetry, advertising modules or automatic crash reporting to its developers.\n\nSubscription URLs, configuration contents, information about servers, visited sites, connections, traffic and logs are not collected by the app developers.`
   String get disclaimerPrivacyContent {
     return Intl.message(
-      'To find bugs the app collects technical data through Google Firebase: crash reports, the app and system versions, the device model and anonymised statistics on feature use.\n\nSubscription links, configuration contents, servers, visited sites, connections, traffic and logs are never collected or sent anywhere. They stay on your device only.',
+      'The app contains no built-in analytics, telemetry, advertising modules or automatic crash reporting to its developers.\n\nSubscription URLs, configuration contents, information about servers, visited sites, connections, traffic and logs are not collected by the app developers.',
       name: 'disclaimerPrivacyContent',
       desc: '',
       args: [],
@@ -2666,10 +2666,10 @@ class AppLocalizations {
     );
   }
 
-  /// `The source code is open under the GPL-3.0 license. The Mihomo core and other third-party components carry their own licenses. The authors are not responsible for modified builds or builds distributed by third parties.`
+  /// `The FlClashZ source code is open and distributed under the GPL-3.0 license. The app is a fork of FlClashX.\n\nThe Mihomo core, Zapret2, Flowseal and other third-party components are distributed under their respective licenses. The authors are not responsible for modified builds or builds distributed by third parties.`
   String get disclaimerLicenseContent {
     return Intl.message(
-      'The source code is open under the GPL-3.0 license. The Mihomo core and other third-party components carry their own licenses. The authors are not responsible for modified builds or builds distributed by third parties.',
+      'The FlClashZ source code is open and distributed under the GPL-3.0 license. The app is a fork of FlClashX.\n\nThe Mihomo core, Zapret2, Flowseal and other third-party components are distributed under their respective licenses. The authors are not responsible for modified builds or builds distributed by third parties.',
       name: 'disclaimerLicenseContent',
       desc: '',
       args: [],
