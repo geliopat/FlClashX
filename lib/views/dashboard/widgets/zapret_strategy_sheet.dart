@@ -50,7 +50,7 @@ class ZapretStrategySheet extends ConsumerWidget {
                     try {
                       await controller.setMode(mode);
                     } catch (error) {
-                      dialogs.showNotifier(error.toString(), level: MessageLevel.error);
+                      if (context.mounted) dialogs.showNotifier(error.toString(), level: MessageLevel.error);
                     }
                   },
                 ),
@@ -63,7 +63,7 @@ class ZapretStrategySheet extends ConsumerWidget {
               items: [
                 ListItem(
                   title: Text(AppLocalizations.of(context).forkCatalogUnavailable),
-                  subtitle: Text(state.error ?? 'Загрузка…'),
+                  subtitle: Text(state.error ?? AppLocalizations.of(context).loading),
                   onTap: controller.loadStrategies,
                 ),
               ],
@@ -87,7 +87,7 @@ class ZapretStrategySheet extends ConsumerWidget {
                         try {
                           await controller.selectStrategy(strategy.id);
                         } catch (error) {
-                          dialogs.showNotifier(error.toString(), level: MessageLevel.error);
+                          if (context.mounted) dialogs.showNotifier(error.toString(), level: MessageLevel.error);
                         }
                       },
                     ),
