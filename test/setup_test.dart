@@ -364,7 +364,8 @@ hooks:
         final pre = render(setup.preDesktop);
         expect(pre, isNot(contains('D915C0D1-2F5B-4676-97D5-6D55F3EF45A4')));
         expect(pre, contains(r'DefaultDirName={autopf}\FlClashX Pre'));
-        expect(pre, contains("HelperService = 'FlClashXPreHelperService';"));
+        expect(pre, contains("HelperService = 'FlClashXHelperService';"));
+        expect(pre, isNot(contains("HelperService = 'FlClashXPreHelperService';")));
         expect(pre, contains('AdoptLegacy = False;'));
         expect(pre, contains("KillProcess('FlClashXPre.exe');"));
         expect(pre, contains(r'{userappdata}\com.follow\clashx.pre'));
@@ -446,6 +447,27 @@ hooks:
             contains('StartupWMClass=com.follow.clashx\n'),
           ),
         );
+      });
+
+      test('Windows pre bundle renames only the app and keeps shared Helper', () {
+        final dir = Directory.systemTemp.createTempSync('channel_windows_helper');
+        addTearDown(() => dir.deleteSync(recursive: true));
+        File('${dir.path}/FlClashX.exe').writeAsStringSync('app');
+        File('${dir.path}/FlClashXHelperService.exe').writeAsStringSync('helper');
+
+        setup.renameForChannel(
+          dir.path,
+          setup.preDesktop,
+          ext: '.exe',
+          renameHelper: false,
+        );
+
+        expect(File('${dir.path}/FlClashXPre.exe').readAsStringSync(), 'app');
+        expect(
+          File('${dir.path}/FlClashXHelperService.exe').readAsStringSync(),
+          'helper',
+        );
+        expect(File('${dir.path}/FlClashXPreHelperService.exe').existsSync(), isFalse);
       });
 
       test('renames the app and Helper in the staged bundle only for pre', () {
