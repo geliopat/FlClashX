@@ -69,14 +69,22 @@ end;
 
 // The client goes first so it cannot bring the Helper back, and the Helper is
 // disabled before it stops because the SCM restarts a killed Helper in 5 s.
-// Older pre builds installed a second Helper service. Retire it on
-// upgrade/uninstall as well as in the new Helper's own installer path.
-procedure RetirePreHelperService;
+// Exact legacy service names; leave unrelated services and drivers alone.
+// The application's elevated installer verifies deletion before creating Z.
+procedure RetireNamedHelper(const Name: String);
 begin
-  RunHidden('sc.exe', 'config "FlClashXPreHelperService" start= disabled');
-  RunHidden('net.exe', 'stop "FlClashXPreHelperService"');
-  RunHidden('sc.exe', 'delete "FlClashXPreHelperService"');
-  KillProcess('FlClashXPreHelperService.exe');
+  RunHidden('sc.exe', 'config "' + Name + '" start= disabled');
+  RunHidden('net.exe', 'stop "' + Name + '"');
+  RunHidden('sc.exe', 'delete "' + Name + '"');
+end;
+
+procedure RetireLegacyHelpers;
+begin
+  RetireNamedHelper('FlClashXHelperService');
+  RetireNamedHelper('FlClashXPreHelperService');
+  RetireNamedHelper('FlClashHelperService');
+  RetireNamedHelper('FlClashPreHelperService');
+  RetireNamedHelper('FlClashZPreHelperService');
 end;
 
 procedure StopLegacyClientInInstallDir;
@@ -95,7 +103,7 @@ begin
   HelperHeld := RunHidden('sc.exe', 'config "' + HelperService + '" start= disabled') = 0;
   RunHidden('net.exe', 'stop "' + HelperService + '"');
   KillProcess(HelperService + '.exe');
-  RetirePreHelperService;
+  RetireLegacyHelpers;
   KillCore;
   Sleep(1000);
 end;
