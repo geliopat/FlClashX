@@ -67,11 +67,23 @@ jobs:
       - name: Run Windows service tests
         run: cargo test --manifest-path services/helper/Cargo.toml --features windows-service
 
+      - name: Run Go core tests (Mihomo and FlClashZ additions)
+        working-directory: core
+        env:
+          CGO_ENABLED: '0'
+        run: go test -tags with_gvisor -timeout 10m ./...
+
       - name: Install Flutter dependencies
         run: flutter pub get
 
       - name: Run Helper, Zapret and Windows packaging tests
         run: flutter test test/core/desktop/helper_client_test.dart test/providers/zapret_diagnostics_test.dart test/providers/zapret_infrastructure_test.dart test/providers/auto_delay_test.dart test/setup_test.dart test/common/preferences_test.dart test/models/config_test.dart test/providers/smart_hosts_test.dart
+
+      - name: Run core IPC and desktop transport contract tests
+        run: flutter test test/core/protocol_contract_test.dart test/core/desktop/rpc_client_test.dart test/core/desktop/lifecycle_test.dart test/common/preferences_store_test.dart
+
+      - name: Run linked Windows lifecycle regression tests
+        run: flutter test test/providers/windows_linked_lifecycle_test.dart
 
       - name: Stage pinned Zapret2 and Flowseal assets
         shell: pwsh
@@ -84,6 +96,10 @@ jobs:
       # Those DLLs are not redistributable. Build Release for a portable user bundle.
       - name: Build Windows Release bundle
         run: flutter build windows --release
+
+      - name: Smoke test the compiled Windows application
+        shell: pwsh
+        run: ./scripts/windows_smoke_test.ps1
 
       - name: Upload Windows Release bundle
         uses: actions/upload-artifact@v6

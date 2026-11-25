@@ -120,6 +120,15 @@ jobs:
         run: ./scripts/setup_zapret.ps1
       - name: Build stable Windows packages
         run: dart setup.dart windows --env stable -v
+      - name: Smoke test the actual portable release
+        shell: pwsh
+        run: |
+          $folder = Join-Path $env:RUNNER_TEMP 'flclashz-release-smoke'
+          Expand-Archive -LiteralPath 'dist/FlClashZ-windows-amd64.zip' -DestinationPath $folder -Force
+          $exe = @(Get-ChildItem -Path $folder -Recurse -File -Filter 'FlClashZ.exe')
+          if ($exe.Count -ne 1) { throw 'Expected one packaged application executable' }
+          ./scripts/windows_smoke_test.ps1 -Bundle $exe[0].Directory.FullName
+
       - name: Verify distribution names
         shell: pwsh
         run: |

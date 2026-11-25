@@ -98,6 +98,28 @@ void main() {
     expect(result.cleanedProcesses, 2);
   });
 
+  test('Zapret restart matches the shared Rust wire contract', () async {
+    final fixture = jsonDecode(
+      await File('test/fixtures/zapret_restart_contract.json').readAsString(),
+    ) as Map<String, dynamic>;
+    final client = _client(_ResponseAdapter((options) {
+      expect(options.method, 'POST');
+      expect(options.path, endsWith('/zapret/restart'));
+      expect(options.data, fixture['request']);
+      return _jsonResponse(Map<String, Object?>.from(fixture['response'] as Map));
+    }));
+    final result = await client.restartZapret(
+      strategyId: 'flowseal-alt',
+      mode: 'fullBypass',
+      debug: true,
+      watchdog: false,
+      reason: 'dashboard',
+    );
+    expect(result.running, isTrue);
+    expect(result.pid, 3210);
+    expect(result.engine, 'winws');
+  });
+
   test('Zapret operations carry increasing sequence numbers from one owner', () async {
     final commands = <int>[];
     final owners = <String>{};

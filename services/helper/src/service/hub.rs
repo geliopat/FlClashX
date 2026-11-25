@@ -3074,7 +3074,21 @@ mod tests {
 
 #[cfg(test)]
 mod zapret_log_reason_tests {
-    use super::zapret_reason;
+    use super::{zapret_reason, ZapretStartRequest};
+
+    #[test]
+    fn shared_flutter_restart_request_deserializes() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../test/fixtures/zapret_restart_contract.json"
+        ))
+        .unwrap();
+        let request: ZapretStartRequest =
+            serde_json::from_value(fixture["request"].clone()).unwrap();
+        assert_eq!(request.strategy_id, "flowseal-alt");
+        assert_eq!(request.reason.as_deref(), Some("dashboard"));
+        assert!(request.debug);
+        assert_eq!(request.watchdog, Some(false));
+    }
 
     #[test]
     fn reason_labels_are_bounded_and_legacy_clients_work() {

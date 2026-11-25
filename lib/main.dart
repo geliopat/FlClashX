@@ -23,6 +23,11 @@ void main(List<String> args) {
       if (args.contains(restartCoreArgument)) {
         exit((await runRestartCoreCli()).code);
       }
+      // CI-only startup acknowledgement. Normal launches never write it.
+      final smokeMarker = Platform.isWindows && args.contains('--ci-smoke-test')
+          ? Platform.environment['FLCLASHZ_SMOKE_MARKER']
+          : null;
+      var startupFailed = false;
       fileLogger.enable();
       if (Platform.isWindows || Platform.isLinux) {
         SharedPreferencesStorePlatform.instance = AtomicFilePreferencesStore(
@@ -33,6 +38,7 @@ void main(List<String> args) {
         linkManager.seedInitialLink(args);
       }
       FlutterError.onError = (details) {
+        startupFailed = true;
         Future.microtask(() {
           commonPrint.log(
             'exception: ${details.exception} stack: ${details.stack}',
@@ -53,6 +59,13 @@ void main(List<String> args) {
             child: const Application(),
           ),
         );
+        if (smokeMarker != null && smokeMarker.isNotEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!startupFailed) {
+              File(smokeMarker).writeAsStringSync('first-frame-ok', flush: true);
+            }
+          });
+        }
         if (system.isDesktop) {
           unawaited(
             coreCliServer.start(

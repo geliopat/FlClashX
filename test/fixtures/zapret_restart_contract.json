@@ -1,0 +1,19 @@
+{
+  "request": {
+    "strategyId": "flowseal-alt",
+    "mode": "fullBypass",
+    "debug": true,
+    "watchdog": false,
+    "reason": "dashboard"
+  },
+  "response": {
+    "running": true,
+    "pid": 3210,
+    "strategyId": "flowseal-alt",
+    "engine": "winws",
+    "mode": "fullBypass",
+    "winDivertFilters": [],
+    "processingLists": [],
+    "cleanedProcesses": 0
+  }
+}

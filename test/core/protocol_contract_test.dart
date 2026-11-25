@@ -74,6 +74,10 @@ class _RecordingCoreHandler extends CoreHandlerInterface {
         'vehicle-type': 'HTTP',
         'update-at': '2024-01-01T00:00:00.000Z',
       },
+      CoreMethod.getAppliedHosts => {
+        'example.test': ['192.0.2.1', '2001:db8::1'],
+        '*.alias.test': ['example.test'],
+      },
       CoreMethod.getConfig => {
         'mode': 'rule',
         'rule': ['MATCH,DIRECT'],
@@ -163,6 +167,15 @@ class _EmptyConfigCoreHandler extends _RecordingCoreHandler {
 }
 
 void main() {
+  test('applied Hosts cross IPC without losing aliases or multiple IPs', () async {
+    final handler = _RecordingCoreHandler();
+    expect(await handler.getAppliedHosts(), {
+      'example.test': '192.0.2.1, 2001:db8::1',
+      '*.alias.test': 'example.test',
+    });
+    expect(handler.calls.containsKey(CoreMethod.getAppliedHosts), isTrue);
+  });
+
   test('method call keeps structured arguments', () async {
     final fixture =
         json.decode(
