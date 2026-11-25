@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:fl_clash/common/boot_record.dart';
 import 'package:fl_clash/common/constant.dart';
 import 'package:fl_clash/common/preferences.dart';
+import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -69,6 +70,28 @@ void main() {
 
       expect(restored.currentProfileId, 42);
       expect(restored.excludeSSIDs, ['home']);
+    });
+
+    test('saveConfig preserves the Zapret dashboard widget', () async {
+      const config = Config(
+        themeProps: defaultThemeProps,
+        currentProfileId: 42,
+        appSettingProps: AppSettingProps(
+          dashboardWidgets: [
+            DashboardWidget.currentOutbound,
+            DashboardWidget.zapret,
+          ],
+          dashboardWidgetsChosen: true,
+          openLogs: true,
+          acceptedDisclaimerVersion: disclaimerVersion,
+        ),
+      );
+
+      expect(await preferences.saveConfig(config), isTrue);
+      final saved = (await preferences.getConfigMap())!;
+      final app = saved['appSettingProps'] as Map<String, Object?>;
+      expect(app['dashboardWidgets'], ['currentOutbound', 'zapret']);
+      expect(Config.strictFromJson(saved), config);
     });
 
     test('getConfigMap returns null for malformed JSON', () async {
