@@ -342,11 +342,11 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
       setState(() {
         _updating = false;
         _error = error is HelperException ? error.message : error.toString();
-        _notice = applied.isEmpty
-            ? null
-            : rollbackFailures.isEmpty
+        _notice = rollbackFailures.isNotEmpty
+            ? 'Не удалось подтвердить или полностью откатить результат: ${rollbackFailures.join('; ')}'
+            : applied.isNotEmpty
                 ? 'Обновление не завершилось. Изменённые файлы автоматически возвращены из .bak.'
-                : 'Не удалось полностью откатить изменения: ${rollbackFailures.join('; ')}';
+                : null;
       });
     }
   }
