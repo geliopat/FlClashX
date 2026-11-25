@@ -360,6 +360,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
     final diagnostics = ref.watch(zapretDiagnosticsProvider);
     final active = zapret.strategies.where((item) => item.id == zapret.activeStrategyId);
     final activeName = active.isEmpty ? null : active.first.name;
+    final activeSupportsSplitMode = active.isNotEmpty && active.first.supportsSplitMode;
 
     return CommonScaffold(
       title: 'Zapret',
@@ -376,7 +377,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
                 Text('Стратегия: ${activeName ?? 'не активна'}'),
                 if (zapret.running) ...[
                   Text('Движок: ${zapret.activeEngine ?? '—'} · PID: ${zapret.pid ?? '—'}'),
-                  Text('Режим: ${zapret.activeMode ?? 'собственные правила стратегии'}'),
+                  Text('Режим: ${activeSupportsSplitMode ? (zapret.activeMode ?? 'не определён') : 'собственные правила стратегии'}'),
                   const SizedBox(height: 8),
                   Text('Фильтры перехвата WinDivert', style: Theme.of(context).textTheme.labelLarge),
                   Text(
