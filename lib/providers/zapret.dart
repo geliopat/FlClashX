@@ -4,7 +4,6 @@ import 'dart:io';
 
 import 'package:fl_clash/common/system.dart';
 import 'package:fl_clash/providers/app.dart';
-import 'package:fl_clash/providers/action.dart';
 import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/providers/zapret_infrastructure.dart';
 import 'package:fl_clash/providers/zapret_diagnostics.dart';
@@ -208,13 +207,18 @@ class ZapretController extends Notifier<ZapretState> {
         _infrastructureProfileId != profileId;
     _profileApplying = changed;
     final wasStopping = _lifecycleStopping;
+    var revision = _lifecycleRevision;
     var restore = false;
     try {
       if (changed && (_desiredRunning || state.running || state.busy)) {
         restore = _desiredRunning || state.running;
-        restore = await stopAlongsideMihomo() || restore;
+        final stopping = stopAlongsideMihomo();
+        // Capture the revision issued by this transition, not a later
+        // user/core stop that might run while the service call is pending.
+        revision = _lifecycleRevision;
+        restore = await stopping || restore;
       }
-      return (revision: _lifecycleRevision, restore: restore, wasStopping: wasStopping, changed: changed);
+      return (revision: revision, restore: restore, wasStopping: wasStopping, changed: changed);
     } catch (_) {
       _profileApplying = false;
       _profileBlocked = true;
@@ -245,7 +249,8 @@ class ZapretController extends Notifier<ZapretState> {
     }
     if (!transition.changed || transition.revision != _lifecycleRevision || transition.wasStopping) return;
     _lifecycleStopping = false;
-    if (accepted && transition.restore && !_launchBlocked) {
+    if (accepted && transition.restore && !_launchBlocked &&
+        profileId == ref.read(currentProfileIdProvider)) {
       await setEnabled(true);
     }
   }
@@ -275,31 +280,17 @@ class ZapretController extends Notifier<ZapretState> {
     if (_profileBlocked || _profileApplying) {
       throw StateError('Конфигурация Mihomo ещё не применена');
     }
+    // Never substitute a freshly downloaded but not yet applied profile.
     if (known != null && _infrastructureProfileId == id) return known;
-    if (id == null) {
-      return const ZapretInfrastructure([], []);
-    }
-    final yaml = await ref.read(setupActionProvider.notifier).getProfileWithId(id);
-    if (yaml.trim().isEmpty) {
-      throw StateError('Не удалось прочитать конфигурацию Mihomo для защиты Zapret');
-    }
-    if (id != ref.read(currentProfileIdProvider)) {
-      throw StateError('Профиль Mihomo изменился во время подготовки Zapret');
-    }
-    updateInfrastructureFromYaml(yaml, id);
-    return _infrastructure!;
+    throw StateError('Нет подтверждённой конфигурации Mihomo для защиты Zapret');
   }
 
   Future<void> refreshInfrastructure() async {
-    final id = ref.read(currentProfileIdProvider);
-    if (id == null || state.busy || _launchBlocked) return;
-    final yaml = await ref.read(setupActionProvider.notifier).getProfileWithId(id);
-    if (yaml.trim().isEmpty) {
-      throw StateError('Не удалось прочитать конфигурацию Mihomo');
-    }
-    if (id != ref.read(currentProfileIdProvider)) return;
-    updateInfrastructureFromYaml(yaml, id);
-    await _reconcileInfrastructure();
+    if (state.busy || _launchBlocked) return;
+    final protection = await _readInfrastructure();
+    if (_launchBlocked) return;
+    state = state.copyWith(protectedDomains: protection.domains, protectedIps: protection.ips);
+    if (state.running) await restart();
   }
 
   Future<void> _reconcileInfrastructure() async {
