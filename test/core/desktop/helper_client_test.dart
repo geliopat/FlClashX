@@ -202,7 +202,7 @@ void main() {
         expect(options.data, {'content': 'example.org\ncustom.org\n'});
         return _jsonResponse({
           'filename': 'list-general.txt',
-          'bytes': 24,
+          'bytes': 23,
           'entries': 2,
           'userManaged': false,
         });
