@@ -26,13 +26,17 @@ pub fn helper_name() -> &'static str {
     // The installed service image is replaced by whichever channel installs
     // most recently; Linux keeps its existing per-channel units.
     if cfg!(windows) {
-        STABLE_HELPER
+        windows_helper_name()
     } else {
         helper_name_for(*PRE)
     }
 }
 
-#[cfg(windows)]
+pub fn windows_helper_name() -> &'static str {
+    STABLE_HELPER
+}
+
+#[cfg(any(windows, test))]
 pub fn retired_windows_helper_names() -> &'static [&'static str] {
     // Remove the second service created by older pre-release builds.
     &[PRE_HELPER]
@@ -84,6 +88,8 @@ mod tests {
         )));
         assert_eq!(helper_name_for(true), "FlClashXPreHelperService");
         assert_eq!(helper_name_for(false), "FlClashXHelperService");
+        assert_eq!(windows_helper_name(), "FlClashXHelperService");
+        assert_eq!(retired_windows_helper_names(), &["FlClashXPreHelperService"]);
         assert_eq!(linux_service_for(true), "flclashx-pre-helper");
         assert_eq!(linux_runtime_dir_for(false), "flclashx");
     }
