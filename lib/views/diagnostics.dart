@@ -1,4 +1,7 @@
 import 'dart:convert';
+import 'dart:io';
+import 'package:fl_clash/common/common.dart';
+import 'package:path/path.dart' as p;
 
 import 'package:fl_clash/common/component_integrity.dart';
 import 'package:fl_clash/common/preferences.dart';
@@ -41,8 +44,10 @@ class _DiagnosticsViewState extends ConsumerState<DiagnosticsView> {
     try {
       await check('Mihomo', () async {
         if (ref.read(coreStatusProvider) != CoreStatus.connected) return unavailable;
-        await ref.read(coreHandlerProvider).getAppliedHosts();
-        return ok;
+        final core = ref.read(coreHandlerProvider);
+        await core.getAppliedHosts();
+        final version = await core.getCoreVersion();
+        return '$ok · $version';
       });
       await check('Helper / IPC', () async =>
         await helperClient.readiness(timeout: const Duration(seconds: 3), verifyHelperBinary: true) == HelperReadiness.ready ? ok : unavailable);
@@ -63,10 +68,27 @@ class _DiagnosticsViewState extends ConsumerState<DiagnosticsView> {
         Config.strictFromJson(jsonDecode(jsonEncode(current)) as Map<String, Object?>);
         return ok;
       });
-      await check(_t('TUN / системный прокси', 'TUN / system proxy'), () async {
-        final tun = ref.read(patchClashConfigProvider).tun.enable;
+      await check('TUN', () async {
+        if (!ref.read(patchClashConfigProvider).tun.enable || !ref.read(isStartProvider)) {
+          return _t('Не запрошен / VPN выключен', 'Not requested / VPN off');
+        }
+        if (ref.read(coreStatusProvider) != CoreStatus.connected) return unavailable;
+        return await ref.read(coreHandlerProvider).getTunFailed()
+          ? _t('Ядро сообщает об ошибке TUN', 'Core reports TUN failure')
+          : _t('Ядро не сообщает об ошибке TUN (не тест трафика)', 'No TUN failure reported by core (not a traffic test)');
+      });
+      await check(_t('Системный прокси', 'System proxy'), () async {
         final proxy = ref.read(networkSettingProvider).systemProxy;
-        return 'TUN: $tun · Proxy: $proxy · ${_t('настройки, не тест трафика', 'configured state, not a traffic test')}';
+        return 'Proxy: $proxy · ${_t('настройка приложения', 'configured state')}';
+      });
+      await check(_t('Журнал службы', 'Service journal'), () async {
+        await helperClient.zapretLogArchive();
+        return ok;
+      });
+      await check(_t('Сетевые проверки', 'Network checks'), () async {
+        final results = ref.read(zapretDiagnosticsProvider);
+        final accepted = ZapretProbeTarget.values.where((target) => results.resultOf(target).accepted).length;
+        return '$accepted/${ZapretProbeTarget.values.length} HTTPS · ${_t('последние результаты DIRECT, не доказательство перехвата WinDivert', 'latest DIRECT results, not proof of WinDivert interception')}';
       });
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -87,6 +109,20 @@ class _DiagnosticsViewState extends ConsumerState<DiagnosticsView> {
             onTap: _busy || _results.isEmpty ? null : () async {
               await Clipboard.setData(ClipboardData(text: _results.entries.map((entry) => '${entry.key}: ${entry.value}').join('\n')));
             }),
+        ]),
+        generateSection(items: [
+          ListItem(
+            title: Text(context.appLocalizations.forkSaveDiagnosticReport),
+            onTap: _busy || _results.isEmpty ? null : () async {
+              try {
+                final file = File(p.join(await appPath.downloadDirPath, 'FlClashZ-diagnostics-${DateTime.now().millisecondsSinceEpoch}.txt'));
+                await file.writeAsString(_results.entries.map((entry) => '${entry.key}: ${entry.value}').join('\n'), flush: true);
+                if (context.mounted) dialogs.showNotifier(file.path);
+              } catch (_) {
+                if (context.mounted) dialogs.showNotifier(context.appLocalizations.forkReportSaveFailed);
+              }
+            },
+          ),
         ]),
         const ListSectionGap(),
         generateSection(title: _t('Результаты', 'Results'), items: [

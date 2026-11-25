@@ -652,6 +652,18 @@ final class HelperClient {
     return data.map(HelperZapretLog.fromJson).toList(growable: false);
   }
 
+  Future<String> zapretLogArchive() async {
+    final response = await _dio.get<Object?>(
+      '$baseUrl/zapret/logs/archive',
+      options: _options(ResponseType.json, receiveTimeout: const Duration(seconds: 15)),
+    );
+    final data = response.data;
+    if (data is! Map || data['content'] is! String) {
+      throw const FormatException('Invalid persistent journal');
+    }
+    return data['content'] as String;
+  }
+
   Future<void> clearZapretLogs() async {
     await _dio.delete<Object?>(
       '$baseUrl/zapret/logs',

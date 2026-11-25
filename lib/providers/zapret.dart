@@ -374,7 +374,7 @@ class ZapretController extends Notifier<ZapretState> {
           payload: '[${entry.level}] ${entry.message}');
         zapretFileLogger.write(log);
         if (entry.message.toLowerCase().contains('watchdog') ||
-            entry.message.toLowerCase().contains('exited unexpectedly')) {
+            entry.message.toLowerCase().contains('engine exited')) {
           crashFileLogger.write(log.copyWith(payload: '[Zapret] ${log.payload}'));
         }
       }

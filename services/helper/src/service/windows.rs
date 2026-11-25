@@ -61,6 +61,11 @@ fn run_windows_service() -> Result<()> {
         .get()
         .cloned()
         .context("the helper service has no owner")?;
+    if let Err(error) = super::journal::init(&owner_sid) {
+        super::hub::log_message(format!("Persistent journal unavailable: {error}"));
+    } else {
+        super::hub::record_service_event("info", "Helper service started");
+    }
     let (shutdown_tx, mut shutdown_rx) = watch::channel(false);
     let status_handle = service_control_handler::register(
         super::identity::helper_name(),
@@ -129,6 +134,10 @@ fn run_windows_service() -> Result<()> {
                 .context("report helper service running")
         },
     ));
+    super::hub::record_service_event(
+        if service_result.is_err() { "error" } else { "info" },
+        if service_result.is_err() { "Helper service failed" } else { "Helper service stopped" },
+    );
     let exit_code = u32::from(service_result.is_err());
     let status_result = status_handle.set_service_status(service_status(
         ServiceState::Stopped,

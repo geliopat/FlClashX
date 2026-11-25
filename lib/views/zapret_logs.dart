@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:io';
+import 'package:path/path.dart' as p;
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/file_logger.dart';
 
@@ -116,18 +118,43 @@ class _ZapretLogsViewState extends ConsumerState<ZapretLogsView> {
           ),
           const ListSectionGap(),
           generateSection(
+            items: [
+              ListItem(
+                title: Text(context.appLocalizations.forkExportServiceJournal),
+                onTap: () async {
+                  try {
+                    final content = await helperClient.zapretLogArchive();
+                    final stamp = DateTime.now().millisecondsSinceEpoch;
+                    final file = File(p.join(await appPath.downloadDirPath, 'FlClashZ-service-$stamp.jsonl'));
+                    await file.writeAsString(content, flush: true);
+                    if (context.mounted) dialogs.showNotifier(file.path);
+                  } catch (_) {
+                    if (context.mounted) dialogs.showNotifier(context.appLocalizations.forkJournalUnavailable);
+                  }
+                },
+              ),
+            ],
+          ),
+          const ListSectionGap(),
+          generateSection(
             title: 'События',
             items: [
               if (logs.isEmpty) const ListItem(title: Text('Нет событий')),
               for (final entry in logs)
-                ListItem(
-                  title: Text(entry.message, style: TextStyle(color: switch (entry.level) {
-                    'error' => context.colorScheme.error,
-                    'stderr' => context.colorScheme.tertiary,
-                    'debug' => context.colorScheme.onSurfaceVariant,
-                    _ => context.colorScheme.onSurface,
-                  })),
-                  subtitle: Text('${entry.time.toLocal().toString().split(".").first} · ${entry.level}'),
+                RecordListItem(
+                  onTap: () {},
+                  header: RecordHeader(children: [
+                    RecordTimestamp(entry.time.toLocal().toString().split('.').first),
+                    RecordLabel(
+                      label: entry.level,
+                      tone: switch (entry.level) {
+                        'error' => RecordTone.error,
+                        'stderr' => RecordTone.warning,
+                        _ => RecordTone.neutral,
+                      },
+                    ),
+                  ]),
+                  body: SelectableText(entry.message, style: RecordTextStyles.of(context).primary),
                 ),
             ],
           ),

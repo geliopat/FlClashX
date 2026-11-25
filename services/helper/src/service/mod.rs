@@ -10,3 +10,6 @@ pub mod peer;
 pub mod windows;
 pub mod zapret;
 pub mod zapret_lists;
+
+#[cfg(all(feature = "windows-service", target_os = "windows"))]
+mod journal;

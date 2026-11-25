@@ -476,6 +476,8 @@ fn reap_exited_core(session_id: &str) {
             match core.child.try_wait() {
                 Ok(Some(status)) => {
                     log_message(format!("Core exited on its own: {status}"));
+                    #[cfg(all(feature = "windows-service", target_os = "windows"))]
+                    record_service_event("error", &format!("Core exited on its own: {status}"));
                     *managed = None;
                     return;
                 }
@@ -1827,11 +1829,54 @@ fn zapret_log(level: &'static str, message: String) {
     while logs.len() >= 500 {
         logs.pop_front();
     }
-    logs.push_back(ZapretLogEntry {
+    let entry = ZapretLogEntry {
         timestamp_ms,
         level,
         message: message.chars().take(2048).collect(),
+    };
+    #[cfg(all(feature = "windows-service", target_os = "windows"))]
+    persist_service_event(&entry, "Zapret");
+    logs.push_back(entry);
+}
+
+#[cfg(all(feature = "windows-service", target_os = "windows"))]
+fn persist_service_event(entry: &ZapretLogEntry, component: &str) {
+    let value = serde_json::json!({
+        "timestampMs": entry.timestamp_ms,
+        "level": entry.level,
+        "component": component,
+        "message": entry.message,
     });
+    if let Ok(bytes) = serde_json::to_vec(&value) {
+        if let Err(error) = super::journal::append(&bytes) {
+            log_message(format!("Persistent journal write failed: {error}"));
+        }
+    }
+}
+
+#[cfg(all(feature = "windows-service", target_os = "windows"))]
+pub(super) fn record_service_event(level: &'static str, message: &str) {
+    let entry = ZapretLogEntry {
+        timestamp_ms: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64,
+        level,
+        message: message.chars().take(2048).collect(),
+    };
+    persist_service_event(&entry, "Helper/Mihomo");
+}
+
+fn get_zapret_archive() -> warp::reply::Response {
+    #[cfg(all(feature = "windows-service", target_os = "windows"))]
+    {
+        match super::journal::read() {
+            Ok(content) => json_response(&serde_json::json!({"content": content}), StatusCode::OK),
+            Err(_) => error_response("journalUnavailable", "Persistent journal unavailable".into(), StatusCode::SERVICE_UNAVAILABLE),
+        }
+    }
+    #[cfg(not(all(feature = "windows-service", target_os = "windows")))]
+    error_response("unsupportedPlatform", "Persistent journal is available only in Windows service".into(), StatusCode::NOT_IMPLEMENTED)
 }
 
 fn get_zapret_logs() -> warp::reply::Response {
@@ -2089,6 +2134,12 @@ pub(super) fn routes() -> impl Filter<Extract = (impl Reply,), Error = Infallibl
         .and(warp::get())
         .map(get_zapret_logs);
     let api_zapret_logs_clear = zapret_logs_path.and(warp::delete()).map(clear_zapret_logs);
+    let api_zapret_archive = warp::path("zapret")
+        .and(warp::path("logs"))
+        .and(warp::path("archive"))
+        .and(warp::path::end())
+        .and(warp::get())
+        .map(get_zapret_archive);
 
     let api_zapret_strategies = warp::path("zapret")
         .and(warp::path("strategies"))
@@ -2177,6 +2228,7 @@ pub(super) fn routes() -> impl Filter<Extract = (impl Reply,), Error = Infallibl
                 .or(api_logs)
                 .or(api_zapret_logs)
                 .or(api_zapret_logs_clear)
+                .or(api_zapret_archive)
                 .or(api_zapret_strategies)
                 .or(api_zapret_status)
                 .or(api_zapret_lists)
