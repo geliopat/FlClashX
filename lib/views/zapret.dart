@@ -60,7 +60,7 @@ class ZapretView extends ConsumerWidget {
 
     Widget details(String title, List<String> values) => ListItem(
       title: Text(title),
-      subtitle: Text(values.isEmpty ? 'Не переданы' : '${values.length} · Нажми для просмотра'),
+      subtitle: Text(values.isEmpty ? AppLocalizations.of(context).forkUnavailable : '${values.length} · ${AppLocalizations.of(context).view}'),
       onTap: values.isEmpty ? null : () => showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -102,7 +102,7 @@ class ZapretView extends ConsumerWidget {
             onTap: zapret.busy ? null : () => showZapretStrategiesSheet(context),
             subtitle: Text(
               zapret.running && zapret.activeStrategyId != zapret.selectedStrategyId
-                  ? 'Выбрана: ${selectedName ?? zapret.selectedStrategyId}\nРаботает: ${activeName ?? zapret.activeStrategyId ?? AppLocalizations.of(context).forkUndefined}'
+                  ? '${AppLocalizations.of(context).forkSelectedStrategy}: ${selectedName ?? zapret.selectedStrategyId}\n${AppLocalizations.of(context).forkActiveStrategy}: ${activeName ?? zapret.activeStrategyId ?? AppLocalizations.of(context).forkUndefined}'
                   : selectedName ?? AppLocalizations.of(context).forkNotSelected,
               maxLines: 3,
             ),
@@ -161,10 +161,10 @@ class ZapretView extends ConsumerWidget {
               title: Text(AppLocalizations.of(context).forkTestResult),
               subtitle: Text([
                 if (zapret.testSummary != null) zapret.testSummary!,
-                'Успешно: $confirmedTrials · частично: $partial',
-                'Не прошли: $failed · ошибки: $errors',
-                'Только отбор: $screened · без результата: ${(zapret.strategies.length - zapret.trials.length).clamp(0, zapret.strategies.length)}',
-                'Нажми для просмотра всех стратегий и топ-5',
+                '${AppLocalizations.of(context).forkSuccess}: $confirmedTrials · ${AppLocalizations.of(context).forkPartialSuccess}: $partial',
+                '${AppLocalizations.of(context).forkTestFailed}: $failed · ${AppLocalizations.of(context).forkErrors}: $errors',
+                '${AppLocalizations.of(context).forkScreenOnly}: $screened · ${AppLocalizations.of(context).forkNoVerifiedResult}: ${(zapret.strategies.length - zapret.trials.length).clamp(0, zapret.strategies.length)}',
+                AppLocalizations.of(context).forkTuneResults,
               ].join('\n'), maxLines: 8),
               trailing: const Icon(Icons.chevron_right),
               onTap: showAllTrials,
@@ -249,7 +249,7 @@ class _ZapretHistoryViewState extends State<_ZapretHistoryView> {
           return const Center(child: CircularProgressIndicator());
         }
         if (snapshot.hasError) {
-          return Center(child: Text('Не удалось прочитать историю: ${snapshot.error}'));
+          return Center(child: Text('${AppLocalizations.of(context).forkCheckFailed}: ${snapshot.error}'));
         }
         final runs = snapshot.data ?? const <ZapretTuneRun>[];
         return ListView(
@@ -261,8 +261,8 @@ class _ZapretHistoryViewState extends State<_ZapretHistoryView> {
                 title: Text(_runDate(run.at)),
                 subtitle: Text([
                   run.tuneMode?.localizedLabel(AppLocalizations.of(context)) ?? AppLocalizations.of(context).forkPreviousRun,
-                  if (run.duration != null) 'Длительность: ${run.duration!.inSeconds} с',
-                  'Проверено: ${run.trials.length}${run.totalStrategies == null ? '' : '/${run.totalStrategies}'} · успешно: ${run.trials.where((trial) => trial.confirmed).length}',
+                  if (run.duration != null) '${AppLocalizations.of(context).duration}: ${run.duration!.inSeconds} ${AppLocalizations.of(context).seconds}',
+                  '${AppLocalizations.of(context).forkResults}: ${run.trials.length}${run.totalStrategies == null ? '' : '/${run.totalStrategies}'} · ${AppLocalizations.of(context).forkSuccess}: ${run.trials.where((trial) => trial.confirmed).length}',
                   if (run.failure != null) AppLocalizations.of(context).forkCompletedWithError,
                 ].join('\n')),
                 trailing: const Icon(Icons.chevron_right),
@@ -296,7 +296,7 @@ class ZapretResultsView extends ConsumerWidget {
         context: context,
         builder: (ctx) => AlertDialog(
           title: Text(AppLocalizations.of(context).forkApplyStrategy),
-          content: Text('${nameOf(trial)} · ${trial.delay} мс'),
+          content: Text('${nameOf(trial)} · ${trial.delay} ms'),
           actions: [
             TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(AppLocalizations.of(context).cancel)),
             TextButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(AppLocalizations.of(context).submit)),
@@ -326,7 +326,7 @@ class ZapretResultsView extends ConsumerWidget {
             if (run!.summary != null) Text(run!.summary!),
             if (run!.failure != null) Text(run!.failure!, style: TextStyle(color: context.colorScheme.error)),
           ],
-          Text('Проверено: ${ranked.length}/${run == null ? zapret.strategies.length : run!.totalStrategies ?? '—'}',
+          Text('${AppLocalizations.of(context).forkResults}: ${ranked.length}/${run == null ? zapret.strategies.length : run!.totalStrategies ?? '—'}',
             style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           Text(top.isEmpty
@@ -344,7 +344,7 @@ class ZapretResultsView extends ConsumerWidget {
                   children: [
                     Row(children: [
                       Expanded(child: Text(
-                        '${ranks.containsKey(trial.id) ? 'ТОП ${ranks[trial.id]} · ' : ''}${nameOf(trial)}',
+                        '${ranks.containsKey(trial.id) ? '#${ranks[trial.id]} · ' : ''}${nameOf(trial)}',
                         style: Theme.of(context).textTheme.titleMedium,
                       )),
                       if (run == null && zapret.activeStrategyId == trial.id)
@@ -352,8 +352,8 @@ class ZapretResultsView extends ConsumerWidget {
                       if (run == null && trial.confirmed)
                         TextButton(onPressed: zapret.busy ? null : () => apply(trial), child: Text(AppLocalizations.of(context).submit)),
                     ]),
-                    Text('${trial.localizedResultLabel(AppLocalizations.of(context))} · ${trial.score}/${trial.screenedOnly ? 2 : 6} баллов · '
-                        '${trial.delay > 0 ? '${trial.delay} мс (среднее)' : 'Нет задержки'}'),
+                    Text('${trial.localizedResultLabel(AppLocalizations.of(context))} · ${trial.score}/${trial.screenedOnly ? 2 : 6} · '
+                        '${trial.delay > 0 ? '${trial.delay} ms' : '—'}'),
                     if (trial.screenedOnly)
                       const Text('Discord и GoogleVideo не проверялись'),
                     if (trial.error != null)
@@ -361,7 +361,7 @@ class ZapretResultsView extends ConsumerWidget {
                     for (final detail in trial.details)
                       SelectableText(detail),
                     if (trial.details.isEmpty)
-                      const Text('Измерения не получены'),
+                      Text(AppLocalizations.of(context).forkNoVerifiedResult),
                   ],
                 ),
               ),
