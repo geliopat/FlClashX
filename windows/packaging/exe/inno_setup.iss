@@ -69,12 +69,23 @@ end;
 
 // The client goes first so it cannot bring the Helper back, and the Helper is
 // disabled before it stops because the SCM restarts a killed Helper in 5 s.
+// Older pre builds installed a second Helper service. Retire it on
+// upgrade/uninstall as well as in the new Helper's own installer path.
+procedure RetirePreHelperService;
+begin
+  RunHidden('sc.exe', 'config "FlClashXPreHelperService" start= disabled');
+  RunHidden('net.exe', 'stop "FlClashXPreHelperService"');
+  RunHidden('sc.exe', 'delete "FlClashXPreHelperService"');
+  KillProcess('FlClashXPreHelperService.exe');
+end;
+
 procedure ShutDownApp;
 begin
   KillProcess('{{EXECUTABLE_NAME}}');
   HelperHeld := RunHidden('sc.exe', 'config "' + HelperService + '" start= disabled') = 0;
   RunHidden('net.exe', 'stop "' + HelperService + '"');
   KillProcess(HelperService + '.exe');
+  RetirePreHelperService;
   KillCore;
   Sleep(1000);
 end;
