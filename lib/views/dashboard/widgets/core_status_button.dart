@@ -62,7 +62,7 @@ class _CoreStatusButtonState extends ConsumerState<CoreStatusButton> {
   }
 
   Future<void> _handleConnection() async {
-    if (_holdTimer != null) {
+    if (_holdTimer != null || (system.isWindows && !ref.read(initProvider))) {
       return;
     }
     final coreStatus = ref.read(coreStatusProvider);
@@ -73,7 +73,7 @@ class _CoreStatusButtonState extends ConsumerState<CoreStatusButton> {
         ? context.appLocalizations.forceRestartCoreTip
         : context.appLocalizations.restartCoreTip;
     final res = await dialogs.showMessage(message: TextSpan(text: tip));
-    if (res != true || !mounted) {
+    if (res != true || !mounted || (system.isWindows && !ref.read(initProvider))) {
       return;
     }
     try {
@@ -87,6 +87,7 @@ class _CoreStatusButtonState extends ConsumerState<CoreStatusButton> {
   Widget build(BuildContext context) {
     final coreStatus = _holdTimer != null ? CoreStatus.connecting : _status;
     final appLocalizations = context.appLocalizations;
+    final canRestart = !system.isWindows || ref.watch(initProvider);
     const style = ElasticPress.buttonStyle;
     final iconOnly =
         coreStatus == CoreStatus.connected || ViewScope.isMobileOf(context);
@@ -99,12 +100,12 @@ class _CoreStatusButtonState extends ConsumerState<CoreStatusButton> {
             ? IconButton.filled(
                 key: ValueKey(iconOnly),
                 style: style,
-                onPressed: _handleConnection,
+                onPressed: canRestart ? _handleConnection : null,
                 icon: icon,
               )
             : FilledButton.icon(
                 key: ValueKey(iconOnly),
-                onPressed: _handleConnection,
+                onPressed: canRestart ? _handleConnection : null,
                 style: style,
                 icon: SizedBox.square(
                   dimension: globalState.measure.textHeight(

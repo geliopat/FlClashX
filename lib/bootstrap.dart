@@ -200,7 +200,27 @@ class Bootstrap {
     }
     await _showCrashRecoveryTip();
     await _showPreChannelTip();
-    // The desktop lifecycle checks Helper before every actual launch.
+    // Complete machine-wide Helper migration before starting either engine.
+    // The launcher independently rechecks readiness before spawning Mihomo.
+    if (system.isWindows && !_container.read(safeModeProvider)) {
+      _container.read(coreStatusProvider.notifier).value = CoreStatus.connecting;
+      try {
+        await windows!.ensureHelperReady();
+        // The dashboard might have queried the previous (or missing) Helper
+        // while the window was opening. Reload the catalog from the new one.
+        await _container.read(zapretControllerProvider.notifier).loadStrategies();
+      } catch (error) {
+        _container.read(coreStatusProvider.notifier).value = CoreStatus.disconnected;
+        final message = 'Не удалось подготовить Helper до запуска Mihomo и Zapret: $error';
+        commonPrint.log(message, logLevel: LogLevel.error);
+        dialogs.showNotifier(message, level: MessageLevel.error);
+        // Leave recovery controls available, but do not restore the VPN or
+        // start either engine using an unverified service.
+        _container.read(initProvider.notifier).value = true;
+        await bootGuard.markRunning();
+        return;
+      }
+    }
     await _container.read(coreActionProvider.notifier).startCore();
     if (system.isWindows &&
         !_container.read(safeModeProvider) &&
