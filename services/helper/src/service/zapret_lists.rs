@@ -93,6 +93,15 @@ pub fn read(filename: &str) -> Result<ZapretListContent, Error> {
     Ok(ZapretListContent { filename: name.to_string(), content })
 }
 
+pub fn restore(filename: &str) -> Result<ZapretListInfo, Error> {
+    let name = validate_name(filename)?;
+    let path = list_path(name)?;
+    let backup = path.with_file_name(format!("{name}.bak"));
+    let content = std::fs::read_to_string(&backup)?;
+    // write() first snapshots the current file, so a rollback itself remains reversible.
+    write(name, content)
+}
+
 pub fn write(filename: &str, content: String) -> Result<ZapretListInfo, Error> {
     let name = validate_name(filename)?;
     if content.len() > MAX_LIST_BYTES {
