@@ -3,26 +3,22 @@ name: Zapret Windows validation
 on:
   push:
     branches:
-      - feature/zapret2-integration
-    paths:
-      - 'services/helper/**'
-      - 'plugins/rust_api/**'
-      - 'lib/**'
-      - 'test/**'
-      - 'windows/**'
-      - 'scripts/setup_zapret.ps1'
-      - '.github/workflows/zapret-windows-validation.yml'
-      - '.github/workflows/build.yaml'
-      - 'pubspec.yaml'
-      - 'pubspec.lock'
+      - fix/zapret2-stability
+      - 'sync/flclashz-*'
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      candidate_ref:
+        description: Exact candidate commit to validate
+        type: string
+        required: true
 
 permissions:
-  contents: write
+  contents: read
 
-# Only one validation run may mutate/publish formatting changes to this branch.
+# Validation must not modify the commit it tests.
 concurrency:
-  group: zapret-windows-validation-${{ github.ref }}
+  group: zapret-windows-validation-${{ inputs.candidate_ref || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -31,13 +27,15 @@ env:
 
 jobs:
   windows:
-    name: Format, test and build Windows Release
+    name: Test and build Windows Release
     runs-on: windows-2022
     steps:
       - name: Checkout
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
+          ref: ${{ inputs.candidate_ref || github.sha }}
+          persist-credentials: false
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -57,38 +55,6 @@ jobs:
 
       - name: Enable git long paths
         run: git config --global core.longpaths true
-
-      - name: Apply Rust formatting and commit changes
-        shell: pwsh
-        run: |
-          cargo fmt --manifest-path services/helper/Cargo.toml
-          cargo fmt --manifest-path plugins/rust_api/rust/Cargo.toml
-
-          # PowerShell does not turn a native command's empty stdout into its
-          # exit code. Capture git diff's exit status explicitly or clean trees
-          # will still attempt an unnecessary push and race other CI runs.
-          git diff --quiet -- services/helper plugins/rust_api
-          $diffExitCode = $LASTEXITCODE
-
-          if ($diffExitCode -gt 1) {
-            throw "git diff failed with exit code $diffExitCode"
-          }
-
-          if ($diffExitCode -eq 1) {
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git config user.name "github-actions[bot]"
-            git add services/helper plugins/rust_api
-            git commit -m "style: format Zapret Rust integration"
-            if ($LASTEXITCODE -ne 0) {
-              throw "Could not commit Rust formatting changes"
-            }
-            git push origin "HEAD:$env:GITHUB_REF_NAME"
-            if ($LASTEXITCODE -ne 0) {
-              throw "Could not push Rust formatting changes"
-            }
-          } else {
-            Write-Host "Rust sources are already formatted; no commit or push needed."
-          }
 
       - name: Verify Rust formatting
         run: |
@@ -122,7 +88,7 @@ jobs:
       - name: Upload Windows Release bundle
         uses: actions/upload-artifact@v6
         with:
-          name: FlClashX-Zapret2-Windows-x64-Release
+          name: FlClashZ-Windows-x64-validation
           path: |
             build/windows/x64/runner/Release/**
             build/windows/runner/Release/**
