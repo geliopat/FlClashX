@@ -113,4 +113,15 @@ jobs:
           SHA: ${{ needs.candidate.outputs.sha }}
         run: |
           printf 'Validated Windows candidate: `%s` (commit `%s`)\n' "$CANDIDATE" "$SHA" >> "$GITHUB_STEP_SUMMARY"
-          echo 'Candidate retained. Publishing is deliberately disabled until FlClashZ branding, signing and runtime regressions are resolved.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Candidate retained. Release publication requires repository opt-in and a compatible signed update manifest.' >> "$GITHUB_STEP_SUMMARY"
+
+  release:
+    needs: [candidate, windows-validation]
+    if: needs.windows-validation.result == 'success' && vars.FLCLASHZ_RELEASE_ENABLED == 'true'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/flclashz-release.yml
+    with:
+      candidate_ref: ${{ needs.candidate.outputs.sha }}
+    secrets:
+      UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
