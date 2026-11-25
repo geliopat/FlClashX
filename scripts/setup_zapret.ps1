@@ -7,8 +7,8 @@ $Zapret2Zip = Join-Path $TempRoot "zapret2.zip"
 $FlowsealZip = Join-Path $TempRoot "flowseal.zip"
 $Zapret2Extract = Join-Path $TempRoot "zapret2"
 $FlowsealExtract = Join-Path $TempRoot "flowseal"
-$Zapret2Url = "https://github.com/bol-van/zapret2/releases/download/v1.0.7/zapret2-v1.0.7.zip"
-$Zapret2Sha256 = "35e14e4e1f345b870c3b87269fa45353efd597241a25304d38375c46b9fd2967"
+$Zapret2Url = "https://github.com/bol-van/zapret2/releases/download/v1.0.8/zapret2-v1.0.8.zip"
+$Zapret2Sha256 = "f2b84934a72536ec0ab4fdf71881a7d596ba67aef3f241dc8c9bc6260e534dd2"
 $FlowsealUrl = "https://github.com/Flowseal/zapret-discord-youtube/releases/download/1.10.4/zapret-discord-youtube-1.10.4.zip"
 $FlowsealSha256 = "291af673bd0238506f9548e0e94ca0abf244000f4c9a06960544fb01c5f97b34"
 $ZapretSourceCommit = "8dd17fcbcca405a50f497a6e2346ca263901d775"
@@ -30,7 +30,7 @@ try {
     New-Item -ItemType Directory -Path $AssetDir -Force | Out-Null
     Get-ChildItem -Path $AssetDir -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force
 
-    Get-PinnedArchive -Url $Zapret2Url -Path $Zapret2Zip -ExpectedSha256 $Zapret2Sha256 -Label "bol-van/zapret2 v1.0.7"
+    Get-PinnedArchive -Url $Zapret2Url -Path $Zapret2Zip -ExpectedSha256 $Zapret2Sha256 -Label "bol-van/zapret2 v1.0.8"
     Expand-Archive -Path $Zapret2Zip -DestinationPath $Zapret2Extract -Force
     $Zapret2Bin = Get-ChildItem -Path $Zapret2Extract -Recurse -Directory | Where-Object { $_.Name -ieq "windows-x86_64" } | Select-Object -First 1
     if (-not $Zapret2Bin) { throw "The zapret2 archive has no windows-x86_64 binary directory." }
