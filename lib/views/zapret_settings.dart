@@ -402,6 +402,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
   @override
   Widget build(BuildContext context) {
     final zapret = ref.watch(zapretControllerProvider);
+    final listsBusy = _loading || _saving || _updating || _updatingHelper;
     final sections = <Widget>[
       generateSection(
         title: 'Служба Helper',
@@ -508,84 +509,92 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
                 dimension: 18,
                 child: CircularProgressIndicator(strokeWidth: 2),
               ),
-            )
-          else ...[
-            if (_lists.isNotEmpty && _selected != null)
-              ListItem<String>.options(
-                title: const Text('Файл списка'),
-                options: _lists.map((item) => item.filename).toList(),
-                value: _selected!,
-                textBuilder: (filename) {
-                  final item = _lists.firstWhere(
-                    (entry) => entry.filename == filename,
-                  );
-                  return '$filename · ${item.entries}';
-                },
-                onChanged: (value) => unawaited(_selectList(value)),
-              ),
-            if (_selected != null)
-              ListItem(
-                title: const Text('Редактировать список'),
-                subtitle: Text(_selected!),
-                onTap: !_listLoaded || _loading || _saving || _updating
-                    ? null
-                    : () async {
-                        final filename = _selected!;
-                        await BaseNavigator.push<void>(
-                          context,
-                          EditorPage(
-                              title: filename,
-                              content: _editor.text,
-                              onSave: (editorContext, title, content) async {
-                                final text = await content.readText();
-                                await helperClient.writeZapretList(filename, text);
-                                if (editorContext.mounted) Navigator.of(editorContext).pop();
-                              },
-                          ),
-                        );
-                        if (mounted) await _loadLists(select: filename);
-                      },
-              ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                alignment: WrapAlignment.end,
-                children: [
-                  TextButton.icon(
-                    onPressed: _loading || _saving || _updating
-                        ? null
-                        : () => _loadLists(),
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Перечитать'),
-                  ),
-                  TextButton.icon(
-                    onPressed: _lists.isEmpty || _loading || _saving || _updating
-                        ? null
-                        : _updateLists,
-                    icon: _updating
-                        ? const SizedBox.square(
-                            dimension: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.cloud_download),
-                    label: const Text('Обновить списки'),
-                  ),
-                  TextButton.icon(
-                    onPressed: !_listLoaded || _loading || _saving || _updating
-                        ? null
-                        : _restoreBackup,
-                    icon: const Icon(Icons.restore),
-                    label: const Text('Откатить .bak'),
-                  ),
-                ],
-              ),
             ),
-          ],
+          if (_lists.isNotEmpty && _selected != null)
+            ListItem<String>.options(
+              title: const Text('Файл списка'),
+              options: _lists.map((item) => item.filename).toList(),
+              value: _selected!,
+              textBuilder: (filename) {
+                final item = _lists.firstWhere(
+                  (entry) => entry.filename == filename,
+                );
+                return '${item.filename} · ${item.entries}';
+              },
+              onChanged: (value) {
+                if (_loading || _saving || _updating || _updatingHelper) return;
+                if (value != _selected) unawaited(_selectList(value));
+              },
+            ),
+          if (_selected != null)
+            ListItem(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('Редактировать список'),
+              subtitle: Text(_selected!),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: !_listLoaded || listsBusy
+                  ? null
+                  : () async {
+                      final filename = _selected!;
+                      await BaseNavigator.push<void>(
+                        context,
+                        EditorPage(
+                          title: filename,
+                          content: _editor.text,
+                          onSave: (editorContext, title, content) async {
+                            final text = await content.readText();
+                            await helperClient.writeZapretList(filename, text);
+                            if (editorContext.mounted) {
+                              Navigator.of(editorContext).pop();
+                            }
+                          },
+                        ),
+                      );
+                      if (mounted) await _loadLists(select: filename);
+                    },
+            ),
+          ListItem(
+            leading: const Icon(Icons.cloud_download_outlined),
+            title: const Text('Обновить списки'),
+            subtitle: const Text('Загрузить актуальные списки с сохранением локальных записей'),
+            trailing: _updating
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : null,
+            onTap: _lists.isEmpty || listsBusy ? null : _updateLists,
+          ),
+          ListItem(
+            leading: const Icon(Icons.refresh),
+            title: const Text('Перечитать списки'),
+            subtitle: const Text('Повторно загрузить файлы с диска'),
+            trailing: _loading && _lists.isNotEmpty
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : null,
+            onTap: listsBusy ? null : () => _loadLists(),
+          ),
+          if (_selected != null)
+            ListItem(
+              leading: const Icon(Icons.restore),
+              title: const Text('Восстановить резервную копию'),
+              subtitle: Text('${_selected!}.bak'),
+              trailing: _saving
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : null,
+              onTap: !_listLoaded || listsBusy ? null : _restoreBackup,
+            ),
         ],
         footer:
-            'Обновляются list-general.txt, list-google.txt, list-exclude.txt и ipset-all.txt. Локальные записи сохраняются; файлы *-user.txt не перезаписываются. Перед записью Helper создаёт .bak. После изменения списков перезапусти Zapret. youtube-bad-nodes.txt не меняется, поскольку исходный GUI применяет его через Windows hosts; list-auto.txt пока не активирован в запускателе.',
+            'Обновляются 4 основных списка. Пользовательские файлы *-user.txt сохраняются. '
+            'Перед записью создаётся .bak. После изменений перезапусти Zapret. '
+            'youtube-bad-nodes.txt и list-auto.txt не обновляются.',
       ),
     ];
 
