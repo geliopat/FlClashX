@@ -185,7 +185,15 @@ class CoreAction extends _$CoreAction {
   Future<bool> _runRestartWorker({bool? running}) async {
     final setupAction = ref.read(setupActionProvider.notifier);
     final bool wasRunning = running ?? ref.read(isStartProvider);
+    var restartZapret = false;
     try {
+      if (system.isWindows) {
+        try {
+          restartZapret = await ref.read(zapretControllerProvider.notifier).stopAlongsideMihomo();
+        } catch (error) {
+          commonPrint.log('Linked Zapret stop failed: $error', logLevel: LogLevel.warning);
+        }
+      }
       ref.read(coreStatusProvider.notifier).value = CoreStatus.connecting;
       final stopping = coreIsEmbedded && wasRunning
           ? setupAction.setRunning(false)
@@ -216,6 +224,11 @@ class CoreAction extends _$CoreAction {
           appliedRevision = revision;
         }
       } while (_relaunchRequested);
+      if (applied && system.isWindows && ref.read(isStartProvider) && !ref.read(safeModeProvider)) {
+        await ref.read(zapretControllerProvider.notifier).startAlongsideMihomo(force: restartZapret).catchError((Object error) {
+          commonPrint.log('Linked Zapret restart failed: $error', logLevel: LogLevel.warning);
+        });
+      }
       return applied;
     } catch (_) {
       ref.read(coreStatusProvider.notifier).value = CoreStatus.disconnected;
