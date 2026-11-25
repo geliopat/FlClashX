@@ -57,7 +57,7 @@ const CORE_SOCKET_PREFIX: &str = "/tmp/FlClashSocket_";
 const CORE_SOCKET_SUFFIX: &str = ".sock";
 const PROTOCOL_VERSION_HEADER: &str = "x-flclashx-helper-protocol";
 #[cfg(windows)]
-const PROTOCOL_VERSION: &str = "9";
+const PROTOCOL_VERSION: &str = "10";
 #[cfg(not(windows))]
 const PROTOCOL_VERSION: &str = "6";
 const EXPECTED_CORE_SHA256: &str = env!("CORE_SHA256");
@@ -875,7 +875,7 @@ fn stop_zapret() -> warp::reply::Response {
 }
 
 fn get_zapret_strategies() -> warp::reply::Response {
-    json_response(&super::zapret::strategies(), StatusCode::OK)
+    json_response(&super::zapret::strategy_info(), StatusCode::OK)
 }
 
 fn get_zapret_lists() -> warp::reply::Response {
@@ -1639,7 +1639,7 @@ mod tests {
 
     #[test]
     fn protocol_uses_lowercase_session_ownership() {
-        assert_eq!(PROTOCOL_VERSION, if cfg!(windows) { "9" } else { "6" });
+        assert_eq!(PROTOCOL_VERSION, if cfg!(windows) { "10" } else { "6" });
         assert!(is_valid_session_id("0123456789abcdef0123456789abcdef"));
         assert!(!is_valid_session_id("ABCDEF0123456789abcdef0123456789"));
         assert!(!is_valid_session_id("0123456789abcdef"));
