@@ -637,6 +637,27 @@ fn kill_stray_winws2_processes(exclude_pid: Option<u32>) -> usize {
     terminated
 }
 
+fn zapret_win_divert_filters(args: &[String]) -> Vec<String> {
+    args.iter()
+        .filter(|arg| arg.starts_with("--wf-"))
+        .cloned()
+        .collect()
+}
+
+fn zapret_processing_lists(args: &[String]) -> Vec<String> {
+    args.iter()
+        .filter(|arg| {
+            arg.starts_with("--hostlist=")
+                || arg.starts_with("--hostlist-auto=")
+                || arg.starts_with("--hostlist-domains=")
+                || arg.starts_with("--hostlist-exclude=")
+                || arg.starts_with("--ipset=")
+                || arg.starts_with("--ipset-exclude=")
+        })
+        .cloned()
+        .collect()
+}
+
 #[cfg(windows)]
 fn zapret_status_response(
     managed: &mut Option<ManagedZapret>,
@@ -660,18 +681,8 @@ fn zapret_status_response(
         log_message(format!("Zapret engine exited: {status}"));
         *managed = None;
     }
-    let win_divert_filters = args.iter()
-        .filter(|arg| arg.starts_with("--wf-tcp=") || arg.starts_with("--wf-udp="))
-        .cloned()
-        .collect();
-    let processing_lists = args.iter()
-        .filter(|arg| arg.starts_with("--hostlist=")
-            || arg.starts_with("--hostlist-domains=")
-            || arg.starts_with("--hostlist-exclude=")
-            || arg.starts_with("--ipset=")
-            || arg.starts_with("--ipset-exclude="))
-        .cloned()
-        .collect();
+    let win_divert_filters = zapret_win_divert_filters(&args);
+    let processing_lists = zapret_processing_lists(&args);
     Ok(json_response(
         &ZapretStatusResponse {
             running: pid.is_some(),
@@ -827,18 +838,8 @@ fn launch_zapret(restart: bool, strategy_id: String, mode: super::zapret::Zapret
             strategy_id: Some(strategy_id),
             engine: Some(engine),
             mode: Some(mode),
-            win_divert_filters: args.iter()
-                .filter(|arg| arg.starts_with("--wf-tcp=") || arg.starts_with("--wf-udp="))
-                .cloned()
-                .collect(),
-            processing_lists: args.iter()
-                .filter(|arg| arg.starts_with("--hostlist=")
-                    || arg.starts_with("--hostlist-domains=")
-                    || arg.starts_with("--hostlist-exclude=")
-                    || arg.starts_with("--ipset=")
-                    || arg.starts_with("--ipset-exclude="))
-                .cloned()
-                .collect(),
+            win_divert_filters: zapret_win_divert_filters(&args),
+            processing_lists: zapret_processing_lists(&args),
             cleaned_processes: cleaned,
         },
         StatusCode::OK,
@@ -1635,6 +1636,31 @@ mod tests {
     fn adopt_core(session_id: &str) {
         *lock_surviving_poison(&MANAGED_CORE) =
             Some(ManagedCore::adopt(session_id.to_string(), spawn_running_core()).unwrap());
+    }
+
+    #[test]
+    fn zapret_diagnostics_distinguish_capture_filters_from_processing_lists() {
+        let args = vec![
+            "--wf-tcp-out=80,443".to_string(),
+            "--wf-udp-out=443".to_string(),
+            "--hostlist=lists/list-general.txt".to_string(),
+            "--hostlist-domains=discord.com".to_string(),
+            "--hostlist-auto=lists/list-auto.txt".to_string(),
+            "--ipset=lists/ipset-all.txt".to_string(),
+        ];
+        assert_eq!(
+            zapret_win_divert_filters(&args),
+            vec!["--wf-tcp-out=80,443", "--wf-udp-out=443"],
+        );
+        assert_eq!(
+            zapret_processing_lists(&args),
+            vec![
+                "--hostlist=lists/list-general.txt",
+                "--hostlist-domains=discord.com",
+                "--hostlist-auto=lists/list-auto.txt",
+                "--ipset=lists/ipset-all.txt",
+            ],
+        );
     }
 
     #[test]
