@@ -137,11 +137,13 @@ class _ZapretLogsViewState extends ConsumerState<ZapretLogsView> {
             ],
           ),
           const ListSectionGap(),
-          generateSection(
-            title: AppLocalizations.of(context).forkEvents,
-            items: [
-              if (logs.isEmpty) ListItem(title: Text(AppLocalizations.of(context).forkNoEvents)),
-              for (final entry in logs)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Text(AppLocalizations.of(context).forkEvents,
+                style: Theme.of(context).textTheme.titleMedium),
+          ),
+          if (logs.isEmpty) ListItem(title: Text(AppLocalizations.of(context).forkNoEvents)),
+          for (final entry in logs) ...[
                 RecordListItem(
                   onTap: () {},
                   header: RecordHeader(children: [
@@ -157,8 +159,8 @@ class _ZapretLogsViewState extends ConsumerState<ZapretLogsView> {
                   ]),
                   body: SelectableText(entry.message, style: RecordTextStyles.of(context).primary),
                 ),
-            ],
-          ),
+                const SizedBox(height: recordListGap),
+          ],
         ],
       ),
     );

@@ -11,7 +11,10 @@ static DIRECTORY: OnceLock<PathBuf> = OnceLock::new();
 static IO_LOCK: Mutex<()> = Mutex::new(());
 
 pub(super) fn init(owner: &str) -> io::Result<()> {
-    if !owner.starts_with("S-1-") || !owner[4..].chars().all(|c| c.is_ascii_digit() || c == '-') {
+    if !owner.starts_with("S-1-")
+        || owner.len() <= 4
+        || !owner[4..].chars().all(|c| c.is_ascii_digit() || c == '-')
+    {
         return Err(io::Error::other("Invalid journal owner SID"));
     }
     let root = std::env::var_os("LOCALAPPDATA")
@@ -20,7 +23,9 @@ pub(super) fn init(owner: &str) -> io::Result<()> {
         .ok_or_else(|| io::Error::other("Service local data is unavailable"))?;
     let dir = root.join("FlClashZ").join("service-logs").join(owner);
     fs::create_dir_all(&dir)?;
-    DIRECTORY.set(dir).map_err(|_| io::Error::other("Journal already initialized"))
+    DIRECTORY
+        .set(dir)
+        .map_err(|_| io::Error::other("Journal already initialized"))
 }
 
 fn file_path(dir: &Path, index: usize) -> PathBuf {
@@ -56,18 +61,24 @@ fn append_at(dir: &Path, line: &[u8], max: u64) -> io::Result<()> {
 }
 
 pub(super) fn append(line: &[u8]) -> io::Result<()> {
-    let dir = DIRECTORY.get().ok_or_else(|| io::Error::other("Journal unavailable"))?;
+    let dir = DIRECTORY
+        .get()
+        .ok_or_else(|| io::Error::other("Journal unavailable"))?;
     let _guard = IO_LOCK.lock().unwrap_or_else(|error| error.into_inner());
     append_at(dir, line, MAX_BYTES)
 }
 
 pub(super) fn read() -> io::Result<String> {
-    let dir = DIRECTORY.get().ok_or_else(|| io::Error::other("Journal unavailable"))?;
+    let dir = DIRECTORY
+        .get()
+        .ok_or_else(|| io::Error::other("Journal unavailable"))?;
     let _guard = IO_LOCK.lock().unwrap_or_else(|error| error.into_inner());
     let mut bytes = Vec::new();
     for index in (0..FILE_COUNT).rev() {
         match File::open(file_path(dir, index)) {
-            Ok(file) => { file.take(MAX_BYTES).read_to_end(&mut bytes)?; }
+            Ok(file) => {
+                file.take(MAX_BYTES).read_to_end(&mut bytes)?;
+            }
             Err(error) if error.kind() == io::ErrorKind::NotFound => {}
             Err(error) => return Err(error),
         }
@@ -82,8 +93,12 @@ mod tests {
     #[test]
     fn rotates_without_exceeding_the_limit() {
         let dir = std::env::temp_dir().join(format!(
-            "flclashz-journal-{}-{}", std::process::id(),
-            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
+            "flclashz-journal-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
         ));
         fs::create_dir_all(&dir).unwrap();
         for _ in 0..12 {

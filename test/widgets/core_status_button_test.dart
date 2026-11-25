@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
@@ -126,7 +128,7 @@ void main() {
     expect(find.text('Disconnected'), findsNothing);
     expect(find.byType(IconButton), findsOneWidget);
     expect(_shown(tester), CoreStatus.disconnected);
-    expect(find.byTooltip('Core status'), findsOneWidget);
+    expect(find.byTooltip(Platform.isWindows ? 'Restart all' : 'Core status'), findsOneWidget);
 
     container.read(coreStatusProvider.notifier).value = CoreStatus.connecting;
     await tester.pump();

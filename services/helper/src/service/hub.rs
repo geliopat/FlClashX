@@ -1872,11 +1872,19 @@ fn get_zapret_archive() -> warp::reply::Response {
     {
         match super::journal::read() {
             Ok(content) => json_response(&serde_json::json!({"content": content}), StatusCode::OK),
-            Err(_) => error_response("journalUnavailable", "Persistent journal unavailable".into(), StatusCode::SERVICE_UNAVAILABLE),
+            Err(_) => error_response(
+                "journalUnavailable",
+                "Persistent journal unavailable",
+                StatusCode::SERVICE_UNAVAILABLE,
+            ),
         }
     }
     #[cfg(not(all(feature = "windows-service", target_os = "windows")))]
-    error_response("unsupportedPlatform", "Persistent journal is available only in Windows service".into(), StatusCode::NOT_IMPLEMENTED)
+    error_response(
+        "unsupportedPlatform",
+        "Persistent journal is available only in Windows service",
+        StatusCode::NOT_IMPLEMENTED,
+    )
 }
 
 fn get_zapret_logs() -> warp::reply::Response {
