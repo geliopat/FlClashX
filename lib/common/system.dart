@@ -476,11 +476,11 @@ class Windows {
     if (!await helper.exists()) return false;
     final root = Platform.environment['SystemRoot'] ?? r'C:\Windows';
     final escaped = helper.path.replaceAll("'", "''");
-    final command = "try { "
+    final command = 'try { '
         "\$p = Start-Process -FilePath '$escaped' "
         "-ArgumentList '${installArguments(pid)}' "
-        "-Verb RunAs -Wait -PassThru -ErrorAction Stop; "
-        "exit \$p.ExitCode } catch { exit 1 }";
+        '-Verb RunAs -Wait -PassThru -ErrorAction Stop; '
+        'exit \$p.ExitCode } catch { exit 1 }';
     final bytes = <int>[
       for (final unit in command.codeUnits) ...[unit & 0xff, unit >> 8],
     ];

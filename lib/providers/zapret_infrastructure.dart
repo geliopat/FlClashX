@@ -91,7 +91,7 @@ class ZapretInfrastructure {
         return;
       }
       final hasScheme = value.contains('://');
-      final uri = Uri.tryParse(hasScheme ? value : 'tcp://' + value);
+      final uri = Uri.tryParse(hasScheme ? value : 'tcp://$value');
       if (uri == null) return;
       if (hasScheme &&
           !const {'http', 'https', 'h3', 'tls', 'quic', 'tcp', 'udp'}

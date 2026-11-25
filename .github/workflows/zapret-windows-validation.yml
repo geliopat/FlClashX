@@ -71,7 +71,7 @@ jobs:
         run: flutter pub get
 
       - name: Run Helper, Zapret and Windows packaging tests
-        run: flutter test test/core/desktop/helper_client_test.dart test/providers/zapret_diagnostics_test.dart test/setup_test.dart
+        run: flutter test test/core/desktop/helper_client_test.dart test/providers/zapret_diagnostics_test.dart test/providers/zapret_infrastructure_test.dart test/setup_test.dart
 
       - name: Stage pinned Zapret2 and Flowseal assets
         shell: pwsh

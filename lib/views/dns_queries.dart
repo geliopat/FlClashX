@@ -266,7 +266,7 @@ List<RecordColumn<DnsQuery>> _dnsQueryColumns(
       sortKey: (query) => query.summary.toLowerCase(),
     ),
     RecordColumn(
-      TableColumn('resolver', 'Резолвер', flex: 1.0),
+      const TableColumn('resolver', 'Резолвер', flex: 1.0),
       cell: (_, query) => RecordCellText(
         query.resolverName.isEmpty ? 'Не определён' : query.resolverName,
         muted: true,
@@ -275,7 +275,7 @@ List<RecordColumn<DnsQuery>> _dnsQueryColumns(
     ),
     if (wide)
       RecordColumn(
-        TableColumn('upstream', 'DNS-сервер', flex: 0.8),
+        const TableColumn('upstream', 'DNS-сервер', flex: 0.8),
         cell: (_, query) => RecordCellText(
           query.cached ? appLocalizations.cache :
               query.upstream.isEmpty ? 'Не сообщён' : query.upstream,

@@ -306,7 +306,9 @@ class ZapretController extends Notifier<ZapretState> {
 
   Future<void> _reconcileInfrastructure() async {
     if (!_pendingInfrastructureRestart || _launchBlocked ||
-        !state.running || state.busy || _refreshing) return;
+        !state.running || state.busy || _refreshing) {
+      return;
+    }
     _pendingInfrastructureRestart = false;
     try {
       await restart();

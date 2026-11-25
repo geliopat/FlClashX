@@ -739,7 +739,7 @@ void main() {
         headers: {
           helperProtocolVersionHeader: [helperProtocolVersion],
           Headers.contentTypeHeader: ['text/plain'],
-          if (runningHash != null) 'x-flclashz-helper-sha256': [runningHash!],
+          if (runningHash != null) 'x-flclashz-helper-sha256': [runningHash],
         },
       )),
       expectedHelperPath: () => bundled.path,
