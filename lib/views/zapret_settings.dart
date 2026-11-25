@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:fl_clash/core/desktop/helper_client.dart';
@@ -42,6 +43,8 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
   bool _updating = false;
   String? _error;
   String? _notice;
+  bool _checkingComponents = false;
+  Map<String, String> _componentUpdates = const {};
 
   @override
   void initState() {
@@ -223,6 +226,43 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
     }
   }
 
+  Future<void> _checkComponentUpdates() async {
+    if (_checkingComponents) return;
+    setState(() => _checkingComponents = true);
+    try {
+      final zapret2Response = await _http.get<String>(
+        'https://api.github.com/repos/bol-van/zapret2/releases/latest',
+        options: Options(headers: const {'Accept': 'application/vnd.github+json'}),
+      );
+      final flowsealResponse = await _http.get<String>(
+        'https://api.github.com/repos/Flowseal/zapret-discord-youtube/releases/latest',
+        options: Options(headers: const {'Accept': 'application/vnd.github+json'}),
+      );
+      final strategiesResponse = await _http.get<String>(
+        'https://api.github.com/repos/geliopat/zapret2-gui/commits/main',
+        options: Options(headers: const {'Accept': 'application/vnd.github+json'}),
+      );
+      final zapret2 = jsonDecode(zapret2Response.data ?? '') as Map<String, dynamic>;
+      final flowseal = jsonDecode(flowsealResponse.data ?? '') as Map<String, dynamic>;
+      final strategies = jsonDecode(strategiesResponse.data ?? '') as Map<String, dynamic>;
+      if (!mounted) return;
+      setState(() {
+        _componentUpdates = {
+          'Zapret2': (zapret2['tag_name'] as String?) ?? 'неизвестно',
+          'Flowseal': (flowseal['tag_name'] as String?) ?? 'неизвестно',
+          'Lua/BAT source': ((strategies['sha'] as String?) ?? 'неизвестно').substring(0, 12),
+        };
+        _checkingComponents = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _checkingComponents = false;
+        _error = 'Не удалось проверить версии компонентов: $error';
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final zapret = ref.watch(zapretControllerProvider);
@@ -301,6 +341,35 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
             ),
           ),
           const SizedBox(height: 12),
+          _Section(
+            title: 'Компоненты Zapret',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text('Установленные версии закреплены в сборке FlClashX: Zapret2 v1.0.7, Flowseal 1.10.4 и каталог стратегий geliopat/zapret2-gui.'),
+                if (_componentUpdates.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  for (final entry in _componentUpdates.entries)
+                    Text('${entry.key}: доступно ${entry.value}'),
+                ],
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: OutlinedButton.icon(
+                    onPressed: _checkingComponents ? null : _checkComponentUpdates,
+                    icon: _checkingComponents
+                        ? const SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.system_update_alt),
+                    label: const Text('Проверить версии'),
+                  ),
+                ),
+                Text(
+                  'Проверка доступных версий работает отдельно. Автоматическая замена winws/winws2, DLL, драйверов WinDivert и Lua/BAT-файлов пока не включена: для неё нужен отдельный staging-процесс с остановкой движка, проверкой SHA256 и откатом всего каталога. До его реализации эти компоненты обновляются вместе с проверенной сборкой FlClashX.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
           _Section(
             title: 'Списки Zapret',
             child: Column(
