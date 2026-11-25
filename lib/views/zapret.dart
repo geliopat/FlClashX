@@ -10,6 +10,7 @@ import 'package:fl_clash/state.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/ui/ui.dart';
 import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:path/path.dart' as p;
 import 'package:rust_api/rust_api.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -856,6 +857,95 @@ class _FlowsealViewState extends State<FlowsealView> {
     await system.openDirectory(p.dirname(logPath));
   }
 
+  Future<void> _showLog() async {
+    final logPath = _runtime?.logPath;
+    if (logPath == null || logPath.isEmpty) return;
+
+    try {
+      final rootPath = await Directory(_root).resolveSymbolicLinks();
+      final sourceFile = File(logPath);
+      if (!await sourceFile.exists()) {
+        await dialogs.showAlert(
+          title: 'Лог Flowseal',
+          message: const TextSpan(
+            text: 'Файл лога ещё не создан. Запустите стратегию, чтобы получить журнал winws.exe.',
+          ),
+        );
+        return;
+      }
+
+      final resolvedPath = await sourceFile.resolveSymbolicLinks();
+      if (!p.isWithin(rootPath, resolvedPath) ||
+          p.basename(resolvedPath).toLowerCase() != 'winws.log') {
+        throw Exception('Путь к логу выходит за пределы каталога Flowseal.');
+      }
+
+      const maxBytes = 512 * 1024;
+      final file = File(resolvedPath);
+      final length = await file.length();
+      final offset = length > maxBytes ? length - maxBytes : 0;
+      final handle = await file.open();
+      late final List<int> bytes;
+      try {
+        await handle.setPosition(offset);
+        bytes = await handle.read(maxBytes);
+      } finally {
+        await handle.close();
+      }
+
+      var logContent = utf8.decode(bytes, allowMalformed: true);
+      if (offset > 0) {
+        final firstLineBreak = logContent.indexOf('\\n');
+        logContent = firstLineBreak < 0
+            ? ''
+            : logContent.substring(firstLineBreak + 1);
+      }
+      final lines = logContent.split(RegExp(r'\\r?\\n'));
+      final omittedLines = lines.length > 500 ? lines.length - 500 : 0;
+      final visibleLines = omittedLines > 0
+          ? lines.sublist(omittedLines)
+          : lines;
+      final logText = visibleLines.join('\\n').trim();
+      final wasTrimmed = offset > 0 || omittedLines > 0;
+      final displayText = logText.isEmpty
+          ? 'Лог пока пуст.'
+          : '${wasTrimmed ? 'Показана последняя часть файла (лимит: 512 КиБ / 500 строк).\\n\\n' : ''}$logText';
+
+      if (!mounted) return;
+      await dialogs.showCommonDialog<void>(
+        child: Builder(
+          builder: (context) => CommonDialog(
+            title: 'Лог Flowseal · winws.exe',
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text(context.appLocalizations.close),
+              ),
+            ],
+            child: SizedBox(
+              width: 720,
+              height: 480,
+              child: Scrollbar(
+                child: SingleChildScrollView(
+                  child: SelectableText(
+                    displayText,
+                    style: const TextStyle(
+                      fontFamily: 'Consolas',
+                      fontSize: 12,
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    } catch (error) {
+      if (mounted) _setError('Не удалось прочитать лог Flowseal: $error');
+    }
+  }
+
   Future<void> _promptAddUserListEntry() async {
     final value = await dialogs.showCommonDialog<String>(
       child: InputDialog(
@@ -1085,6 +1175,14 @@ class _FlowsealViewState extends State<FlowsealView> {
                 onTap: _runtime == null || _runtime!.logPath.isEmpty
                     ? null
                     : _openLogFolder,
+              ),
+              ListItem(
+                leading: const Icon(Icons.article_outlined),
+                title: const Text('Просмотреть лог winws.exe'),
+                subtitle: const Text('Последние 500 строк, максимум 512 КиБ'),
+                onTap: _runtime == null || _runtime!.logPath.isEmpty
+                    ? null
+                    : _showLog,
               ),
             ],
           ),
