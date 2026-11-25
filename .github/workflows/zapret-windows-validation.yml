@@ -8,6 +8,7 @@ on:
       - 'services/helper/**'
       - 'plugins/rust_api/**'
       - 'lib/**'
+      - 'test/**'
       - 'windows/**'
       - 'scripts/setup_zapret.ps1'
       - '.github/workflows/zapret-windows-validation.yml'
@@ -102,6 +103,9 @@ jobs:
 
       - name: Install Flutter dependencies
         run: flutter pub get
+
+      - name: Run Helper, Zapret and Windows packaging tests
+        run: flutter test test/core/desktop/helper_client_test.dart test/providers/zapret_diagnostics_test.dart test/setup_test.dart
 
       - name: Stage pinned Zapret2 and Flowseal assets
         shell: pwsh
