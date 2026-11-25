@@ -210,6 +210,10 @@ class Bootstrap {
           'Автоматический запуск ядра и Zapret отменён.',
           level: MessageLevel.error,
         );
+        // Keep the interface available for repair or a clean exit. Do not
+        // restore the previous VPN/Zapret state using an unverified service.
+        _container.read(initProvider.notifier).value = true;
+        await bootGuard.markRunning();
         return;
       }
     }
