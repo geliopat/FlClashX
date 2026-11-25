@@ -422,6 +422,34 @@ class AppLocalizations {
   String get forkYoutubeListHint => Intl.message("Problematic CDNs from the Zapret2 GUI list are redirected to 127.0.0.2", name: 'forkYoutubeListHint', desc: '', args: []);
   String get forkCdnFast => Intl.message("Fast", name: 'forkCdnFast', desc: '', args: []);
   String get forkCdnHint => Intl.message("Measurements use signed video stream URLs and up to 3 MiB per node. Unknown results do not create blocks. Old measurements expire automatically.", name: 'forkCdnHint', desc: '', args: []);
+  String get forkCdnProcessChanged => Intl.message("Strategy changed during the check; result discarded", name: 'forkCdnProcessChanged', desc: '', args: []);
+  String get forkCdnCheckBusy => Intl.message("Check already running", name: 'forkCdnCheckBusy', desc: '', args: []);
+  String get forkCdnProbeBusy => Intl.message("No free probe slot or timed out", name: 'forkCdnProbeBusy', desc: '', args: []);
+  String get forkDirectUnconfirmed => Intl.message("DIRECT route not confirmed", name: 'forkDirectUnconfirmed', desc: '', args: []);
+  String get forkCdnWatchHttp => Intl.message("YouTube page error", name: 'forkCdnWatchHttp', desc: '', args: []);
+  String get forkCdnNoStreamUrls => Intl.message("YouTube did not return direct video URLs", name: 'forkCdnNoStreamUrls', desc: '', args: []);
+  String get forkCdnStreamUrls => Intl.message("Video URLs obtained", name: 'forkCdnStreamUrls', desc: '', args: []);
+  String get forkCdnLocalMapping => Intl.message("Node already mapped to a local address", name: 'forkCdnLocalMapping', desc: '', args: []);
+  String get forkCdnRedirectRejected => Intl.message("Rejected CDN redirect", name: 'forkCdnRedirectRejected', desc: '', args: []);
+  String get forkCdnStreamHttp => Intl.message("CDN response error", name: 'forkCdnStreamHttp', desc: '', args: []);
+  String get forkCdnNotMedia => Intl.message("CDN did not return media", name: 'forkCdnNotMedia', desc: '', args: []);
+  String get forkCdnInsufficientSample => Intl.message("Insufficient measurement sample", name: 'forkCdnInsufficientSample', desc: '', args: []);
+  String get forkCdnBudgetExhausted => Intl.message("Overall check time expired", name: 'forkCdnBudgetExhausted', desc: '', args: []);
+  String get forkCdnNoMeasurements => Intl.message("No reliable measurements; lists unchanged", name: 'forkCdnNoMeasurements', desc: '', args: []);
+  String get forkCdnMeasured => Intl.message("Measured", name: 'forkCdnMeasured', desc: '', args: []);
+  String get forkControlRun => Intl.message("Verification run", name: 'forkControlRun', desc: '', args: []);
+  String get forkTuneRequirements => Intl.message("A connected Mihomo core and strategy catalog are required.", name: 'forkTuneRequirements', desc: '', args: []);
+  String get forkPreparing => Intl.message("Preparing", name: 'forkPreparing', desc: '', args: []);
+  String get forkEngineChanged => Intl.message("Engine stopped or changed PID during the check", name: 'forkEngineChanged', desc: '', args: []);
+  String get forkEngineExited => Intl.message("Engine exited during the check", name: 'forkEngineExited', desc: '', args: []);
+  String get forkTuneInterrupted => Intl.message("Test interrupted; previous results retained", name: 'forkTuneInterrupted', desc: '', args: []);
+  String get forkTuneEarlyStop => Intl.message("Found 6/6; test finished early", name: 'forkTuneEarlyStop', desc: '', args: []);
+  String get forkHistorySaveFailed => Intl.message("Could not save auto-tuning history", name: 'forkHistorySaveFailed', desc: '', args: []);
+  String get forkTuneSaveFailed => Intl.message("Could not save auto-tuning results", name: 'forkTuneSaveFailed', desc: '', args: []);
+  String get forkRestoreStateFailed => Intl.message("Could not restore original state", name: 'forkRestoreStateFailed', desc: '', args: []);
+  String get forkAdditional => Intl.message("additional", name: 'forkAdditional', desc: '', args: []);
+  String get forkLastError => Intl.message("Last error", name: 'forkLastError', desc: '', args: []);
+  String get forkStrategyLaunchFailed => Intl.message("Strategy failed to start", name: 'forkStrategyLaunchFailed', desc: '', args: []);
   String get forkArchiveSaved => Intl.message("Archive saved", name: 'forkArchiveSaved', desc: '', args: []);
 
   /// `Rule`

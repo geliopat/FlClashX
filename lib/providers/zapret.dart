@@ -322,7 +322,7 @@ Future<void> saveZapretTuneRun(ZapretTuneRun run) async {
   );
   final history = [run, ...previous].take(zapretHistoryLimit).toList();
   if (!await prefs.setString(_zapretArchiveKey, jsonEncode(history.map((item) => item.toJson()).toList()))) {
-    throw StateError('Не удалось сохранить историю автоподбора');
+    throw StateError(AppLocalizations().forkHistorySaveFailed);
   }
 }
 
@@ -347,7 +347,8 @@ List<ZapretTrial> selectZapretFinalists(Iterable<ZapretTrial> trials) =>
       trial.screenedOnly && trial.error == null && trial.score > 0), limit: 5);
 
 /// Keep the worse of two full scores (both runs must actually pass).
-ZapretTrial combineZapretControlRuns(ZapretTrial first, ZapretTrial second) {
+ZapretTrial combineZapretControlRuns(ZapretTrial first, ZapretTrial second, {String? runLabel}) {
+  final label = runLabel ?? AppLocalizations().forkControlRun;
   final error = first.error ?? second.error;
   return ZapretTrial(first.id, first.mode,
     error != null ? 0 : first.score < second.score ? first.score : second.score,
@@ -357,7 +358,7 @@ ZapretTrial combineZapretControlRuns(ZapretTrial first, ZapretTrial second) {
     passedTargets: error != null ? 0 : first.passedTargets < second.passedTargets
         ? first.passedTargets : second.passedTargets,
     error: error,
-    details: ['Контроль 1:', ...first.details, 'Контроль 2:', ...second.details],
+    details: ['$label 1:', ...first.details, '$label 2:', ...second.details],
   );
 }
 
@@ -1077,12 +1078,13 @@ class ZapretController extends Notifier<ZapretState> {
     int? expectedPid,
     bool screenOnly = false,
   }) async {
+    final l = AppLocalizations();
     const required = [ZapretProbeTarget.youtube, ZapretProbeTarget.discordGateway, ZapretProbeTarget.discordVoice];
     final targets = screenOnly ? const [ZapretProbeTarget.youtube] : ZapretProbeTarget.values;
     final before = await _client.zapretStatus();
     if (!before.running || before.strategyId != id || before.pid == null ||
         (expectedPid != null && before.pid != expectedPid)) {
-      throw StateError('Движок стратегии не запущен: $id');
+      throw StateError('${l.forkStrategyLaunchFailed}: $id');
     }
     final items = await measureZapretTargets(ref, targets, timeoutMs: timeoutMs);
     final scored = (screenOnly ? targets : required).map((target) => items[target])
@@ -1098,23 +1100,25 @@ class ZapretController extends Notifier<ZapretState> {
     final sameProcess = status.running && status.strategyId == id && status.pid == before.pid;
     final details = [
       for (final target in targets)
-        '${target.label}${target == ZapretProbeTarget.googleVideo ? ' (доп.)' : ''}: ${items[target]?.statusLabel ?? 'Не проверен'} · ${items[target]?.message ?? 'Нет результата'}${items[target]?.latencyMs == null ? '' : ' · ${items[target]!.latencyMs} мс'}',
-      if (!sameProcess) 'Движок остановился или сменил PID во время проверки',
+        '${target.label}${target == ZapretProbeTarget.googleVideo ? ' (${l.forkAdditional})' : ''}: ${items[target]?.localizedStatusLabel(l) ?? l.forkUnconfirmed} · ${items[target]?.message ?? l.forkNoVerifiedResult}${items[target]?.latencyMs == null ? '' : ' · ${items[target]!.latencyMs} ms'}',
+      if (!sameProcess) l.forkEngineChanged,
     ];
     return ZapretTrial(id, mode, sameProcess ? score : 0,
         sameProcess ? delay : 0,
         confirmed: sameProcess && confirmed,
         screenedOnly: screenOnly,
         passedTargets: sameProcess ? reachable.length : 0,
-        error: sameProcess ? null : 'Движок завершился во время проверки',
+        error: sameProcess ? null : l.forkEngineExited,
         details: details);
   }
 
   Future<void> testStrategies({ZapretAutoTuneMode tuneMode = ZapretAutoTuneMode.fast}) async {
+    final l = AppLocalizations();
+    final controlLabel = l.forkControlRun;
     if (!Platform.isWindows || state.busy || _launchBlocked || state.strategies.isEmpty ||
         ref.read(coreStatusProvider) != CoreStatus.connected) {
       if (ref.mounted && !state.busy) {
-        state = state.copyWith(testSummary: 'Нужны подключённое ядро Mihomo и каталог стратегий.');
+        state = state.copyWith(testSummary: l.forkTuneRequirements);
       }
       return;
     }
@@ -1123,7 +1127,7 @@ class ZapretController extends Notifier<ZapretState> {
     final runClock = Stopwatch()..start();
     final strategies = state.strategies.toList();
     final selectedMode = state.mode;
-    state = state.copyWith(busy: true, trials: const [], testProgress: 'Подготовка', clearTestSummary: true, clearError: true);
+    state = state.copyWith(busy: true, trials: const [], testProgress: l.forkPreparing, clearTestSummary: true, clearError: true);
     final results = <String, ZapretTrial>{};
     HelperZapretStatus? original;
     var trialStarted = false;
@@ -1150,7 +1154,7 @@ class ZapretController extends Notifier<ZapretState> {
             infrastructure: protection.toJson(),
           );
           if (!started.running || started.strategyId != item.id || started.pid == null) {
-            throw StateError('Стратегия не запустилась');
+            throw StateError(l.forkStrategyLaunchFailed);
           }
           await Future<void>.delayed(Duration(milliseconds: screen ? 1000 : 1500));
           if (cancelled()) return null;
@@ -1169,10 +1173,10 @@ class ZapretController extends Notifier<ZapretState> {
             // Preserve the first round's actual measurements even when the
             // second round cannot run. Never present the mixed result as valid.
             second = ZapretTrial(item.id, mode, 0, 0, error: message,
-                details: ['Ошибка второго прогона: $message']);
+                details: ['$controlLabel 2 · ${l.error}: $message']);
           }
           if (_cancelTrial || _launchBlocked) return null;
-          return combineZapretControlRuns(first, second);
+          return combineZapretControlRuns(first, second, runLabel: controlLabel);
         } catch (error) {
           final message = _errorMessage(error);
           if (error is HelperException && error.code == 'zapretConflict') {
@@ -1192,11 +1196,11 @@ class ZapretController extends Notifier<ZapretState> {
           confirmed: trial.confirmed, passedTargets: trial.passedTargets,
           screenedOnly: trial.screenedOnly, error: trial.error,
           details: [
-            if (trial.screenedOnly) 'Предварительный отбор:',
+            if (trial.screenedOnly) '${l.forkScreenOnly}:',
             if (previous != null) ...previous.details,
-            if (!trial.screenedOnly && tuneMode.controlRuns == 1) 'Контроль:',
+            if (!trial.screenedOnly && tuneMode.controlRuns == 1) '$controlLabel:',
             if (!trial.screenedOnly && tuneMode.controlRuns == 2 &&
-                !trial.details.contains('Контроль 1:')) 'Контроль 1:',
+                !trial.details.contains('$controlLabel 1:')) '$controlLabel 1:',
             ...trial.details,
           ]);
         if (ref.mounted) {
@@ -1257,16 +1261,16 @@ class ZapretController extends Notifier<ZapretState> {
           }
         }
       } catch (error) {
-        failure = 'Не удалось восстановить исходное состояние: ${_errorMessage(error)}';
+        failure = '${l.forkRestoreStateFailed}: ${_errorMessage(error)}';
       }
       if (ref.mounted) {
         final interrupted = _cancelTrial || _launchBlocked;
         final ranked = shortlistZapretTrials(results.values, limit: results.length);
-        final summary = interrupted ? 'Тест прерван · предыдущие результаты сохранены' :
-            '${tuneMode.label} · ${tuneMode.screenFirst ? 'Отбор $attempted/${strategies.length} · ' : ''}'
-            'Контроль $verified/$finalists · операций с ошибками $launchFailures'
-            '${earlyStop ? ' · найдено 6/6, тест завершён досрочно' : ''}'
-            '${lastLaunchFailure == null ? '' : '\nПоследняя ошибка: $lastLaunchFailure'}';
+        final summary = interrupted ? l.forkTuneInterrupted :
+            '${tuneMode.localizedLabel(l)} · ${tuneMode.screenFirst ? '${l.forkScreenOnly} $attempted/${strategies.length} · ' : ''}'
+            '$controlLabel $verified/$finalists · ${l.forkErrors}: $launchFailures'
+            '${earlyStop ? ' · ${l.forkTuneEarlyStop}' : ''}'
+            '${lastLaunchFailure == null ? '' : '\n${l.forkLastError}: $lastLaunchFailure'}';
         String? historyError;
         if (!interrupted) {
           try {
@@ -1280,11 +1284,11 @@ class ZapretController extends Notifier<ZapretState> {
               failure: failure,
             ));
           } catch (_) {
-            historyError = 'Не удалось сохранить историю автоподбора';
+            historyError = l.forkHistorySaveFailed;
           }
           if (failure == null) {
             try { await _saveTrials(ranked); } catch (_) {
-              historyError = 'Не удалось сохранить результаты автоподбора';
+              historyError = l.forkTuneSaveFailed;
             }
           }
         }

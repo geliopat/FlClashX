@@ -1,3 +1,4 @@
+import 'package:fl_clash/l10n/l10n.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -581,41 +582,42 @@ class SmartHostsController extends Notifier<SmartHostsState> {
   }
 
   Future<void> checkCdn() async {
+    final l = AppLocalizations();
     if (!_loaded || _cdnChecking || _updating || ref.read(zapretControllerProvider).busy) return;
     if (ref.read(coreStatusProvider) != CoreStatus.connected) {
-      _cdnMessage = 'Ядро Mihomo недоступно';
+      _cdnMessage = l.forkCoreUnavailable;
       _publish();
       return;
     }
     _cdnChecking = true;
-    _cdnMessage = 'Измерение DIRECT';
+    _cdnMessage = 'DIRECT · ${l.forkChecking}';
     _publish();
     try {
       final pid = ref.read(zapretControllerProvider).pid;
       final results = await ref.read(coreHandlerProvider).zapretCdnCheck();
       if (!ref.mounted) return;
       if (ref.read(zapretControllerProvider).pid != pid || ref.read(zapretControllerProvider).busy) {
-        _cdnMessage = 'Стратегия изменилась во время проверки; результат отброшен';
+        _cdnMessage = l.forkCdnProcessChanged;
         return;
       }
       final measured = <CdnMeasurement>[];
       final diagnostics = <String, int>{};
       final now = DateTime.now();
-      const reasons = {
-        'check_busy': 'Проверка уже выполняется',
-        'probe_busy_or_timeout': 'Нет свободного слота или истёк тайм-аут',
-        'timeout': 'Тайм-аут',
-        'network_error': 'Ошибка сети',
-        'direct_unconfirmed': 'Маршрут DIRECT не подтверждён',
-        'watch_http': 'Ошибка страницы YouTube',
-        'no_stream_urls': 'YouTube не выдал прямые ссылки на видео',
-        'stream_urls_found': 'Получены ссылки на видео',
-        'local_hosts_mapping': 'Узел уже перенаправлен на локальный адрес',
-        'redirect_rejected': 'Недопустимое перенаправление CDN',
-        'stream_http': 'Ошибка ответа CDN',
-        'not_media': 'CDN вернул не видеопоток',
-        'insufficient_sample': 'Недостаточно данных для измерения',
-        'budget_exhausted': 'Истекло общее время проверки',
+      final reasons = {
+        'check_busy': l.forkCdnCheckBusy,
+        'probe_busy_or_timeout': l.forkCdnProbeBusy,
+        'timeout': l.timeout,
+        'network_error': l.unknownNetworkError,
+        'direct_unconfirmed': l.forkDirectUnconfirmed,
+        'watch_http': l.forkCdnWatchHttp,
+        'no_stream_urls': l.forkCdnNoStreamUrls,
+        'stream_urls_found': l.forkCdnStreamUrls,
+        'local_hosts_mapping': l.forkCdnLocalMapping,
+        'redirect_rejected': l.forkCdnRedirectRejected,
+        'stream_http': l.forkCdnStreamHttp,
+        'not_media': l.forkCdnNotMedia,
+        'insufficient_sample': l.forkCdnInsufficientSample,
+        'budget_exhausted': l.forkCdnBudgetExhausted,
       };
       for (final item in results) {
         final reason = reasons[item['reason']];
@@ -642,14 +644,14 @@ class SmartHostsController extends Notifier<SmartHostsState> {
       }
       _lastCdn = now;
       _cdnMessage = measured.isEmpty
-          ? 'Нет достоверных измерений; списки не изменены'
-          : 'Измерено: ${measured.length}; быстрых: ${measured.where((record) => record.fast).length}';
+          ? l.forkCdnNoMeasurements
+          : '${l.forkCdnMeasured}: ${measured.length}; ${l.forkCdnFast}: ${measured.where((record) => record.fast).length}';
       if (diagnostics.isNotEmpty) {
         _cdnMessage = '$_cdnMessage\n${diagnostics.entries.map((entry) => '${entry.key}: ${entry.value}').join('\n')}';
       }
       await _save();
     } catch (error) {
-      _cdnMessage = 'Ошибка измерения: $error';
+      _cdnMessage = '${l.forkCheckFailed}: $error';
     } finally {
       _cdnChecking = false;
       _publish();
