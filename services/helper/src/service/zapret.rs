@@ -1303,6 +1303,29 @@ impl StrategyBuilder {
         }
     }
 
+    /// Adds the auto hostlist only to a TCP block that is explicitly
+    /// gated by one of the general hostlists. Keep it after all hostlist
+    /// exclusions so the exclude rules retain their intended precedence.
+    fn inject_auto_into_block(block: &mut Vec<String>, auto_arg: &str) {
+        let is_tcp = block.iter().any(|arg| arg.starts_with("--filter-tcp="));
+        let has_general_hostlist = block.iter().any(|arg| {
+            arg.starts_with("--hostlist=")
+                && (arg.contains("list-general.txt") || arg.contains("list-general-user.txt"))
+        });
+        let already_has_auto = block.iter().any(|arg| arg.starts_with("--hostlist-auto="));
+
+        if !is_tcp || !has_general_hostlist || already_has_auto {
+            return;
+        }
+
+        if let Some(last_exclude) = block
+            .iter()
+            .rposition(|arg| arg.starts_with("--hostlist-exclude="))
+        {
+            block.insert(last_exclude + 1, auto_arg.to_string());
+        }
+    }
+
     /// Inserts `--hostlist-auto=<auto_path>` into every section of
     /// a Flowseal argument list that is (a) TCP (`--filter-tcp`)
     /// and (b) gated on list-general.txt, right after the section's
@@ -1477,6 +1500,42 @@ mod tests {
 
         assert!(args.iter().any(|arg| arg == "--new=quic"));
         assert!(args.iter().any(|arg| arg.contains("list-general.txt")));
+    }
+
+    #[test]
+    fn auto_hostlist_is_added_only_to_tcp_general_sections_after_excludes() {
+        let args = vec![
+            "--wf-tcp=80,443".into(),
+            "--new".into(),
+            "--filter-tcp=80,443".into(),
+            "--hostlist=lists/list-general.txt".into(),
+            "--hostlist=lists/list-general-user.txt".into(),
+            "--hostlist-exclude=lists/list-exclude.txt".into(),
+            "--hostlist-exclude=lists/list-exclude-user.txt".into(),
+            "--dpi-desync=fake".into(),
+            "--new".into(),
+            "--filter-udp=443".into(),
+            "--hostlist=lists/list-general.txt".into(),
+            "--hostlist-exclude=lists/list-exclude.txt".into(),
+            "--new".into(),
+            "--filter-tcp=443".into(),
+            "--hostlist=lists/list-google.txt".into(),
+            "--hostlist-exclude=lists/list-exclude.txt".into(),
+        ];
+
+        let result = StrategyBuilder::inject_auto_hostlist(args, "lists/list-auto.txt");
+        let auto_positions: Vec<usize> = result
+            .iter()
+            .enumerate()
+            .filter_map(|(index, arg)| (arg == "--hostlist-auto=lists/list-auto.txt").then_some(index))
+            .collect();
+
+        assert_eq!(auto_positions.len(), 1);
+        assert_eq!(
+            result[auto_positions[0] - 1],
+            "--hostlist-exclude=lists/list-exclude-user.txt"
+        );
+        assert_eq!(result[auto_positions[0] + 1], "--dpi-desync=fake");
     }
 
     #[test]
