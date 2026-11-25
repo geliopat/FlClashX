@@ -267,6 +267,120 @@ class AppLocalizations {
 
   String get forkSaveSettingsFailed => Intl.message("Failed to save settings", name: 'forkSaveSettingsFailed', desc: '', args: []);
 
+  String get forkVeryFast => Intl.message("Very fast", name: 'forkVeryFast', desc: '', args: []);
+
+  String get forkFast => Intl.message("Fast", name: 'forkFast', desc: '', args: []);
+
+  String get forkFull => Intl.message("Full", name: 'forkFull', desc: '', args: []);
+
+  String get forkVeryFastDesc => Intl.message("YouTube screening, up to 5 finalists, stop at 6/6", name: 'forkVeryFastDesc', desc: '', args: []);
+
+  String get forkFastDesc => Intl.message("YouTube screening, up to 5 finalists, two verification runs", name: 'forkFastDesc', desc: '', args: []);
+
+  String get forkFullDesc => Intl.message("All strategies, two full runs each", name: 'forkFullDesc', desc: '', args: []);
+
+  String get forkTrialError => Intl.message("Launch or test error", name: 'forkTrialError', desc: '', args: []);
+
+  String get forkSuccess => Intl.message("Successful", name: 'forkSuccess', desc: '', args: []);
+
+  String get forkScreenFailed => Intl.message("Screening failed", name: 'forkScreenFailed', desc: '', args: []);
+
+  String get forkScreenOnly => Intl.message("Screening only", name: 'forkScreenOnly', desc: '', args: []);
+
+  String get forkPartialSuccess => Intl.message("Partially successful", name: 'forkPartialSuccess', desc: '', args: []);
+
+  String get forkTestFailed => Intl.message("Test failed", name: 'forkTestFailed', desc: '', args: []);
+
+  String get forkDegraded => Intl.message("Restricted / high latency", name: 'forkDegraded', desc: '', args: []);
+
+  String get forkNoConnection => Intl.message("No connection", name: 'forkNoConnection', desc: '', args: []);
+
+  String get forkUnconfirmed => Intl.message("Not confirmed", name: 'forkUnconfirmed', desc: '', args: []);
+
+  String get forkNoResponse => Intl.message("Server did not respond", name: 'forkNoResponse', desc: '', args: []);
+
+  String get forkHighLatency => Intl.message("High latency", name: 'forkHighLatency', desc: '', args: []);
+
+  String get forkReachable => Intl.message("Connection available", name: 'forkReachable', desc: '', args: []);
+
+  String get forkCoreUnavailable => Intl.message("Mihomo core unavailable", name: 'forkCoreUnavailable', desc: '', args: []);
+
+  String get forkNoCoreResponse => Intl.message("No core response", name: 'forkNoCoreResponse', desc: '', args: []);
+
+  String get forkNoVerifiedResult => Intl.message("No verified result", name: 'forkNoVerifiedResult', desc: '', args: []);
+
+  String get forkActiveStrategy => Intl.message("Active strategy", name: 'forkActiveStrategy', desc: '', args: []);
+
+  String get forkSelectedStrategy => Intl.message("Selected strategy", name: 'forkSelectedStrategy', desc: '', args: []);
+
+  String get forkUndefined => Intl.message("Undefined", name: 'forkUndefined', desc: '', args: []);
+
+  String get forkNotSelected => Intl.message("Not selected", name: 'forkNotSelected', desc: '', args: []);
+
+  String get forkHttpsLatency => Intl.message("Network latency · HTTPS", name: 'forkHttpsLatency', desc: '', args: []);
+
+  String get forkChooseStrategy => Intl.message("Choose Zapret strategy", name: 'forkChooseStrategy', desc: '', args: []);
+
+  String get forkChecking => Intl.message("Checking", name: 'forkChecking', desc: '', args: []);
+
+  String get forkSlow => Intl.message("Slow", name: 'forkSlow', desc: '', args: []);
+
+  String get forkNoReply => Intl.message("No response", name: 'forkNoReply', desc: '', args: []);
+
+  String get forkUseCache => Intl.message("Using cached or bundled list", name: 'forkUseCache', desc: '', args: []);
+
+  String get forkFallbackDownloaded => Intl.message("Downloaded from fallback source", name: 'forkFallbackDownloaded', desc: '', args: []);
+
+  String get forkRetryInterval => Intl.message("Automatic retries every 15 minutes", name: 'forkRetryInterval', desc: '', args: []);
+
+  String get forkNoUpdate => Intl.message("Not updated yet", name: 'forkNoUpdate', desc: '', args: []);
+
+  String get forkDailyOff => Intl.message("Daily, disabled by default", name: 'forkDailyOff', desc: '', args: []);
+
+  String get forkRealDirect => Intl.message("Actual video stream via DIRECT", name: 'forkRealDirect', desc: '', args: []);
+
+  String get forkExcludeAuto => Intl.message("Do not add automatically", name: 'forkExcludeAuto', desc: '', args: []);
+
+  String get forkAllApplied => Intl.message("All entries applied in Mihomo", name: 'forkAllApplied', desc: '', args: []);
+
+  String get forkConflict => Intl.message("Conflict", name: 'forkConflict', desc: '', args: []);
+
+  String get forkConflicts => Intl.message("Conflicts", name: 'forkConflicts', desc: '', args: []);
+
+  String get forkSourceMatches => Intl.message("Matches", name: 'forkSourceMatches', desc: '', args: []);
+
+  String get forkNextZapretStart => Intl.message("Applies at next Zapret start", name: 'forkNextZapretStart', desc: '', args: []);
+
+  String get forkEngineDebugTip => Intl.message("Debug shows raw winws/winws2 output.", name: 'forkEngineDebugTip', desc: '', args: []);
+
+  String get forkHttpsInterval => Intl.message("Zapret HTTPS check interval", name: 'forkHttpsInterval', desc: '', args: []);
+
+  String get forkCoreRecovery => Intl.message("Recover core after a crash", name: 'forkCoreRecovery', desc: '', args: []);
+
+  String get forkSelectedPingInterval => Intl.message("Selected server check interval", name: 'forkSelectedPingInterval', desc: '', args: []);
+
+  String get forkOtherPingInterval => Intl.message("Other server check interval", name: 'forkOtherPingInterval', desc: '', args: []);
+
+  String get forkDisabled => Intl.message("Disabled", name: 'forkDisabled', desc: '', args: []);
+
+  String get forkLogFooter => Intl.message("Last 500 events. Local archive is collected while the app runs.", name: 'forkLogFooter', desc: '', args: []);
+
+  String get forkNoTodayLogs => Intl.message("No saved logs for today", name: 'forkNoTodayLogs', desc: '', args: []);
+
+  String get forkExportLogsFailed => Intl.message("Failed to export logs", name: 'forkExportLogsFailed', desc: '', args: []);
+
+  String get forkTunNotRequested => Intl.message("Not requested / VPN off", name: 'forkTunNotRequested', desc: '', args: []);
+
+  String get forkTunFailure => Intl.message("Core reports TUN failure", name: 'forkTunFailure', desc: '', args: []);
+
+  String get forkTunNoFailure => Intl.message("No TUN failure reported by core (not a traffic test)", name: 'forkTunNoFailure', desc: '', args: []);
+
+  String get forkDriverNotFound => Intl.message("Driver not found among running services", name: 'forkDriverNotFound', desc: '', args: []);
+
+  String get forkLatestDirect => Intl.message("Latest DIRECT results, not proof of WinDivert interception", name: 'forkLatestDirect', desc: '', args: []);
+
+  String get forkArchiveSaved => Intl.message("Archive saved", name: 'forkArchiveSaved', desc: '', args: []);
+
   /// `Rule`
   String get rule {
     return Intl.message('Rule', name: 'rule', desc: '', args: []);
