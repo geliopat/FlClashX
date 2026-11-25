@@ -19,6 +19,11 @@ on:
 permissions:
   contents: write
 
+# Only one validation run may mutate/publish formatting changes to this branch.
+concurrency:
+  group: zapret-windows-validation-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   FLUTTER_VERSION: '3.47.6'
   GO_VERSION: '1.27.1'
@@ -57,12 +62,31 @@ jobs:
         run: |
           cargo fmt --manifest-path services/helper/Cargo.toml
           cargo fmt --manifest-path plugins/rust_api/rust/Cargo.toml
-          if (-not (git diff --quiet)) {
+
+          # PowerShell does not turn a native command's empty stdout into its
+          # exit code. Capture git diff's exit status explicitly or clean trees
+          # will still attempt an unnecessary push and race other CI runs.
+          git diff --quiet -- services/helper plugins/rust_api
+          $diffExitCode = $LASTEXITCODE
+
+          if ($diffExitCode -gt 1) {
+            throw "git diff failed with exit code $diffExitCode"
+          }
+
+          if ($diffExitCode -eq 1) {
             git config user.email "github-actions[bot]@users.noreply.github.com"
             git config user.name "github-actions[bot]"
             git add services/helper plugins/rust_api
             git commit -m "style: format Zapret Rust integration"
+            if ($LASTEXITCODE -ne 0) {
+              throw "Could not commit Rust formatting changes"
+            }
             git push origin "HEAD:$env:GITHUB_REF_NAME"
+            if ($LASTEXITCODE -ne 0) {
+              throw "Could not push Rust formatting changes"
+            }
+          } else {
+            Write-Host "Rust sources are already formatted; no commit or push needed."
           }
 
       - name: Verify Rust formatting
