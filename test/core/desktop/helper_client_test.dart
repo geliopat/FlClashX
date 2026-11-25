@@ -60,6 +60,8 @@ void main() {
       'kinlay0-alt14',
     ]);
     expect(result.first.engine, 'winws');
+    expect(result.first.supportsSplitMode, isTrue);
+    expect(result[1].supportsSplitMode, isFalse);
     expect(result.last.engine, 'winws2');
   });
 
@@ -87,6 +89,9 @@ void main() {
     expect(result.pid, 3210);
     expect(result.strategyId, 'flowseal-alt');
     expect(result.engine, 'winws');
+    expect(result.mode, 'fullBypass');
+    expect(result.winDivertFilters, ['--wf-tcp=80,443']);
+    expect(result.processingLists, ['--hostlist=lists/list-general.txt']);
     expect(result.cleanedProcesses, 2);
   });
 
