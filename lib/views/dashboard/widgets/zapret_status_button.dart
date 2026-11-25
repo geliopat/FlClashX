@@ -54,14 +54,14 @@ class ZapretStatusButton extends ConsumerWidget {
         child: iconOnly
             ? IconButton.filled(
                 style: style,
-                onPressed: busy || safeMode || !initialized || !initialized
+                onPressed: busy || safeMode || !initialized
                     ? null
                     : () => _restart(context, ref),
                 icon: icon,
               )
             : FilledButton.icon(
                 style: style,
-                onPressed: busy || safeMode
+                onPressed: busy || safeMode || !initialized
                     ? null
                     : () => _restart(context, ref),
                 icon: icon,
