@@ -17,6 +17,7 @@ class ZapretState {
   final bool running;
   final bool busy;
   final bool debugLogs;
+  final bool startWithMihomo;
   final int? pid;
   final Duration elapsed;
   final int cleanedProcesses;
@@ -35,6 +36,7 @@ class ZapretState {
     this.running = false,
     this.busy = false,
     this.debugLogs = false,
+    this.startWithMihomo = false,
     this.pid,
     this.elapsed = Duration.zero,
     this.cleanedProcesses = 0,
@@ -54,6 +56,7 @@ class ZapretState {
     bool? running,
     bool? busy,
     bool? debugLogs,
+    bool? startWithMihomo,
     int? pid,
     Duration? elapsed,
     bool clearPid = false,
@@ -77,6 +80,7 @@ class ZapretState {
       running: running ?? this.running,
       busy: busy ?? this.busy,
       debugLogs: debugLogs ?? this.debugLogs,
+      startWithMihomo: startWithMihomo ?? this.startWithMihomo,
       pid: clearPid ? null : pid ?? this.pid,
       elapsed: elapsed ?? this.elapsed,
       cleanedProcesses: cleanedProcesses ?? this.cleanedProcesses,
@@ -107,6 +111,7 @@ class ZapretController extends Notifier<ZapretState> {
   static const _selectedStrategyPreferenceKey = 'zapret.strategyId';
   static const _modePreferenceKey = 'zapret.mode';
   static const _debugPreferenceKey = 'zapret.debugLogs';
+  static const _linkedStartPreferenceKey = 'zapret.startWithMihomo';
   static const _pollInterval = Duration(seconds: 3);
   static const _readinessTimeout = Duration(seconds: 3);
 
@@ -184,6 +189,7 @@ class ZapretController extends Notifier<ZapretState> {
         selectedStrategyId: selectedId,
         mode: selectedMode,
         debugLogs: preferences.getBool(_debugPreferenceKey) ?? false,
+        startWithMihomo: preferences.getBool(_linkedStartPreferenceKey) ?? false,
         clearError: strategies.isNotEmpty,
       );
       if (strategies.isNotEmpty && savedId != selectedId) {
@@ -215,6 +221,24 @@ class ZapretController extends Notifier<ZapretState> {
     state = state.copyWith(mode: mode, clearError: true);
     final preferences = await SharedPreferences.getInstance();
     await preferences.setString(_modePreferenceKey, mode.name);
+  }
+
+  Future<void> setStartWithMihomo(bool enabled) async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setBool(_linkedStartPreferenceKey, enabled);
+    if (ref.mounted) state = state.copyWith(startWithMihomo: enabled);
+  }
+
+  /// Called once after an actual new Mihomo run starts. Never follows stop.
+  Future<void> startAlongsideMihomo() async {
+    if (!Platform.isWindows || !ref.mounted) return;
+    final preferences = await SharedPreferences.getInstance();
+    if (preferences.getBool(_linkedStartPreferenceKey) != true || !ref.mounted) return;
+    if (state.strategies.isEmpty) await loadStrategies();
+    await refresh();
+    if (ref.mounted && state.available && !state.busy && !state.running) {
+      await setEnabled(true);
+    }
   }
 
   Future<void> setDebugLogs(bool enabled) async {

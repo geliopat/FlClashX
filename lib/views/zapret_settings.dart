@@ -436,6 +436,14 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
       generateSection(
         title: 'Служба Helper',
         items: [
+          ListItem(
+            title: const Text('Запуск Zapret при старте Mihomo'),
+            subtitle: const Text('Движки можно останавливать независимо'),
+            trailing: Switch(
+              value: zapret.startWithMihomo,
+              onChanged: ref.read(zapretControllerProvider.notifier).setStartWithMihomo,
+            ),
+          ),
             ListItem(
               leading: const Icon(Icons.admin_panel_settings_outlined),
               title: const Text('Переустановить Helper'),

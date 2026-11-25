@@ -8,6 +8,8 @@ import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/providers/action.dart';
 import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/providers/state.dart';
+import 'package:fl_clash/providers/zapret.dart';
+import 'package:fl_clash/providers/zapret_diagnostics.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:tray/tray.dart';
@@ -40,6 +42,13 @@ class _TrayManagerState extends ConsumerState<TrayManager> {
         _requestUpdate();
       }
     });
+    if (system.isWindows) {
+      ref.listenManual(zapretControllerProvider.select((state) => (
+        state.running, state.busy, state.available, state.selectedStrategyId,
+        state.mode, state.startWithMihomo, state.strategies,
+      )), (_, _) => _requestUpdate());
+      ref.listenManual(zapretDiagnosticsProvider, (_, _) {});
+    }
     if (system.isMacOS) {
       ref.listenManual(trayDelaysProvider, (prev, next) {
         if (!const DeepCollectionEquality().equals(prev, next)) {

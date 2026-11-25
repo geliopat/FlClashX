@@ -231,7 +231,17 @@ class SetupAction extends _$SetupAction {
     if (request.initialize) {
       globalState.needInitStatus = false;
     }
-    return running ? _start(request) : _stop(request);
+    if (!running) return _stop(request);
+    return _start(request).then((success) {
+      if (success && system.isWindows && _isCurrent(request) &&
+          request.previousStartTime == null && !request.resume &&
+          !ref.read(safeModeProvider)) {
+        unawaited(ref.read(zapretControllerProvider.notifier).startAlongsideMihomo().catchError((Object error) {
+          commonPrint.log('Linked Zapret start failed: $error', logLevel: LogLevel.warning);
+        }));
+      }
+      return success;
+    });
   }
 
   Future<bool> _start(_RunRequest request) async {
