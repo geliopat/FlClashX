@@ -71,7 +71,7 @@ jobs:
                   versions.append(tuple(map(int, t.groups())))
           a, b, c = max(versions)
           version = f"{a}.{b}.{c + 1}"
-          build = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d%H%M")
+          build = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d%H")
           p.write_text(re.sub(r"(?m)^version: [^\r\n]+", f"version: {version}+{build}", data, count=1), encoding="utf-8")
           print(f"v{version}")
           PY
