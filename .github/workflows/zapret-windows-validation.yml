@@ -1,0 +1,97 @@
+name: Zapret Windows validation
+
+on:
+  push:
+    branches:
+      - feature/zapret2-integration
+    paths:
+      - 'services/helper/**'
+      - 'plugins/rust_api/**'
+      - 'lib/**'
+      - 'windows/**'
+      - 'scripts/setup_zapret.ps1'
+      - '.github/workflows/zapret-windows-validation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  FLUTTER_VERSION: '3.47.6'
+  GO_VERSION: '1.27.1'
+
+jobs:
+  windows:
+    name: Format, test and build Windows
+    runs-on: windows-2022
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: core/go.sum
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Enable git long paths
+        run: git config --global core.longpaths true
+
+      - name: Apply Rust formatting and commit changes
+        shell: pwsh
+        run: |
+          cargo fmt --manifest-path services/helper/Cargo.toml
+          cargo fmt --manifest-path plugins/rust_api/rust/Cargo.toml
+          if (-not (git diff --quiet)) {
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git config user.name "github-actions[bot]"
+            git add services/helper plugins/rust_api
+            git commit -m "style: format Zapret Rust integration"
+            git push origin "HEAD:$env:GITHUB_REF_NAME"
+          }
+
+      - name: Verify Rust formatting
+        run: |
+          cargo fmt --manifest-path services/helper/Cargo.toml -- --check
+          cargo fmt --manifest-path plugins/rust_api/rust/Cargo.toml -- --check
+
+      - name: Run Helper unit tests
+        run: cargo test --manifest-path services/helper/Cargo.toml
+
+      - name: Run Windows service tests
+        run: cargo test --manifest-path services/helper/Cargo.toml --features windows-service
+
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      - name: Stage pinned Zapret2 and Flowseal assets
+        shell: pwsh
+        run: ./scripts/setup_zapret.ps1
+
+      - name: Analyze Flutter sources
+        run: flutter analyze --no-fatal-infos
+
+      - name: Build Windows debug bundle
+        run: flutter build windows --debug
+
+      - name: Upload Windows debug bundle
+        uses: actions/upload-artifact@v6
+        with:
+          name: FlClashX-Zapret2-Windows-debug
+          path: |
+            build/windows/x64/runner/Debug/**
+            build/windows/runner/Debug/**
+          if-no-files-found: error
+          retention-days: 7
