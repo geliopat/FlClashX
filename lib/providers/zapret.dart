@@ -147,7 +147,7 @@ class ZapretController extends Notifier<ZapretState> {
   static const _modePreferenceKey = 'zapret.mode';
   static const _debugPreferenceKey = 'zapret.debugLogs';
   static const _linkedStartPreferenceKey = 'zapret.startWithMihomo';
-  static const _trialHistoryKey = 'zapret.trialHistory.v1';
+  static const _trialHistoryKey = 'zapret.trialHistory.v2';
   static const _pollInterval = Duration(seconds: 3);
   static const _readinessTimeout = Duration(seconds: 3);
 
