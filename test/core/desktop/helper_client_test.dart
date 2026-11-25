@@ -103,7 +103,7 @@ void main() {
     final adapter = _ResponseAdapter((options) {
       commands.add(int.parse(options.headers['x-zapret-command'].toString()));
       owners.add(options.headers['x-zapret-owner-pid'].toString());
-      if (options.path.endsWith('/watchdog')) return _jsonResponse(true);
+      if (options.path.endsWith('/watchdog')) return _jsonResponse(<String, Object?>{});
       return _jsonResponse({
         'running': false,
         'winDivertFilters': <String>[],
