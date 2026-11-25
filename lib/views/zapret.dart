@@ -20,8 +20,64 @@ class ZapretView extends ConsumerWidget {
     );
     final selectedName = selected.isEmpty ? null : selected.first.name;
 
-    final top = zapret.trials.where((trial) => trial.confirmed).toList()
-      ..sort((a, b) => a.delay.compareTo(b.delay));
+    final confirmedTrials = zapret.trials.where((trial) => trial.confirmed).length;
+    final errors = zapret.trials.where((trial) => trial.error != null).length;
+    final screened = zapret.trials.where((trial) =>
+        trial.screenedOnly && trial.error == null && trial.passedTargets > 0).length;
+    final partial = zapret.trials.where((trial) =>
+        !trial.confirmed && !trial.screenedOnly && trial.error == null && trial.passedTargets > 0).length;
+    final failed = zapret.trials.length - confirmedTrials - errors - screened - partial;
+    final top = shortlistZapretTrials(zapret.trials.where((trial) =>
+        trial.error == null && (trial.confirmed || trial.passedTargets > 0)), limit: 5);
+
+    String trialName(ZapretTrial trial) => zapret.strategies
+        .where((item) => item.id == trial.id).firstOrNull?.name ?? trial.id;
+    String trialDescription(ZapretTrial trial) =>
+        '${trial.resultLabel} · ${trial.passedTargets}/3 сервисов'
+        '${trial.delay > 0 ? ' · ${trial.delay} мс' : ''}';
+    Future<void> showTrialDetails(ZapretTrial trial) async {
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(trialName(trial)),
+          content: SingleChildScrollView(
+            child: SelectableText([
+              trialDescription(trial),
+              if (trial.error != null) trial.error!,
+              ...trial.details,
+            ].join('\n')),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Закрыть')),
+          ],
+        ),
+      );
+    }
+    Future<void> showAllTrials() async {
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text('Все результаты (${zapret.trials.length})'),
+          content: SizedBox(
+            width: 650,
+            child: ListView(
+              shrinkWrap: true,
+              children: [
+                for (final trial in zapret.trials)
+                  ListItem(
+                    title: Text(trialName(trial)),
+                    subtitle: Text(trialDescription(trial)),
+                    onTap: () => showTrialDetails(trial),
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Закрыть')),
+          ],
+        ),
+      );
+    }
     Future<void> confirmTrial(ZapretTrial trial) async {
       final name = zapret.strategies.where((item) => item.id == trial.id).firstOrNull?.name ?? trial.id;
       final confirmed = await showDialog<bool>(
@@ -137,22 +193,41 @@ class ZapretView extends ConsumerWidget {
         items: [
           ListItem(
             title: Text(zapret.testProgress ?? 'Проверить все стратегии'),
-            subtitle: const Text('Проверка DIRECT через Mihomo, затем подтверждение YouTube, Discord Gateway и Voice. Исходное состояние восстанавливается.'),
+            subtitle: const Text('Быстрый отбор всех стратегий и контроль лучших кандидатов через Mihomo DIRECT. YouTube и два HTTPS API Discord.'),
             onTap: zapret.busy ? null : () => ref.read(zapretControllerProvider.notifier).testStrategies(),
           ),
           if (zapret.testProgress != null)
             ListItem(title: const Text('Отменить тестирование'), onTap: ref.read(zapretControllerProvider.notifier).cancelTrials),
           if (zapret.testSummary != null)
             ListItem(title: const Text('Результат проверки'), subtitle: Text(zapret.testSummary!, maxLines: 5)),
-          if (top.isNotEmpty)
-            const ListItem(title: Text('Топ-5 подтверждённых стратегий'), subtitle: Text('Средняя задержка HTTPS · нажми для применения')),
-          for (final (index, trial) in top.take(5).indexed)
+          if (zapret.trials.isNotEmpty) ...[
             ListItem(
-              title: Text('${index + 1}. ${zapret.strategies.where((item) => item.id == trial.id).firstOrNull?.name ?? trial.id}'),
-              subtitle: Text('${trial.delay} мс · ${trial.score}/6'),
-              trailing: zapret.activeStrategyId == trial.id ? const Icon(Icons.check_circle_outline) : null,
-              onTap: zapret.busy ? null : () => confirmTrial(trial),
+              title: const Text('Статистика стратегий'),
+              subtitle: Text('Успешно: $confirmedTrials · частично: $partial\n'
+                  'Не прошли: $failed · ошибки: $errors\n'
+                  'Только отбор: $screened · без результата: ${(zapret.strategies.length - zapret.trials.length).clamp(0, zapret.strategies.length)}'),
+              onTap: showAllTrials,
             ),
+            ListItem(
+              title: const Text('Все результаты проверки'),
+              subtitle: Text('${zapret.trials.length} стратегий · детали по каждому сервису'),
+              onTap: showAllTrials,
+            ),
+            ListItem(
+              title: const Text('Топ-5 стратегий'),
+              subtitle: Text(top.isEmpty
+                  ? 'Ни одного подтверждённого кандидата или успешного запроса. Смотри все результаты.'
+                  : 'Подтверждённые первыми. Неподтверждённые — только просмотр.'),
+            ),
+            for (final (index, trial) in top.indexed)
+              ListItem(
+                title: Text('${index + 1}. ${trialName(trial)}'),
+                subtitle: Text(trialDescription(trial)),
+                trailing: zapret.activeStrategyId == trial.id ? const Icon(Icons.check_circle_outline) : null,
+                onTap: zapret.busy ? null : () => trial.confirmed
+                    ? confirmTrial(trial) : showTrialDetails(trial),
+              ),
+          ],
           ListItem(
             title: const Text('Автоматический переход на резервную стратегию'),
             subtitle: const Text('Три неудачные проверки, только подтверждённые кандидаты, откат при неудаче'),
