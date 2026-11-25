@@ -3,6 +3,30 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+final zapretProbeIntervalProvider = NotifierProvider<ZapretProbeInterval, int>(ZapretProbeInterval.new);
+
+class ZapretProbeInterval extends Notifier<int> {
+  static const values = [0, 5, 10, 15, 30, 60, 120];
+  static const _key = 'zapret.httpsInterval';
+  @override
+  int build() {
+    scheduleMicrotask(() async {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getInt(_key);
+      if (ref.mounted && values.contains(saved)) state = saved!;
+    });
+    return 15;
+  }
+
+  Future<void> update(int value) async {
+    if (!values.contains(value)) return;
+    state = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_key, value);
+  }
+}
 
 final zapretDiagnosticsProvider =
     NotifierProvider<ZapretDiagnosticsController, ZapretDiagnosticsState>(
@@ -92,7 +116,6 @@ class ZapretDiagnosticsState {
 }
 
 class ZapretDiagnosticsController extends Notifier<ZapretDiagnosticsState> {
-  static const _pollInterval = Duration(seconds: 30);
   static const _dnsTimeout = Duration(seconds: 2);
   static const _connectTimeout = Duration(milliseconds: 2500);
   static const _requestTimeout = Duration(milliseconds: 3500);
@@ -128,9 +151,16 @@ class ZapretDiagnosticsController extends Notifier<ZapretDiagnosticsState> {
       scheduleMicrotask(() {
         if (ref.mounted) unawaited(refresh());
       });
-      _poller = Timer.periodic(_pollInterval, (_) {
-        if (ref.mounted) unawaited(refresh());
-      });
+      void configure(int seconds) {
+        _poller?.cancel();
+        if (seconds > 0) {
+          _poller = Timer.periodic(Duration(seconds: seconds), (_) {
+            if (ref.mounted) unawaited(refresh());
+          });
+        }
+      }
+      configure(ref.read(zapretProbeIntervalProvider));
+      ref.listen(zapretProbeIntervalProvider, (_, value) => configure(value));
     }
     return ZapretDiagnosticsState({
       for (final target in ZapretProbeTarget.values)

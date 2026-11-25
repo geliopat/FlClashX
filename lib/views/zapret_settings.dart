@@ -7,7 +7,8 @@ import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:fl_clash/pages/editor.dart';
-import 'package:fl_clash/views/dashboard/widgets/zapret_strategy_sheet.dart';
+import 'package:fl_clash/common/common.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class ZapretSettingsView extends ConsumerStatefulWidget {
@@ -431,98 +432,15 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
   @override
   Widget build(BuildContext context) {
     final zapret = ref.watch(zapretControllerProvider);
-    final diagnostics = ref.watch(zapretDiagnosticsProvider);
-    final active = zapret.strategies.where(
-      (item) => item.id == zapret.activeStrategyId,
-    );
-    final activeName = active.isEmpty ? null : active.first.name;
-    final activeSupportsSplitMode =
-        active.isNotEmpty && active.first.supportsSplitMode;
-    final selected = zapret.strategies.where(
-      (item) => item.id == zapret.selectedStrategyId,
-    );
-    final selectedName = selected.isEmpty ? null : selected.first.name;
-
     final sections = <Widget>[
       generateSection(
-        title: 'Состояние',
+        title: 'Служба Helper',
         items: [
-          ListItem(
-            leading: Icon(
-              zapret.running ? Icons.check_circle_rounded : Icons.pause_circle_outline,
-              color: zapret.running
-                  ? context.colorScheme.primary
-                  : context.colorScheme.onSurfaceVariant,
-            ),
-            title: const Text('Zapret'),
-            subtitle: Text(zapret.running ? 'Запущен' : 'Остановлен'),
-          ),
-          ListItem(
-            title: const Text('Выбранная стратегия'),
-            onTap: () => showZapretStrategiesSheet(context),
-            subtitle: Text(zapret.running
-                ? activeName ?? 'Не определена'
-                : selectedName ?? 'Не выбрана'),
-          ),
-          if (zapret.running) ...[
-            ListItem(
-              title: const Text('Движок и процесс'),
-              subtitle: Text(
-                '${zapret.activeEngine ?? '—'} · PID ${zapret.pid ?? '—'}',
-              ),
-            ),
-            ListItem(
-              title: const Text('Режим'),
-              onTap: () => showZapretStrategiesSheet(context),
-              subtitle: Text(
-                activeSupportsSplitMode
-                    ? zapret.activeMode ?? 'Не определён'
-                    : 'Собственные правила стратегии',
-              ),
-            ),
-            ListItem(
-              title: const Text('Фильтры WinDivert'),
-              subtitle: Text(
-                zapret.winDivertFilters.isEmpty
-                    ? 'Не переданы'
-                    : zapret.winDivertFilters.join(' · '),
-                style: TextStyle(fontFamily: 'monospace', color: context.colorScheme.onSurfaceVariant),
-              ),
-            ),
-            ListItem(
-              title: const Text('Списки обработки трафика'),
-              subtitle: Text(
-                zapret.processingLists.isEmpty
-                    ? 'Не переданы'
-                    : zapret.processingLists.join(' · '),
-                style: TextStyle(fontFamily: 'monospace', color: context.colorScheme.onSurfaceVariant),
-              ),
-            ),
-          ],
-          if (zapret.error != null)
-            ListItem(
-              leading: Icon(Icons.error_outline, color: context.colorScheme.error),
-              title: const Text('Ошибка Helper'),
-              subtitle: Text(
-                zapret.error!,
-                style: TextStyle(color: context.colorScheme.error),
-              ),
-            ),
-          ListItem(
-            leading: const Icon(Icons.refresh),
-            title: const Text('Обновить состояние'),
-            onTap: zapret.busy
-                ? null
-                : () => ref
-                    .read(zapretControllerProvider.notifier)
-                    .refresh(),
-          ),
-          if (!zapret.available || zapret.error != null)
             ListItem(
               leading: const Icon(Icons.admin_panel_settings_outlined),
               title: const Text('Переустановить Helper'),
               subtitle: const Text(
-                'Обновить единую службу Mihomo и Zapret из текущей папки FlClashX',
+                'Обновить единую службу Mihomo и Zapret из текущей папки FlClashZ',
               ),
               trailing: _updatingHelper
                   ? const SizedBox.square(
@@ -534,34 +452,6 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
                   ? null
                   : _updateHelperService,
             ),
-        ],
-      ),
-      const ListSectionGap(),
-      generateSection(
-        title: 'Сетевые проверки',
-        items: [
-          for (final target in ZapretProbeTarget.values)
-            ListItem(
-              title: Text(target.label),
-              subtitle: Text(
-                diagnostics.resultOf(target).message ?? target.url,
-              ),
-              trailing: Text(
-                diagnostics.resultOf(target).latencyMs == null
-                    ? diagnostics.resultOf(target).status.name
-                    : '${diagnostics.resultOf(target).latencyMs} ms',
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      color: context.colorScheme.onSurfaceVariant,
-                    ),
-              ),
-            ),
-          ListItem(
-            leading: const Icon(Icons.speed),
-            title: const Text('Проверить сейчас'),
-            onTap: () => ref
-                .read(zapretDiagnosticsProvider.notifier)
-                .refresh(),
-          ),
         ],
       ),
       const ListSectionGap(),
@@ -642,9 +532,9 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
                     ? null
                     : () async {
                         final filename = _selected!;
-                        await Navigator.of(context).push<void>(
-                          MaterialPageRoute<void>(
-                            builder: (_) => EditorPage(
+                        await BaseNavigator.push<void>(
+                          context,
+                          EditorPage(
                               title: filename,
                               content: _editor.text,
                               onSave: (editorContext, title, content) async {
@@ -652,7 +542,6 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
                                 await helperClient.writeZapretList(filename, text);
                                 if (editorContext.mounted) Navigator.of(editorContext).pop();
                               },
-                            ),
                           ),
                         );
                         if (mounted) await _loadLists(select: filename);

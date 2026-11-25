@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:fl_clash/common/app_ports.dart';
+import 'package:fl_clash/views/zapret.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/ui/icons/app_glyphs.dart';
@@ -36,6 +39,13 @@ class Navigation implements NavigationPort {
         builder: (_) =>
             const ProfilesView(key: GlobalObjectKey(PageLabel.profiles)),
       ),
+      if (Platform.isWindows)
+        NavigationItem(
+          glyph: AppGlyphs.resources,
+          label: PageLabel.zapret,
+          builder: (_) => const ZapretView(key: GlobalObjectKey(PageLabel.zapret)),
+          modes: [NavigationItemMode.desktop],
+        ),
       NavigationItem(
         glyph: AppGlyphs.connections,
         label: PageLabel.connections,

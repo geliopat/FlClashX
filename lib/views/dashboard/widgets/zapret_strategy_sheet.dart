@@ -58,6 +58,7 @@ class ZapretStrategySheet extends ConsumerWidget {
             ),
           if (state.strategies.isEmpty)
             generateSection(
+              title: 'Стратегии',
               items: [
                 ListItem(
                   title: const Text('Каталог стратегий недоступен'),

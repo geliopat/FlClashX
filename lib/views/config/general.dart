@@ -483,6 +483,7 @@ class GeneralView extends ConsumerWidget {
     return [
       const TestUrlItem(),
       const DelayTestTimeoutItem(),
+      if (system.isWindows) const ZapretProbeIntervalItem(),
       _clashToggle(
         title: (l) => l.unifiedDelay,
         managedKey: 'clash.unified-delay',
@@ -649,6 +650,21 @@ class GeneralView extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class ZapretProbeIntervalItem extends ConsumerWidget {
+  const ZapretProbeIntervalItem({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return ListItem<int>.options(
+      title: const Text('Интервал HTTPS-проверок Zapret'),
+      options: ZapretProbeInterval.values,
+      value: ref.watch(zapretProbeIntervalProvider),
+      textBuilder: (value) => value == 0 ? 'Отключено' : '$value сек.',
+      onChanged: (value) => ref.read(zapretProbeIntervalProvider.notifier).update(value),
     );
   }
 }
