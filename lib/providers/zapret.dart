@@ -433,6 +433,7 @@ class ZapretController extends Notifier<ZapretState> {
       if (!ref.mounted) return;
       state = state.copyWith(
         available: false,
+        strategies: const [],
         error: _errorMessage(error),
       );
     }
@@ -1028,6 +1029,7 @@ class ZapretController extends Notifier<ZapretState> {
     final readiness = await _client.readiness(
       timeout: _readinessTimeout,
       logFailure: false,
+      verifyHelperBinary: true,
     );
     if (readiness != HelperReadiness.ready) {
       throw const HelperException(
