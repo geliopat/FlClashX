@@ -7,11 +7,15 @@ $Zapret2Zip = Join-Path $TempRoot "zapret2.zip"
 $FlowsealZip = Join-Path $TempRoot "flowseal.zip"
 $Zapret2Extract = Join-Path $TempRoot "zapret2"
 $FlowsealExtract = Join-Path $TempRoot "flowseal"
-$Zapret2Url = "https://github.com/bol-van/zapret2/releases/download/v1.0.8/zapret2-v1.0.8.zip"
+$Zapret2Version = "v1.0.8"
+$Zapret2Url = "https://github.com/bol-van/zapret2/releases/download/$Zapret2Version/zapret2-$Zapret2Version.zip"
 $Zapret2Sha256 = "f2b84934a72536ec0ab4fdf71881a7d596ba67aef3f241dc8c9bc6260e534dd2"
-$FlowsealUrl = "https://github.com/Flowseal/zapret-discord-youtube/releases/download/1.10.4/zapret-discord-youtube-1.10.4.zip"
+$FlowsealVersion = "1.10.4"
+$FlowsealUrl = "https://github.com/Flowseal/zapret-discord-youtube/releases/download/$FlowsealVersion/zapret-discord-youtube-$FlowsealVersion.zip"
 $FlowsealSha256 = "291af673bd0238506f9548e0e94ca0abf244000f4c9a06960544fb01c5f97b34"
 $ZapretSourceCommit = "8dd17fcbcca405a50f497a6e2346ca263901d775"
+# Shared Lua libraries carry upstream fixes on top of this GUI base.
+$LuaLibraryVersion = "v1.0.8"
 $ZapretSourceBase = "https://raw.githubusercontent.com/geliopat/zapret2-gui/$ZapretSourceCommit"
 
 function Get-PinnedArchive {
@@ -30,13 +34,13 @@ try {
     New-Item -ItemType Directory -Path $AssetDir -Force | Out-Null
     Get-ChildItem -Path $AssetDir -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force
 
-    Get-PinnedArchive -Url $Zapret2Url -Path $Zapret2Zip -ExpectedSha256 $Zapret2Sha256 -Label "bol-van/zapret2 v1.0.8"
+    Get-PinnedArchive -Url $Zapret2Url -Path $Zapret2Zip -ExpectedSha256 $Zapret2Sha256 -Label "bol-van/zapret2 $Zapret2Version"
     Expand-Archive -Path $Zapret2Zip -DestinationPath $Zapret2Extract -Force
     $Zapret2Bin = Get-ChildItem -Path $Zapret2Extract -Recurse -Directory | Where-Object { $_.Name -ieq "windows-x86_64" } | Select-Object -First 1
     if (-not $Zapret2Bin) { throw "The zapret2 archive has no windows-x86_64 binary directory." }
     Get-ChildItem -Path $Zapret2Bin.FullName -File | ForEach-Object { Copy-Item -Path $_.FullName -Destination $AssetDir -Force }
 
-    Get-PinnedArchive -Url $FlowsealUrl -Path $FlowsealZip -ExpectedSha256 $FlowsealSha256 -Label "Flowseal/zapret-discord-youtube 1.10.4"
+    Get-PinnedArchive -Url $FlowsealUrl -Path $FlowsealZip -ExpectedSha256 $FlowsealSha256 -Label "Flowseal/zapret-discord-youtube $FlowsealVersion"
     Expand-Archive -Path $FlowsealZip -DestinationPath $FlowsealExtract -Force
     $FlowsealEngine = Get-ChildItem -Path $FlowsealExtract -Recurse -File -Filter "winws.exe" | Select-Object -First 1
     if (-not $FlowsealEngine) { throw "The Flowseal archive has no winws.exe." }
@@ -107,6 +111,43 @@ try {
         $Path = Join-Path $AssetDir $Name
         if (-not (Test-Path $Path -PathType Leaf) -or (Get-Item $Path).Length -eq 0) { throw "Required Zapret asset is missing or empty: $Name" }
     }
+    # Record successfully staged components. User-editable lists are excluded.
+    $LuaHashes = [ordered]@{}
+    foreach ($Name in $LuaFiles) {
+        foreach ($Relative in @($Name, "strategies/$Name")) {
+            $LuaHashes[$Relative] = (Get-FileHash -LiteralPath (Join-Path $AssetDir $Relative) -Algorithm SHA256).Hash.ToLowerInvariant()
+        }
+    }
+    foreach ($File in (Get-ChildItem -LiteralPath (Join-Path $StrategyDir "imported") -Recurse -File -Filter "*.bat" | Sort-Object FullName)) {
+        $Relative = $File.FullName.Substring($AssetDir.Length + 1).Replace('\', '/')
+        $LuaHashes[$Relative] = (Get-FileHash -LiteralPath $File.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+    }
+    $EngineHashes = [ordered]@{}
+    foreach ($Name in @("winws2.exe", "WinDivert.dll", "WinDivert64.sys", "cygwin1.dll")) {
+        $EngineHashes[$Name] = (Get-FileHash -LiteralPath (Join-Path $AssetDir $Name) -Algorithm SHA256).Hash.ToLowerInvariant()
+    }
+    $Manifest = [ordered]@{
+        schema = 1
+        components = [ordered]@{
+            Zapret2 = [ordered]@{
+                version = $Zapret2Version
+                archiveSha256 = $Zapret2Sha256
+                files = $EngineHashes
+            }
+            Flowseal = [ordered]@{
+                version = $FlowsealVersion
+                archiveSha256 = $FlowsealSha256
+                files = [ordered]@{ "winws.exe" = (Get-FileHash -LiteralPath (Join-Path $AssetDir "winws.exe") -Algorithm SHA256).Hash.ToLowerInvariant() }
+            }
+            "Lua/BAT source" = [ordered]@{
+                version = $ZapretSourceCommit
+                luaLibraryVersion = $LuaLibraryVersion
+                files = $LuaHashes
+            }
+        }
+    }
+    [System.IO.File]::WriteAllText((Join-Path $AssetDir "versions.json"), ($Manifest | ConvertTo-Json -Depth 8), [System.Text.UTF8Encoding]::new($false))
+    Write-Host "Zapret component versions manifest created"
     Write-Host "Zapret2 and Flowseal Windows assets staged in $AssetDir"
 } finally {
     if (Test-Path $TempRoot) { Remove-Item -Path $TempRoot -Recurse -Force -ErrorAction SilentlyContinue }

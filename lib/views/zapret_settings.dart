@@ -475,11 +475,9 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
       generateSection(
         title: 'Компоненты Zapret',
         items: [
-          const ListItem(
-            title: Text('Версии в этой сборке'),
-            subtitle: Text(
-              'Zapret2 v1.0.7 · Flowseal 1.10.4 · стратегии geliopat/zapret2-gui',
-            ),
+          ListItem(
+            title: const Text('Версии в этой сборке'),
+            subtitle: Text(components.summary),
           ),
           for (final entry in components.versions.entries)
               ListItem(
