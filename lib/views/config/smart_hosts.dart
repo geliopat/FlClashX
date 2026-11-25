@@ -62,7 +62,7 @@ class SmartHostsView extends ConsumerWidget {
                 title: Text(AppLocalizations.of(context).forkUpdateInterval),
                 options: const [6, 12, 24, 48, 168],
                 value: state.intervalHours,
-                textBuilder: (value) => '$value ч.',
+                textBuilder: (value) => AppLocalizations.of(context).profileHoursFigure(value),
                 onChanged: (value) => controller.configure(intervalHours: value),
               ),
               ListItem(
@@ -72,14 +72,14 @@ class SmartHostsView extends ConsumerWidget {
                 trailing: state.updating ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2)) : null,
               ),
             ],
-            footer: 'Работает через Hosts Mihomo. Системный hosts Windows и настройки DNS не изменяются. Записи профиля и ручные записи имеют приоритет.',
+            footer: AppLocalizations.of(context).forkSmartHostsHint,
           ),
           const ListSectionGap(),
           generateSection(
             title: AppLocalizations.of(context).forkSources,
             items: [
-              source('malw', 'MALW.link', 'DNS + SNI-прокси: обход IP-блокировок сервисов (ChatGPT, Spotify, Twitch и др.)'),
-              source('geohide', 'GeoHide', 'Hosts GeoHide: рабочие IP и прокси для заблокированных сервисов'),
+              source('malw', 'MALW.link', AppLocalizations.of(context).forkMalwHint),
+              source('geohide', 'GeoHide', AppLocalizations.of(context).forkGeoHideHint),
               ListItem(
                 title: Text(AppLocalizations.of(context).forkAdBlock),
                 trailing: Switch(
@@ -114,7 +114,7 @@ class SmartHostsView extends ConsumerWidget {
           generateSection(
             title: AppLocalizations.of(context).forkYouTubeOptimization,
             items: [
-              source('youtube', AppLocalizations.of(context).forkCommunityList, 'Проблемные CDN из списка Zapret2 GUI перенаправляются на 127.0.0.2'),
+              source('youtube', AppLocalizations.of(context).forkCommunityList, AppLocalizations.of(context).forkYoutubeListHint),
               ListItem(
                 title: Text(AppLocalizations.of(context).forkSlowCdn),
                 trailing: Switch(value: state.blockSlowCdn,
@@ -130,14 +130,14 @@ class SmartHostsView extends ConsumerWidget {
                 title: Text(AppLocalizations.of(context).forkSpeedThreshold),
                 options: const [0.5, 1.0, 1.5, 2.0, 3.0, 5.0],
                 value: state.cdnThreshold,
-                textBuilder: (value) => '$value Мбит/с',
+                textBuilder: (value) => '$value Mbps',
                 onChanged: (value) => controller.configure(cdnThreshold: value),
               ),
               ListItem<int>.options(
                 title: Text(AppLocalizations.of(context).forkRetention),
                 options: const [1, 3, 7, 14, 30],
                 value: state.cdnTtlDays,
-                textBuilder: (value) => '$value дн.',
+                textBuilder: (value) => AppLocalizations.of(context).profileDaysFigure(value),
                 onChanged: (value) => controller.configure(cdnTtlDays: value),
               ),
               ListItem(
@@ -148,11 +148,11 @@ class SmartHostsView extends ConsumerWidget {
               ),
               for (final record in state.cdnMeasurements)
                 ListItem(title: Text(record.host),
-                    subtitle: Text('${record.fast ? "Быстрый" : "Медленный"} · ${record.mbps.toStringAsFixed(2)} Мбит/с')),
+                    subtitle: Text('${record.fast ? AppLocalizations.of(context).forkCdnFast : AppLocalizations.of(context).forkSlow} · ${record.mbps.toStringAsFixed(2)} Mbps')),
               ListItem(title: Text(AppLocalizations.of(context).forkResetMeasurements),
                   onTap: state.cdnChecking ? null : controller.resetCdn),
             ],
-            footer: 'Измерение использует подписанные ссылки видеопотоков и до 3 МиБ на узел. Неизвестный результат не создаёт блокировок. Старые измерения истекают автоматически.',
+            footer: AppLocalizations.of(context).forkCdnHint,
           ),
           const ListSectionGap(),
           generateSection(

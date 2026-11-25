@@ -134,10 +134,11 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
   Future<void> _restoreBackup() async {
     final filename = _selected;
     if (filename == null || !_listLoaded || _saving || _updating || _loading) return;
+    final l = AppLocalizations.of(context);
     final confirmed = await showFloatingDialog<bool>(
       context: context,
       child: CommonDialog(
-        title: 'Восстановить резервную копию?',
+        title: l.forkRestoreBackupQuestion,
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -148,7 +149,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
             child: Text(AppLocalizations.of(context).restore),
           ),
         ],
-        child: Text('Текущий $filename будет заменён содержимым $filename.bak. Текущая версия также сохранится в .bak.'),
+        child: Text('$filename · $filename.bak\n${l.forkRestoreBackupHint}'),
       ),
     );
     if (confirmed != true || !mounted) return;
@@ -164,7 +165,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
       if (!mounted) return;
       setState(() {
         _saving = false;
-        _notice = 'Резервная копия $filename.bak восстановлена. Предыдущая версия сохранена в новой .bak.';
+        _notice = '$filename.bak · ${l.forkBackupRestored}';
       });
     } catch (error) {
       if (!mounted) return;
@@ -208,6 +209,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
 
   Future<void> _updateLists() async {
     if (_updating || _saving || _lists.isEmpty) return;
+    final l = AppLocalizations.of(context);
     setState(() {
       _updating = true;
       _error = null;
@@ -227,7 +229,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
         final response = await _http.get<String>(entry.value);
         final upstream = response.data;
         if (upstream == null || (entry.key != 'ipset-all.txt' && upstream.trim().length < 20)) {
-          throw StateError('Источник вернул пустой или слишком короткий файл: ${entry.key}');
+          throw StateError('${entry.key}: ${l.forkEmptySourceFile}');
         }
 
         final upstreamCount = upstream
@@ -236,12 +238,12 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
             .length;
         if (upstreamCount == 0 && entry.key != 'ipset-all.txt') {
           throw StateError(
-            'Обновление ${entry.key} отклонено: источник не содержит записей.',
+            '${entry.key}: ${l.forkSourceNoEntries}',
           );
         }
 
         if (entry.key == 'ipset-all.txt' && upstreamCount == 0) {
-          details.add('ipset-all.txt: пустой шаблон, локальный файл сохранён');
+          details.add('ipset-all.txt: ${l.forkKeepEmptyTemplate}');
           continue;
         }
 
@@ -250,7 +252,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
         // many valid local additions which are intentionally retained.
         final merged = _mergeList(upstream, current.content, entry.key);
         if (utf8.encode(merged).length > 2 * 1024 * 1024) {
-          throw StateError('Обновлённый файл ${entry.key} превышает лимит 2 МиБ.');
+          throw StateError('${entry.key}: ${l.forkListSizeLimit}');
         }
         originals[entry.key] = current.content;
         staged[entry.key] = merged;
@@ -262,12 +264,12 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
         final current = await helperClient.readZapretList(entry.key);
         if (current.content != originals[entry.key]) {
           throw StateError(
-            '${entry.key} изменился после загрузки источника. Обновление остановлено, чтобы сохранить параллельную правку.',
+            '${entry.key}: ${l.forkConcurrentEdit}',
           );
         }
         final saved = await helperClient.writeZapretList(entry.key, entry.value);
         applied.add(entry.key);
-        details.add('${saved.filename}: ${saved.entries} записей');
+        details.add('${saved.filename}: ${saved.entries}');
       }
 
       if (!mounted) return;
@@ -275,7 +277,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
       if (!mounted) return;
       setState(() {
         _updating = false;
-        _notice = 'Обновлено файлов: ${applied.length}. ${details.join(' · ')}. Пользовательские файлы *-user.txt не перезаписывались.';
+        _notice = '${l.forkFilesUpdated}: ${applied.length}. ${details.join(' · ')}. ${l.forkUserFilesKept}';
       });
     } catch (error) {
       // A request can fail after Helper has already replaced the file but
@@ -289,12 +291,12 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
             applied.add(entry.key);
           } else if (current.content != originals[entry.key]) {
             rollbackFailures.add(
-              '${entry.key}: файл изменился параллельно; автоматический откат пропущен, чтобы не затереть чужую правку.',
+              '${entry.key}: ${l.forkRollbackConcurrent}',
             );
           }
         } catch (verificationError) {
           rollbackFailures.add(
-            '${entry.key}: не удалось проверить результат записи: $verificationError',
+            '${entry.key}: ${l.forkWriteVerificationFailed}: $verificationError',
           );
         }
       }
@@ -306,7 +308,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
           final current = await helperClient.readZapretList(filename);
           if (current.content != staged[filename]) {
             rollbackFailures.add(
-              '$filename: файл изменился после обновления; автоматический откат пропущен.',
+              '$filename: ${l.forkRollbackConcurrent}',
             );
             continue;
           }
@@ -323,9 +325,9 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
         _updating = false;
         _error = error is HelperException ? error.message : error.toString();
         _notice = rollbackFailures.isNotEmpty
-            ? 'Не удалось подтвердить или полностью откатить результат: ${rollbackFailures.join('; ')}'
+            ? '${l.forkRollbackUnconfirmed}: ${rollbackFailures.join('; ')}'
             : applied.isNotEmpty
-                ? 'Обновление не завершилось. Изменённые файлы автоматически возвращены из .bak.'
+                ? l.forkRollbackRestored
                 : null;
       });
     }
@@ -333,10 +335,11 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
 
   Future<void> _updateHelperService() async {
     if (_updatingHelper) return;
+    final l = AppLocalizations.of(context);
     final confirmed = await showFloatingDialog<bool>(
       context: context,
       child: CommonDialog(
-        title: 'Переустановить службу Helper?',
+        title: l.forkReinstallHelperQuestion,
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -347,12 +350,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
             child: Text(AppLocalizations.of(context).confirm),
           ),
         ],
-        child: const Text(
-          'Служба будет заменена версией из текущей папки FlClashZ. '
-          'Во время переустановки Helper остановит Mihomo Core и Zapret, '
-          'поэтому VPN и обход временно прервутся. После обновления запусти их снова. '
-          'Не перемещай и не удаляй папку FlClashZ после переустановки службы.',
-        ),
+        child: Text(l.forkReinstallHelperHint),
       ),
     );
     if (confirmed != true || !mounted) return;
@@ -365,7 +363,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
       await ref.read(zapretControllerProvider.notifier).updateHelperService();
       if (!mounted) return;
       setState(() {
-        _notice = 'Служба Helper переустановлена. Каталог Zapret2 загружен.';
+        _notice = l.forkHelperReinstalled;
       });
     } catch (error) {
       if (!mounted) return;
@@ -409,12 +407,12 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
         items: [
           ListItem(
             title: const Text('Watchdog Zapret'),
-            subtitle: const Text('Восстановление процесса службой Helper, до трёх попыток'),
+            subtitle: Text(AppLocalizations.of(context).forkWatchdogHint),
             trailing: Switch(value: zapret.watchdog, onChanged: ref.read(zapretControllerProvider.notifier).setWatchdog),
           ),
           ListItem(
-            title: const Text('Запуск Zapret при старте Mihomo'),
-            subtitle: const Text('При остановке Mihomo Zapret также останавливается'),
+            title: Text(AppLocalizations.of(context).forkStartWithMihomo),
+            subtitle: Text(AppLocalizations.of(context).forkStopWithMihomo),
             trailing: Switch(
               value: zapret.startWithMihomo,
               onChanged: ref.read(zapretControllerProvider.notifier).setStartWithMihomo,
@@ -423,9 +421,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
             ListItem(
               leading: const Icon(Icons.admin_panel_settings_outlined),
               title: Text(AppLocalizations.of(context).forkReinstallHelper),
-              subtitle: const Text(
-                'Обновить единую службу Mihomo и Zapret из текущей папки FlClashZ',
-              ),
+              subtitle: Text(AppLocalizations.of(context).forkReinstallHelperDesc),
               trailing: _updatingHelper
                   ? const SizedBox.square(
                       dimension: 18,
@@ -444,14 +440,14 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
         items: [
           ListItem(
             title: Text(AppLocalizations.of(context).forkExcludedIps),
-            subtitle: Text('${zapret.protectedIps.length} · автоматически из профиля'),
+            subtitle: Text('${zapret.protectedIps.length} · ${AppLocalizations.of(context).forkAutomaticFromProfile}'),
             onTap: zapret.protectedIps.isEmpty ? null : () => _showProtectionList(
               AppLocalizations.of(context).forkExcludedIps, zapret.protectedIps,
             ),
           ),
           ListItem(
             title: Text(AppLocalizations.of(context).forkExcludedDomains),
-            subtitle: Text('${zapret.protectedDomains.length} · автоматически из профиля'),
+            subtitle: Text('${zapret.protectedDomains.length} · ${AppLocalizations.of(context).forkAutomaticFromProfile}'),
             onTap: zapret.protectedDomains.isEmpty ? null : () => _showProtectionList(
               AppLocalizations.of(context).forkExcludedDomains, zapret.protectedDomains,
             ),
@@ -468,8 +464,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
             },
           ),
         ],
-        footer: 'hosts, proxies, DNS, fake-ip и route-exclude-address. '
-            'Списки создаются отдельно, настройки профиля не меняются.',
+        footer: AppLocalizations.of(context).forkProtectionHint,
       ),
       const ListSectionGap(),
       generateSection(
@@ -544,7 +539,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
           ListItem(
             leading: const Icon(Icons.cloud_download_outlined),
             title: Text(AppLocalizations.of(context).forkUpdateLists),
-            subtitle: const Text('Загрузить актуальные списки с сохранением локальных записей'),
+            subtitle: Text(AppLocalizations.of(context).forkUpdateListsHint),
             trailing: _updating
                 ? const SizedBox.square(
                     dimension: 18,
@@ -556,7 +551,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
           ListItem(
             leading: const Icon(Icons.refresh),
             title: Text(AppLocalizations.of(context).forkReloadLists),
-            subtitle: const Text('Повторно загрузить файлы с диска'),
+            subtitle: Text(AppLocalizations.of(context).forkReloadListsHint),
             trailing: _loading && _lists.isNotEmpty
                 ? const SizedBox.square(
                     dimension: 18,
@@ -580,9 +575,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
             ),
         ],
         footer:
-            'Обновляются 4 основных списка. Пользовательские файлы *-user.txt сохраняются. '
-            'Перед записью создаётся .bak. После изменений перезапусти Zapret. '
-            'youtube-bad-nodes.txt и list-auto.txt не обновляются.',
+            AppLocalizations.of(context).forkListsFooter,
       ),
     ];
 
