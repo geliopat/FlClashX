@@ -491,7 +491,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
               subtitle: Text(_notice!),
             ),
           if (_loading && _lists.isEmpty)
-            const ListItem(
+            ListItem(
               title: Text(AppLocalizations.of(context).loading),
               trailing: SizedBox.square(
                 dimension: 18,
