@@ -298,7 +298,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
           'Zapret2': 'установлено $_installedZapret2 · upstream ${(zapret2['tag_name'] as String?) ?? 'неизвестно'}',
           'Flowseal': 'установлено $_installedFlowseal · upstream ${(flowseal['tag_name'] as String?) ?? 'неизвестно'}',
           'Lua/BAT source': 'установлено ${_installedStrategyCommit.substring(0, 12)} · upstream ${((strategies['sha'] as String?) ?? 'неизвестно').substring(0, 12)}',
-        }
+        };
         _checkingComponents = false;
       });
     } catch (error) {
