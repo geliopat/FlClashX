@@ -270,7 +270,7 @@ void main() {
 
     expect(peer, contains('r"${helperPortKeyFor('{}')}"'));
     expect(peer, contains('const PORT_VALUE: &str = "$helperPortValue";'));
-    expect(helperPortKey, helperPortKeyFor('FlClashXHelperService'));
+    expect(helperPortKey, helperPortKeyFor(Platform.isWindows ? 'FlClashZHelperService' : 'FlClashXHelperService'));
   });
 
   test('only the stable app falls back to the fixed Helper port', () {
