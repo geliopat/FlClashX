@@ -7,6 +7,7 @@ import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:material_ui/material_ui.dart' show ListItem;
 
 class ZapretSettingsView extends ConsumerStatefulWidget {
   const ZapretSettingsView({super.key});
@@ -445,245 +446,312 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
   Widget build(BuildContext context) {
     final zapret = ref.watch(zapretControllerProvider);
     final diagnostics = ref.watch(zapretDiagnosticsProvider);
-    final active = zapret.strategies.where((item) => item.id == zapret.activeStrategyId);
+    final active = zapret.strategies.where(
+      (item) => item.id == zapret.activeStrategyId,
+    );
     final activeName = active.isEmpty ? null : active.first.name;
-    final activeSupportsSplitMode = active.isNotEmpty && active.first.supportsSplitMode;
+    final activeSupportsSplitMode =
+        active.isNotEmpty && active.first.supportsSplitMode;
+
+    final sections = <Widget>[
+      generateSection(
+        title: 'Состояние',
+        items: [
+          ListItem(
+            leading: Icon(
+              zapret.running ? Icons.check_circle_rounded : Icons.pause_circle_outline,
+              color: zapret.running
+                  ? context.colorScheme.primary
+                  : context.colorScheme.onSurfaceVariant,
+            ),
+            title: const Text('Zapret'),
+            subtitle: Text(zapret.running ? 'Запущен' : 'Остановлен'),
+          ),
+          ListItem(
+            title: const Text('Выбранная стратегия'),
+            subtitle: Text(zapret.running
+                ? activeName ?? 'Не определена'
+                : zapret.strategies
+                    .where((item) => item.id == zapret.selectedStrategyId)
+                    .map((item) => item.name)
+                    .firstOrNull ?? 'Не выбрана'),
+          ),
+          if (zapret.running) ...[
+            ListItem(
+              title: const Text('Движок и процесс'),
+              subtitle: Text(
+                '${zapret.activeEngine ?? '—'} · PID ${zapret.pid ?? '—'}',
+              ),
+            ),
+            ListItem(
+              title: const Text('Режим'),
+              subtitle: Text(
+                activeSupportsSplitMode
+                    ? zapret.activeMode ?? 'Не определён'
+                    : 'Собственные правила стратегии',
+              ),
+            ),
+            ListItem(
+              title: const Text('Фильтры WinDivert'),
+              subtitle: Text(
+                zapret.winDivertFilters.isEmpty
+                    ? 'Не переданы'
+                    : zapret.winDivertFilters.join(' · '),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      fontFamily: 'monospace',
+                    ),
+              ),
+            ),
+            ListItem(
+              title: const Text('Списки обработки трафика'),
+              subtitle: Text(
+                zapret.processingLists.isEmpty
+                    ? 'Не переданы'
+                    : zapret.processingLists.join(' · '),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      fontFamily: 'monospace',
+                    ),
+              ),
+            ),
+          ],
+          if (zapret.error != null)
+            ListItem(
+              leading: Icon(Icons.error_outline, color: context.colorScheme.error),
+              title: const Text('Ошибка Helper'),
+              subtitle: Text(
+                zapret.error!,
+                style: TextStyle(color: context.colorScheme.error),
+              ),
+            ),
+          ListItem(
+            leading: const Icon(Icons.refresh),
+            title: const Text('Обновить состояние'),
+            onTap: zapret.busy
+                ? null
+                : () => ref
+                    .read(zapretControllerProvider.notifier)
+                    .refresh(),
+          ),
+          if (!zapret.available || zapret.error != null)
+            ListItem(
+              leading: const Icon(Icons.admin_panel_settings_outlined),
+              title: const Text('Переустановить Helper'),
+              subtitle: const Text(
+                'Обновить единую службу Mihomo и Zapret из текущей папки FlClashX',
+              ),
+              trailing: _updatingHelper
+                  ? const SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : null,
+              onTap: zapret.busy || _updatingHelper
+                  ? null
+                  : _updateHelperService,
+            ),
+        ],
+      ),
+      ListSectionGap(),
+      generateSection(
+        title: 'Сетевые проверки',
+        items: [
+          for (final target in ZapretProbeTarget.values)
+            ListItem(
+              title: Text(target.label),
+              subtitle: Text(
+                diagnostics.resultOf(target).message ?? target.url,
+              ),
+              trailing: Text(
+                diagnostics.resultOf(target).latencyMs == null
+                    ? diagnostics.resultOf(target).status.name
+                    : '${diagnostics.resultOf(target).latencyMs} ms',
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: context.colorScheme.onSurfaceVariant,
+                    ),
+              ),
+            ),
+          ListItem(
+            leading: const Icon(Icons.speed),
+            title: const Text('Проверить сейчас'),
+            onTap: () => ref
+                .read(zapretDiagnosticsProvider.notifier)
+                .refresh(),
+          ),
+        ],
+      ),
+      ListSectionGap(),
+      generateSection(
+        title: 'Компоненты Zapret',
+        items: [
+          ListItem(
+            title: const Text('Версии в этой сборке'),
+            subtitle: const Text(
+              'Zapret2 v1.0.7 · Flowseal 1.10.4 · стратегии geliopat/zapret2-gui',
+            ),
+          ),
+          if (_componentUpdates.isNotEmpty)
+            for (final entry in _componentUpdates.entries)
+              ListItem(
+                title: Text(entry.key),
+                subtitle: Text(entry.value),
+              ),
+          ListItem(
+            leading: _checkingComponents
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.system_update_alt),
+            title: const Text('Проверить версии'),
+            onTap: _checkingComponents ? null : _checkComponentUpdates,
+          ),
+        ],
+        footer:
+            'Проверка новых версий выполняется отдельно. Замена winws/winws2, DLL, драйверов WinDivert и Lua/BAT пока не автоматизирована: обновление требует остановки движка, проверки SHA256 и возможности отката.',
+      ),
+      ListSectionGap(),
+      generateSection(
+        title: 'Списки Zapret',
+        items: [
+          if (_error != null)
+            ListItem(
+              leading: Icon(Icons.error_outline, color: context.colorScheme.error),
+              title: const Text('Ошибка'),
+              subtitle: Text(
+                _error!,
+                style: TextStyle(color: context.colorScheme.error),
+              ),
+            ),
+          if (_notice != null)
+            ListItem(
+              leading: Icon(Icons.info_outline, color: context.colorScheme.primary),
+              title: const Text('Результат операции'),
+              subtitle: Text(_notice!),
+            ),
+          if (_loading && _lists.isEmpty)
+            const ListItem(
+              title: Text('Загрузка списков…'),
+              trailing: SizedBox.square(
+                dimension: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          else ...[
+            if (_lists.isNotEmpty && _selected != null)
+              ListItem<String>.options(
+                title: const Text('Файл списка'),
+                options: _lists.map((item) => item.filename).toList(),
+                value: _selected!,
+                textBuilder: (filename) {
+                  final item = _lists.firstWhere(
+                    (entry) => entry.filename == filename,
+                  );
+                  return '$filename · ${item.entries}';
+                },
+                onChanged: (value) => unawaited(_selectList(value)),
+              ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+              child: SizedBox(
+                height: 260,
+                child: TextField(
+                  controller: _editor,
+                  enabled: _listLoaded && !_loading && !_saving && !_updating,
+                  expands: true,
+                  maxLines: null,
+                  minLines: null,
+                  textAlignVertical: TextAlignVertical.top,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontFamily: 'monospace',
+                      ),
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: SurfaceLevel.inset.colorOf(context.colorScheme),
+                    border: OutlineInputBorder(
+                      borderSide: BorderSide(
+                        color: context.colorScheme.outlineVariant,
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderSide: BorderSide(
+                        color: context.colorScheme.outlineVariant,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderSide: BorderSide(
+                        color: context.colorScheme.primary,
+                        width: 1.5,
+                      ),
+                    ),
+                    hintText: 'Одна запись на строку',
+                    alignLabelWithHint: true,
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                alignment: WrapAlignment.end,
+                children: [
+                  TextButton.icon(
+                    onPressed: _loading || _saving || _updating
+                        ? null
+                        : () => _loadLists(),
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Перечитать'),
+                  ),
+                  FilledButton.tonalIcon(
+                    onPressed: !_listLoaded || _loading || _saving || _updating
+                        ? null
+                        : _saveList,
+                    icon: _saving
+                        ? const SizedBox.square(
+                            dimension: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.save),
+                    label: const Text('Сохранить'),
+                  ),
+                  TextButton.icon(
+                    onPressed: _lists.isEmpty || _loading || _saving || _updating
+                        ? null
+                        : _updateLists,
+                    icon: _updating
+                        ? const SizedBox.square(
+                            dimension: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.cloud_download),
+                    label: const Text('Обновить списки'),
+                  ),
+                  TextButton.icon(
+                    onPressed: !_listLoaded || _loading || _saving || _updating
+                        ? null
+                        : _restoreBackup,
+                    icon: const Icon(Icons.restore),
+                    label: const Text('Откатить .bak'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+        footer:
+            'Обновляются list-general.txt, list-google.txt, list-exclude.txt и ipset-all.txt. Локальные записи сохраняются; файлы *-user.txt не перезаписываются. Перед записью Helper создаёт .bak. После изменения списков перезапусти Zapret. youtube-bad-nodes.txt не меняется, поскольку исходный GUI применяет его через Windows hosts; list-auto.txt пока не активирован в запускателе.',
+      ),
+    ];
 
     return CommonScaffold(
       title: 'Zapret',
       body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _Section(
-            title: 'Состояние',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(zapret.running ? 'Запущен' : 'Остановлен'),
-                const SizedBox(height: 4),
-                Text('Стратегия: ${activeName ?? 'не активна'}'),
-                if (zapret.running) ...[
-                  Text('Движок: ${zapret.activeEngine ?? '—'} · PID: ${zapret.pid ?? '—'}'),
-                  Text('Режим: ${activeSupportsSplitMode ? (zapret.activeMode ?? 'не определён') : 'собственные правила стратегии'}'),
-                  const SizedBox(height: 8),
-                  Text('Фильтры перехвата WinDivert', style: Theme.of(context).textTheme.labelLarge),
-                  Text(
-                    zapret.winDivertFilters.isEmpty ? 'Не переданы' : zapret.winDivertFilters.join(' · '),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
-                  ),
-                  const SizedBox(height: 8),
-                  Text('Списки обработки трафика', style: Theme.of(context).textTheme.labelLarge),
-                  Text(
-                    zapret.processingLists.isEmpty ? 'Не переданы' : zapret.processingLists.join('\n'),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
-                  ),
-                ],
-                if (zapret.error != null)
-                  Text(zapret.error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-                Wrap(
-                  alignment: WrapAlignment.end,
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    TextButton.icon(
-                      onPressed: zapret.busy
-                          ? null
-                          : () => ref.read(zapretControllerProvider.notifier).refresh(),
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Обновить состояние'),
-                    ),
-                    if (!zapret.available || zapret.error != null)
-                      OutlinedButton.icon(
-                        onPressed: zapret.busy || _updatingHelper
-                            ? null
-                            : _updateHelperService,
-                        icon: _updatingHelper
-                            ? const SizedBox.square(
-                                dimension: 16,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Icon(Icons.admin_panel_settings_outlined),
-                        label: const Text('Переустановить Helper'),
-                      ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          _Section(
-            title: 'Сетевые проверки',
-            child: Column(
-              children: [
-                for (final target in ZapretProbeTarget.values)
-                  ListTile(
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(target.label),
-                    subtitle: Text(diagnostics.resultOf(target).message ?? target.url),
-                    trailing: Text(
-                      diagnostics.resultOf(target).latencyMs == null
-                          ? diagnostics.resultOf(target).status.name
-                          : '${diagnostics.resultOf(target).latencyMs} ms',
-                    ),
-                  ),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton.icon(
-                    onPressed: () => ref.read(zapretDiagnosticsProvider.notifier).refresh(),
-                    icon: const Icon(Icons.speed),
-                    label: const Text('Проверить сейчас'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          _Section(
-            title: 'Компоненты Zapret',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Text('Установленные версии закреплены в сборке FlClashX: Zapret2 v1.0.7, Flowseal 1.10.4 и каталог стратегий geliopat/zapret2-gui.'),
-                if (_componentUpdates.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  for (final entry in _componentUpdates.entries)
-                    Text('${entry.key}: доступно ${entry.value}'),
-                ],
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: OutlinedButton.icon(
-                    onPressed: _checkingComponents ? null : _checkComponentUpdates,
-                    icon: _checkingComponents
-                        ? const SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Icon(Icons.system_update_alt),
-                    label: const Text('Проверить версии'),
-                  ),
-                ),
-                Text(
-                  'Проверка доступных версий работает отдельно. Автоматическая замена winws/winws2, DLL, драйверов WinDivert и Lua/BAT-файлов пока не включена: для неё нужен отдельный staging-процесс с остановкой движка, проверкой SHA256 и откатом всего каталога. До его реализации эти компоненты обновляются вместе с проверенной сборкой FlClashX.',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
-            ),
-          ),
-          _Section(
-            title: 'Списки Zapret',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (_error != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-                  ),
-                if (_notice != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Text(_notice!, style: TextStyle(color: Theme.of(context).colorScheme.primary)),
-                  ),
-                if (_loading && _lists.isEmpty)
-                  const Center(child: CircularProgressIndicator())
-                else ...[
-                  DropdownButtonFormField<String>(
-                    initialValue: _selected,
-                    isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'Файл списка'),
-                    items: [
-                      for (final item in _lists)
-                        DropdownMenuItem(
-                          value: item.filename,
-                          child: Text('${item.filename} · ${item.entries} записей${item.userManaged ? ' · пользовательский' : ''}'),
-                        ),
-                    ],
-                    onChanged: _loading || _saving || _updating ? null : (value) {
-                      if (value != null) unawaited(_selectList(value));
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    height: 300,
-                    child: TextField(
-                      controller: _editor,
-                      enabled: _listLoaded && !_loading && !_saving && !_updating,
-                      expands: true,
-                      maxLines: null,
-                      minLines: null,
-                      textAlignVertical: TextAlignVertical.top,
-                      style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        hintText: 'Одна запись на строку',
-                        alignLabelWithHint: true,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    alignment: WrapAlignment.end,
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      OutlinedButton.icon(
-                        onPressed: _loading || _saving || _updating ? null : () => _loadLists(),
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('Перечитать'),
-                      ),
-                      FilledButton.icon(
-                        onPressed: !_listLoaded || _loading || _saving || _updating ? null : _saveList,
-                        icon: _saving ? const SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.save),
-                        label: const Text('Сохранить'),
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: _lists.isEmpty || _loading || _saving || _updating ? null : _updateLists,
-                        icon: _updating ? const SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.cloud_download),
-                        label: const Text('Обновить списки'),
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: !_listLoaded || _loading || _saving || _updating ? null : _restoreBackup,
-                        icon: const Icon(Icons.restore),
-                        label: const Text('Откатить .bak'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Обновляются только list-general.txt, list-google.txt, list-exclude.txt и ipset-all.txt из Flowseal. Локальные записи сохраняются; файлы *-user.txt не перезаписываются. Перед каждой записью Helper создаёт .bak. После изменения списков перезапусти Zapret, чтобы движок перечитал их.\n\nНе подключены: youtube-bad-nodes.txt — исходный GUI применяет его через Windows hosts, а FlClashX не меняет hosts/DNS; list-auto.txt — auto-hostlist пока не активирован в текущем запускателе.',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Section extends StatelessWidget {
-  const _Section({required this.title, required this.child});
-
-  final String title;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return FrostedSurface(
-      color: context.raisedSurfaceLevel.colorOf(context.colorScheme),
-      radius: AppRadius.xl,
-      clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(title, style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 12),
-            child,
-          ],
+        padding: EdgeInsets.symmetric(horizontal: 16).copyWith(
+          top: context.sectionsTopPadding,
+          bottom: 16 + context.bottomInset,
         ),
+        children: sections,
       ),
     );
   }
