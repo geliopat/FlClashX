@@ -15,12 +15,49 @@ class ZapretView extends ConsumerWidget {
       (item) => item.id == zapret.activeStrategyId,
     );
     final activeName = active.isEmpty ? null : active.first.name;
-    final activeSupportsSplitMode =
-        active.isNotEmpty && active.first.supportsSplitMode;
     final selected = zapret.strategies.where(
       (item) => item.id == zapret.selectedStrategyId,
     );
     final selectedName = selected.isEmpty ? null : selected.first.name;
+
+    final top = zapret.trials.where((trial) => trial.confirmed).toList()
+      ..sort((a, b) => a.delay.compareTo(b.delay));
+    Future<void> confirmTrial(ZapretTrial trial) async {
+      final name = zapret.strategies.where((item) => item.id == trial.id).firstOrNull?.name ?? trial.id;
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Применить стратегию?'),
+          content: Text('$name · ${trial.delay} мс'),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Отмена')),
+            TextButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Применить')),
+          ],
+        ),
+      );
+      if (confirmed == true && context.mounted) {
+        try {
+          await ref.read(zapretControllerProvider.notifier).applyTrial(trial);
+        } catch (error) {
+          if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.toString())));
+        }
+      }
+    }
+
+    Widget details(String title, List<String> values) => ListItem(
+      title: Text(title),
+      subtitle: Text(values.isEmpty ? 'Не переданы' : '${values.length} · Нажми для просмотра'),
+      onTap: values.isEmpty ? null : () => showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(title),
+          content: SizedBox(width: 650, child: SingleChildScrollView(
+            child: SelectableText(values.join('\n\n'), style: const TextStyle(fontFamily: 'monospace')),
+          )),
+          actions: [TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Закрыть'))],
+        ),
+      ),
+    );
 
     final sections = <Widget>[
       generateSection(
@@ -67,32 +104,8 @@ class ZapretView extends ConsumerWidget {
                 '${zapret.activeEngine ?? '—'} · PID ${zapret.pid ?? '—'}',
               ),
             ),
-            ListItem(
-              title: const Text('Активный режим'),
-              subtitle: Text(
-                activeSupportsSplitMode
-                    ? zapret.activeMode ?? 'Не определён'
-                    : 'Собственные правила стратегии',
-              ),
-            ),
-            ListItem(
-              title: const Text('Фильтры WinDivert'),
-              subtitle: Text(
-                zapret.winDivertFilters.isEmpty
-                    ? 'Не переданы'
-                    : zapret.winDivertFilters.join(' · '),
-                style: TextStyle(fontFamily: 'monospace', color: context.colorScheme.onSurfaceVariant),
-              ),
-            ),
-            ListItem(
-              title: const Text('Списки обработки трафика'),
-              subtitle: Text(
-                zapret.processingLists.isEmpty
-                    ? 'Не переданы'
-                    : zapret.processingLists.join(' · '),
-                style: TextStyle(fontFamily: 'monospace', color: context.colorScheme.onSurfaceVariant),
-              ),
-            ),
+            details('Фильтры WinDivert', zapret.winDivertFilters),
+            details('Списки обработки трафика', zapret.processingLists),
           ],
           if (zapret.error != null)
             ListItem(
@@ -125,16 +138,16 @@ class ZapretView extends ConsumerWidget {
           ),
           if (zapret.testProgress != null)
             ListItem(title: const Text('Отменить тестирование'), onTap: ref.read(zapretControllerProvider.notifier).cancelTrials),
-          if (zapret.trials.any((trial) => trial.confirmed))
+          if (zapret.testSummary != null)
+            ListItem(title: const Text('Результат проверки'), subtitle: Text(zapret.testSummary!, maxLines: 5)),
+          if (top.isNotEmpty)
+            const ListItem(title: Text('Топ-5 подтверждённых стратегий'), subtitle: Text('Средняя задержка HTTPS · нажми для применения')),
+          for (final (index, trial) in top.take(5).indexed)
             ListItem(
-              title: const Text('Применить лучшую стратегию'),
-              onTap: zapret.busy ? null : () => ref.read(zapretControllerProvider.notifier).applyTrial(zapret.trials.firstWhere((trial) => trial.confirmed)),
-            ),
-          for (final trial in zapret.trials)
-            ListItem(
-              title: Text(trial.id),
-              subtitle: Text(trial.confirmed ? 'Подтверждено · ${trial.delay} мс · ${trial.score}/6' : 'Не подтверждено'),
-              onTap: zapret.busy || !trial.confirmed ? null : () => ref.read(zapretControllerProvider.notifier).applyTrial(trial),
+              title: Text('${index + 1}. ${zapret.strategies.where((item) => item.id == trial.id).firstOrNull?.name ?? trial.id}'),
+              subtitle: Text('${trial.delay} мс · ${trial.score}/6'),
+              trailing: zapret.activeStrategyId == trial.id ? const Icon(Icons.check_circle_outline) : null,
+              onTap: zapret.busy ? null : () => confirmTrial(trial),
             ),
           ListItem(
             title: const Text('Автоматический переход на резервную стратегию'),
