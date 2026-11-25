@@ -122,8 +122,8 @@ class ZapretView extends ConsumerWidget {
                 '${zapret.activeEngine ?? '—'} · PID ${zapret.pid ?? '—'}',
               ),
             ),
-            details('Фильтры WinDivert', zapret.winDivertFilters),
-            details('Списки обработки трафика', zapret.processingLists),
+            details(AppLocalizations.of(context).forkWinDivertFilters, zapret.winDivertFilters),
+            details(AppLocalizations.of(context).forkTrafficLists, zapret.processingLists),
           ],
           if (zapret.error != null)
             ListItem(
@@ -151,7 +151,7 @@ class ZapretView extends ConsumerWidget {
         items: [
           ListItem(
             title: Text(zapret.testProgress ?? AppLocalizations.of(context).forkStartAutoTune),
-            subtitle: const Text('Очень быстрый, быстрый или полный · Mihomo DIRECT'),
+            subtitle: Text(AppLocalizations.of(context).forkTuneModesHint),
             onTap: zapret.busy ? null : chooseTestMode,
           ),
           if (zapret.testProgress != null)
@@ -178,7 +178,7 @@ class ZapretView extends ConsumerWidget {
           ),
           ListItem(
             title: Text(AppLocalizations.of(context).forkAutoFallback),
-            subtitle: const Text('Три неудачные проверки, только подтверждённые кандидаты, откат при неудаче'),
+            subtitle: Text(AppLocalizations.of(context).forkFallbackHint),
             trailing: Switch(value: zapret.autoFallback,
               onChanged: ref.read(zapretControllerProvider.notifier).setAutoFallback),
           ),
@@ -330,9 +330,9 @@ class ZapretResultsView extends ConsumerWidget {
             style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           Text(top.isEmpty
-              ? 'Нет финалистов с положительной оценкой. Предварительный отбор показан отдельно.'
-              : run == null ? 'Топ-5 выделены цветом и номером. Подтверждённые можно применить.' : 'Топ-5 выделены цветом и номером. История доступна только для просмотра.'),
-          const Text('Баллы: работает — 2, с ограничениями — 1, нет ответа — 0. Полный тест: 0–6; отбор: только YouTube, 0–2. GoogleVideo — дополнительный. Discord Voice API не проверяет голосовой UDP.'),
+              ? AppLocalizations.of(context).forkNoFinalists
+              : run == null ? AppLocalizations.of(context).forkLiveTopFive : AppLocalizations.of(context).forkHistoryTopFive),
+          Text(AppLocalizations.of(context).forkScoringHint),
           const SizedBox(height: 12),
           for (final trial in ranked)
             Card(
@@ -353,9 +353,9 @@ class ZapretResultsView extends ConsumerWidget {
                         TextButton(onPressed: zapret.busy ? null : () => apply(trial), child: Text(AppLocalizations.of(context).submit)),
                     ]),
                     Text('${trial.localizedResultLabel(AppLocalizations.of(context))} · ${trial.score}/${trial.screenedOnly ? 2 : 6} · '
-                        '${trial.delay > 0 ? '${trial.delay} ms' : '—'}'),
+                        '${trial.delay > 0 ? '${trial.delay} ms (${AppLocalizations.of(context).forkAverage})' : '—'}'),
                     if (trial.screenedOnly)
-                      const Text('Discord и GoogleVideo не проверялись'),
+                      Text(AppLocalizations.of(context).forkScreeningHint),
                     if (trial.error != null)
                       Text(trial.error!, style: TextStyle(color: context.colorScheme.error)),
                     for (final detail in trial.details)

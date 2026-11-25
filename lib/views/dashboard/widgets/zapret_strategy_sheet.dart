@@ -55,7 +55,7 @@ class ZapretStrategySheet extends ConsumerWidget {
                   },
                 ),
               ],
-              footer: 'При работающем Zapret режим применяется сразу с перезапуском.',
+              footer: AppLocalizations.of(context).forkModeRestartHint,
             ),
           if (state.strategies.isEmpty)
             generateSection(

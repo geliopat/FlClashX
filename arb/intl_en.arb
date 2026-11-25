@@ -1202,5 +1202,16 @@
   "forkTunNoFailure": "No TUN failure reported by core (not a traffic test)",
   "forkDriverNotFound": "Driver not found among running services",
   "forkLatestDirect": "Latest DIRECT results, not proof of WinDivert interception",
-  "forkArchiveSaved": "Archive saved"
+  "forkArchiveSaved": "Archive saved",
+  "forkWinDivertFilters": "WinDivert filters",
+  "forkTrafficLists": "Traffic processing lists",
+  "forkTuneModesHint": "Very fast, fast or full · Mihomo DIRECT",
+  "forkFallbackHint": "Three failed checks; only confirmed candidates; rollback on failure",
+  "forkNoFinalists": "No finalists with a positive score. Preliminary screening is shown separately.",
+  "forkLiveTopFive": "The top five are highlighted and ranked. Confirmed strategies can be applied.",
+  "forkHistoryTopFive": "The top five are highlighted and ranked. History is read-only.",
+  "forkScoringHint": "Scoring: working = 2, restricted = 1, no response = 0. Full test: 0–6; screening: YouTube only, 0–2. GoogleVideo is additional. Discord Voice API does not test voice UDP.",
+  "forkScreeningHint": "Discord and GoogleVideo were not tested.",
+  "forkModeRestartHint": "When Zapret is running, the mode is applied immediately by restarting it.",
+  "forkAverage": "average"
 }

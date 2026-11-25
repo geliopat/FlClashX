@@ -1202,5 +1202,16 @@
   "forkTunNoFailure": "Ядро не сообщает об ошибке TUN (не тест трафика)",
   "forkDriverNotFound": "Драйвер не найден среди запущенных служб",
   "forkLatestDirect": "Последние результаты DIRECT, не доказательство перехвата WinDivert",
-  "forkArchiveSaved": "Архив сохранён"
+  "forkArchiveSaved": "Архив сохранён",
+  "forkWinDivertFilters": "Фильтры WinDivert",
+  "forkTrafficLists": "Списки обработки трафика",
+  "forkTuneModesHint": "Очень быстрый, быстрый или полный · Mihomo DIRECT",
+  "forkFallbackHint": "Три неудачные проверки, только подтверждённые кандидаты, откат при неудаче",
+  "forkNoFinalists": "Нет финалистов с положительной оценкой. Предварительный отбор показан отдельно.",
+  "forkLiveTopFive": "Топ-5 выделены цветом и номером. Подтверждённые можно применить.",
+  "forkHistoryTopFive": "Топ-5 выделены цветом и номером. История доступна только для просмотра.",
+  "forkScoringHint": "Баллы: работает — 2, с ограничениями — 1, нет ответа — 0. Полный тест: 0–6; отбор: только YouTube, 0–2. GoogleVideo — дополнительный. Discord Voice API не проверяет голосовой UDP.",
+  "forkScreeningHint": "Discord и GoogleVideo не проверялись.",
+  "forkModeRestartHint": "При работающем Zapret режим применяется сразу с перезапуском.",
+  "forkAverage": "среднее"
 }

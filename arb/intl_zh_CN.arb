@@ -1202,5 +1202,16 @@
   "forkTunNoFailure": "核心未报告 TUN 错误（非流量测试）",
   "forkDriverNotFound": "运行中的服务中未找到驱动",
   "forkLatestDirect": "最近 DIRECT 结果，不能证明 WinDivert 拦截",
-  "forkArchiveSaved": "归档已保存"
+  "forkArchiveSaved": "归档已保存",
+  "forkWinDivertFilters": "WinDivert 过滤器",
+  "forkTrafficLists": "流量处理列表",
+  "forkTuneModesHint": "极速、快速或完整 · Mihomo DIRECT",
+  "forkFallbackHint": "连续三次检查失败，仅使用已确认的候选策略，失败时回滚",
+  "forkNoFinalists": "没有得分为正的入围策略。初筛结果单独显示。",
+  "forkLiveTopFive": "前五名以高亮和排名显示。可以应用已确认的策略。",
+  "forkHistoryTopFive": "前五名以高亮和排名显示。历史记录仅供查看。",
+  "forkScoringHint": "评分：正常 = 2，受限 = 1，无响应 = 0。完整测试：0–6；初筛：仅 YouTube，0–2。GoogleVideo 为额外测试。Discord Voice API 不测试语音 UDP。",
+  "forkScreeningHint": "未测试 Discord 和 GoogleVideo。",
+  "forkModeRestartHint": "Zapret 运行时，模式通过重启立即生效。",
+  "forkAverage": "平均"
 }

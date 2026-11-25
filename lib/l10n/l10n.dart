@@ -379,6 +379,17 @@ class AppLocalizations {
 
   String get forkLatestDirect => Intl.message("Latest DIRECT results, not proof of WinDivert interception", name: 'forkLatestDirect', desc: '', args: []);
 
+  String get forkWinDivertFilters => Intl.message("WinDivert filters", name: 'forkWinDivertFilters', desc: '', args: []);
+  String get forkTrafficLists => Intl.message("Traffic processing lists", name: 'forkTrafficLists', desc: '', args: []);
+  String get forkTuneModesHint => Intl.message("Very fast, fast or full · Mihomo DIRECT", name: 'forkTuneModesHint', desc: '', args: []);
+  String get forkFallbackHint => Intl.message("Three failed checks; only confirmed candidates; rollback on failure", name: 'forkFallbackHint', desc: '', args: []);
+  String get forkNoFinalists => Intl.message("No finalists with a positive score. Preliminary screening is shown separately.", name: 'forkNoFinalists', desc: '', args: []);
+  String get forkLiveTopFive => Intl.message("The top five are highlighted and ranked. Confirmed strategies can be applied.", name: 'forkLiveTopFive', desc: '', args: []);
+  String get forkHistoryTopFive => Intl.message("The top five are highlighted and ranked. History is read-only.", name: 'forkHistoryTopFive', desc: '', args: []);
+  String get forkScoringHint => Intl.message("Scoring: working = 2, restricted = 1, no response = 0. Full test: 0–6; screening: YouTube only, 0–2. GoogleVideo is additional. Discord Voice API does not test voice UDP.", name: 'forkScoringHint', desc: '', args: []);
+  String get forkScreeningHint => Intl.message("Discord and GoogleVideo were not tested.", name: 'forkScreeningHint', desc: '', args: []);
+  String get forkModeRestartHint => Intl.message("When Zapret is running, the mode is applied immediately by restarting it.", name: 'forkModeRestartHint', desc: '', args: []);
+  String get forkAverage => Intl.message("average", name: 'forkAverage', desc: '', args: []);
   String get forkArchiveSaved => Intl.message("Archive saved", name: 'forkArchiveSaved', desc: '', args: []);
 
   /// `Rule`
