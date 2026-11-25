@@ -45,6 +45,31 @@ void main() {
     expect((await readZapretComponentVersions(dir))['Flowseal'], 'неизвестно');
   });
 
+  test('verifies GUI source and Lua version with imported BAT names', () async {
+    final files = <String, String>{};
+    for (final name in [
+      'zapret-lib.lua', 'zapret-auto.lua', 'zapret-antidpi.lua', 'zapret-obfs.lua',
+      'strategies/zapret-lib.lua', 'strategies/zapret-auto.lua',
+      'strategies/zapret-antidpi.lua', 'strategies/zapret-obfs.lua',
+      'strategies/imported/kinlay0/general (ALT14).bat',
+    ]) {
+      final bytes = utf8.encode(name);
+      final file = File(p.joinAll([dir.path, ...name.split('/')]));
+      await file.parent.create(recursive: true);
+      await file.writeAsBytes(bytes);
+      files[name] = sha256.convert(bytes).toString();
+    }
+    await writeManifest({
+      'Lua/BAT source': {
+        'version': '8dd17fcbcca405a50f497a6e2346ca263901d775',
+        'luaLibraryVersion': 'v1.0.8',
+        'files': files,
+      },
+    });
+    expect((await readZapretComponentVersions(dir))['Lua/BAT source'],
+        '8dd17fcbcca4 + Lua v1.0.8');
+  });
+
   test('rejects a manifest with paths outside the component directory', () async {
     final bytes = utf8.encode('test binary');
     final hash = sha256.convert(bytes).toString();
