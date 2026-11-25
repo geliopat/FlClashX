@@ -287,6 +287,15 @@ abstract class DnsQuery with _$DnsQuery {
 }
 
 extension DnsQueryExt on DnsQuery {
+  // dns_watch.go wraps these three Mihomo package-level resolvers.
+  // The initiator is not proof of which upstream DNS server answered.
+  String get resolverName => switch (initiator) {
+    DnsQueryInitiator.rule => 'DefaultResolver',
+    DnsQueryInitiator.direct => 'DirectHostResolver',
+    DnsQueryInitiator.proxy => 'ProxyServerHostResolver',
+    DnsQueryInitiator.app || DnsQueryInitiator.other || null => '',
+  };
+
   bool get hasFailureRcode => rcode.isNotEmpty && rcode != 'NOERROR';
 
   bool get isFailed => error.isNotEmpty || hasFailureRcode;
@@ -308,6 +317,7 @@ extension DnsQueryExt on DnsQuery {
     domain,
     ...tags,
     rcode,
+    resolverName,
     upstream,
     error,
     ...answers,
