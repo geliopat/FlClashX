@@ -42,6 +42,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
   List<HelperZapretListInfo> _lists = const [];
   String? _selected;
   bool _loading = true;
+  bool _listLoaded = false;
   bool _saving = false;
   bool _updating = false;
   String? _error;
@@ -70,14 +71,17 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
   Future<void> _loadLists({String? select}) async {
     setState(() {
       _loading = true;
+      _listLoaded = false;
       _error = null;
       _notice = null;
     });
     try {
       final lists = await helperClient.zapretLists();
+      final currentSelection = _selected;
       final filename = select ??
-          (_selected != null && lists.any((item) => item.filename == _selected)
-              ? _selected
+          (currentSelection != null &&
+                  lists.any((item) => item.filename == currentSelection)
+              ? currentSelection
               : lists.first.filename);
       final data = await helperClient.readZapretList(filename);
       if (!mounted) return;
@@ -86,11 +90,13 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
         _selected = filename;
         _editor.text = data.content;
         _loading = false;
+        _listLoaded = true;
       });
     } catch (error) {
       if (!mounted) return;
       setState(() {
         _loading = false;
+        _listLoaded = false;
         _error = error is HelperException ? error.message : error.toString();
       });
     }
@@ -100,6 +106,8 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
     setState(() {
       _selected = filename;
       _loading = true;
+      _listLoaded = false;
+      _editor.clear();
       _error = null;
     });
     try {
@@ -108,11 +116,13 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
       setState(() {
         _editor.text = data.content;
         _loading = false;
+        _listLoaded = true;
       });
     } catch (error) {
       if (!mounted) return;
       setState(() {
         _loading = false;
+        _listLoaded = false;
         _error = error is HelperException ? error.message : error.toString();
       });
     }
@@ -120,7 +130,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
 
   Future<void> _saveList() async {
     final filename = _selected;
-    if (filename == null || _saving || _loading) return;
+    if (filename == null || !_listLoaded || _saving || _loading) return;
     setState(() {
       _saving = true;
       _error = null;
@@ -148,7 +158,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
 
   Future<void> _restoreBackup() async {
     final filename = _selected;
-    if (filename == null || _saving || _updating || _loading) return;
+    if (filename == null || !_listLoaded || _saving || _updating || _loading) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -446,7 +456,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
                           child: Text('${item.filename} · ${item.entries} записей${item.userManaged ? ' · пользовательский' : ''}'),
                         ),
                     ],
-                    onChanged: _loading ? null : (value) {
+                    onChanged: _loading || _saving || _updating ? null : (value) {
                       if (value != null) unawaited(_selectList(value));
                     },
                   ),
@@ -455,7 +465,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
                     height: 300,
                     child: TextField(
                       controller: _editor,
-                      enabled: !_loading && !_saving && !_updating,
+                      enabled: _listLoaded && !_loading && !_saving && !_updating,
                       expands: true,
                       maxLines: null,
                       minLines: null,
@@ -480,17 +490,17 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
                         label: const Text('Перечитать'),
                       ),
                       FilledButton.icon(
-                        onPressed: _loading || _saving || _updating ? null : _saveList,
+                        onPressed: !_listLoaded || _loading || _saving || _updating ? null : _saveList,
                         icon: _saving ? const SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.save),
                         label: const Text('Сохранить'),
                       ),
                       OutlinedButton.icon(
-                        onPressed: _loading || _saving || _updating ? null : _updateLists,
+                        onPressed: _lists.isEmpty || _loading || _saving || _updating ? null : _updateLists,
                         icon: _updating ? const SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.cloud_download),
                         label: const Text('Обновить списки'),
                       ),
                       OutlinedButton.icon(
-                        onPressed: _loading || _saving || _updating ? null : _restoreBackup,
+                        onPressed: !_listLoaded || _loading || _saving || _updating ? null : _restoreBackup,
                         icon: const Icon(Icons.restore),
                         label: const Text('Откатить .bak'),
                       ),
