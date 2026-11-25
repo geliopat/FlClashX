@@ -95,13 +95,15 @@ class CommonAction extends _$CommonAction {
     final manifestUrl = globalState.isPre
         ? headers?.preUpdateManifestUrl
         : headers?.updateManifestUrl;
-    if (manifestUrl == null) {
+    // Windows fork releases require our signed manifest. Do not fall back
+    // to an unsigned GitHub release when the signing key is not configured.
+    if (manifestUrl == null && (!Platform.isWindows || globalState.isPre)) {
       return request.checkForUpdate();
     }
     try {
       return await fetchManifestUpdate(
         request.dio,
-        Uri.parse(manifestUrl),
+        Uri.parse(manifestUrl ?? 'https://github.com/$repository/releases/latest/download/manifest.json'),
         currentVersion: globalState.packageInfo.displayVersion,
         pre: globalState.isPre,
       );

@@ -146,7 +146,7 @@ hooks:
     test('names artifacts by platform and architecture', () {
       expect(
         setup.artifactName('windows', 'amd64', '-setup.exe'),
-        'FlClashX-windows-amd64-setup.exe',
+        'FlClashZ-windows-amd64-setup.exe',
       );
       expect(
         setup.artifactName('android', 'arm64-v8a', '.apk'),

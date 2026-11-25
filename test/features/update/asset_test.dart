@@ -31,9 +31,9 @@ void main() {
       'FlClashX-android-arm64-v8a.apk',
       'FlClashX-android-armeabi-v7a.apk',
       'FlClashX-android-universal.apk',
-      'FlClashX-windows-amd64-setup.exe',
-      'FlClashX-windows-amd64.zip',
-      'FlClashX-windows-arm64-setup.exe',
+      'FlClashZ-windows-amd64-setup.exe',
+      'FlClashZ-windows-amd64.zip',
+      'FlClashZ-windows-arm64-setup.exe',
       'FlClashX-macos-amd64.dmg',
       'FlClashX-macos-arm64.dmg',
       'FlClashX-linux-amd64.AppImage',
@@ -75,7 +75,7 @@ void main() {
     test('picks the desktop package for the install type and arch', () {
       expect(
         select(const UpdateTarget(UpdateInstallKind.windows, ['arm64'])),
-        'FlClashX-windows-arm64-setup.exe',
+        'FlClashZ-windows-arm64-setup.exe',
       );
       expect(
         select(const UpdateTarget(UpdateInstallKind.macos, ['amd64'])),
@@ -228,7 +228,7 @@ void main() {
       expect(
         asset.url.toString(),
         'https://github.com/$_repository/releases/download/v0.5.1/'
-        'FlClashX-windows-amd64-setup.exe',
+        'FlClashZ-windows-amd64-setup.exe',
       );
       expect(asset.checksumUrl!.path, endsWith('setup.exe.sha256'));
       expect(asset.size, isNull);
@@ -313,7 +313,7 @@ void main() {
 
     test('picks the asset for the platform with its inline hash', () {
       final asset = manifestUpdateAsset(
-        manifest('FlClashX-windows-amd64-setup.exe'),
+        manifest('FlClashZ-windows-amd64-setup.exe'),
         const UpdateTarget(UpdateInstallKind.windows, ['amd64']),
       );
       expect(asset.url.host, 'mirror.example');
@@ -325,7 +325,7 @@ void main() {
     test('a missing asset for the platform fails', () {
       expect(
         () => manifestUpdateAsset(
-          manifest('FlClashX-windows-amd64-setup.exe'),
+          manifest('FlClashZ-windows-amd64-setup.exe'),
           const UpdateTarget(UpdateInstallKind.macos, ['arm64']),
         ),
         _fails(UpdateErrorKind.noAsset),

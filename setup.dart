@@ -295,7 +295,7 @@ List<int> utf16le(String value) => [
 /// `FlClashX-<platform>-<arch>` plus the format's extension; the release
 /// templates and the AUR package link these names.
 String artifactName(String platform, String arch, String extension) =>
-    '$_appName-$platform-$arch$extension';
+    '${platform == 'windows' ? 'FlClashZ' : _appName}-$platform-$arch$extension';
 
 void _showHelp(ArgParser parser) {
   stderr.writeln('Usage: dart setup.dart [platform] [options]');
@@ -638,7 +638,18 @@ Future<void> _packageWindows(
   Set<String> targets, {
   required String env,
 }) async {
-  final identity = desktopIdentityOf(env);
+  final legacy = desktopIdentityOf(env);
+  final identity = DesktopIdentity(
+    pre: legacy.pre,
+    executable: legacy.pre ? 'FlClashZPre' : 'FlClashZ',
+    helper: legacy.helper,
+    displayName: legacy.pre ? 'FlClashZ Pre' : 'FlClashZ',
+    bundleId: legacy.bundleId,
+    packageName: legacy.packageName,
+    installDir: legacy.installDir,
+    helperUnit: legacy.helperUnit,
+    windowsDataDir: legacy.windowsDataDir,
+  );
   await build.mustRun('flutter', [
     'build',
     'windows',
@@ -656,13 +667,13 @@ Future<void> _packageWindows(
   );
   var bundle = built;
   if (identity.pre) {
-    requireChannelMarker(p.join(built, '$_appName.exe'), utf16le('clashx.pre'));
+    requireChannelMarker(p.join(built, 'FlClashZ.exe'), utf16le('clashx.pre'));
     bundle = p.join(build.rootDir, 'build', 'windows', winArch, 'pre_bundle');
     if (Directory(bundle).existsSync()) {
       Directory(bundle).deleteSync(recursive: true);
     }
     await build.copyTree(built, bundle);
-    renameForChannel(bundle, identity, ext: '.exe', renameHelper: false);
+    File(p.join(bundle, 'FlClashZ.exe')).renameSync(p.join(bundle, '${identity.executable}.exe'));
   }
   if (targets.contains('zip')) {
     final zip = build.dist(artifactName('windows', build.arch, '.zip'));

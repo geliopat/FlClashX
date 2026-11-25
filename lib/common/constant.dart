@@ -9,7 +9,7 @@ import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:material_ui/material_ui.dart';
 
-const appName = 'FlClashX';
+const appName = 'FlClashZ';
 const userAgentAppName = 'FlClashZ';
 final appHelperService = helperServiceFor(pre: isPreDesktopApp);
 final appSystemName = isPreDesktopApp ? '$appName Pre' : appName;
@@ -131,7 +131,7 @@ const systemProxyAppliedKey = 'system_proxy_applied';
 const bootRecordKey = 'boot_record';
 const appliedConfigMd5Key = 'applied_config_md5';
 const defaultSystemDnsFallback = '1.1.1.1';
-const repository = 'pluralplay/FlClashX';
+const repository = 'geliopat/FlClashZ';
 const maxMobileWidth = 600;
 const maxLaptopWidth = 840;
 const defaultTestUrl = 'https://www.gstatic.com/generate_204';

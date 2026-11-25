@@ -5,7 +5,11 @@ import 'package:cryptography/cryptography.dart';
 import 'package:cryptography/dart.dart';
 
 /// A list so a new key can ship in the app before the old one retires.
-const updateManifestKeys = ['MDf1zyd4RNKZ+Gx6yNgQKungx/XtHn+wNvMJT9xvEiA='];
+// The fork's release signing public key is provisioned at packaging time.
+// Empty means fail closed until release infrastructure is configured.
+const updateManifestKeys = [
+  String.fromEnvironment('FLCLASHZ_UPDATE_PUBLIC_KEY'),
+];
 
 const _domain = 'flclashx-update-manifest-v1';
 

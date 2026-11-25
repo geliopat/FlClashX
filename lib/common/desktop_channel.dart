@@ -7,7 +7,8 @@ const preExecutableName = 'FlClashXPre';
 
 bool isPreExecutable(String executable) {
   final context = executable.contains(r'\') ? p.windows : p.posix;
-  return context.basenameWithoutExtension(executable) == preExecutableName;
+  final name = context.basenameWithoutExtension(executable);
+  return name == preExecutableName || name == 'FlClashZPre';
 }
 
 final bool isPreDesktopApp =

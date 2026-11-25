@@ -592,7 +592,7 @@ class ZapretController extends Notifier<ZapretState> {
   }
 
   /// Replaces an older Windows Helper service with the executable
-  /// shipped beside the currently running FlClashX instance.
+  /// shipped beside the currently running FlClashZ instance.
   Future<void> updateHelperService() async {
     if (!Platform.isWindows || state.busy) return;
     state = state.copyWith(busy: true, clearError: true);
@@ -635,7 +635,7 @@ class ZapretController extends Notifier<ZapretState> {
     if (readiness != HelperReadiness.ready) {
       throw const HelperException(
         code: 'helperUnavailable',
-        message: 'Служба FlClashX Helper недоступна. Перезапусти клиент и проверь установку службы.',
+        message: 'Служба Helper недоступна. Перезапусти клиент и проверь установку службы.',
       );
     }
   }
