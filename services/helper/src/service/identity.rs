@@ -22,7 +22,20 @@ pub fn is_pre_helper(executable: &Path) -> bool {
 }
 
 pub fn helper_name() -> &'static str {
-    helper_name_for(*PRE)
+    // Windows stable and pre builds deliberately share one SCM service name.
+    // The installed service image is replaced by whichever channel installs
+    // most recently; Linux keeps its existing per-channel units.
+    if cfg!(windows) {
+        STABLE_HELPER
+    } else {
+        helper_name_for(*PRE)
+    }
+}
+
+#[cfg(windows)]
+pub fn retired_windows_helper_names() -> &'static [&'static str] {
+    // Remove the second service created by older pre-release builds.
+    &[PRE_HELPER]
 }
 
 pub fn helper_name_for(pre: bool) -> &'static str {
