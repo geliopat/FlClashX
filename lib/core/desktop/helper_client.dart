@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
 import 'package:fl_clash/common/constant.dart';
@@ -305,6 +306,7 @@ final class HelperClient {
   Future<HelperReadiness> readiness({
     Duration? timeout,
     bool logFailure = true,
+    bool verifyHelperBinary = false,
   }) async {
     if (timeout != null && timeout <= Duration.zero) {
       return HelperReadiness.notReady;
@@ -328,9 +330,22 @@ final class HelperClient {
         cancelToken: cancelToken,
         options: _options(ResponseType.plain, acceptAnyStatus: true),
       );
-      return response.statusCode == HttpStatus.ok
+      final readiness = response.statusCode == HttpStatus.ok
           ? _readyFromOk(response, logFailure)
           : _notReadyFromPing(response, logFailure);
+      if (readiness == HelperReadiness.ready && verifyHelperBinary) {
+        final runningHash = response.headers.value('x-flclashz-helper-sha256');
+        if (runningHash == null || !RegExp(r'^[0-9a-f]{64}$').hasMatch(runningHash)) {
+          _logPingFailure('Missing running Helper SHA256', logFailure);
+          return HelperReadiness.notReady;
+        }
+        final bundledHash = await sha256.bind(File(_expectedHelperPath()).openRead()).first;
+        if (bundledHash.toString() != runningHash) {
+          _logPingFailure('Running Helper binary differs from bundled Helper', logFailure);
+          return HelperReadiness.notReady;
+        }
+      }
+      return readiness;
     } catch (error) {
       _logPingFailure('helper ping failed: $error', logFailure);
       return HelperReadiness.notReady;
