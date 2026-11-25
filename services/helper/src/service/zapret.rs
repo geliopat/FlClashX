@@ -75,6 +75,34 @@ pub struct ZapretLaunch {
     pub args: Vec<String>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ZapretStrategyInfo {
+    pub id: &'static str,
+    pub name: &'static str,
+    pub filename: &'static str,
+    pub description: &'static str,
+    pub engine: &'static str,
+    pub category: &'static str,
+    pub supports_split_mode: bool,
+}
+
+pub fn strategy_info() -> Vec<ZapretStrategyInfo> {
+    strategies().into_iter().map(|strategy| {
+        let supports_split_mode = FLOWSEAL.iter().any(|item| item.id == strategy.id)
+            || LUA_STRATEGIES.iter().any(|item| item.id == strategy.id);
+        ZapretStrategyInfo {
+            id: strategy.id,
+            name: strategy.name,
+            filename: strategy.filename,
+            description: strategy.description,
+            engine: strategy.engine,
+            category: strategy.category,
+            supports_split_mode,
+        }
+    }).collect()
+}
+
 pub fn strategies() -> Vec<ZapretStrategy> {
     let mut result = FLOWSEAL.to_vec();
     result.push(ZapretStrategy {
