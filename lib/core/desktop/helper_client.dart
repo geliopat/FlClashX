@@ -666,10 +666,18 @@ final class HelperClient {
     }
   }
 
+  // Shared across HelperClient instances within this desktop process.
+  static int _zapretCommand = 0;
+
+  Map<String, String> _zapretHeaders() => {
+    'x-zapret-owner-pid': pid.toString(),
+    'x-zapret-command': (++_zapretCommand).toString(),
+  };
+
   Future<void> setZapretWatchdog(bool enabled) async {
     await _dio.put<Object?>('$baseUrl/zapret/watchdog',
       data: {'enabled': enabled}, options: _options(ResponseType.json,
-        receiveTimeout: const Duration(seconds: 5)));
+        receiveTimeout: const Duration(seconds: 5)).copyWith(headers: _zapretHeaders()));
   }
 
   Future<HelperZapretStatus> startZapret({required String strategyId, required String mode, bool debug = false, bool? watchdog, Map<String, List<String>>? infrastructure}) =>
@@ -701,7 +709,7 @@ final class HelperClient {
           receiveTimeout: operation == 'stop'
               ? stopTimeout
               : const Duration(seconds: 20),
-        ),
+        ).copyWith(headers: _zapretHeaders()),
       );
       return _parseZapretResponse(response, operation: 'Zapret $operation');
     } on HelperException {
