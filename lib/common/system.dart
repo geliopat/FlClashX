@@ -1,12 +1,15 @@
+import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:ffi/ffi.dart';
 import 'package:fl_clash/common/boot_record.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/system_dns.dart';
 import 'package:fl_clash/core/desktop/helper_client.dart';
+import 'package:fl_clash/core/desktop/core_manifest.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/plugins/app.dart';
 import 'package:flutter/foundation.dart' show visibleForTesting;
@@ -422,12 +425,96 @@ class Windows {
   static String installArguments(int ownerPid) =>
       'install --owner-pid $ownerPid';
 
+  // Keep this exact-name list synchronized with retired_windows_helper_names
+  // in the Rust installer. Never remove generic WinDivert or Zapret services.
+  static const retiredHelperServices = [
+    'FlClashXPreHelperService',
+    'FlClashHelperService',
+    'FlClashPreHelperService',
+    'FlClashZHelperService',
+    'FlClashZPreHelperService',
+  ];
+
+  Future<AuthorizeCode>? _registration;
+
   Future<AuthorizeCode> registerService({bool forceReinstall = false}) {
-    return registerHelperService(
-      () async =>
-          runas(appPath.helperPath, installArguments(pid), showWindow: false),
-      forceReinstall: forceReinstall,
+    return _registration ??= _registerService(forceReinstall).whenComplete(() {
+      _registration = null;
+    });
+  }
+
+  Future<bool> _hasRetiredHelper() async {
+    final root = Platform.environment['SystemRoot'] ?? r'C:\Windows';
+    for (final service in retiredHelperServices) {
+      final result = await system.runProcess(
+        '$root\\System32\\sc.exe',
+        ['query', service],
+      );
+      if (result.exitCode == 0) return true;
+      if (result.exitCode != 1060) {
+        throw StateError('Cannot inspect Helper service $service: ${result.exitCode}');
+      }
+    }
+    return false;
+  }
+
+  Future<bool> _verifyBundledCore() async {
+    final expected = await CoreManifest.readCoreSha256();
+    if (expected == null) return false;
+    try {
+      final actual = await sha256.bind(File(appPath.corePath).openRead()).first;
+      return actual.toString() == expected;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // Wait for the elevated installer itself, not merely for the old service
+  // to answer a ping. This also detects UAC cancellation and installer errors.
+  Future<bool> _installAndWait() async {
+    final helper = File(appPath.helperPath);
+    if (!await helper.exists()) return false;
+    final root = Platform.environment['SystemRoot'] ?? r'C:\Windows';
+    final escaped = helper.path.replaceAll("'", "''");
+    final command = "try { "
+        "\$p = Start-Process -FilePath '$escaped' "
+        "-ArgumentList '${installArguments(pid)}' "
+        "-Verb RunAs -Wait -PassThru -ErrorAction Stop; "
+        "exit \$p.ExitCode } catch { exit 1 }";
+    final bytes = <int>[
+      for (final unit in command.codeUnits) ...[unit & 0xff, unit >> 8],
+    ];
+    final result = await system.runProcess(
+      '$root\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden',
+       '-EncodedCommand', base64Encode(bytes)],
     );
+    if (result.exitCode != 0) {
+      commonPrint.log('Helper installation failed: ${result.exitCode}',
+          logLevel: LogLevel.error);
+    }
+    return result.exitCode == 0;
+  }
+
+  Future<AuthorizeCode> _registerService(bool forceReinstall) async {
+    try {
+      final retired = await _hasRetiredHelper();
+      final result = await registerHelperService(
+        _installAndWait,
+        forceReinstall: forceReinstall || retired,
+        verifyCoreOnMismatch: _verifyBundledCore,
+      );
+      if (result != AuthorizeCode.error && await _hasRetiredHelper()) {
+        commonPrint.log('Legacy Helper services remain after installation',
+            logLevel: LogLevel.error);
+        return AuthorizeCode.error;
+      }
+      return result;
+    } catch (error) {
+      commonPrint.log('Helper startup verification failed: $error',
+          logLevel: LogLevel.error);
+      return AuthorizeCode.error;
+    }
   }
 }
 
@@ -437,6 +524,7 @@ typedef ElevatedHelperInstaller = Future<bool> Function();
 Future<AuthorizeCode> registerHelperService(
   ElevatedHelperInstaller install, {
   bool forceReinstall = false,
+  Future<bool> Function()? verifyCoreOnMismatch,
 }) async {
   final readiness = await helperClient.readiness();
   switch (readiness) {
@@ -462,6 +550,11 @@ Future<AuthorizeCode> registerHelperService(
       );
       return AuthorizeCode.error;
     case HelperReadiness.coreMismatch:
+      if (verifyCoreOnMismatch != null && await verifyCoreOnMismatch()) {
+        commonPrint.log('Bundled Core verified; installed Helper is outdated',
+            logLevel: LogLevel.warning);
+        break;
+      }
       commonPrint.log(
         'the Core on disk does not match the bundled manifest, so the Helper '
         'refuses it; a package build may have stripped the binary',
