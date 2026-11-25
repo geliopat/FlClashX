@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:fl_clash/common/constant.dart';
 import 'package:fl_clash/common/desktop_channel.dart';
@@ -721,6 +722,33 @@ void main() {
           r'C:\Program Files\FlClash\FlClashXHelperService.exe',
     );
 
+    expect(await client.readiness(), HelperReadiness.ready);
+  });
+
+  test('startup verifies the running Helper hash even with a matching protocol', () async {
+    final dir = Directory.systemTemp.createTempSync('helper-binary-check');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final bundled = File([dir.path, 'FlClashZHelperService.exe'].join(Platform.pathSeparator));
+    await bundled.writeAsString('current helper');
+    final digest = sha256.convert(utf8.encode('current helper')).toString();
+    String? runningHash = digest;
+    final client = _client(
+      _ResponseAdapter((_) => ResponseBody.fromString(
+        bundled.path,
+        HttpStatus.ok,
+        headers: {
+          helperProtocolVersionHeader: [helperProtocolVersion],
+          Headers.contentTypeHeader: ['text/plain'],
+          if (runningHash != null) 'x-flclashz-helper-sha256': [runningHash!],
+        },
+      )),
+      expectedHelperPath: () => bundled.path,
+    );
+    expect(await client.readiness(verifyHelperBinary: true), HelperReadiness.ready);
+    runningHash = _coreSha256;
+    expect(await client.readiness(verifyHelperBinary: true), HelperReadiness.notReady);
+    runningHash = null;
+    expect(await client.readiness(verifyHelperBinary: true), HelperReadiness.notReady);
     expect(await client.readiness(), HelperReadiness.ready);
   });
 
