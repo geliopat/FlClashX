@@ -2,6 +2,7 @@ name: build
 
 on:
   push:
+    # Keep the Zapret2 integration branch on the same compile/test path as PR-ready code.
     branches:
       - feature/zapret2-integration
     tags:
