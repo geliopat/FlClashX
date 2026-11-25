@@ -37,8 +37,15 @@ pub fn windows_helper_name() -> &'static str {
 
 #[cfg(any(windows, test))]
 pub fn retired_windows_helper_names() -> &'static [&'static str] {
-    // Remove the second service created by older pre-release builds.
-    &[PRE_HELPER]
+    // Exact service names of this application family, never wildcard names.
+    // The current shared Windows service is removed separately by the installer.
+    &[
+        PRE_HELPER,
+        "FlClashHelperService",
+        "FlClashPreHelperService",
+        "FlClashZHelperService",
+        "FlClashZPreHelperService",
+    ]
 }
 
 pub fn helper_name_for(pre: bool) -> &'static str {
@@ -90,7 +97,13 @@ mod tests {
         assert_eq!(windows_helper_name(), "FlClashXHelperService");
         assert_eq!(
             retired_windows_helper_names(),
-            &["FlClashXPreHelperService"]
+            &[
+                "FlClashXPreHelperService",
+                "FlClashHelperService",
+                "FlClashPreHelperService",
+                "FlClashZHelperService",
+                "FlClashZPreHelperService",
+            ]
         );
         assert_eq!(linux_service_for(true), "flclashx-pre-helper");
         assert_eq!(linux_runtime_dir_for(false), "flclashx");
