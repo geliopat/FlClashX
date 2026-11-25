@@ -1131,6 +1131,17 @@ fn launch_zapret(
             StatusCode::SERVICE_UNAVAILABLE,
         );
     }
+    // A partially installed component transaction must never run as SYSTEM.
+    // This marker is outside the asset directory and survives a client crash.
+    if let Ok(helper) = std::env::current_exe() {
+        if helper.parent().is_some_and(|dir| dir.join("zapret-update.pending").exists()) {
+            return error_response(
+                "zapretUpdatePending",
+                "A Zapret component update requires completion or rollback",
+                StatusCode::CONFLICT,
+            );
+        }
+    }
     if let Err(error) = infrastructure.validate() {
         return error_response(
             "invalidZapretInfrastructure",

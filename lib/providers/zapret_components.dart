@@ -153,7 +153,7 @@ class ZapretComponentsController extends Notifier<ZapretComponentState> {
     if (!ref.mounted) return;
     final versions = <String, String>{
       for (final name in zapretComponentNames)
-        name: 'в сборке ${installed[name]} · upstream проверяется',
+        name: 'установлено ${installed[name]} · upstream проверяется',
     };
     state = ZapretComponentState(Map.unmodifiable(versions), installed: installed, checking: true);
     final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 8), receiveTimeout: const Duration(seconds: 15)));
@@ -166,9 +166,9 @@ class ZapretComponentsController extends Notifier<ZapretComponentState> {
           final upstream = value is String
               ? (entry.key == 'Lua/BAT source' && value.length >= 12 ? value.substring(0, 12) : value)
               : _unknown;
-          versions[entry.key] = 'в сборке ${installed[entry.key]} · upstream $upstream';
+          versions[entry.key] = 'установлено ${installed[entry.key]} · upstream $upstream';
         } catch (_) {
-          versions[entry.key] = 'в сборке ${installed[entry.key]} · проверка недоступна';
+          versions[entry.key] = 'установлено ${installed[entry.key]} · проверка недоступна';
         }
       }));
     } finally {

@@ -122,12 +122,22 @@ try {
         $Relative = $File.FullName.Substring($AssetDir.Length + 1).Replace('\', '/')
         $LuaHashes[$Relative] = (Get-FileHash -LiteralPath $File.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
     }
+    foreach ($Name in $BlobFiles) {
+        $LuaHashes[$Name] = (Get-FileHash -LiteralPath (Join-Path $AssetDir $Name) -Algorithm SHA256).Hash.ToLowerInvariant()
+    }
+    # The client must not install a strategy pack whose compiled catalog differs.
+    $CatalogParts = @("services/helper/src/service/zapret.rs", "services/helper/src/service/zapret/imported_strategies.rs") | ForEach-Object {
+        $Hash = (git -C $Root rev-parse "HEAD:$_")
+        if ($LASTEXITCODE -ne 0 -or $Hash -notmatch '^[a-f0-9]{40}$') { throw "Cannot identify strategy catalog: $_" }
+        $Hash
+    }
     $EngineHashes = [ordered]@{}
     foreach ($Name in @("winws2.exe", "WinDivert.dll", "WinDivert64.sys", "cygwin1.dll")) {
         $EngineHashes[$Name] = (Get-FileHash -LiteralPath (Join-Path $AssetDir $Name) -Algorithm SHA256).Hash.ToLowerInvariant()
     }
     $Manifest = [ordered]@{
         schema = 1
+        catalogAbi = ($CatalogParts -join ':')
         components = [ordered]@{
             Zapret2 = [ordered]@{
                 version = $Zapret2Version
