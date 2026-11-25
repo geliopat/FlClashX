@@ -1,0 +1,185 @@
+name: FlClashZ versioned Windows release
+
+on:
+  workflow_call:
+    inputs:
+      candidate_ref:
+        description: Validated integration commit
+        type: string
+        required: true
+    secrets:
+      UPDATE_SIGNING_KEY:
+        required: true
+  workflow_dispatch:
+    inputs:
+      candidate_ref:
+        description: Validated integration commit SHA
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flclashz-versioned-release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    # Explicit repository opt-in: the current runtime regressions must be
+    # fixed and the fork's public signing key must be pinned first.
+    if: vars.FLCLASHZ_RELEASE_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    outputs:
+      sha: ${{ steps.version.outputs.sha }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.candidate_ref }}
+          fetch-depth: 0
+      - name: Verify release prerequisites and allocate an immutable version branch
+        id: version
+        shell: bash
+        env:
+          CANDIDATE_SHA: ${{ inputs.candidate_ref }}
+        run: |
+          set -euo pipefail
+          [[ "$CANDIDATE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$(git rev-parse HEAD)" == "$CANDIDATE_SHA" ]]
+          # Do not accept upstream-branded binaries or manifests in this pipeline.
+          grep -Fq "const appName = 'FlClashZ';" lib/common/constant.dart
+          grep -Fq "const repository = 'geliopat/FlClashZ';" lib/common/constant.dart
+          grep -Fq "FlClashZ-windows-" lib/features/update/asset.dart
+          grep -Fq "FlClashZ" windows/CMakeLists.txt
+          # Never allocate a version already used by a tag or archived branch.
+          git ls-remote --refs origin 'refs/tags/v*' 'refs/heads/release/v*' > "$RUNNER_TEMP/versions.txt"
+          export VERSIONS_FILE="$RUNNER_TEMP/versions.txt"
+          tag=$(python3 - <<'PY'
+          import datetime, os, pathlib, re
+          p = pathlib.Path("pubspec.yaml")
+          data = p.read_text(encoding="utf-8")
+          m = re.search(r"(?m)^version: (\d+)\.(\d+)\.(\d+)(?:\+\d+)?\s*$", data)
+          if not m:
+              raise SystemExit("pubspec version is not a stable three-part version")
+          versions = [tuple(map(int, m.groups()))]
+          for line in pathlib.Path(os.environ["VERSIONS_FILE"]).read_text().splitlines():
+              t = re.search(r"/v(\d+)\.(\d+)\.(\d+)$", line)
+              if t:
+                  versions.append(tuple(map(int, t.groups())))
+          a, b, c = max(versions)
+          version = f"{a}.{b}.{c + 1}"
+          build = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d%H%M")
+          p.write_text(re.sub(r"(?m)^version: [^\r\n]+", f"version: {version}+{build}", data, count=1), encoding="utf-8")
+          print(f"v{version}")
+          PY
+          )
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -c "release/$tag"
+          git add pubspec.yaml
+          git commit -m "release: FlClashZ $tag"
+          git push origin "HEAD:refs/heads/release/$tag"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+  validate:
+    needs: prepare
+    uses: ./.github/workflows/zapret-windows-validation.yml
+    with:
+      candidate_ref: ${{ needs.prepare.outputs.sha }}
+
+  package:
+    needs: [prepare, validate]
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.27.1'
+          cache-dependency-path: core/go.sum
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.47.6'
+          cache: true
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Stage pinned assets
+        shell: pwsh
+        run: ./scripts/setup_zapret.ps1
+      - name: Build stable Windows packages
+        run: dart setup.dart windows --env stable -v
+      - name: Verify distribution names
+        shell: pwsh
+        run: |
+          if (!(Test-Path 'dist/FlClashZ-windows-amd64-setup.exe')) { throw 'Expected branded Windows installer is missing' }
+          if (!(Test-Path 'dist/FlClashZ-windows-amd64.zip')) { throw 'Expected branded portable build is missing' }
+      - uses: actions/upload-artifact@v6
+        with:
+          name: FlClashZ-versioned-dist
+          path: dist/FlClashZ-windows-*
+          if-no-files-found: error
+
+  publish:
+    needs: [prepare, validate, package]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+          persist-credentials: false
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.47.6'
+          cache: true
+      - name: Install signer dependencies
+        run: flutter pub get
+      - uses: actions/download-artifact@v7
+        with:
+          name: FlClashZ-versioned-dist
+          path: dist
+      - name: Sign upstream-compatible update manifest and checksums
+        shell: bash
+        env:
+          FLCLASHX_UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+          FLCLASHZ_UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          set -euo pipefail
+          test -n "$FLCLASHZ_UPDATE_SIGNING_KEY"
+          for file in dist/FlClashZ-windows-*; do
+            (cd dist && sha256sum "$(basename "$file")" > "$(basename "$file").sha256")
+          done
+          dart run tool/sign_update_manifest.dart --version "$TAG" \
+            --base-url "https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG" \
+            --out dist/manifest.json dist
+          test -s dist/manifest.json
+      - name: Publish a new version as latest without deleting any older version
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          SHA: ${{ needs.prepare.outputs.sha }}
+          CANDIDATE_SHA: ${{ inputs.candidate_ref }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::error::Release already exists; refusing to replace it."
+            exit 1
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null; then
+            echo "::error::Version tag already exists; refusing to replace it."
+            exit 1
+          fi
+          notes=$(printf 'FlClashZ Windows x64\n\nValidated source: %s\nRelease commit: %s\n' "$CANDIDATE_SHA" "$SHA")
+          gh release create "$TAG" dist/* --target "$SHA" --title "FlClashZ $TAG" --notes "$notes" --latest
