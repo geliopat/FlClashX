@@ -335,6 +335,21 @@ hooks:
       );
     });
 
+    test('the installer retires the legacy pre Helper service', () {
+      final script = File(
+        'windows/packaging/exe/inno_setup.iss',
+      ).readAsStringSync();
+
+      expect(script, contains('procedure RetirePreHelperService;'));
+      expect(script, contains('config "FlClashXPreHelperService" start= disabled'));
+      expect(script, contains('stop "FlClashXPreHelperService"'));
+      expect(script, contains('delete "FlClashXPreHelperService"'));
+      expect(
+        script,
+        matches(RegExp(r'procedure ShutDownApp;[\\s\\S]+?RetirePreHelperService;')),
+      );
+    });
+
     test('the installer takes over a 0.4 FlClashX registration in place', () {
       final script = File(
         'windows/packaging/exe/inno_setup.iss',
