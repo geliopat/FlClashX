@@ -54,7 +54,7 @@ class ZapretStrategySheet extends ConsumerWidget {
                   },
                 ),
               ],
-              footer: 'Выбранный режим применяется при следующем запуске Zapret.',
+              footer: 'При работающем Zapret режим применяется сразу с перезапуском.',
             ),
           if (state.strategies.isEmpty)
             generateSection(
