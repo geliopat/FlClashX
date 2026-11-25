@@ -514,26 +514,73 @@ fn zapret_bin_dir() -> Result<PathBuf, Error> {
 }
 
 #[cfg(windows)]
-fn process_image_matches(handle: HANDLE, expected_exe_name: &str, zapret_root: &Path) -> bool {
+fn process_image_path(handle: HANDLE) -> Option<String> {
     unsafe {
         let mut buffer = [0u16; 1024];
         let mut size = buffer.len() as u32;
         if QueryFullProcessImageNameW(handle, 0, buffer.as_mut_ptr(), &mut size) == 0 {
-            return false;
+            return None;
         }
-        let image_path = String::from_utf16_lossy(&buffer[..size as usize]);
-        let Some(name) = Path::new(&image_path).file_name().and_then(|name| name.to_str()) else {
-            return false;
-        };
-        if !name.eq_ignore_ascii_case(expected_exe_name) {
-            return false;
-        }
-        // Never terminate another Zapret installation (or another application)
-        // merely because it uses the same executable filename.
-        let root = zapret_root.to_string_lossy().trim_end_matches(|ch| ch == '\\' || ch == '/').to_ascii_lowercase();
-        let candidate = image_path.to_ascii_lowercase();
-        candidate.starts_with(&format!("{root}\\"))
+        Some(String::from_utf16_lossy(&buffer[..size as usize]))
     }
+}
+
+#[cfg(windows)]
+fn process_path_is_in_zapret_root(image_path: &str, zapret_root: &Path) -> bool {
+    let root = zapret_root.to_string_lossy()
+        .trim_end_matches(|ch| ch == '\\' || ch == '/')
+        .to_ascii_lowercase();
+    image_path.to_ascii_lowercase().starts_with(&format!("{root}\\"))
+}
+
+#[cfg(windows)]
+fn process_image_matches(handle: HANDLE, expected_exe_name: &str, zapret_root: &Path) -> bool {
+    let Some(image_path) = process_image_path(handle) else {
+        return false;
+    };
+    let Some(name) = Path::new(&image_path).file_name().and_then(|name| name.to_str()) else {
+        return false;
+    };
+    name.eq_ignore_ascii_case(expected_exe_name)
+        && process_path_is_in_zapret_root(&image_path, zapret_root)
+}
+
+#[cfg(windows)]
+fn find_external_winws_processes(zapret_root: &Path) -> Vec<String> {
+    let targets = ["winws2.exe", "winws.exe", "winws2-split.exe"];
+    let mut conflicts = Vec::new();
+    unsafe {
+        let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+        if snapshot == 0 || snapshot == -1isize {
+            return conflicts;
+        }
+        let mut entry: PROCESSENTRY32W = std::mem::zeroed();
+        entry.dwSize = std::mem::size_of::<PROCESSENTRY32W>() as u32;
+        if Process32FirstW(snapshot, &mut entry) != 0 {
+            loop {
+                let length = entry.szExeFile.iter()
+                    .position(|unit| *unit == 0)
+                    .unwrap_or(entry.szExeFile.len());
+                let name = String::from_utf16_lossy(&entry.szExeFile[..length]);
+                if targets.iter().any(|target| name.eq_ignore_ascii_case(target)) {
+                    let process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, entry.th32ProcessID);
+                    if process != 0 {
+                        if let Some(image_path) = process_image_path(process) {
+                            if !process_path_is_in_zapret_root(&image_path, zapret_root) {
+                                conflicts.push(format!("{image_path} (PID {})", entry.th32ProcessID));
+                            }
+                        }
+                        let _ = CloseHandle(process);
+                    }
+                }
+                if Process32NextW(snapshot, &mut entry) == 0 {
+                    break;
+                }
+            }
+        }
+        let _ = CloseHandle(snapshot);
+    }
+    conflicts
 }
 
 /// Mirrors zapret2-gui's Windows doctor: enumerate by image name, open each
@@ -708,6 +755,15 @@ fn launch_zapret(restart: bool, strategy_id: String, mode: super::zapret::Zapret
     let args = launch.args;
     let engine = launch.strategy.engine.to_string();
     let strategy_id = launch.strategy.id.to_string();
+
+    let external_processes = find_external_winws_processes(&bin_dir);
+    if !external_processes.is_empty() {
+        return error_response(
+            "zapretConflict",
+            format!("Другой экземпляр Zapret/WinDivert уже работает: {}", external_processes.join("; ")),
+            StatusCode::CONFLICT,
+        );
+    }
 
     if let Err(error) = stop_managed_zapret(&mut managed) {
         return error_response("zapretStopFailed", error.to_string(), StatusCode::INTERNAL_SERVER_ERROR);
