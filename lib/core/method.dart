@@ -32,6 +32,7 @@ enum CoreMethod {
   outboundIp,
   serviceCheck,
   zapretCdnCheck,
+  getAppliedHosts,
   getConnections,
   getConnectionCount,
   closeConnections,

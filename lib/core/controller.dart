@@ -328,6 +328,8 @@ class CoreController {
   Future<OutboundIpResult?> outboundIp(OutboundIpParams params) =>
       _interface.outboundIp(params);
 
+  Future<Map<String, String>> getAppliedHosts() => _interface.getAppliedHosts();
+
   Future<List<Map<String, dynamic>>> zapretCdnCheck() => _interface.zapretCdnCheck();
 
   Future<List<ServiceCheckItem>> serviceCheck(ServiceCheckParams params) =>

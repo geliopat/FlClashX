@@ -1,5 +1,6 @@
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/features/form/form.dart';
+import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -175,6 +176,11 @@ class SmartHostsView extends ConsumerWidget {
                 subtitle: Text('${state.entries.length}'),
                 widget: _SmartHostsEntries(entries: state.entries),
               ),
+              ListItem.open(
+                title: const Text('Просмотр итогового Hosts'),
+                subtitle: const Text('Все записи, применённые в Mihomo'),
+                widget: const _AppliedHostsView(),
+              ),
             ],
           ),
         ],
@@ -183,9 +189,64 @@ class SmartHostsView extends ConsumerWidget {
   }
 }
 
+class _AppliedHostsView extends ConsumerStatefulWidget {
+  const _AppliedHostsView();
+
+  @override
+  ConsumerState<_AppliedHostsView> createState() => _AppliedHostsViewState();
+}
+
+class _AppliedHostsViewState extends ConsumerState<_AppliedHostsView> {
+  late Future<Map<String, String>> _entries;
+
+  @override
+  void initState() {
+    super.initState();
+    _entries = _load();
+  }
+
+  Future<Map<String, String>> _load() async {
+    if (ref.read(coreStatusProvider) != CoreStatus.connected) {
+      throw StateError('Ядро Mihomo недоступно');
+    }
+    return ref.read(coreHandlerProvider).getAppliedHosts();
+  }
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<Map<String, String>>(
+    future: _entries,
+    builder: (context, snapshot) {
+      if (snapshot.connectionState == ConnectionState.done && snapshot.hasData) {
+        return _SmartHostsEntries(
+          entries: snapshot.data!,
+          title: 'Итоговый Hosts',
+        );
+      }
+      return CommonScaffold(
+        title: 'Итоговый Hosts',
+        body: Center(
+          child: snapshot.connectionState != ConnectionState.done
+              ? const CircularProgressIndicator()
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('Не удалось получить применённые Hosts: ${snapshot.error}'),
+                    TextButton(
+                      onPressed: () => setState(() => _entries = _load()),
+                      child: const Text('Повторить'),
+                    ),
+                  ],
+                ),
+        ),
+      );
+    },
+  );
+}
+
 class _SmartHostsEntries extends StatefulWidget {
-  const _SmartHostsEntries({required this.entries});
+  const _SmartHostsEntries({required this.entries, this.title = 'Полученные Hosts'});
   final Map<String, String> entries;
+  final String title;
   @override
   State<_SmartHostsEntries> createState() => _SmartHostsEntriesState();
 }
@@ -195,10 +256,11 @@ class _SmartHostsEntriesState extends State<_SmartHostsEntries> {
   @override
   Widget build(BuildContext context) {
     final entries = widget.entries.entries.where((entry) =>
-      entry.key.contains(_query.toLowerCase()) || entry.value.contains(_query)
-    ).toList();
+      entry.key.toLowerCase().contains(_query.toLowerCase()) ||
+      entry.value.toLowerCase().contains(_query.toLowerCase())
+    ).toList()..sort((a, b) => a.key.compareTo(b.key));
     return CommonScaffold(
-      title: 'Полученные Hosts',
+      title: '${widget.title} (${widget.entries.length})',
       searchState: AppBarSearchState(onSearch: (query) => setState(() => _query = query)),
       body: ListView.builder(
         padding: EdgeInsets.fromLTRB(16, context.contentTopPadding, 16, 16 + context.bottomInset),

@@ -38,6 +38,7 @@ const (
 	outboundIpMethod               CoreMethod = "outboundIp"
 	serviceCheckMethod             CoreMethod = "serviceCheck"
 	zapretCdnCheckMethod           CoreMethod = "zapretCdnCheck"
+	getAppliedHostsMethod          CoreMethod = "getAppliedHosts"
 	getConnectionsMethod           CoreMethod = "getConnections"
 	getConnectionCountMethod       CoreMethod = "getConnectionCount"
 	closeConnectionsMethod         CoreMethod = "closeConnections"

@@ -678,6 +678,24 @@ abstract class CoreHandlerInterface with CoreInterface {
               .toList();
   }
 
+  Future<Map<String, String>> getAppliedHosts() async {
+    final data = await _invokeMethod<Map<String, dynamic>>(
+      method: CoreMethod.getAppliedHosts,
+    );
+    if (data == null) {
+      throw const CoreMethodException(
+        code: 'empty_result',
+        message: 'Mihomo has no applied configuration',
+      );
+    }
+    return data.map((domain, values) {
+      if (values is! List || values.any((value) => value is! String)) {
+        throw const FormatException('Invalid applied Hosts response');
+      }
+      return MapEntry(domain, values.join(', '));
+    });
+  }
+
   Future<List<Map<String, dynamic>>> zapretCdnCheck() async {
     final data = await _invokeMethod<List<dynamic>>(
       method: CoreMethod.zapretCdnCheck,

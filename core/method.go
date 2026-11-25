@@ -213,6 +213,7 @@ var methodHandlers = map[CoreMethod]methodHandler{
 	outboundIpMethod:               withArguments(handleOutboundIp),
 	serviceCheckMethod:             withArguments(handleServiceCheck),
 	zapretCdnCheckMethod:           withoutArguments(handleZapretCdnCheck),
+	getAppliedHostsMethod:          withoutArguments(handleGetAppliedHosts),
 	getTrafficMethod:               withArguments(handleGetTraffic),
 	getTotalTrafficMethod:          withArguments(handleGetTotalTraffic),
 	resetTrafficMethod:             acknowledged(handleResetTraffic),
