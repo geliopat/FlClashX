@@ -163,6 +163,82 @@ void main() {
     );
   });
 
+  test('reads Zapret list metadata through Helper', () async {
+    final client = _client(
+      _ResponseAdapter((options) {
+        expect(options.path, endsWith('/zapret/lists'));
+        return _jsonListResponse([
+          {
+            'filename': 'list-general.txt',
+            'bytes': 120,
+            'entries': 3,
+            'userManaged': false,
+          },
+        ]);
+      }),
+    );
+
+    final lists = await client.zapretLists();
+
+    expect(lists.single.filename, 'list-general.txt');
+    expect(lists.single.entries, 3);
+    expect(lists.single.userManaged, isFalse);
+  });
+
+  test('reads and writes an allow-listed Zapret list', () async {
+    var read = false;
+    final client = _client(
+      _ResponseAdapter((options) {
+        if (options.method == 'GET') {
+          read = true;
+          expect(options.path, endsWith('/zapret/lists/list-general.txt'));
+          return _jsonResponse({
+            'filename': 'list-general.txt',
+            'content': 'example.org\\n',
+          });
+        }
+        expect(read, isTrue);
+        expect(options.method, 'PUT');
+        expect(options.data, {'content': 'example.org\\ncustom.org\\n'});
+        return _jsonResponse({
+          'filename': 'list-general.txt',
+          'bytes': 24,
+          'entries': 2,
+          'userManaged': false,
+        });
+      }),
+    );
+
+    final loaded = await client.readZapretList('list-general.txt');
+    final saved = await client.writeZapretList(
+      'list-general.txt',
+      'example.org\\ncustom.org\\n',
+    );
+
+    expect(loaded.content, 'example.org\\n');
+    expect(saved.entries, 2);
+  });
+
+  test('restores a Zapret list backup through Helper', () async {
+    final client = _client(
+      _ResponseAdapter((options) {
+        expect(options.method, 'POST');
+        expect(options.path, endsWith('/zapret/lists/list-general.txt/restore'));
+        return _jsonResponse({
+          'filename': 'list-general.txt',
+          'bytes': 12,
+          'entries': 1,
+          'userManaged': false,
+        });
+      }),
+    );
+
+    final result = await client.restoreZapretList('list-general.txt');
+
+    expect(result.filename, 'list-general.txt');
+    expect(result.entries, 1);
+  });
+
   test('reads the port from the key the Windows service publishes it in', () {
     final peer = File('services/helper/src/service/peer.rs').readAsStringSync();
 
