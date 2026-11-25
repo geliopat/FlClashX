@@ -346,7 +346,7 @@ hooks:
       expect(script, contains('delete "FlClashXPreHelperService"'));
       expect(
         script,
-        matches(RegExp(r'procedure ShutDownApp;[\\s\\S]+?RetirePreHelperService;')),
+        matches(RegExp(r'procedure ShutDownApp;[\s\S]+?RetirePreHelperService;')),
       );
     });
 
