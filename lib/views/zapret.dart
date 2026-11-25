@@ -110,7 +110,7 @@ class ZapretView extends ConsumerWidget {
         items: [
           ListItem(
             title: Text(zapret.testProgress ?? 'Проверить все стратегии'),
-            subtitle: const Text('Проверка DIRECT через Mihomo, затем подтверждение YouTube и Discord. Исходное состояние восстанавливается.'),
+            subtitle: const Text('Проверка DIRECT через Mihomo, затем подтверждение YouTube, Discord Gateway и Voice. Исходное состояние восстанавливается.'),
             onTap: zapret.busy ? null : () => ref.read(zapretControllerProvider.notifier).testStrategies(),
           ),
           if (zapret.testProgress != null)
@@ -118,7 +118,7 @@ class ZapretView extends ConsumerWidget {
           for (final trial in zapret.trials)
             ListItem(
               title: Text(trial.id),
-              subtitle: Text(trial.confirmed ? 'Подтверждено · ${trial.delay} мс · ${trial.score}/4' : 'Не подтверждено'),
+              subtitle: Text(trial.confirmed ? 'Подтверждено · ${trial.delay} мс · ${trial.score}/6' : 'Не подтверждено'),
               onTap: zapret.busy || !trial.confirmed ? null : () => ref.read(zapretControllerProvider.notifier).applyTrial(trial),
             ),
           ListItem(

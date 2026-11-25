@@ -2,9 +2,8 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:fl_clash/common/system.dart';
-import 'package:fl_clash/models/models.dart';
-import 'package:fl_clash/providers/core.dart';
 import 'package:fl_clash/providers/app.dart';
+import 'package:fl_clash/providers/zapret_diagnostics.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/core/desktop/helper_client.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -479,24 +478,20 @@ class ZapretController extends Notifier<ZapretState> {
   void cancelTrials() => _cancelTrial = true;
 
   Future<int?> _screen() async {
-    final result = await ref.read(coreHandlerProvider).getDelay(
-      'https://www.youtube.com/generate_204', 'DIRECT', const Duration(seconds: 4));
-    return result?.value;
+    final results = await measureZapretTargets(ref, [ZapretProbeTarget.youtube]);
+    final result = results[ZapretProbeTarget.youtube];
+    return result?.message == 'DIRECT · HTTP 2xx' ? result?.latencyMs : null;
   }
 
   Future<ZapretTrial> _verify(String id, ZapretMode mode) async {
-    final core = ref.read(coreHandlerProvider);
-    final items = await core.serviceCheck(const ServiceCheckParams(
-      proxyName: 'DIRECT', names: ['youtube', 'discord'], timeout: 6000));
-    final good = items.where((item) => item.status == 'available' &&
-        item.delay > 0 && item.chains.isNotEmpty &&
-        item.chains.first == 'DIRECT').toList();
-    final score = good.fold<int>(0, (sum, item) => sum + (item.delay <= 450 ? 2 : 1));
-    final delay = good.fold<int>(0, (sum, item) => sum + item.delay);
+    const targets = [ZapretProbeTarget.youtube, ZapretProbeTarget.discordGateway, ZapretProbeTarget.discordVoice];
+    final items = await measureZapretTargets(ref, targets);
+    final good = items.values.where((item) => item.message == 'DIRECT · HTTP 2xx' && item.latencyMs != null).toList();
+    final score = good.fold<int>(0, (sum, item) => sum + (item.latencyMs! <= 450 ? 2 : 1));
+    final delay = good.fold<int>(0, (sum, item) => sum + item.latencyMs!);
     final status = await _client.zapretStatus();
     return ZapretTrial(id, mode, status.running && status.strategyId == id ? score : 0,
-        delay, confirmed: status.running && status.strategyId == id &&
-        good.map((item) => item.name).toSet().containsAll(['youtube', 'discord']));
+        delay, confirmed: status.running && status.strategyId == id && good.length == targets.length);
   }
 
   /// Two-phase adaptation of Zapret2 GUI: screen all installed profiles, then
@@ -570,7 +565,9 @@ class ZapretController extends Notifier<ZapretState> {
       }
       _wantedRunning = original.running || originalWanted;
       _wantedStrategy = original.strategyId ?? originalWantedId;
-      _wantedMode = original.mode == 'strictSplit' ? ZapretMode.strictSplit : originalWantedMode;
+      _wantedMode = original.running
+          ? (original.mode == 'strictSplit' ? ZapretMode.strictSplit : ZapretMode.fullBypass)
+          : originalWantedMode;
       if (ref.mounted) {
         state = state.copyWith(busy: false, clearTestProgress: true,
             trials: _cancelTrial ? const [] : List.unmodifiable(results), error: failure);
@@ -600,6 +597,7 @@ class ZapretController extends Notifier<ZapretState> {
       final originalMode = state.activeMode == 'strictSplit' ? ZapretMode.strictSplit : ZapretMode.fullBypass;
       final current = await _verify(originalId, originalMode);
       if (state.busy || state.activeStrategyId != originalId || !state.running) return;
+      if (!state.autoFallback || ref.read(coreStatusProvider) != CoreStatus.connected) return;
       if (current.confirmed) {
         _failedChecks = 0;
         return;

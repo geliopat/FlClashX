@@ -543,6 +543,7 @@ class GeneralView extends ConsumerWidget {
         update: (state, value) => state.copyWith(ipv6: value),
       ),
       const HostsItem(),
+      if (system.isWindows) const MihomoWatchdogItem(),
       if (system.isWindows)
         ListItem.open(
           title: const Text('Умный Hosts'),
@@ -671,6 +672,21 @@ class ZapretProbeIntervalItem extends ConsumerWidget {
       value: ref.watch(zapretProbeIntervalProvider),
       textBuilder: (value) => value == 0 ? 'Отключено' : '$value сек.',
       onChanged: (value) => ref.read(zapretProbeIntervalProvider.notifier).update(value),
+    );
+  }
+}
+
+class MihomoWatchdogItem extends ConsumerWidget {
+  const MihomoWatchdogItem({super.key});
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return ListItem(
+      title: const Text('Watchdog Mihomo'),
+      subtitle: const Text('Восстановление ядра после аварийного завершения'),
+      trailing: Switch(
+        value: ref.watch(mihomoWatchdogProvider),
+        onChanged: ref.read(mihomoWatchdogProvider.notifier).setEnabled,
+      ),
     );
   }
 }

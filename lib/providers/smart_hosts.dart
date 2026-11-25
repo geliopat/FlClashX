@@ -28,7 +28,9 @@ Map<String, String> parseSmartHosts(String content, {bool includeAdblock = false
     for (final value in parts.skip(1)) {
       final domain = value.toLowerCase();
       if (domain.length > 253 || !_domain.hasMatch(domain) ||
-          domain == 'localhost' || domain == 'ip6-localhost') continue;
+          domain == 'localhost' || domain == 'ip6-localhost') {
+        continue;
+      }
       result.putIfAbsent(domain, () => ip.address);
       if (result.length >= _maxEntries) return result;
     }

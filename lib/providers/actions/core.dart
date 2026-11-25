@@ -98,6 +98,9 @@ class CoreAction extends _$CoreAction {
 
   /// Restarting a Core that keeps falling would only hide why it falls.
   Future<void> restartAfterCrash(String reason) async {
+    if (system.isWindows && !ref.read(mihomoWatchdogProvider)) {
+      return;
+    }
     final restartedAt = _crashRestartedAt;
     final restartFailed =
         _restartingAfterCrash ||

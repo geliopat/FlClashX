@@ -1,7 +1,10 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:dio/dio.dart';
+import 'package:fl_clash/enum/enum.dart';
+import 'package:fl_clash/models/models.dart';
+import 'package:fl_clash/providers/core.dart';
+import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/providers/zapret.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -116,42 +119,63 @@ class ZapretDiagnosticsState {
       results[target] ?? const ZapretProbeResult();
 }
 
+/// Never use the Windows resolver or system HTTP proxy for these tests:
+/// the existing service-check RPC explicitly dials the Mihomo DIRECT adapter.
+Future<Map<ZapretProbeTarget, ZapretProbeResult>> measureZapretTargets(
+  Ref ref, Iterable<ZapretProbeTarget> targets,
+) async {
+  final wanted = targets.toList();
+  if (ref.read(coreStatusProvider) != CoreStatus.connected) {
+    return {for (final target in wanted) target: const ZapretProbeResult(message: 'Ядро Mihomo недоступно')};
+  }
+  try {
+    final items = await ref.read(coreHandlerProvider).serviceCheck(ServiceCheckParams(
+      proxyName: 'DIRECT',
+      names: wanted.map((target) => 'zapret-${target.name}').toList(),
+      timeout: 3500,
+    ));
+    return {
+      for (final target in wanted)
+        target: _fromService(items.where((item) => item.name == 'zapret-${target.name}').firstOrNull),
+    };
+  } catch (error) {
+    return {for (final target in wanted) target: ZapretProbeResult(message: 'Проверка DIRECT недоступна: $error')};
+  }
+}
+
+ZapretProbeResult _fromService(ServiceCheckItem? item) {
+  if (item == null) return const ZapretProbeResult(message: 'Ответ ядра отсутствует');
+  if (item.delay > 0) {
+    if (item.chains.isEmpty || item.chains.any((chain) => chain != 'DIRECT')) {
+      return const ZapretProbeResult(message: 'DIRECT не подтверждён');
+    }
+    if (item.status == 'available') {
+      return ZapretProbeResult(
+        status: item.delay <= 450 ? ZapretProbeStatus.operational : ZapretProbeStatus.degraded,
+        latencyMs: item.delay,
+        message: 'DIRECT · HTTP 2xx',
+      );
+    }
+    return ZapretProbeResult(
+      status: ZapretProbeStatus.degraded,
+      latencyMs: item.delay,
+      message: 'DIRECT · HTTP: ${item.status}',
+    );
+  }
+  if (item.status == 'timeout' || item.status == 'failed') {
+    return ZapretProbeResult(status: ZapretProbeStatus.blocked, message: 'DIRECT · ${item.status}');
+  }
+  return const ZapretProbeResult(message: 'Нет подтверждённого результата');
+}
+
 class ZapretDiagnosticsController extends Notifier<ZapretDiagnosticsState> {
-  static const _dnsTimeout = Duration(seconds: 2);
-  static const _connectTimeout = Duration(milliseconds: 2500);
-  static const _requestTimeout = Duration(milliseconds: 3500);
-
-  final Dio _client = Dio(
-    BaseOptions(
-      connectTimeout: _connectTimeout,
-      receiveTimeout: _requestTimeout,
-      sendTimeout: _connectTimeout,
-      responseType: ResponseType.plain,
-      followRedirects: true,
-      maxRedirects: 3,
-      validateStatus: (status) =>
-          status != null && status >= 100 && status < 600,
-      headers: const {
-        'Cache-Control': 'no-cache',
-        'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      },
-    ),
-  );
-
   Timer? _poller;
   var _refreshing = false;
 
   @override
   ZapretDiagnosticsState build() {
-    ref.onDispose(() {
-      _poller?.cancel();
-      _client.close(force: true);
-    });
+    ref.onDispose(() => _poller?.cancel());
     if (Platform.isWindows) {
-      scheduleMicrotask(() {
-        if (ref.mounted) unawaited(refresh());
-      });
       void configure(int seconds) {
         _poller?.cancel();
         if (seconds > 0) {
@@ -161,7 +185,19 @@ class ZapretDiagnosticsController extends Notifier<ZapretDiagnosticsState> {
         }
       }
       configure(ref.read(zapretProbeIntervalProvider));
-      ref.listen(zapretProbeIntervalProvider, (_, value) => configure(value));
+      ref.listen(zapretProbeIntervalProvider, (_, value) {
+        configure(value);
+        if (value > 0) unawaited(refresh());
+      });
+      ref.listen(coreStatusProvider, (_, value) {
+        if (value == CoreStatus.connected) unawaited(refresh());
+      });
+      ref.listen(zapretControllerProvider.select((s) => (s.running, s.pid, s.activeMode, s.busy)), (before, after) {
+        if (!after.$4 && before != after) unawaited(refresh());
+      });
+      scheduleMicrotask(() {
+        if (ref.mounted) unawaited(refresh());
+      });
     }
     return ZapretDiagnosticsState({
       for (final target in ZapretProbeTarget.values)
@@ -173,70 +209,15 @@ class ZapretDiagnosticsController extends Notifier<ZapretDiagnosticsState> {
     if (!Platform.isWindows || !ref.mounted || _refreshing || ref.read(zapretControllerProvider).busy) return;
     _refreshing = true;
     try {
-      final measured = await Future.wait(
-        ZapretProbeTarget.values.map(_measure),
-      );
+      final before = ref.read(zapretControllerProvider);
+      final results = await measureZapretTargets(ref, ZapretProbeTarget.values);
       if (!ref.mounted) return;
-      state = ZapretDiagnosticsState({
-        for (final item in measured) item.$1: item.$2,
-      });
+      final after = ref.read(zapretControllerProvider);
+      if (after.busy || after.pid != before.pid) return;
+      state = ZapretDiagnosticsState(results);
+      unawaited(ref.read(zapretControllerProvider.notifier).checkFallback());
     } finally {
       _refreshing = false;
-    }
-    if (ref.mounted) unawaited(ref.read(zapretControllerProvider.notifier).checkFallback());
-  }
-
-  Future<(ZapretProbeTarget, ZapretProbeResult)> _measure(
-    ZapretProbeTarget target,
-  ) async {
-    // Match zapret2-gui: DNS is a separate phase and is not added to the
-    // displayed HTTPS latency.
-    try {
-      final addresses = await InternetAddress.lookup(target.host).timeout(
-        _dnsTimeout,
-      );
-      if (addresses.isEmpty) {
-        return (
-          target,
-          const ZapretProbeResult(
-            status: ZapretProbeStatus.blocked,
-            message: 'DNS: адрес не найден',
-          ),
-        );
-      }
-    } catch (error) {
-      return (
-        target,
-        ZapretProbeResult(
-          status: ZapretProbeStatus.blocked,
-          message: 'Ошибка DNS: $error',
-        ),
-      );
-    }
-
-    final stopwatch = Stopwatch()..start();
-    try {
-      final response = await _client.get<String>(target.url);
-      stopwatch.stop();
-      return (
-        target,
-        classifyZapretProbe(
-          statusCode: response.statusCode,
-          latencyMs: stopwatch.elapsedMilliseconds,
-        ),
-      );
-    } catch (error) {
-      stopwatch.stop();
-      final message = error is DioException
-          ? error.message ?? error.type.name
-          : error.toString();
-      return (
-        target,
-        ZapretProbeResult(
-          status: ZapretProbeStatus.blocked,
-          message: message,
-        ),
-      );
     }
   }
 }

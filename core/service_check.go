@@ -119,6 +119,15 @@ var serviceCheckers = []serviceChecker{
 	{name: "kinopoisk", check: checkReachable("https://www.kinopoisk.ru/")},
 }
 
+// Explicit Zapret requests reuse the existing Mihomo probe transport and DNS.
+// They are not part of the generic service-unlock sweep.
+var zapretCheckers = []serviceChecker{
+	{name: "zapret-youtube", check: checkReachable("https://www.youtube.com/generate_204")},
+	{name: "zapret-googleVideo", check: checkReachable("https://redirector.googlevideo.com/report_mapping")},
+	{name: "zapret-discordGateway", check: checkReachable("https://discord.com/api/v10/gateway")},
+	{name: "zapret-discordVoice", check: checkReachable("https://discord.com/api/v10/voice/regions")},
+}
+
 func handleServiceCheck(params *ServiceCheckParams) []ServiceCheckItem {
 	wanted := selectedCheckers(params.Names)
 	items := make([]ServiceCheckItem, len(wanted))
@@ -229,7 +238,7 @@ func selectedCheckers(names []string) []serviceChecker {
 	}
 	wanted := make([]serviceChecker, 0, len(names))
 	for _, name := range names {
-		for _, checker := range serviceCheckers {
+		for _, checker := range append(append([]serviceChecker(nil), serviceCheckers...), zapretCheckers...) {
 			if checker.name == name {
 				wanted = append(wanted, checker)
 				break
