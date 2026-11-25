@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:fl_clash/common/boot_guard.dart';
+import 'package:fl_clash/common/component_integrity.dart';
 import 'package:fl_clash/common/boot_record.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/system_notification.dart';
@@ -205,6 +206,10 @@ class Bootstrap {
     if (system.isWindows && !_container.read(safeModeProvider)) {
       _container.read(coreStatusProvider.notifier).value = CoreStatus.connecting;
       try {
+        final integrity = await checkWindowsComponents();
+        if (integrity.isNotEmpty) {
+          throw StateError('Component integrity: ${integrity.join(', ')}');
+        }
         await windows!.ensureHelperReady();
         // The dashboard might have queried the previous (or missing) Helper
         // while the window was opening. Reload the catalog from the new one.

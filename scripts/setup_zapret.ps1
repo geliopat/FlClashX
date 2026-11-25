@@ -107,6 +107,16 @@ try {
         $Path = Join-Path $AssetDir $Name
         if (-not (Test-Path $Path -PathType Leaf) -or (Get-Item $Path).Length -eq 0) { throw "Required Zapret asset is missing or empty: $Name" }
     }
+    # Only immutable binaries, payloads and packaged strategies are hashed.
+    # User-editable lists remain outside the manifest.
+    $Hashes = [ordered]@{}
+    Get-ChildItem -Path $AssetDir -Recurse -File | Where-Object {
+        $_.Extension -in @('.exe','.dll','.sys','.bin','.lua','.bat','.cmd')
+    } | Sort-Object FullName | ForEach-Object {
+        $Relative = [System.IO.Path]::GetRelativePath($AssetDir, $_.FullName).Replace('\','/')
+        $Hashes[$Relative] = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+    }
+    $Hashes | ConvertTo-Json -Depth 3 | Set-Content -Path (Join-Path $AssetDir 'integrity.json') -Encoding utf8
     Write-Host "Zapret2 and Flowseal Windows assets staged in $AssetDir"
 } finally {
     if (Test-Path $TempRoot) { Remove-Item -Path $TempRoot -Recurse -Force -ErrorAction SilentlyContinue }

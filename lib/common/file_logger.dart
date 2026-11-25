@@ -44,7 +44,7 @@ class FileLogger {
   int _size = 0;
 
   static final _dayPattern = RegExp(
-    r'^FlClashX_(\d{4}-\d{2}-\d{2})(?:_\d+)?\.log$',
+    r'^FlClash[ZX]_(\d{4}-\d{2}-\d{2})(?:_\d+)?\.log$',
   );
 
   static Future<String> _defaultDirectory() async =>

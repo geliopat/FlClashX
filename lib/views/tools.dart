@@ -20,6 +20,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'config/advanced.dart';
 import 'config/custom_resources.dart';
 import 'developer.dart';
+import 'diagnostics.dart';
 import 'disclaimer.dart';
 import 'theme.dart';
 import 'zapret_settings.dart';
@@ -61,6 +62,7 @@ class _ToolViewState extends ConsumerState<ToolsView> {
           const _LocaleItem(),
           const _ThemeItem(),
           if (Platform.isWindows) const _ZapretItem(),
+          if (Platform.isWindows) const _DiagnosticsItem(),
           const _GeneralItem(),
         ],
       );
@@ -76,6 +78,7 @@ class _ToolViewState extends ConsumerState<ToolsView> {
         const _AdvancedConfigItem(),
         const _CustomResourcesItem(),
         if (Platform.isWindows) const _ZapretItem(),
+          if (Platform.isWindows) const _DiagnosticsItem(),
         const _GeneralItem(),
       ],
       footer: [
@@ -251,6 +254,17 @@ class _ZapretItem extends StatelessWidget {
       widget: const ZapretSettingsView(),
     );
   }
+}
+
+class _DiagnosticsItem extends StatelessWidget {
+  const _DiagnosticsItem();
+
+  @override
+  Widget build(BuildContext context) => ListItem.open(
+    leading: const Icon(Icons.health_and_safety_outlined),
+    title: Text(Localizations.localeOf(context).languageCode == 'ru' ? 'Диагностика' : 'Diagnostics'),
+    widget: const DiagnosticsView(),
+  );
 }
 
 class _GeneralItem extends StatelessWidget {

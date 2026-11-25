@@ -44,6 +44,9 @@ class SetupAction extends _$SetupAction {
   _RunRequest? _latestRunRequest;
   DateTime? _startTime;
   _SetupInputs? _appliedInputs;
+  final _builtHostCandidates = <String, HostCandidates>{};
+  HostCandidates _appliedHostCandidates = const {};
+  HostCandidates get appliedHostCandidates => _appliedHostCandidates;
   var _lastPushDuration = Duration.zero;
   var _pendingForceApply = false;
   var _pushes = 0;
@@ -729,8 +732,11 @@ class SetupAction extends _$SetupAction {
     if (hasScript) {
       rawConfig = await handleEvaluate(scriptContent!, rawConfig);
     }
+    HostCandidates? hostCandidates;
     if (system.isWindows && !ref.read(safeModeProvider)) {
-      rawConfig = mergeSmartHosts(rawConfig, patchConfig.hosts, ref.read(smartHostsProvider).entries);
+      final smart = ref.read(smartHostsProvider);
+      hostCandidates = collectHostCandidates(rawConfig['hosts'], patchConfig.hosts, smart.candidates);
+      rawConfig = mergeSmartHosts(rawConfig, patchConfig.hosts, smart.entries);
     }
     final directory = await appPath.profilesPath;
     final injected = await _resolveInjectedProviders(
@@ -766,6 +772,15 @@ class SetupAction extends _$SetupAction {
         proxyChains: setupState.proxyChains,
       ),
     );
+    if (hostCandidates != null) {
+      final digest = profileBase == null
+          ? res.md5
+          : '${res.md5}${profileBase.base.digest}${matchOverride ?? ''}'.toMd5();
+      _builtHostCandidates[digest] = hostCandidates;
+      while (_builtHostCandidates.length > 4) {
+        _builtHostCandidates.remove(_builtHostCandidates.keys.first);
+      }
+    }
     if (profileBase == null) {
       return (yaml: res.yaml, md5: res.md5, counts: res.counts, base: null);
     }
@@ -1037,8 +1052,10 @@ class SetupAction extends _$SetupAction {
     };
     final yamlString = realProfile?.yaml ?? '';
     final yamlMd5 = realProfile?.md5 ?? '';
+    final hostCandidates = _builtHostCandidates.remove(yamlMd5) ?? const <String, Map<String, String>>{};
     if (!profileFailed && yamlMd5 == globalState.lastConfigMd5 && !force) {
       _appliedInputs = inputs;
+      _appliedHostCandidates = hostCandidates;
       globalState.lastConfigCounts = realProfile.counts;
       await preloadInvoke?.call();
       await _syncZapretInfrastructure(realProfile, profile?.id);
@@ -1047,6 +1064,7 @@ class SetupAction extends _$SetupAction {
     // Go answers a config it rejects by running its built-in default, which
     // has no proxies, so until this push succeeds no applied config is known.
     _appliedInputs = null;
+    _appliedHostCandidates = const {};
     _pushes++;
     if (system.isWindows) {
       ref.read(proxiesActionProvider.notifier).cancelDelayTests();
@@ -1097,6 +1115,7 @@ class SetupAction extends _$SetupAction {
             throw MessageException(message);
           }
           accepted = !profileFailed;
+          if (accepted) _appliedHostCandidates = hostCandidates;
         } catch (e, s) {
           setupFailed = true;
           if (preloadInvoke != null) {

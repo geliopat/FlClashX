@@ -174,7 +174,7 @@ class SmartHostsView extends ConsumerWidget {
               ListItem.open(
                 title: const Text('Просмотр автоматических записей'),
                 subtitle: Text('${state.entries.length}'),
-                widget: _SmartHostsEntries(entries: state.entries),
+                widget: _SmartHostsEntries(entries: state.entries, candidates: state.candidates),
               ),
               ListItem.open(
                 title: const Text('Просмотр итогового Hosts'),
@@ -197,7 +197,7 @@ class _AppliedHostsView extends ConsumerStatefulWidget {
 }
 
 class _AppliedHostsViewState extends ConsumerState<_AppliedHostsView> {
-  late Future<Map<String, String>> _entries;
+  late Future<({Map<String, String> entries, HostCandidates candidates})> _entries;
 
   @override
   void initState() {
@@ -205,20 +205,25 @@ class _AppliedHostsViewState extends ConsumerState<_AppliedHostsView> {
     _entries = _load();
   }
 
-  Future<Map<String, String>> _load() async {
+  Future<({Map<String, String> entries, HostCandidates candidates})> _load() async {
     if (ref.read(coreStatusProvider) != CoreStatus.connected) {
       throw StateError('Ядро Mihomo недоступно');
     }
-    return ref.read(coreHandlerProvider).getAppliedHosts();
+    final setup = ref.read(setupActionProvider.notifier);
+    final before = setup.pushes;
+    final candidates = setup.appliedHostCandidates;
+    final entries = await ref.read(coreHandlerProvider).getAppliedHosts();
+    return (entries: entries, candidates: setup.pushes == before ? candidates : const {});
   }
 
   @override
-  Widget build(BuildContext context) => FutureBuilder<Map<String, String>>(
+  Widget build(BuildContext context) => FutureBuilder<({Map<String, String> entries, HostCandidates candidates})>(
     future: _entries,
     builder: (context, snapshot) {
       if (snapshot.connectionState == ConnectionState.done && snapshot.hasData) {
         return _SmartHostsEntries(
-          entries: snapshot.data!,
+          entries: snapshot.data!.entries,
+          candidates: snapshot.data!.candidates,
           title: 'Итоговый Hosts',
         );
       }
@@ -244,7 +249,8 @@ class _AppliedHostsViewState extends ConsumerState<_AppliedHostsView> {
 }
 
 class _SmartHostsEntries extends StatefulWidget {
-  const _SmartHostsEntries({required this.entries, this.title = 'Полученные Hosts'});
+  const _SmartHostsEntries({required this.entries, this.title = 'Полученные Hosts', this.candidates = const {}});
+  final HostCandidates candidates;
   final Map<String, String> entries;
   final String title;
   @override
@@ -253,22 +259,50 @@ class _SmartHostsEntries extends StatefulWidget {
 
 class _SmartHostsEntriesState extends State<_SmartHostsEntries> {
   String _query = '';
+  bool _conflictsOnly = false;
+  String _source(String source) => switch (source) {
+    'profile' => 'Профиль / скрипт',
+    'manual' => 'Ручные Hosts',
+    _ => smartHostLabel(source.startsWith('auto:') ? source.substring(5) : source),
+  };
+  Map<String, String> _candidates(String domain) => widget.candidates[normalizedHostKey(domain)] ?? const {};
+  bool _conflict(String domain) => _candidates(domain).values.toSet().length > 1;
   @override
   Widget build(BuildContext context) {
     final entries = widget.entries.entries.where((entry) =>
-      entry.key.toLowerCase().contains(_query.toLowerCase()) ||
-      entry.value.toLowerCase().contains(_query.toLowerCase())
+      (!_conflictsOnly || _conflict(entry.key)) &&
+      (entry.key.toLowerCase().contains(_query.toLowerCase()) ||
+      entry.value.toLowerCase().contains(_query.toLowerCase()) ||
+      _candidates(entry.key).keys.any((source) => _source(source).toLowerCase().contains(_query.toLowerCase())))
     ).toList()..sort((a, b) => a.key.compareTo(b.key));
     return CommonScaffold(
       title: '${widget.title} (${widget.entries.length})',
       searchState: AppBarSearchState(onSearch: (query) => setState(() => _query = query)),
       body: ListView.builder(
         padding: EdgeInsets.fromLTRB(16, context.contentTopPadding, 16, 16 + context.bottomInset),
-        itemCount: entries.length,
-        itemBuilder: (context, index) => ListItem(
-          title: Text(entries[index].key),
-          subtitle: Text(entries[index].value),
-        ),
+        itemCount: entries.length + 1,
+        itemBuilder: (context, index) {
+          if (index == 0) {
+            return ListItem(
+              title: const Text('Только конфликты'),
+              subtitle: Text('Конфликтов: ${widget.entries.keys.where(_conflict).length}'),
+              trailing: Switch(value: _conflictsOnly, onChanged: (value) => setState(() => _conflictsOnly = value)),
+            );
+          }
+          final entry = entries[index - 1];
+          final candidates = _candidates(entry.key);
+          final matching = candidates.entries.where((item) => item.value == entry.value).map((item) => _source(item.key)).toList();
+          return ListItem(
+            title: Text(entry.key),
+            subtitle: Text([
+              entry.value,
+              matching.isEmpty ? 'Источник не подтверждён' : 'Совпадает с: ${matching.join(', ')}',
+              if (_conflict(entry.key)) 'Конфликт:',
+              if (_conflict(entry.key))
+                for (final item in candidates.entries) '${_source(item.key)}: ${item.value}',
+            ].join('\n'), maxLines: 12),
+          );
+        },
       ),
     );
   }

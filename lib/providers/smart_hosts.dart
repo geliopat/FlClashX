@@ -174,6 +174,49 @@ class CdnMeasurement {
   );
 }
 
+String smartHostLabel(String id) => switch (id) {
+  'malw' => 'MALW.link',
+  'geohide' => 'GeoHide',
+  'youtube' => 'YouTube CDN',
+  'cdn-measurement' => 'CDN test',
+  _ => id,
+};
+
+String normalizedHostKey(String domain) =>
+    domain.toLowerCase().replaceFirst(RegExp(r'\.$'), '');
+
+String hostValueText(Object? value) =>
+    value is List ? value.join(', ') : value.toString();
+
+typedef HostCandidates = Map<String, Map<String, String>>;
+
+HostCandidates collectHostCandidates(
+  Object? profileHosts,
+  Map<String, String> manual,
+  HostCandidates automatic,
+) {
+  final result = <String, Map<String, String>>{};
+  void add(String domain, String source, Object? value) {
+    result.putIfAbsent(normalizedHostKey(domain), () => {})[source] =
+        hostValueText(value);
+  }
+  if (profileHosts is Map) {
+    for (final entry in profileHosts.entries) {
+      if (entry.key is String) add(entry.key as String, 'profile', entry.value);
+    }
+  }
+  for (final entry in manual.entries) {
+    add(entry.key, 'manual', entry.value);
+  }
+  for (final entry in automatic.entries) {
+    for (final candidate in entry.value.entries) {
+      add(entry.key, candidate.key, candidate.value);
+    }
+  }
+  return Map.unmodifiable(result.map((key, value) =>
+    MapEntry(key, Map<String, String>.unmodifiable(value))));
+}
+
 class SmartHostsState {
   const SmartHostsState({
     this.enabled = false,
@@ -184,6 +227,7 @@ class SmartHostsState {
     this.customSources = const {},
     this.exclusions = const {},
     this.entries = const {},
+    this.candidates = const {},
     this.sourceCounts = const {},
     this.errors = const {},
     this.fallbackSources = const {},
@@ -207,6 +251,7 @@ class SmartHostsState {
   final Map<String, String> customSources;
   final Set<String> exclusions;
   final Map<String, String> entries;
+  final HostCandidates candidates;
   final Map<String, int> sourceCounts;
   final Map<String, String> errors;
   final Set<String> fallbackSources;
@@ -389,6 +434,7 @@ class SmartHostsController extends Notifier<SmartHostsState> {
   void _publish() {
     if (!ref.mounted) return;
     final entries = <String, String>{};
+    final candidates = <String, Map<String, String>>{};
     final counts = <String, int>{};
     _cdnMeasurements.removeWhere((_, record) => DateTime.now().difference(record.checkedAt) >= Duration(days: _ttlDays));
     for (final id in _urls.keys) {
@@ -401,7 +447,8 @@ class SmartHostsController extends Notifier<SmartHostsState> {
       for (final entry in parsed.entries) {
         if (_exclusions.any((key) => protectedHostMatches(key, entry.key))) continue;
         if (id == 'youtube' && _cdnMeasurements[youtubeCluster(entry.key)]?.fast == true) continue;
-        if (entries.length >= _maxEntries) break;
+        if (entries.length >= _maxEntries && !entries.containsKey(entry.key)) continue;
+        candidates.putIfAbsent(entry.key, () => {})['auto:$id'] = entry.value;
         entries.putIfAbsent(entry.key, () => entry.value);
       }
     }
@@ -409,8 +456,9 @@ class SmartHostsController extends Notifier<SmartHostsState> {
       for (final entry in _cdnMeasurements.entries) {
         if (entry.value.fast) continue;
         for (final host in {entry.value.host, for (var rr = 1; rr <= 20; rr++) 'rr$rr---${entry.key}'}) {
-          if (entries.length >= _maxEntries) break;
+          if (entries.length >= _maxEntries && !entries.containsKey(host)) continue;
           if (_exclusions.any((key) => protectedHostMatches(key, host))) continue;
+          candidates.putIfAbsent(host, () => {})['auto:cdn-measurement'] = '127.0.0.2';
           entries.putIfAbsent(host, () => '127.0.0.2');
         }
       }
@@ -428,6 +476,7 @@ class SmartHostsController extends Notifier<SmartHostsState> {
       customSources: Map.unmodifiable(_custom),
       exclusions: Set.unmodifiable(_exclusions),
       entries: Map.unmodifiable(entries),
+      candidates: Map.unmodifiable(candidates.map((key, value) => MapEntry(key, Map<String, String>.unmodifiable(value)))),
       sourceCounts: Map.unmodifiable(counts),
       errors: Map.unmodifiable(_errors),
       fallbackSources: Set.unmodifiable(_fallbackSources.where(_rawCache.containsKey)),
