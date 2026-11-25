@@ -37,6 +37,7 @@ class ZapretState {
   final bool available;
   final bool running;
   final bool busy;
+  final bool dashboardRestarting;
   final bool debugLogs;
   final bool startWithMihomo;
   final bool watchdog;
@@ -63,6 +64,7 @@ class ZapretState {
     this.available = false,
     this.running = false,
     this.busy = false,
+    this.dashboardRestarting = false,
     this.debugLogs = false,
     this.startWithMihomo = false,
     this.watchdog = true,
@@ -90,6 +92,7 @@ class ZapretState {
     bool? available,
     bool? running,
     bool? busy,
+    bool? dashboardRestarting,
     bool? debugLogs,
     bool? startWithMihomo,
     bool? watchdog,
@@ -123,6 +126,7 @@ class ZapretState {
       available: available ?? this.available,
       running: running ?? this.running,
       busy: busy ?? this.busy,
+      dashboardRestarting: dashboardRestarting ?? this.dashboardRestarting,
       debugLogs: debugLogs ?? this.debugLogs,
       startWithMihomo: startWithMihomo ?? this.startWithMihomo,
       watchdog: watchdog ?? this.watchdog,
@@ -745,6 +749,77 @@ class ZapretController extends Notifier<ZapretState> {
       if (ref.mounted) {
         state = state.copyWith(busy: false);
       }
+    }
+  }
+
+  /// Explicit dashboard recovery is allowed even when the Helper catalog
+  /// could not be loaded. Do not replace a service outside the coordinated
+  /// core restart: it may own both processes.
+  Future<void> restartFromDashboard() async {
+    if (!Platform.isWindows || !ref.mounted || state.busy ||
+        state.dashboardRestarting || _coreRestarting || _profileApplying ||
+        ref.read(safeModeProvider)) {
+      return;
+    }
+    state = state.copyWith(dashboardRestarting: true, clearError: true);
+    try {
+      // Keep other strategy operations out of the read-only preflight,
+      // but release busy before the restart worker drains Zapret.
+      state = state.copyWith(busy: true);
+      final bool needsRepair;
+      try {
+        needsRepair = await windows!.helperNeedsRepair();
+      } finally {
+        if (ref.mounted) state = state.copyWith(busy: false);
+      }
+      if (!ref.mounted) return;
+      if (_coreRestarting || _profileApplying || ref.read(safeModeProvider)) {
+        throw StateError('Дождись завершения текущей операции Mihomo');
+      }
+      if (needsRepair || ref.read(coreStatusProvider) != CoreStatus.connected) {
+        final restored = await ref.read(coreActionProvider.notifier)
+            .restartCore(repairHelper: needsRepair);
+        if (!ref.mounted) return;
+        if (!restored || ref.read(coreStatusProvider) != CoreStatus.connected) {
+          throw const HelperException(
+            code: 'helperUpdateFailed',
+            message: 'Не удалось восстановить Mihomo после проверки Helper',
+          );
+        }
+        await loadStrategies();
+        await refresh();
+        if (!ref.mounted) return;
+        if (!state.available) {
+          throw HelperException(
+            code: 'helperZapretStillUnavailable',
+            message: state.error ?? 'Каталог стратегий Zapret недоступен',
+          );
+        }
+        // The core restart already restores a previously running Zapret.
+        // An explicit dashboard start also starts it if it had been off,
+        // but never overrides a VPN stop made during the repair.
+        if (!state.running && ref.read(isStartProvider) && !_launchBlocked) {
+          await restart();
+        }
+        if (!ref.mounted) return;
+        if (!state.running) {
+          throw StateError(ref.read(isStartProvider)
+              ? 'Helper проверен, но Zapret не запущен'
+              : 'Helper проверен. Включи Mihomo перед запуском Zapret');
+        }
+        return;
+      }
+      if (!state.available) await loadStrategies();
+      if (!ref.mounted) return;
+      if (!state.available || _launchBlocked) {
+        throw StateError(state.error ?? 'Запуск Zapret сейчас недоступен');
+      }
+      await restart();
+    } catch (error) {
+      if (ref.mounted) state = state.copyWith(error: _errorMessage(error));
+      rethrow;
+    } finally {
+      if (ref.mounted) state = state.copyWith(dashboardRestarting: false);
     }
   }
 

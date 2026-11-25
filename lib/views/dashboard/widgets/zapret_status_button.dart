@@ -12,10 +12,10 @@ class ZapretStatusButton extends ConsumerWidget {
 
   Future<void> _restart(BuildContext context, WidgetRef ref) async {
     final status = ref.read(zapretControllerProvider);
-    if (status.busy || !status.available) return;
+    if (status.busy || status.dashboardRestarting || ref.read(safeModeProvider)) return;
     final message = status.running
-        ? 'Перезапустить выбранную стратегию Zapret? Перед запуском будут проверены и завершены зависшие процессы winws.exe, winws2.exe и winws2-split.exe.'
-        : 'Запустить выбранную стратегию Zapret? Перед запуском будут проверены и завершены зависшие процессы winws.exe, winws2.exe и winws2-split.exe.';
+        ? 'Перезапустить выбранную стратегию Zapret? Helper будет проверен и при необходимости переустановлен с восстановлением Mihomo. Зависшие процессы нашего Zapret будут завершены.'
+        : 'Запустить выбранную стратегию Zapret? Helper будет проверен и при необходимости переустановлен с восстановлением Mihomo. Зависшие процессы нашего Zapret будут завершены.';
     final confirmed = await dialogs.showMessage(
       title: 'Zapret',
       message: TextSpan(text: message),
@@ -23,7 +23,7 @@ class ZapretStatusButton extends ConsumerWidget {
     );
     if (confirmed != true || !context.mounted) return;
     try {
-      await ref.read(zapretControllerProvider.notifier).restart();
+      await ref.read(zapretControllerProvider.notifier).restartFromDashboard();
     } catch (error) {
       dialogs.showNotifier(
         error is HelperException ? error.message : error.toString(),
@@ -35,7 +35,9 @@ class ZapretStatusButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(zapretControllerProvider);
-    final icon = state.busy
+    final busy = state.busy || state.dashboardRestarting;
+    final safeMode = ref.watch(safeModeProvider);
+    final icon = busy
         ? const SizedBox.square(
             dimension: 18,
             child: CircularProgressIndicator(strokeWidth: 2),
@@ -50,19 +52,19 @@ class ZapretStatusButton extends ConsumerWidget {
         child: iconOnly
             ? IconButton.filled(
                 style: style,
-                onPressed: state.busy || !state.available
+                onPressed: busy || safeMode
                     ? null
                     : () => _restart(context, ref),
                 icon: icon,
               )
             : FilledButton.icon(
                 style: style,
-                onPressed: state.busy || !state.available
+                onPressed: busy || safeMode
                     ? null
                     : () => _restart(context, ref),
                 icon: icon,
-                label: Text(state.busy
-                    ? 'Запуск...'
+                label: Text(busy
+                    ? 'Проверка / запуск...'
                     : state.running
                         ? 'Zapret включён'
                         : 'Zapret выключен'),
@@ -111,7 +113,7 @@ class ProviderZapretButton extends ConsumerWidget {
   static const _duration = Duration(milliseconds: 300);
 
   Future<void> _toggle(WidgetRef ref, ZapretState state) async {
-    if (state.busy || !state.available) return;
+    if (state.busy || state.dashboardRestarting || !state.available) return;
     try {
       await ref
           .read(zapretControllerProvider.notifier)
@@ -159,7 +161,7 @@ class ProviderZapretButton extends ConsumerWidget {
                     width: 1.5,
                   ),
                 ),
-                onPressed: state.busy || !state.available
+                onPressed: state.busy || state.dashboardRestarting || !state.available
                     ? null
                     : () => _toggle(ref, state),
                 child: state.busy

@@ -438,6 +438,17 @@ class Windows {
   Future<AuthorizeCode>? _registration;
   String? _registrationError;
 
+  /// Read-only preflight: never replace a live service here, because it
+  /// may own the current Mihomo process. Repair belongs to the restart worker.
+  Future<bool> helperNeedsRepair() async {
+    final readiness = await helperClient.readiness(
+      timeout: const Duration(seconds: 3),
+      logFailure: false,
+      verifyHelperBinary: true,
+    );
+    return readiness != HelperReadiness.ready || await _hasRetiredHelper();
+  }
+
   Future<HelperReadiness> ensureHelperReady({bool forceReinstall = false}) async {
     final result = await registerService(forceReinstall: forceReinstall);
     if (result == AuthorizeCode.error) {
