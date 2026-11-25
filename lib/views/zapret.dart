@@ -60,8 +60,8 @@ class ZapretView extends ConsumerWidget {
           title: Text('Все результаты (${zapret.trials.length})'),
           content: SizedBox(
             width: 650,
+            height: 400,
             child: ListView(
-              shrinkWrap: true,
               children: [
                 for (final trial in zapret.trials)
                   ListItem(
@@ -200,18 +200,18 @@ class ZapretView extends ConsumerWidget {
             ListItem(title: const Text('Отменить тестирование'), onTap: ref.read(zapretControllerProvider.notifier).cancelTrials),
           if (zapret.testSummary != null)
             ListItem(title: const Text('Результат проверки'), subtitle: Text(zapret.testSummary!, maxLines: 5)),
-          if (zapret.trials.isNotEmpty) ...[
+          if (zapret.trials.isNotEmpty || zapret.testSummary != null) ...[
             ListItem(
               title: const Text('Статистика стратегий'),
               subtitle: Text('Успешно: $confirmedTrials · частично: $partial\n'
                   'Не прошли: $failed · ошибки: $errors\n'
                   'Только отбор: $screened · без результата: ${(zapret.strategies.length - zapret.trials.length).clamp(0, zapret.strategies.length)}'),
-              onTap: showAllTrials,
+              onTap: zapret.trials.isEmpty ? null : showAllTrials,
             ),
             ListItem(
               title: const Text('Все результаты проверки'),
               subtitle: Text('${zapret.trials.length} стратегий · детали по каждому сервису'),
-              onTap: showAllTrials,
+              onTap: zapret.trials.isEmpty ? null : showAllTrials,
             ),
             ListItem(
               title: const Text('Топ-5 стратегий'),
