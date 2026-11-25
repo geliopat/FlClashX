@@ -502,7 +502,7 @@ class Windows {
       final result = await registerHelperService(
         _installAndWait,
         forceReinstall: forceReinstall || retired,
-        verifyCoreOnMismatch: _verifyBundledCore,
+        verifyBundledCore: _verifyBundledCore,
         verifyHelperBinary: true,
       );
       if (result != AuthorizeCode.error && await _hasRetiredHelper()) {
@@ -525,7 +525,7 @@ typedef ElevatedHelperInstaller = Future<bool> Function();
 Future<AuthorizeCode> registerHelperService(
   ElevatedHelperInstaller install, {
   bool forceReinstall = false,
-  Future<bool> Function()? verifyCoreOnMismatch,
+  Future<bool> Function()? verifyBundledCore,
   bool verifyHelperBinary = false,
 }) async {
   final readiness = await helperClient.readiness(verifyHelperBinary: verifyHelperBinary);
@@ -552,8 +552,8 @@ Future<AuthorizeCode> registerHelperService(
       );
       return AuthorizeCode.error;
     case HelperReadiness.coreMismatch:
-      if (verifyCoreOnMismatch != null && await verifyCoreOnMismatch()) {
-        commonPrint.log('Bundled Core verified; installed Helper is outdated',
+      if (verifyBundledCore != null) {
+        commonPrint.log('Installed Helper reports a Core mismatch; verifying bundled Core before repair',
             logLevel: LogLevel.warning);
         break;
       }
@@ -571,6 +571,13 @@ Future<AuthorizeCode> registerHelperService(
       break;
   }
 
+  if (verifyBundledCore != null && !await verifyBundledCore()) {
+    commonPrint.log('Bundled Core verification failed; installed services were not changed',
+        logLevel: LogLevel.error);
+    dialogs.showNotifier(currentAppLocalizations.helperCorruptTip,
+        level: MessageLevel.error);
+    return AuthorizeCode.error;
+  }
   commonPrint.log(
     'helper service is unavailable, requesting elevated installation',
     logLevel: LogLevel.warning,
