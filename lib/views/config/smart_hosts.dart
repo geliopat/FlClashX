@@ -22,8 +22,8 @@ class SmartHostsView extends ConsumerWidget {
         else if (state.fallbackSources.contains(id))
           'Загружено с резервного источника',
         if (state.errors[id] != null) 'Ошибка: ${state.errors[id]}',
-        if (state.errors[id] != null && state.autoUpdate && state.sources.contains(id))
-          'Повторная попытка через 15 минут',
+        if (state.errors[id] != null && state.enabled && state.autoUpdate && state.sources.contains(id))
+          'Автоматические повторы с интервалом 15 минут',
       ].join('\n')),
       trailing: Switch(
         value: state.sources.contains(id),

@@ -239,6 +239,7 @@ class SmartHostsController extends Notifier<SmartHostsState> {
     responseType: ResponseType.stream,
   ));
   Timer? _timer;
+  Timer? _retryTimer;
   bool _loaded = false;
   bool _updating = false;
   bool _enabled = false;
@@ -263,14 +264,17 @@ class SmartHostsController extends Notifier<SmartHostsState> {
   SmartHostsState build() {
     ref.onDispose(() {
       _timer?.cancel();
+      _retryTimer?.cancel();
       _client.close(force: true);
     });
     if (Platform.isWindows) {
       scheduleMicrotask(_load);
       _timer = Timer.periodic(const Duration(minutes: 15), (_) {
         _publish();
-        unawaited(_refreshIfDue());
         unawaited(_checkCdnIfDue());
+      });
+      _retryTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+        unawaited(_refreshIfDue());
       });
     }
     return const SmartHostsState();
@@ -308,8 +312,14 @@ class SmartHostsController extends Notifier<SmartHostsState> {
           if (cluster != null) _cdnMeasurements[cluster] = record;
         } catch (_) {}
       }
-      final last = json['last'];
-      _last = last is int ? DateTime.fromMillisecondsSinceEpoch(last) : null;
+      final errors = json['sourceErrors'];
+      if (errors is Map) {
+        for (final entry in errors.entries) {
+          if (entry.key is String && entry.value is String) {
+            _errors[entry.key as String] = entry.value as String;
+          }
+        }
+      }
       for (final (key, target) in [
         ('sourceSuccess', _lastSuccess),
         ('sourceFailure', _lastFailure),
@@ -337,6 +347,10 @@ class SmartHostsController extends Notifier<SmartHostsState> {
         if (_rawCache.containsKey(id) && !_lastSuccess.containsKey(id)) {
           _lastSuccess[id] = await file.lastModified();
         }
+        if (!_rawCache.containsKey(id)) _lastSuccess.remove(id);
+      }
+      for (final success in _lastSuccess.values) {
+        if (_last == null || success.isAfter(_last!)) _last = success;
       }
     } catch (error) {
       _errors['cache'] = error.toString();
@@ -362,6 +376,7 @@ class SmartHostsController extends Notifier<SmartHostsState> {
       'sourceSuccess': _lastSuccess.map((key, value) => MapEntry(key, value.millisecondsSinceEpoch)),
       'sourceFailure': _lastFailure.map((key, value) => MapEntry(key, value.millisecondsSinceEpoch)),
       'fallbackSources': _fallbackSources.toList(),
+      'sourceErrors': {for (final entry in _errors.entries) if (_urls.containsKey(entry.key)) entry.key: entry.value},
       'blockSlowCdn': _blockSlow,
       'autoCdn': _autoCdn,
       'cdnThreshold': _threshold,
@@ -416,7 +431,7 @@ class SmartHostsController extends Notifier<SmartHostsState> {
       sourceCounts: Map.unmodifiable(counts),
       errors: Map.unmodifiable(_errors),
       fallbackSources: Set.unmodifiable(_fallbackSources.where(_rawCache.containsKey)),
-      cachedSources: Set.unmodifiable(_urls.keys.where((id) => _lastFailure.containsKey(id) && (_rawCache.containsKey(id) || id == 'youtube'))),
+      cachedSources: Set.unmodifiable(_urls.keys.where((id) => (_lastFailure.containsKey(id) && _rawCache.containsKey(id)) || (id == 'youtube' && !_rawCache.containsKey(id)))),
       lastUpdate: _last,
       updating: _updating,
       revision: _revision,
