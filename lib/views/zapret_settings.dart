@@ -437,7 +437,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
         items: [
           ListItem(
             title: const Text('Watchdog Zapret'),
-            subtitle: const Text('Восстановление процесса после сбоя, до трёх попыток'),
+            subtitle: const Text('Восстановление процесса службой Helper, до трёх попыток'),
             trailing: Switch(value: zapret.watchdog, onChanged: ref.read(zapretControllerProvider.notifier).setWatchdog),
           ),
           ListItem(

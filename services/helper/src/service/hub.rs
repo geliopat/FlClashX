@@ -111,6 +111,7 @@ struct StopResponse {
 #[serde(rename_all = "camelCase")]
 struct ZapretStatusResponse {
     running: bool,
+    uptime_ms: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pid: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -131,7 +132,15 @@ struct ZapretStartRequest {
     #[serde(default)]
     debug: bool,
     #[serde(default)]
+    watchdog: Option<bool>,
+    #[serde(default)]
     mode: super::zapret::ZapretLaunchMode,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ZapretWatchdogRequest {
+    enabled: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -479,6 +488,7 @@ fn release_managed_core(managed: &mut Option<ManagedCore>) -> Result<(), Error> 
 #[cfg(windows)]
 struct ManagedZapret {
     child: Child,
+    started_at: Instant,
     _job: CoreJob,
     strategy_id: String,
     engine: String,
@@ -488,6 +498,155 @@ struct ManagedZapret {
 
 #[cfg(windows)]
 static MANAGED_ZAPRET: Lazy<Mutex<Option<ManagedZapret>>> = Lazy::new(|| Mutex::new(None));
+
+#[cfg(windows)]
+static ZAPRET_OPERATION: Mutex<()> = Mutex::new(());
+#[cfg(windows)]
+static ZAPRET_WATCHDOG: Mutex<bool> = Mutex::new(true);
+#[cfg(windows)]
+static ZAPRET_INTENT: Mutex<Option<ZapretIntent>> = Mutex::new(None);
+#[cfg(windows)]
+static ZAPRET_WATCHDOG_THREAD: std::sync::Once = std::sync::Once::new();
+
+#[cfg(windows)]
+struct ZapretIntent {
+    strategy_id: String,
+    mode: super::zapret::ZapretLaunchMode,
+    debug: bool,
+    attempts: u8,
+    retry_at: Option<Instant>,
+}
+
+// The same operation lock guards every user launch/stop and each watchdog
+// tick. A stop can never be followed by a stale, queued restart.
+#[cfg(windows)]
+fn ensure_zapret_watchdog() {
+    ZAPRET_WATCHDOG_THREAD.call_once(|| {
+        thread::spawn(|| loop {
+            thread::sleep(Duration::from_secs(3));
+            if SHUTTING_DOWN.load(Ordering::SeqCst) {
+                break;
+            }
+            let _operation = lock_surviving_poison(&ZAPRET_OPERATION);
+            if SHUTTING_DOWN.load(Ordering::SeqCst) {
+                break;
+            }
+            if !*lock_surviving_poison(&ZAPRET_WATCHDOG) {
+                continue;
+            }
+            let mut desired = lock_surviving_poison(&ZAPRET_INTENT);
+            let Some(intent) = desired.as_mut() else {
+                continue;
+            };
+            let mut managed = lock_surviving_poison(&MANAGED_ZAPRET);
+            if let Some(active) = managed.as_mut() {
+                match active.child.try_wait() {
+                    Ok(None) => {
+                        if active.started_at.elapsed() >= Duration::from_secs(30) {
+                            intent.attempts = 0;
+                        }
+                        intent.retry_at = None;
+                        continue;
+                    }
+                    Ok(Some(status)) => {
+                        zapret_log("error", format!("Zapret engine exited: {status}"));
+                        *managed = None;
+                    }
+                    Err(error) => {
+                        zapret_log("error", format!("Watchdog status error: {error}"));
+                        continue;
+                    }
+                }
+            }
+            drop(managed);
+            if intent.attempts >= 3 {
+                continue;
+            }
+            let now = Instant::now();
+            let retry = *intent.retry_at.get_or_insert(now + Duration::from_secs(5));
+            if now < retry {
+                continue;
+            }
+            intent.attempts += 1;
+            intent.retry_at = Some(now + Duration::from_secs(5));
+            zapret_log(
+                "info",
+                format!(
+                    "Watchdog recovery {}/3: {}",
+                    intent.attempts, intent.strategy_id
+                ),
+            );
+            let response = launch_zapret(
+                true,
+                intent.strategy_id.clone(),
+                intent.mode,
+                intent.debug,
+            );
+            if response.status() != StatusCode::OK {
+                zapret_log(
+                    "error",
+                    format!("Watchdog recovery: HTTP {}", response.status()),
+                );
+            }
+            if intent.attempts >= 3 && response.status() != StatusCode::OK {
+                zapret_log("error", "Watchdog attempt limit reached".to_string());
+            }
+        });
+    });
+}
+
+#[cfg(windows)]
+fn launch_zapret_with_intent(restart: bool, request: ZapretStartRequest) -> warp::reply::Response {
+    let _operation = lock_surviving_poison(&ZAPRET_OPERATION);
+    let response = launch_zapret(
+        restart,
+        request.strategy_id.clone(),
+        request.mode,
+        request.debug,
+    );
+    if response.status() == StatusCode::OK {
+        if let Some(enabled) = request.watchdog {
+            *lock_surviving_poison(&ZAPRET_WATCHDOG) = enabled;
+        }
+        *lock_surviving_poison(&ZAPRET_INTENT) = Some(ZapretIntent {
+            strategy_id: request.strategy_id,
+            mode: request.mode,
+            debug: request.debug,
+            attempts: 0,
+            retry_at: None,
+        });
+        ensure_zapret_watchdog();
+    }
+    response
+}
+
+#[cfg(not(windows))]
+fn launch_zapret_with_intent(restart: bool, request: ZapretStartRequest) -> warp::reply::Response {
+    let _ = request.watchdog;
+    launch_zapret(restart, request.strategy_id, request.mode, request.debug)
+}
+
+#[cfg(windows)]
+fn update_zapret_watchdog(request: ZapretWatchdogRequest) -> warp::reply::Response {
+    let _operation = lock_surviving_poison(&ZAPRET_OPERATION);
+    *lock_surviving_poison(&ZAPRET_WATCHDOG) = request.enabled;
+    if let Some(intent) = lock_surviving_poison(&ZAPRET_INTENT).as_mut() {
+        intent.retry_at = None;
+        intent.attempts = 0;
+    }
+    zapret_log("info", format!("Watchdog enabled: {}", request.enabled));
+    json_response(&request.enabled, StatusCode::OK)
+}
+
+#[cfg(not(windows))]
+fn update_zapret_watchdog(request: ZapretWatchdogRequest) -> warp::reply::Response {
+    let _ = request.enabled;
+    error_response(
+        "unsupportedPlatform",
+        "Zapret is available only on Windows",
+        StatusCode::NOT_IMPLEMENTED,
+    )
+}
 
 #[cfg(windows)]
 const ZAPRET_CREATE_NO_WINDOW: u32 = 0x08000000;
@@ -703,6 +862,9 @@ fn zapret_status_response(
     Ok(json_response(
         &ZapretStatusResponse {
             running: pid.is_some(),
+            uptime_ms: managed
+                .as_ref()
+                .map_or(0, |active| active.started_at.elapsed().as_millis() as u64),
             pid,
             strategy_id,
             engine,
@@ -915,6 +1077,7 @@ fn launch_zapret(
     );
     *managed = Some(ManagedZapret {
         child,
+        started_at: Instant::now(),
         _job: job,
         strategy_id: strategy_id.clone(),
         engine: engine.clone(),
@@ -924,6 +1087,7 @@ fn launch_zapret(
     json_response(
         &ZapretStatusResponse {
             running: true,
+            uptime_ms: 0,
             pid: Some(pid),
             strategy_id: Some(strategy_id),
             engine: Some(engine),
@@ -938,6 +1102,8 @@ fn launch_zapret(
 
 #[cfg(windows)]
 fn stop_zapret() -> warp::reply::Response {
+    let _operation = lock_surviving_poison(&ZAPRET_OPERATION);
+    *lock_surviving_poison(&ZAPRET_INTENT) = None;
     let mut managed = lock_surviving_poison(&MANAGED_ZAPRET);
     if let Err(error) = stop_managed_zapret(&mut managed) {
         return error_response(
@@ -957,6 +1123,7 @@ fn stop_zapret() -> warp::reply::Response {
     json_response(
         &ZapretStatusResponse {
             running: false,
+            uptime_ms: 0,
             pid: None,
             strategy_id: None,
             engine: None,
@@ -1101,9 +1268,7 @@ async fn launch_zapret_request(
     restart: bool,
     request: ZapretStartRequest,
 ) -> Result<warp::reply::Response, Rejection> {
-    match tokio::task::spawn_blocking(move || {
-        launch_zapret(restart, request.strategy_id, request.mode, request.debug)
-    })
+    match tokio::task::spawn_blocking(move || launch_zapret_with_intent(restart, request))
     .await
     {
         Ok(response) => Ok(response),
@@ -1639,6 +1804,14 @@ pub(super) fn routes() -> impl Filter<Extract = (impl Reply,), Error = Infallibl
         .and(warp::post())
         .and_then(restore_zapret_list);
 
+    let api_zapret_watchdog = warp::path("zapret")
+        .and(warp::path("watchdog"))
+        .and(warp::path::end())
+        .and(warp::put())
+        .and(warp::body::content_length_limit(MAX_REQUEST_BODY_BYTES))
+        .and(warp::body::json())
+        .map(update_zapret_watchdog);
+
     let api_zapret_start = warp::path("zapret")
         .and(warp::path("start"))
         .and(warp::path::end())
@@ -1675,6 +1848,7 @@ pub(super) fn routes() -> impl Filter<Extract = (impl Reply,), Error = Infallibl
                 .or(api_zapret_list_get)
                 .or(api_zapret_list_put)
                 .or(api_zapret_list_restore)
+                .or(api_zapret_watchdog)
                 .or(api_zapret_start)
                 .or(api_zapret_restart)
                 .or(api_zapret_stop),
@@ -1756,6 +1930,8 @@ pub(super) fn release_managed_core_on_shutdown() {
     }
     #[cfg(windows)]
     {
+        let _operation = lock_surviving_poison(&ZAPRET_OPERATION);
+        *lock_surviving_poison(&ZAPRET_INTENT) = None;
         let mut zapret = lock_surviving_poison(&MANAGED_ZAPRET);
         if let Err(error) = stop_managed_zapret(&mut zapret) {
             log_message(format!("Helper could not stop Zapret on shutdown: {error}"));

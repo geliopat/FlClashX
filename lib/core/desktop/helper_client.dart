@@ -148,6 +148,7 @@ final class HelperZapretLog {
 
 final class HelperZapretStatus {
   final bool running;
+  final int uptimeMs;
   final int? pid;
   final String? strategyId;
   final String? engine;
@@ -158,6 +159,7 @@ final class HelperZapretStatus {
 
   const HelperZapretStatus({
     required this.running,
+    this.uptimeMs = 0,
     required this.pid,
     this.strategyId,
     this.engine,
@@ -664,14 +666,20 @@ final class HelperClient {
     }
   }
 
-  Future<HelperZapretStatus> startZapret({required String strategyId, required String mode, bool debug = false}) =>
-      _zapretAction('start', operation: 'start', strategyId: strategyId, mode: mode, debug: debug);
+  Future<void> setZapretWatchdog(bool enabled) async {
+    await _dio.put<Object?>('$baseUrl/zapret/watchdog',
+      data: {'enabled': enabled}, options: _options(ResponseType.json,
+        receiveTimeout: const Duration(seconds: 5)));
+  }
+
+  Future<HelperZapretStatus> startZapret({required String strategyId, required String mode, bool debug = false, bool? watchdog}) =>
+      _zapretAction('start', operation: 'start', strategyId: strategyId, mode: mode, debug: debug, watchdog: watchdog);
 
   Future<HelperZapretStatus> stopZapret() =>
       _zapretAction('stop', operation: 'stop');
 
-  Future<HelperZapretStatus> restartZapret({required String strategyId, required String mode, bool debug = false}) =>
-      _zapretAction('restart', operation: 'restart', strategyId: strategyId, mode: mode, debug: debug);
+  Future<HelperZapretStatus> restartZapret({required String strategyId, required String mode, bool debug = false, bool? watchdog}) =>
+      _zapretAction('restart', operation: 'restart', strategyId: strategyId, mode: mode, debug: debug, watchdog: watchdog);
 
   Future<HelperZapretStatus> _zapretAction(
     String route, {
@@ -679,13 +687,14 @@ final class HelperClient {
     String? strategyId,
     String? mode,
     bool debug = false,
+    bool? watchdog,
   }) async {
     try {
       final response = await _dio.post<Object?>(
         '$baseUrl/zapret/$route',
         data: strategyId == null
             ? null
-            : {'strategyId': strategyId, 'mode': mode ?? 'fullBypass', if (debug) 'debug': true},
+            : {'strategyId': strategyId, 'mode': mode ?? 'fullBypass', if (debug) 'debug': true, if (watchdog != null) 'watchdog': watchdog},
         options: _options(
           ResponseType.json,
           receiveTimeout: operation == 'stop'
@@ -714,6 +723,7 @@ final class HelperClient {
     final data = _responseMap(response, operation: operation);
     final running = data['running'];
     final pid = data['pid'];
+    final uptime = data['uptimeMs'] ?? 0;
     final cleaned = data['cleanedProcesses'] ?? 0;
     final strategyId = data['strategyId'];
     final engine = data['engine'];
@@ -722,6 +732,7 @@ final class HelperClient {
     final lists = data['processingLists'] ?? const [];
     if (running is! bool ||
         (pid != null && (pid is! int || pid <= 0)) ||
+        uptime is! int || uptime < 0 ||
         cleaned is! int ||
         cleaned < 0 ||
         (strategyId != null && (strategyId is! String || strategyId.isEmpty)) ||
@@ -739,6 +750,7 @@ final class HelperClient {
     }
     return HelperZapretStatus(
       running: running,
+      uptimeMs: uptime,
       pid: pid as int?,
       strategyId: strategyId as String?,
       engine: engine as String?,
