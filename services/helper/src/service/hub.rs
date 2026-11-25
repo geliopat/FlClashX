@@ -3,9 +3,9 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::VecDeque;
 use std::convert::Infallible;
-use std::fs::{File, OpenOptions};
 #[cfg(windows)]
 use std::fs;
+use std::fs::{File, OpenOptions};
 use std::future::{pending, Future};
 use std::io::{BufRead, Error, Read};
 #[cfg(windows)]
@@ -28,20 +28,19 @@ use windows_sys::Win32::Foundation::{CloseHandle, HANDLE};
 #[cfg(windows)]
 use windows_sys::Win32::Storage::FileSystem::FILE_SHARE_READ;
 #[cfg(windows)]
+use windows_sys::Win32::System::Diagnostics::ToolHelp::{
+    CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W, TH32CS_SNAPPROCESS,
+};
+#[cfg(windows)]
 use windows_sys::Win32::System::JobObjects::{
     AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation,
     SetInformationJobObject, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
     JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
 };
 #[cfg(windows)]
-use windows_sys::Win32::System::Diagnostics::ToolHelp::{
-    CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W,
-    TH32CS_SNAPPROCESS,
-};
-#[cfg(windows)]
 use windows_sys::Win32::System::Threading::{
-    OpenProcess, QueryFullProcessImageNameW, TerminateProcess,
-    PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_TERMINATE,
+    OpenProcess, QueryFullProcessImageNameW, TerminateProcess, PROCESS_QUERY_LIMITED_INFORMATION,
+    PROCESS_TERMINATE,
 };
 
 #[cfg(not(any(
@@ -475,7 +474,6 @@ fn release_managed_core(managed: &mut Option<ManagedCore>) -> Result<(), Error> 
     Ok(())
 }
 
-
 #[cfg(windows)]
 struct ManagedZapret {
     child: Child,
@@ -487,8 +485,7 @@ struct ManagedZapret {
 }
 
 #[cfg(windows)]
-static MANAGED_ZAPRET: Lazy<Mutex<Option<ManagedZapret>>> =
-    Lazy::new(|| Mutex::new(None));
+static MANAGED_ZAPRET: Lazy<Mutex<Option<ManagedZapret>>> = Lazy::new(|| Mutex::new(None));
 
 #[cfg(windows)]
 const ZAPRET_CREATE_NO_WINDOW: u32 = 0x08000000;
@@ -508,7 +505,9 @@ fn zapret_bin_dir() -> Result<PathBuf, Error> {
         ))
     })?;
     if !bin_dir.is_dir() || !bin_dir.starts_with(&app_dir) {
-        return Err(Error::other("Zapret2 asset directory resolves outside the application directory"));
+        return Err(Error::other(
+            "Zapret2 asset directory resolves outside the application directory",
+        ));
     }
     Ok(bin_dir)
 }
@@ -527,10 +526,13 @@ fn process_image_path(handle: HANDLE) -> Option<String> {
 
 #[cfg(windows)]
 fn process_path_is_in_zapret_root(image_path: &str, zapret_root: &Path) -> bool {
-    let root = zapret_root.to_string_lossy()
+    let root = zapret_root
+        .to_string_lossy()
         .trim_end_matches(|ch| ch == '\\' || ch == '/')
         .to_ascii_lowercase();
-    image_path.to_ascii_lowercase().starts_with(&format!("{root}\\"))
+    image_path
+        .to_ascii_lowercase()
+        .starts_with(&format!("{root}\\"))
 }
 
 #[cfg(windows)]
@@ -538,7 +540,10 @@ fn process_image_matches(handle: HANDLE, expected_exe_name: &str, zapret_root: &
     let Some(image_path) = process_image_path(handle) else {
         return false;
     };
-    let Some(name) = Path::new(&image_path).file_name().and_then(|name| name.to_str()) else {
+    let Some(name) = Path::new(&image_path)
+        .file_name()
+        .and_then(|name| name.to_str())
+    else {
         return false;
     };
     name.eq_ignore_ascii_case(expected_exe_name)
@@ -558,16 +563,23 @@ fn find_external_winws_processes(zapret_root: &Path) -> Vec<String> {
         entry.dwSize = std::mem::size_of::<PROCESSENTRY32W>() as u32;
         if Process32FirstW(snapshot, &mut entry) != 0 {
             loop {
-                let length = entry.szExeFile.iter()
+                let length = entry
+                    .szExeFile
+                    .iter()
                     .position(|unit| *unit == 0)
                     .unwrap_or(entry.szExeFile.len());
                 let name = String::from_utf16_lossy(&entry.szExeFile[..length]);
-                if targets.iter().any(|target| name.eq_ignore_ascii_case(target)) {
-                    let process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, entry.th32ProcessID);
+                if targets
+                    .iter()
+                    .any(|target| name.eq_ignore_ascii_case(target))
+                {
+                    let process =
+                        OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, entry.th32ProcessID);
                     if process != 0 {
                         if let Some(image_path) = process_image_path(process) {
                             if !process_path_is_in_zapret_root(&image_path, zapret_root) {
-                                conflicts.push(format!("{image_path} (PID {})", entry.th32ProcessID));
+                                conflicts
+                                    .push(format!("{image_path} (PID {})", entry.th32ProcessID));
                             }
                         }
                         let _ = CloseHandle(process);
@@ -608,7 +620,10 @@ fn kill_stray_winws2_processes(exclude_pid: Option<u32>) -> usize {
                     .position(|unit| *unit == 0)
                     .unwrap_or(entry.szExeFile.len());
                 let image = String::from_utf16_lossy(&entry.szExeFile[..length]);
-                if targets.iter().any(|target| image.eq_ignore_ascii_case(target)) {
+                if targets
+                    .iter()
+                    .any(|target| image.eq_ignore_ascii_case(target))
+                {
                     let pid = entry.th32ProcessID;
                     if Some(pid) != exclude_pid {
                         let process = OpenProcess(
@@ -699,9 +714,7 @@ fn zapret_status_response(
 }
 
 #[cfg(windows)]
-fn stop_managed_zapret(
-    managed: &mut Option<ManagedZapret>,
-) -> Result<(), Error> {
+fn stop_managed_zapret(managed: &mut Option<ManagedZapret>) -> Result<(), Error> {
     let Some(zapret) = managed.as_mut() else {
         return Ok(());
     };
@@ -711,14 +724,20 @@ fn stop_managed_zapret(
     }
     let _ = zapret.child.kill();
     if !wait_for_child_exit(&mut zapret.child, CORE_EXIT_TIMEOUT)? {
-        return Err(Error::other("Zapret2 engine did not exit after termination"));
+        return Err(Error::other(
+            "Zapret2 engine did not exit after termination",
+        ));
     }
     *managed = None;
     Ok(())
 }
 
 #[cfg(windows)]
-fn launch_zapret(restart: bool, strategy_id: String, mode: super::zapret::ZapretLaunchMode) -> warp::reply::Response {
+fn launch_zapret(
+    restart: bool,
+    strategy_id: String,
+    mode: super::zapret::ZapretLaunchMode,
+) -> warp::reply::Response {
     if SHUTTING_DOWN.load(Ordering::SeqCst) {
         return error_response(
             "helperStopping",
@@ -738,7 +757,11 @@ fn launch_zapret(restart: bool, strategy_id: String, mode: super::zapret::Zapret
                 }
             }
             Err(error) => {
-                return error_response("zapretStatusFailed", error.to_string(), StatusCode::INTERNAL_SERVER_ERROR);
+                return error_response(
+                    "zapretStatusFailed",
+                    error.to_string(),
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                );
             }
         }
     }
@@ -747,21 +770,50 @@ fn launch_zapret(restart: bool, strategy_id: String, mode: super::zapret::Zapret
     // the user's active bypass.
     let bin_dir = match zapret_bin_dir() {
         Ok(path) => path,
-        Err(error) => return error_response("zapretAssetsMissing", error.to_string(), StatusCode::CONFLICT),
+        Err(error) => {
+            return error_response(
+                "zapretAssetsMissing",
+                error.to_string(),
+                StatusCode::CONFLICT,
+            )
+        }
     };
     let launch = match super::zapret::build_launch(&bin_dir, &strategy_id, mode) {
         Ok(launch) => launch,
         Err(error) if error.kind() == std::io::ErrorKind::InvalidInput => {
-            return error_response("invalidZapretStrategy", error.to_string(), StatusCode::BAD_REQUEST);
+            return error_response(
+                "invalidZapretStrategy",
+                error.to_string(),
+                StatusCode::BAD_REQUEST,
+            );
         }
         Err(error) => {
-            return error_response("zapretAssetsMissing", error.to_string(), StatusCode::CONFLICT);
+            return error_response(
+                "zapretAssetsMissing",
+                error.to_string(),
+                StatusCode::CONFLICT,
+            );
         }
     };
     let executable = match fs::canonicalize(bin_dir.join(launch.executable)) {
         Ok(path) if path.starts_with(&bin_dir) && path.is_file() => path,
-        Ok(_) => return error_response("zapretExecutableInvalid", format!("{} resolves outside the Zapret directory", launch.executable), StatusCode::CONFLICT),
-        Err(error) => return error_response("zapretAssetsMissing", error.to_string(), StatusCode::CONFLICT),
+        Ok(_) => {
+            return error_response(
+                "zapretExecutableInvalid",
+                format!(
+                    "{} resolves outside the Zapret directory",
+                    launch.executable
+                ),
+                StatusCode::CONFLICT,
+            )
+        }
+        Err(error) => {
+            return error_response(
+                "zapretAssetsMissing",
+                error.to_string(),
+                StatusCode::CONFLICT,
+            )
+        }
     };
     let args = launch.args;
     let engine = launch.strategy.engine.to_string();
@@ -771,18 +823,27 @@ fn launch_zapret(restart: bool, strategy_id: String, mode: super::zapret::Zapret
     if !external_processes.is_empty() {
         return error_response(
             "zapretConflict",
-            format!("Другой экземпляр Zapret/WinDivert уже работает: {}", external_processes.join("; ")),
+            format!(
+                "Другой экземпляр Zapret/WinDivert уже работает: {}",
+                external_processes.join("; ")
+            ),
             StatusCode::CONFLICT,
         );
     }
 
     if let Err(error) = stop_managed_zapret(&mut managed) {
-        return error_response("zapretStopFailed", error.to_string(), StatusCode::INTERNAL_SERVER_ERROR);
+        return error_response(
+            "zapretStopFailed",
+            error.to_string(),
+            StatusCode::INTERNAL_SERVER_ERROR,
+        );
     }
 
     let cleaned = kill_stray_winws2_processes(None);
     if cleaned > 0 {
-        log_message(format!("Zapret cleanup terminated {cleaned} orphaned winws processes"));
+        log_message(format!(
+            "Zapret cleanup terminated {cleaned} orphaned winws processes"
+        ));
     }
 
     let mut command = Command::new(&executable);
@@ -818,7 +879,10 @@ fn launch_zapret(restart: bool, strategy_id: String, mode: super::zapret::Zapret
             let _ = wait_for_child_exit(&mut child, CORE_EXIT_TIMEOUT);
             return error_response(
                 "zapretConfinementFailed",
-                format!("Could not place {} in a kill-on-close job: {error}", launch.executable),
+                format!(
+                    "Could not place {} in a kill-on-close job: {error}",
+                    launch.executable
+                ),
                 StatusCode::INTERNAL_SERVER_ERROR,
             );
         }
@@ -858,7 +922,9 @@ fn stop_zapret() -> warp::reply::Response {
     }
     let cleaned = kill_stray_winws2_processes(None);
     if cleaned > 0 {
-        log_message(format!("Zapret stop cleaned {cleaned} orphaned winws processes"));
+        log_message(format!(
+            "Zapret stop cleaned {cleaned} orphaned winws processes"
+        ));
     }
     json_response(
         &ZapretStatusResponse {
@@ -882,31 +948,53 @@ fn get_zapret_strategies() -> warp::reply::Response {
 fn get_zapret_lists() -> warp::reply::Response {
     match super::zapret_lists::list() {
         Ok(lists) => json_response(&lists, StatusCode::OK),
-        Err(error) => error_response("zapretListsUnavailable", error.to_string(), StatusCode::CONFLICT),
+        Err(error) => error_response(
+            "zapretListsUnavailable",
+            error.to_string(),
+            StatusCode::CONFLICT,
+        ),
     }
 }
 
 async fn restore_zapret_list(filename: String) -> Result<warp::reply::Response, Rejection> {
     match tokio::task::spawn_blocking(move || super::zapret_lists::restore(&filename)).await {
         Ok(Ok(list)) => Ok(json_response(&list, StatusCode::OK)),
-        Ok(Err(error)) if error.kind() == std::io::ErrorKind::InvalidInput => {
-            Ok(error_response("invalidZapretList", error.to_string(), StatusCode::BAD_REQUEST))
-        }
-        Ok(Err(error)) if error.kind() == std::io::ErrorKind::NotFound => {
-            Ok(error_response("zapretBackupMissing", error.to_string(), StatusCode::CONFLICT))
-        }
-        Ok(Err(error)) => Ok(error_response("zapretListRestoreFailed", error.to_string(), StatusCode::CONFLICT)),
-        Err(error) => Ok(error_response("zapretListTaskFailed", error.to_string(), StatusCode::INTERNAL_SERVER_ERROR)),
+        Ok(Err(error)) if error.kind() == std::io::ErrorKind::InvalidInput => Ok(error_response(
+            "invalidZapretList",
+            error.to_string(),
+            StatusCode::BAD_REQUEST,
+        )),
+        Ok(Err(error)) if error.kind() == std::io::ErrorKind::NotFound => Ok(error_response(
+            "zapretBackupMissing",
+            error.to_string(),
+            StatusCode::CONFLICT,
+        )),
+        Ok(Err(error)) => Ok(error_response(
+            "zapretListRestoreFailed",
+            error.to_string(),
+            StatusCode::CONFLICT,
+        )),
+        Err(error) => Ok(error_response(
+            "zapretListTaskFailed",
+            error.to_string(),
+            StatusCode::INTERNAL_SERVER_ERROR,
+        )),
     }
 }
 
 fn get_zapret_list(filename: String) -> warp::reply::Response {
     match super::zapret_lists::read(&filename) {
         Ok(list) => json_response(&list, StatusCode::OK),
-        Err(error) if error.kind() == std::io::ErrorKind::InvalidInput => {
-            error_response("invalidZapretList", error.to_string(), StatusCode::BAD_REQUEST)
-        }
-        Err(error) => error_response("zapretListReadFailed", error.to_string(), StatusCode::CONFLICT),
+        Err(error) if error.kind() == std::io::ErrorKind::InvalidInput => error_response(
+            "invalidZapretList",
+            error.to_string(),
+            StatusCode::BAD_REQUEST,
+        ),
+        Err(error) => error_response(
+            "zapretListReadFailed",
+            error.to_string(),
+            StatusCode::CONFLICT,
+        ),
     }
 }
 
@@ -914,53 +1002,98 @@ async fn put_zapret_list(
     filename: String,
     request: ZapretListWriteRequest,
 ) -> Result<warp::reply::Response, Rejection> {
-    match tokio::task::spawn_blocking(move || super::zapret_lists::write(&filename, request.content)).await {
+    match tokio::task::spawn_blocking(move || {
+        super::zapret_lists::write(&filename, request.content)
+    })
+    .await
+    {
         Ok(Ok(list)) => Ok(json_response(&list, StatusCode::OK)),
-        Ok(Err(error)) if error.kind() == std::io::ErrorKind::InvalidInput => {
-            Ok(error_response("invalidZapretList", error.to_string(), StatusCode::BAD_REQUEST))
-        }
-        Ok(Err(error)) => Ok(error_response("zapretListWriteFailed", error.to_string(), StatusCode::CONFLICT)),
-        Err(error) => Ok(error_response("zapretListTaskFailed", error.to_string(), StatusCode::INTERNAL_SERVER_ERROR)),
+        Ok(Err(error)) if error.kind() == std::io::ErrorKind::InvalidInput => Ok(error_response(
+            "invalidZapretList",
+            error.to_string(),
+            StatusCode::BAD_REQUEST,
+        )),
+        Ok(Err(error)) => Ok(error_response(
+            "zapretListWriteFailed",
+            error.to_string(),
+            StatusCode::CONFLICT,
+        )),
+        Err(error) => Ok(error_response(
+            "zapretListTaskFailed",
+            error.to_string(),
+            StatusCode::INTERNAL_SERVER_ERROR,
+        )),
     }
 }
-
 
 #[cfg(windows)]
 fn get_zapret_status() -> warp::reply::Response {
     let mut managed = lock_surviving_poison(&MANAGED_ZAPRET);
     match zapret_status_response(&mut managed, 0) {
         Ok(response) => response,
-        Err(error) => error_response("zapretStatusFailed", error.to_string(), StatusCode::INTERNAL_SERVER_ERROR),
+        Err(error) => error_response(
+            "zapretStatusFailed",
+            error.to_string(),
+            StatusCode::INTERNAL_SERVER_ERROR,
+        ),
     }
 }
 
 #[cfg(not(windows))]
-fn launch_zapret(_restart: bool, _strategy_id: String, _mode: super::zapret::ZapretLaunchMode) -> warp::reply::Response {
-    error_response("unsupportedPlatform", "Zapret is available only on Windows", StatusCode::NOT_IMPLEMENTED)
+fn launch_zapret(
+    _restart: bool,
+    _strategy_id: String,
+    _mode: super::zapret::ZapretLaunchMode,
+) -> warp::reply::Response {
+    error_response(
+        "unsupportedPlatform",
+        "Zapret is available only on Windows",
+        StatusCode::NOT_IMPLEMENTED,
+    )
 }
 #[cfg(not(windows))]
 fn stop_zapret() -> warp::reply::Response {
-    error_response("unsupportedPlatform", "Zapret is available only on Windows", StatusCode::NOT_IMPLEMENTED)
+    error_response(
+        "unsupportedPlatform",
+        "Zapret is available only on Windows",
+        StatusCode::NOT_IMPLEMENTED,
+    )
 }
 #[cfg(not(windows))]
 fn get_zapret_status() -> warp::reply::Response {
-    error_response("unsupportedPlatform", "Zapret is available only on Windows", StatusCode::NOT_IMPLEMENTED)
+    error_response(
+        "unsupportedPlatform",
+        "Zapret is available only on Windows",
+        StatusCode::NOT_IMPLEMENTED,
+    )
 }
 
 async fn launch_zapret_request(
     restart: bool,
     request: ZapretStartRequest,
 ) -> Result<warp::reply::Response, Rejection> {
-    match tokio::task::spawn_blocking(move || launch_zapret(restart, request.strategy_id, request.mode)).await {
+    match tokio::task::spawn_blocking(move || {
+        launch_zapret(restart, request.strategy_id, request.mode)
+    })
+    .await
+    {
         Ok(response) => Ok(response),
-        Err(error) => Ok(error_response("zapretTaskFailed", error.to_string(), StatusCode::INTERNAL_SERVER_ERROR)),
+        Err(error) => Ok(error_response(
+            "zapretTaskFailed",
+            error.to_string(),
+            StatusCode::INTERNAL_SERVER_ERROR,
+        )),
     }
 }
 
 async fn stop_zapret_request() -> Result<warp::reply::Response, Rejection> {
     match tokio::task::spawn_blocking(stop_zapret).await {
         Ok(response) => Ok(response),
-        Err(error) => Ok(error_response("zapretTaskFailed", error.to_string(), StatusCode::INTERNAL_SERVER_ERROR)),
+        Err(error) => Ok(error_response(
+            "zapretTaskFailed",
+            error.to_string(),
+            StatusCode::INTERNAL_SERVER_ERROR,
+        )),
     }
 }
 
@@ -1650,7 +1783,10 @@ mod tests {
         ];
         assert_eq!(
             zapret_win_divert_filters(&args),
-            vec!["--wf-tcp-out=80,443".to_string(), "--wf-udp-out=443".to_string()],
+            vec![
+                "--wf-tcp-out=80,443".to_string(),
+                "--wf-udp-out=443".to_string()
+            ],
         );
         assert_eq!(
             zapret_processing_lists(&args),
@@ -2072,19 +2208,27 @@ mod tests {
             .await;
 
         assert_eq!(response.status(), StatusCode::OK);
-        let strategies: Vec<serde_json::Value> =
-            serde_json::from_slice(response.body()).unwrap();
+        let strategies: Vec<serde_json::Value> = serde_json::from_slice(response.body()).unwrap();
         assert_eq!(strategies.len(), 41);
         assert_eq!(
-            strategies.iter().filter(|item| item["engine"] == "winws").count(),
+            strategies
+                .iter()
+                .filter(|item| item["engine"] == "winws")
+                .count(),
             5
         );
         assert_eq!(
-            strategies.iter().filter(|item| item["engine"] == "winws2").count(),
+            strategies
+                .iter()
+                .filter(|item| item["engine"] == "winws2")
+                .count(),
             36
         );
         assert_eq!(
-            strategies.iter().filter(|item| item["id"].as_str().unwrap().starts_with("kinlay0-")).count(),
+            strategies
+                .iter()
+                .filter(|item| item["id"].as_str().unwrap().starts_with("kinlay0-"))
+                .count(),
             26
         );
     }

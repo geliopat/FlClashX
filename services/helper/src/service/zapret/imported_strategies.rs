@@ -2388,13 +2388,10 @@ pub fn blob_file(name: &str) -> Option<&'static str> {
 /// Test-only: the shape test consults it when checking blob
 /// registration completeness.
 #[cfg(test)]
-pub const RUNTIME_BLOBS: &[&str] = &[
-    "ch_clone",
-];
+pub const RUNTIME_BLOBS: &[&str] = &["ch_clone"];
 
 /// Whether `name` is a runtime-filled blob (see RUNTIME_BLOBS).
 #[cfg(test)]
 pub fn is_runtime_blob(name: &str) -> bool {
     RUNTIME_BLOBS.contains(&name)
 }
-

@@ -25,7 +25,9 @@ pub enum ZapretLaunchMode {
 }
 
 impl Default for ZapretLaunchMode {
-    fn default() -> Self { Self::FullBypass }
+    fn default() -> Self {
+        Self::FullBypass
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -38,11 +40,47 @@ struct AutoLists {
 }
 
 const FLOWSEAL: &[ZapretStrategy] = &[
-    ZapretStrategy { id: "flowseal-alt", name: "Flowseal ALT (Fakedsplit) — Рекомендован для РФ", filename: "general (ALT).bat", description: "Основной рабочий режим для всех провайдеров РФ (Ростелеком, МТС, Дом.ру, Билайн, ТСПУ)", engine: "winws", category: "flowseal" },
-    ZapretStrategy { id: "flowseal-alt11", name: "Flowseal ALT11 (Усиленный 4K)", filename: "general (ALT11).bat", description: "YouTube 4K 60FPS (seqovl=681, repeats=11) + Discord Голос", engine: "winws", category: "flowseal" },
-    ZapretStrategy { id: "flowseal-general", name: "Flowseal General (Multisplit)", filename: "general.bat", description: "YouTube + Discord + Сайты (мягкий режим без поддельных пакетов)", engine: "winws", category: "flowseal" },
-    ZapretStrategy { id: "flowseal-fake-tls-auto", name: "Flowseal FAKE TLS AUTO (Игровой)", filename: "general (FAKE TLS AUTO).bat", description: "Discord Голос + Минимальный пинг в онлайн-играх", engine: "winws", category: "flowseal" },
-    ZapretStrategy { id: "flowseal-simple-fake", name: "Flowseal Simple Fake", filename: "general (SIMPLE FAKE).bat", description: "Простой режим для мобильных раздач и Wi-Fi роутеров", engine: "winws", category: "flowseal" },
+    ZapretStrategy {
+        id: "flowseal-alt",
+        name: "Flowseal ALT (Fakedsplit) — Рекомендован для РФ",
+        filename: "general (ALT).bat",
+        description:
+            "Основной рабочий режим для всех провайдеров РФ (Ростелеком, МТС, Дом.ру, Билайн, ТСПУ)",
+        engine: "winws",
+        category: "flowseal",
+    },
+    ZapretStrategy {
+        id: "flowseal-alt11",
+        name: "Flowseal ALT11 (Усиленный 4K)",
+        filename: "general (ALT11).bat",
+        description: "YouTube 4K 60FPS (seqovl=681, repeats=11) + Discord Голос",
+        engine: "winws",
+        category: "flowseal",
+    },
+    ZapretStrategy {
+        id: "flowseal-general",
+        name: "Flowseal General (Multisplit)",
+        filename: "general.bat",
+        description: "YouTube + Discord + Сайты (мягкий режим без поддельных пакетов)",
+        engine: "winws",
+        category: "flowseal",
+    },
+    ZapretStrategy {
+        id: "flowseal-fake-tls-auto",
+        name: "Flowseal FAKE TLS AUTO (Игровой)",
+        filename: "general (FAKE TLS AUTO).bat",
+        description: "Discord Голос + Минимальный пинг в онлайн-играх",
+        engine: "winws",
+        category: "flowseal",
+    },
+    ZapretStrategy {
+        id: "flowseal-simple-fake",
+        name: "Flowseal Simple Fake",
+        filename: "general (SIMPLE FAKE).bat",
+        description: "Простой режим для мобильных раздач и Wi-Fi роутеров",
+        engine: "winws",
+        category: "flowseal",
+    },
 ];
 
 const LUA_STRATEGIES: &[ZapretStrategy] = &[
@@ -88,19 +126,22 @@ pub struct ZapretStrategyInfo {
 }
 
 pub fn strategy_info() -> Vec<ZapretStrategyInfo> {
-    strategies().into_iter().map(|strategy| {
-        let supports_split_mode = FLOWSEAL.iter().any(|item| item.id == strategy.id)
-            || LUA_STRATEGIES.iter().any(|item| item.id == strategy.id);
-        ZapretStrategyInfo {
-            id: strategy.id,
-            name: strategy.name,
-            filename: strategy.filename,
-            description: strategy.description,
-            engine: strategy.engine,
-            category: strategy.category,
-            supports_split_mode,
-        }
-    }).collect()
+    strategies()
+        .into_iter()
+        .map(|strategy| {
+            let supports_split_mode = FLOWSEAL.iter().any(|item| item.id == strategy.id)
+                || LUA_STRATEGIES.iter().any(|item| item.id == strategy.id);
+            ZapretStrategyInfo {
+                id: strategy.id,
+                name: strategy.name,
+                filename: strategy.filename,
+                description: strategy.description,
+                engine: strategy.engine,
+                category: strategy.category,
+                supports_split_mode,
+            }
+        })
+        .collect()
 }
 
 pub fn strategies() -> Vec<ZapretStrategy> {
@@ -127,11 +168,20 @@ pub fn strategies() -> Vec<ZapretStrategy> {
     result
 }
 
-pub fn build_launch(bin_dir: &Path, strategy_id: &str, launch_mode: ZapretLaunchMode) -> Result<ZapretLaunch, Error> {
+pub fn build_launch(
+    bin_dir: &Path,
+    strategy_id: &str,
+    launch_mode: ZapretLaunchMode,
+) -> Result<ZapretLaunch, Error> {
     let strategy = strategies()
         .into_iter()
         .find(|item| item.id == strategy_id)
-        .ok_or_else(|| Error::new(ErrorKind::InvalidInput, format!("Unknown Zapret strategy: {strategy_id}")))?;
+        .ok_or_else(|| {
+            Error::new(
+                ErrorKind::InvalidInput,
+                format!("Unknown Zapret strategy: {strategy_id}"),
+            )
+        })?;
     let lists_dir = bin_dir.join("lists");
     // Split modes intentionally affect only Flowseal and built-in Lua presets.
     // Ultimate and imported/user strategies keep their own filters unchanged.
@@ -143,9 +193,14 @@ pub fn build_launch(bin_dir: &Path, strategy_id: &str, launch_mode: ZapretLaunch
         TunnelMode::Full
     };
     for name in [
-        "list-general.txt", "list-general-user.txt", "list-exclude.txt",
-        "list-exclude-user.txt", "list-google.txt", "ipset-all.txt",
-        "ipset-exclude.txt", "ipset-exclude-user.txt",
+        "list-general.txt",
+        "list-general-user.txt",
+        "list-exclude.txt",
+        "list-exclude-user.txt",
+        "list-google.txt",
+        "ipset-all.txt",
+        "ipset-exclude.txt",
+        "ipset-exclude-user.txt",
     ] {
         require_file(&lists_dir.join(name))?;
     }
@@ -153,8 +208,13 @@ pub fn build_launch(bin_dir: &Path, strategy_id: &str, launch_mode: ZapretLaunch
         "winws" => (
             "winws.exe",
             StrategyBuilder::build_flowseal_args_inner(
-                strategy.id, bin_dir, &lists_dir, tunnel_mode,
-                "1024-65535", "1024-65535", None,
+                strategy.id,
+                bin_dir,
+                &lists_dir,
+                tunnel_mode,
+                "1024-65535",
+                "1024-65535",
+                None,
             ),
         ),
         "winws2" => {
@@ -180,33 +240,59 @@ pub fn build_launch(bin_dir: &Path, strategy_id: &str, launch_mode: ZapretLaunch
             };
             ("winws2.exe", args)
         }
-        _ => return Err(Error::new(ErrorKind::InvalidInput, "Unsupported Zapret engine")),
+        _ => {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "Unsupported Zapret engine",
+            ))
+        }
     };
     args.insert(0, "--debug=0".to_string());
     validate_referenced_files(bin_dir, &args)?;
-    Ok(ZapretLaunch { strategy, executable, args })
+    Ok(ZapretLaunch {
+        strategy,
+        executable,
+        args,
+    })
 }
 
 fn require_file(path: &Path) -> Result<(), Error> {
-    if path.is_file() { Ok(()) } else {
-        Err(Error::new(ErrorKind::NotFound, format!("Required Zapret file is missing: {}", path.display())))
+    if path.is_file() {
+        Ok(())
+    } else {
+        Err(Error::new(
+            ErrorKind::NotFound,
+            format!("Required Zapret file is missing: {}", path.display()),
+        ))
     }
 }
 
 fn validate_referenced_files(bin_dir: &Path, args: &[String]) -> Result<(), Error> {
     for arg in args {
-        let candidate = if let Some((_, value)) = arg.split_once("=@").or_else(|| arg.split_once(":@")) {
-            Some(value)
-        } else if let Some((_, value)) = arg.split_once('=') {
-            if arg.starts_with("--hostlist=") || arg.starts_with("--hostlist-exclude=") ||
-               arg.starts_with("--ipset=") || arg.starts_with("--ipset-exclude=") {
+        let candidate =
+            if let Some((_, value)) = arg.split_once("=@").or_else(|| arg.split_once(":@")) {
                 Some(value)
-            } else if arg.starts_with("--dpi-desync-fake-") || arg.starts_with("--dpi-desync-split-seqovl-pattern=") {
-                Some(value)
-            } else { None }
-        } else { None };
+            } else if let Some((_, value)) = arg.split_once('=') {
+                if arg.starts_with("--hostlist=")
+                    || arg.starts_with("--hostlist-exclude=")
+                    || arg.starts_with("--ipset=")
+                    || arg.starts_with("--ipset-exclude=")
+                {
+                    Some(value)
+                } else if arg.starts_with("--dpi-desync-fake-")
+                    || arg.starts_with("--dpi-desync-split-seqovl-pattern=")
+                {
+                    Some(value)
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
         if let Some(value) = candidate {
-            if value.starts_with("0x") || value == "!" || value.contains(',') { continue; }
+            if value.starts_with("0x") || value == "!" || value.contains(',') {
+                continue;
+            }
             let path = bin_dir.join(value.replace('/', std::path::MAIN_SEPARATOR_STR));
             require_file(&path)?;
         }
@@ -215,11 +301,15 @@ fn validate_referenced_files(bin_dir: &Path, args: &[String]) -> Result<(), Erro
 }
 
 impl ZapretLaunch {
-    pub fn strategy_id(&self) -> &str { self.strategy.id }
+    pub fn strategy_id(&self) -> &str {
+        self.strategy.id
+    }
 }
 
 impl ZapretStrategy {
-    fn engine_is_winws1(&self) -> bool { self.engine == "winws" }
+    fn engine_is_winws1(&self) -> bool {
+        self.engine == "winws"
+    }
 }
 
 struct StrategyBuilder;
@@ -228,10 +318,12 @@ impl StrategyBuilder {
     const DISCORD_MEDIA_DOMAINS: &'static str =
         "discord.media,gateway.discord.gg,discord.com,discordapp.com,discordapp.net,discordcdn.com,discord.gg,dis.gd,discord.co,discord.app,tenor.com,tenor.co,giphy.com";
 
-        fn sanitize_port_spec(raw: &str) -> String {
+    fn sanitize_port_spec(raw: &str) -> String {
         let ok = !raw.is_empty()
             && raw.len() <= 64
-            && raw.chars().all(|c| c.is_ascii_digit() || c == ',' || c == '-');
+            && raw
+                .chars()
+                .all(|c| c.is_ascii_digit() || c == ',' || c == '-');
         if ok {
             raw.to_string()
         } else {
@@ -239,8 +331,7 @@ impl StrategyBuilder {
         }
     }
 
-    
-        fn build_flowseal_args_inner(
+    fn build_flowseal_args_inner(
         preset_id: &str,
         bin_dir: &Path,
         lists_dir: &Path,
@@ -708,10 +799,16 @@ impl StrategyBuilder {
                 "--dpi-desync-fooling=ts".into(),
                 "--dpi-desync-fakedsplit-pattern=0x00".into(),
                 format!("--dpi-desync-fake-tls={}", b("stun.bin")),
-                format!("--dpi-desync-fake-tls={}", b("tls_clienthello_www_google_com.bin")),
+                format!(
+                    "--dpi-desync-fake-tls={}",
+                    b("tls_clienthello_www_google_com.bin")
+                ),
                 format!("--dpi-desync-fake-http={}", b("tls_clienthello_max_ru.bin")),
                 format!("--dpi-desync-fake-unknown={}", b("stun.bin")),
-                format!("--dpi-desync-fake-unknown={}", b("tls_clienthello_www_google_com.bin")),
+                format!(
+                    "--dpi-desync-fake-unknown={}",
+                    b("tls_clienthello_www_google_com.bin")
+                ),
                 "--new".into(),
                 format!("--filter-udp={}", game_udp),
                 format!("--ipset={}", l("ipset-all.txt")),
@@ -731,7 +828,9 @@ impl StrategyBuilder {
             let mut current_block = Vec::new();
             for arg in args {
                 if arg == "--new" {
-                    let has_general = current_block.iter().any(|a: &String| a.contains("list-general") || a.contains("ipset-all.txt"));
+                    let has_general = current_block.iter().any(|a: &String| {
+                        a.contains("list-general") || a.contains("ipset-all.txt")
+                    });
                     if !has_general {
                         if !filtered.is_empty() {
                             filtered.push("--new".to_string());
@@ -744,7 +843,9 @@ impl StrategyBuilder {
                 }
             }
             if !current_block.is_empty() {
-                let has_general = current_block.iter().any(|a: &String| a.contains("list-general") || a.contains("ipset-all.txt"));
+                let has_general = current_block
+                    .iter()
+                    .any(|a: &String| a.contains("list-general") || a.contains("ipset-all.txt"));
                 if !has_general {
                     if !filtered.is_empty() {
                         filtered.push("--new".to_string());
@@ -793,7 +894,7 @@ impl StrategyBuilder {
     /// flagship's general sections. The QUIC section stays out:
     /// the UDP failure detector is out of phase-1 scope there too.
 
-        fn build_imported_args(
+    fn build_imported_args(
         imported: &imported_strategies::ImportedStrategy,
         auto: Option<&str>,
         list_path: &dyn Fn(&str) -> String,
@@ -822,10 +923,7 @@ impl StrategyBuilder {
             }
         }
         if let Some(auto_path) = auto {
-            let anchor = format!(
-                "--hostlist-exclude={}",
-                list_path("list-exclude-user.txt")
-            );
+            let anchor = format!("--hostlist-exclude={}", list_path("list-exclude-user.txt"));
             StrategyBuilder::insert_after_in_section(
                 &mut args,
                 "domain_tls",
@@ -844,7 +942,7 @@ impl StrategyBuilder {
     /// list-path resolver (relative "lists/..." when the files sit
     /// next to the engine, absolute lists_dir otherwise).
 
-        fn build_ultimate_args_with_auto(
+    fn build_ultimate_args_with_auto(
         bin_dir: &Path,
         lists_dir: &Path,
         auto: Option<&str>,
@@ -994,7 +1092,7 @@ impl StrategyBuilder {
     /// or anchor leaves the list untouched (the builders' tests pin
     /// the shapes this is used with).
 
-        fn build_lua_preset_args(
+    fn build_lua_preset_args(
         mode: TunnelMode,
         game_tcp: &str,
         game_udp: &str,
@@ -1039,10 +1137,8 @@ impl StrategyBuilder {
         // The preset's TLS desync pair: identical parameters in the
         // FULL section and in both STRICT gated sections. The mode
         // changes WHERE desync applies, never HOW it desyncs.
-        let fake_tls =
-            "--lua-desync=fake:blob=fake_default_tls:tcp_md5:tls_mod=rnd,rndsni,dupsid";
-        let multisplit =
-            "--lua-desync=multisplit:pos=2:seqovl=5:seqovl_pattern=0x1603030000";
+        let fake_tls = "--lua-desync=fake:blob=fake_default_tls:tcp_md5:tls_mod=rnd,rndsni,dupsid";
+        let multisplit = "--lua-desync=multisplit:pos=2:seqovl=5:seqovl_pattern=0x1603030000";
         // The syndata preset's extra instance: same fake blob and
         // mutation as fake_tls, but delivered inside the SYN packet.
         // Placed before the section's payload lines (see below), so
@@ -1183,8 +1279,7 @@ impl StrategyBuilder {
         args
     }
 
-
-        fn insert_after_in_section(
+    fn insert_after_in_section(
         args: &mut Vec<String>,
         section: &str,
         anchor: &str,
@@ -1216,7 +1311,7 @@ impl StrategyBuilder {
     /// preset) are deliberately skipped: the UDP failure detector
     /// is out of phase-1 scope, and google-only / ipset-only /
     /// domains-only sections are not general sections.
-        fn inject_auto_hostlist(args: Vec<String>, auto_path: &str) -> Vec<String> {
+    fn inject_auto_hostlist(args: Vec<String>, auto_path: &str) -> Vec<String> {
         let auto_arg = format!("--hostlist-auto={}", auto_path);
         let mut out: Vec<String> = Vec::with_capacity(args.len() + 4);
         let mut block: Vec<String> = Vec::new();
@@ -1233,7 +1328,6 @@ impl StrategyBuilder {
         out.append(&mut block);
         out
     }
-
 }
 
 #[cfg(test)]
@@ -1245,8 +1339,20 @@ mod tests {
         let items = strategies();
         assert_eq!(items.len(), 41);
         assert_eq!(items.iter().filter(|s| s.engine == "winws").count(), 5);
-        assert_eq!(items.iter().filter(|s| s.id.starts_with("kinlay0-")).count(), 26);
-        assert_eq!(items.iter().filter(|s| s.engine == "winws2" && !s.id.starts_with("kinlay0-")).count(), 10);
+        assert_eq!(
+            items
+                .iter()
+                .filter(|s| s.id.starts_with("kinlay0-"))
+                .count(),
+            26
+        );
+        assert_eq!(
+            items
+                .iter()
+                .filter(|s| s.engine == "winws2" && !s.id.starts_with("kinlay0-"))
+                .count(),
+            10
+        );
     }
 
     #[test]
@@ -1254,16 +1360,26 @@ mod tests {
         let bin = Path::new("C:/FlClashX/zapret");
         let _ = bin;
         let flowseal = StrategyBuilder::build_flowseal_args_inner(
-            "flowseal-alt", Path::new("."), Path::new("./lists"),
-            TunnelMode::Full, "1024-65535", "1024-65535", None
+            "flowseal-alt",
+            Path::new("."),
+            Path::new("./lists"),
+            TunnelMode::Full,
+            "1024-65535",
+            "1024-65535",
+            None,
         );
         assert!(flowseal.iter().any(|a| a.starts_with("--dpi-desync=")));
         assert!(!flowseal.iter().any(|a| a.starts_with("--lua-desync=")));
         let lua = StrategyBuilder::build_lua_preset_args(
-            TunnelMode::Full, "1024-65535", "1024-65535",
+            TunnelMode::Full,
+            "1024-65535",
+            "1024-65535",
             Some("--lua-init=@zapret-lib.lua"),
             Some("--lua-init=@strategies/zapret-yt4k.lua"),
-            "lists/list-google.txt", "lists/ipset-all.txt", None, false
+            "lists/list-google.txt",
+            "lists/ipset-all.txt",
+            None,
+            false,
         );
         assert!(lua.iter().any(|a| a.starts_with("--lua-desync=")));
         assert!(!lua.iter().any(|a| a.starts_with("--dpi-desync=")));
@@ -1302,17 +1418,21 @@ mod tests {
         let metadata = strategy_info();
         for strategy in FLOWSEAL.iter().chain(LUA_STRATEGIES.iter()) {
             assert!(
-                metadata.iter().any(|item| item.id == strategy.id && item.supports_split_mode),
+                metadata
+                    .iter()
+                    .any(|item| item.id == strategy.id && item.supports_split_mode),
                 "{} should support split modes",
                 strategy.id,
             );
         }
-        assert!(
-            metadata.iter().any(|item| item.id == "zapret2-ru-ultimate" && !item.supports_split_mode)
-        );
+        assert!(metadata
+            .iter()
+            .any(|item| item.id == "zapret2-ru-ultimate" && !item.supports_split_mode));
         for strategy in imported_strategies::all() {
             assert!(
-                metadata.iter().any(|item| item.id == strategy.id && !item.supports_split_mode),
+                metadata
+                    .iter()
+                    .any(|item| item.id == strategy.id && !item.supports_split_mode),
                 "{} must keep its own rules",
                 strategy.id,
             );
