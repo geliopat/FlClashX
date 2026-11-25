@@ -336,12 +336,18 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
       final zapret2 = jsonDecode(zapret2Response.data ?? '') as Map<String, dynamic>;
       final flowseal = jsonDecode(flowsealResponse.data ?? '') as Map<String, dynamic>;
       final strategies = jsonDecode(strategiesResponse.data ?? '') as Map<String, dynamic>;
+      final upstreamStrategySha = strategies['sha'] is String
+          ? strategies['sha'] as String
+          : '';
+      final upstreamStrategyVersion = upstreamStrategySha.length >= 12
+          ? upstreamStrategySha.substring(0, 12)
+          : 'неизвестно';
       if (!mounted) return;
       setState(() {
         _componentUpdates = {
           'Zapret2': 'установлено $_installedZapret2 · upstream ${(zapret2['tag_name'] as String?) ?? 'неизвестно'}',
           'Flowseal': 'установлено $_installedFlowseal · upstream ${(flowseal['tag_name'] as String?) ?? 'неизвестно'}',
-          'Lua/BAT source': 'установлено ${_installedStrategyCommit.substring(0, 12)} · upstream ${((strategies['sha'] as String?) ?? 'неизвестно').substring(0, 12)}',
+          'Lua/BAT source': 'установлено ${_installedStrategyCommit.substring(0, 12)} · upstream $upstreamStrategyVersion',
         };
         _checkingComponents = false;
       });
