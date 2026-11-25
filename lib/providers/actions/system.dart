@@ -50,10 +50,18 @@ class SystemAction extends _$SystemAction {
   Future<void> relaunchSelf() => relaunchSelfAfterExit();
 
   @protected
-  Duration get exitWatchdogDuration => const Duration(seconds: 3);
+  Duration get exitWatchdogDuration =>
+      system.isWindows ? const Duration(seconds: 40) : const Duration(seconds: 3);
 
   @protected
   Future<void> cleanupExitResources(bool needSave) async {
+    if (system.isWindows) {
+      try {
+        await ref.read(zapretControllerProvider.notifier).stopAlongsideMihomo();
+      } catch (error) {
+        commonPrint.log('Zapret exit stop failed: $error', logLevel: LogLevel.warning);
+      }
+    }
     final saveOperation = needSave ? _savePreferencesSafely() : null;
     final tray = trayPort;
     if (tray != null) {
