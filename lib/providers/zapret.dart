@@ -899,8 +899,20 @@ class ZapretController extends Notifier<ZapretState> {
             timeoutMs: screen ? 2000 : 3500, expectedPid: started.pid, screenOnly: screen);
           if (cancelled()) return null;
           if (screen || tuneMode.controlRuns == 1 || first.error != null) return first;
-          final second = await _verify(item.id, mode, expectedPid: started.pid);
-          if (cancelled()) return null;
+          ZapretTrial second;
+          try {
+            second = await _verify(item.id, mode, expectedPid: started.pid);
+          } catch (error) {
+            final message = _errorMessage(error);
+            if (error is HelperException && error.code == 'zapretConflict') {
+              failure = message;
+            }
+            // Preserve the first round's actual measurements even when the
+            // second round cannot run. Never present the mixed result as valid.
+            second = ZapretTrial(item.id, mode, 0, 0, error: message,
+                details: ['Ошибка второго прогона: $message']);
+          }
+          if (_cancelTrial || _launchBlocked) return null;
           return combineZapretControlRuns(first, second);
         } catch (error) {
           final message = _errorMessage(error);
