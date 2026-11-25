@@ -200,6 +200,19 @@ class Bootstrap {
     }
     await _showCrashRecoveryTip();
     await _showPreChannelTip();
+    // The machine-wide Windows Helper must be checked before either engine
+    // can launch. Safe mode remains available without service installation.
+    if (system.isWindows && !_container.read(safeModeProvider)) {
+      final result = await windows!.registerService();
+      if (result == AuthorizeCode.error) {
+        dialogs.showNotifier(
+          'Не удалось проверить или обновить службу Helper. '
+          'Автоматический запуск ядра и Zapret отменён.',
+          level: MessageLevel.error,
+        );
+        return;
+      }
+    }
     await _container.read(coreActionProvider.notifier).startCore();
     if (!_bootDecision.isDegraded) {
       await _container.read(setupActionProvider.notifier).initStatus();
