@@ -91,10 +91,16 @@ class _DiagnosticsViewState extends ConsumerState<DiagnosticsView> {
         final expected = ref.read(networkSettingProvider).systemProxy && ref.read(isStartProvider);
         // Report only the enable flag; never expose proxy addresses or credentials.
         final actual = await _windowsStatus(
-          r"$ErrorActionPreference='Stop'; $v=Get-ItemProperty -LiteralPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings' -Name ProxyEnable -ErrorAction SilentlyContinue; if ($v.ProxyEnable -eq 1) {'1'} else {'0'}",
+          r"$ErrorActionPreference='Stop'; $v=Get-ItemProperty -LiteralPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings' -ErrorAction Stop; if ($v.ProxyEnable -eq 1) {'1'} else {'0'}",
         );
         if (actual != '0' && actual != '1') return unavailable;
-        return 'Configured: $expected · Windows: ${actual == '1'}';
+        final enabled = actual == '1';
+        final state = enabled ? l.enabled : l.disabled;
+        if (enabled != expected) {
+          final expectedState = expected ? l.enabled : l.disabled;
+          return '${l.forkCheckFailed} · ${l.forkState}: $expectedState → Windows: $state';
+        }
+        return '$ok · Windows: $state';
       });
       await check('WinDivert', () async {
         final running = ref.read(zapretControllerProvider).running;
