@@ -276,9 +276,15 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
         staged[entry.key] = merged;
       }
 
-      // Apply staged files. If one write fails, restore every earlier file
-      // from its just-created .bak so the list set remains consistent.
+      // Apply staged files. Re-read before each write so an edit made in
+      // another FlClashX instance during download is not silently overwritten.
       for (final entry in staged.entries) {
+        final current = await helperClient.readZapretList(entry.key);
+        if (current.content != originals[entry.key]) {
+          throw StateError(
+            '${entry.key} изменился после загрузки источника. Обновление остановлено, чтобы сохранить параллельную правку.',
+          );
+        }
         final saved = await helperClient.writeZapretList(entry.key, entry.value);
         applied.add(entry.key);
         details.add('${saved.filename}: ${saved.entries} записей');
