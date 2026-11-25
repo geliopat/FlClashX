@@ -5,9 +5,8 @@ use once_cell::sync::Lazy;
 const STABLE_HELPER: &str = "FlClashXHelperService";
 const PRE_HELPER: &str = "FlClashXPreHelperService";
 
-/// A pre-release ships this binary as `FlClashXPreHelperService`, and every
-/// name the Helper registers follows from that, so a stable and a pre-release
-/// install keep their own service, port key, unit and socket.
+/// Linux still derives its per-channel service, port key, unit and socket
+/// from the Helper filename. Windows deliberately uses one shared service.
 static PRE: Lazy<bool> = Lazy::new(|| {
     std::env::current_exe()
         .map(|path| is_pre_helper(&path))
