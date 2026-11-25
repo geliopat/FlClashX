@@ -88,7 +88,10 @@ mod tests {
         assert_eq!(helper_name_for(true), "FlClashXPreHelperService");
         assert_eq!(helper_name_for(false), "FlClashXHelperService");
         assert_eq!(windows_helper_name(), "FlClashXHelperService");
-        assert_eq!(retired_windows_helper_names(), &["FlClashXPreHelperService"]);
+        assert_eq!(
+            retired_windows_helper_names(),
+            &["FlClashXPreHelperService"]
+        );
         assert_eq!(linux_service_for(true), "flclashx-pre-helper");
         assert_eq!(linux_runtime_dir_for(false), "flclashx");
     }

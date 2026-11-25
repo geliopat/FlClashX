@@ -225,7 +225,8 @@ fn remove_named_service(manager: &ServiceManager, service_name: &str) -> Result<
             return wait_for_deletion(manager, service_name)
         }
         Err(error) => {
-            return Err(error).with_context(|| format!("open existing helper service {service_name}"))
+            return Err(error)
+                .with_context(|| format!("open existing helper service {service_name}"))
         }
     };
 
