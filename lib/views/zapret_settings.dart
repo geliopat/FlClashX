@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:fl_clash/core/desktop/helper_client.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/providers/zapret_components.dart';
+import 'package:fl_clash/providers/zapret_component_update.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:fl_clash/pages/editor.dart';
@@ -48,6 +49,9 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
   String? _error;
   String? _notice;
   bool _updatingHelper = false;
+  bool _updatingComponents = false;
+  String? _componentProgress;
+  String? _componentResult;
 
   @override
   void initState() {
@@ -331,8 +335,47 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
     }
   }
 
+  Future<void> _updateComponents(ZapretComponent component) async {
+    if (_updatingComponents || _updatingHelper || _updating || _saving ||
+        ref.read(zapretControllerProvider).busy) return;
+    setState(() {
+      _updatingComponents = true;
+      _componentProgress = 'Подготовка';
+      _componentResult = null;
+    });
+    ZapretComponentTransaction? transaction;
+    try {
+      transaction = await ZapretComponentUpdater().prepare(component, (message) {
+        if (mounted) setState(() => _componentProgress = message);
+      });
+      if (!mounted) return;
+      setState(() => _componentProgress = 'Остановка Zapret и установка');
+      await ref.read(zapretControllerProvider.notifier)
+          .installComponentUpdate(transaction.apply, transaction.rollback);
+      if (!mounted) return;
+      await ref.read(zapretComponentsProvider.notifier).refresh();
+      if (!mounted) return;
+      final backupPath = transaction.backup?.path ?? '';
+      setState(() => _componentResult = 'Компоненты установлены. Резервная копия: '+backupPath);
+      if (component == ZapretComponent.all) {
+        await _updateLists();
+        if (mounted && _error != null) {
+          setState(() => _componentResult = 'Компоненты установлены, но списки не обновлены: '+_error!);
+        }
+      }
+    } catch (error) {
+      if (mounted) setState(() => _componentResult = 'Ошибка: '+error.toString());
+    } finally {
+      transaction?.dispose();
+      if (mounted) setState(() {
+        _updatingComponents = false;
+        _componentProgress = null;
+      });
+    }
+  }
+
   Future<void> _updateHelperService() async {
-    if (_updatingHelper) return;
+    if (_updatingHelper || _updatingComponents) return;
     final confirmed = await showFloatingDialog<bool>(
       context: context,
       child: CommonDialog(
@@ -403,6 +446,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
   Widget build(BuildContext context) {
     final zapret = ref.watch(zapretControllerProvider);
     final components = ref.watch(zapretComponentsProvider);
+    final componentBusy = zapret.busy || _updatingComponents || _updatingHelper || _updating || _saving || components.checking;
     final sections = <Widget>[
       generateSection(
         title: 'Служба Helper',
@@ -432,7 +476,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : null,
-              onTap: zapret.busy || _updatingHelper
+              onTap: zapret.busy || _updatingHelper || _updatingComponents
                   ? null
                   : _updateHelperService,
             ),
@@ -475,12 +519,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
       generateSection(
         title: 'Компоненты Zapret',
         items: [
-          const ListItem(
-            title: Text('Версии в этой сборке'),
-            subtitle: Text(
-              'Zapret2 v1.0.7 · Flowseal 1.10.4 · стратегии geliopat/zapret2-gui',
-            ),
-          ),
+
           for (final entry in components.versions.entries)
               ListItem(
                 title: Text(entry.key),
@@ -494,11 +533,35 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
                   )
                 : const Icon(Icons.system_update_alt),
             title: const Text('Проверить версии'),
-            onTap: components.checking ? null : ref.read(zapretComponentsProvider.notifier).refresh,
+            onTap: componentBusy ? null : ref.read(zapretComponentsProvider.notifier).refresh,
           ),
+          for (final item in const {
+            ZapretComponent.zapret2: 'Обновить Zapret2',
+            ZapretComponent.flowseal: 'Обновить Flowseal',
+            ZapretComponent.strategies: 'Обновить стратегии',
+            ZapretComponent.all: 'Обновить всё',
+          }.entries)
+            ListItem(
+              leading: const Icon(Icons.cloud_download),
+              title: Text(item.value),
+              onTap: componentBusy ? null : () => _updateComponents(item.key),
+            ),
+          ListItem(
+            leading: const Icon(Icons.cloud_download),
+            title: const Text('Обновить списки'),
+            onTap: componentBusy || _lists.isEmpty || _loading ? null : _updateLists,
+          ),
+          if (_componentProgress != null)
+            ListItem(
+              title: Text(_componentProgress!),
+              trailing: const SizedBox.square(dimension: 18,
+                child: CircularProgressIndicator(strokeWidth: 2)),
+            ),
+          if (_componentResult != null)
+            ListItem(title: const Text('Результат обновления'), subtitle: Text(_componentResult!)),
         ],
         footer:
-            'Проверка новых версий выполняется отдельно. Замена winws/winws2, DLL, драйверов WinDivert и Lua/BAT пока не автоматизирована: обновление требует остановки движка, проверки SHA256 и возможности отката.',
+            'Загружаются совместимые версии из каталога FlClashZ. Архивы проверяются по SHA256, Lua и payload — по Git-хешам. BAT-профили, преобразованные в Rust, обновляются со сборкой Helper. Пользовательские файлы не заменяются.',
       ),
       const ListSectionGap(),
       generateSection(
@@ -579,7 +642,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
                     label: const Text('Перечитать'),
                   ),
                   TextButton.icon(
-                    onPressed: _lists.isEmpty || _loading || _saving || _updating
+                    onPressed: _lists.isEmpty || _loading || _saving || _updating || _updatingComponents
                         ? null
                         : _updateLists,
                     icon: _updating

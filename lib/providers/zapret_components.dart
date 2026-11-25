@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:fl_clash/providers/zapret_component_update.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final zapretComponentsProvider =
@@ -16,11 +17,7 @@ class ZapretComponentState {
 }
 
 class ZapretComponentsController extends Notifier<ZapretComponentState> {
-  static const installed = {
-    'Zapret2': 'v1.0.7',
-    'Flowseal': '1.10.4',
-    'Lua/BAT source': '8dd17fcbcca4',
-  };
+  static Map<String, String> get installed => installedZapretVersions();
   static const _urls = {
     'Zapret2': 'https://api.github.com/repos/bol-van/zapret2/releases/latest',
     'Flowseal': 'https://api.github.com/repos/Flowseal/zapret-discord-youtube/releases/latest',

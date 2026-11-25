@@ -1,0 +1,207 @@
+{
+  "schema": 1,
+  "zapret2": {
+    "version": "v1.0.8",
+    "sha256": "f2b84934a72536ec0ab4fdf71881a7d596ba67aef3f241dc8c9bc6260e534dd2"
+  },
+  "flowseal": {
+    "version": "1.10.4",
+    "sha256": "291af673bd0238506f9548e0e94ca0abf244000f4c9a06960544fb01c5f97b34"
+  },
+  "strategies": {
+    "version": "8dd17fcbcca405a50f497a6e2346ca263901d775",
+    "adaptedCommit": "702b1d71cf03ea0bfd7acf1f310b661a200d2cb9",
+    "files": [
+      {
+        "name": "zapret-antidpi.lua",
+        "sha": "ab1ad269daed8c38585a36d32f96ba700f129271",
+        "size": 51775
+      },
+      {
+        "name": "zapret-auto.lua",
+        "sha": "a1e6c087beda0a49e9032a080fe18ba2d1d81ae9",
+        "size": 21507
+      },
+      {
+        "name": "zapret-discord-light.lua",
+        "sha": "38962602cc7a00f3e6d53cd6043d46d6c0336621",
+        "size": 7241
+      },
+      {
+        "name": "zapret-extsplit.lua",
+        "sha": "44db3a4ac84e52b84a9d46892dbf0b54a3139d89",
+        "size": 7279
+      },
+      {
+        "name": "zapret-firstbyte.lua",
+        "sha": "e8264e4bf32e678de814df5c6a93bd8b2690710c",
+        "size": 7202
+      },
+      {
+        "name": "zapret-ipfrag.lua",
+        "sha": "e043d96360ba53f02244a52045c16dd722c04ceb",
+        "size": 7711
+      },
+      {
+        "name": "zapret-lib.lua",
+        "sha": "0e2d7824af571f91466beffa4be6cb811113e239",
+        "size": 97359
+      },
+      {
+        "name": "zapret-obfs.lua",
+        "sha": "6039fe8553737f64a49eda9374ae52579f6588ec",
+        "size": 18906
+      },
+      {
+        "name": "zapret-pcap.lua",
+        "sha": "ff979dc272e935de7fde6cf6f3cc0117812322fd",
+        "size": 1441
+      },
+      {
+        "name": "zapret-sites-light.lua",
+        "sha": "a82605ef10c2b4a9637d15af2182b81c067c1c47",
+        "size": 6653
+      },
+      {
+        "name": "zapret-syndata.lua",
+        "sha": "3cdfcfbc423363289e664c375dfc0ce9d19469ca",
+        "size": 7478
+      },
+      {
+        "name": "zapret-tests.lua",
+        "sha": "b0eca547188878221fb562d9fe534628738fad06",
+        "size": 37399
+      },
+      {
+        "name": "zapret-tspu-max.lua",
+        "sha": "bb7f96fc918026d156b2c847ada942e160b356fc",
+        "size": 9106
+      },
+      {
+        "name": "zapret-yt4k.lua",
+        "sha": "a3bf7f0a067f3ff8049e1eb54a8adb73266a5f95",
+        "size": 7606
+      },
+      {
+        "name": "ACTIVE_DISCORD_UDP.bin",
+        "sha": "7c0013b92920c337438b6f3e447152d8033606cf",
+        "size": 1200
+      },
+      {
+        "name": "ACTIVE_GAME_UDP.bin",
+        "sha": "7ad95b5d5a2d362c356494974687ab2c2abdf743",
+        "size": 1250
+      },
+      {
+        "name": "quic_initial_4pda_to.bin",
+        "sha": "7ad95b5d5a2d362c356494974687ab2c2abdf743",
+        "size": 1250
+      },
+      {
+        "name": "quic_initial_5ka_ru.bin",
+        "sha": "48a6268ad8d27fb976dc57b4c044f010536425f9",
+        "size": 1250
+      },
+      {
+        "name": "quic_initial_lemana_pro.bin",
+        "sha": "59593ba851f0b1b9c8924853154cda30969f3dda",
+        "size": 1357
+      },
+      {
+        "name": "quic_initial_rutube_ru.bin",
+        "sha": "6cf95250251d185cdd7e8adaf071c0691f25fe3e",
+        "size": 1357
+      },
+      {
+        "name": "quic_initial_steam_chat_com.bin",
+        "sha": "49f7512835bee040471f23ae0a1a32964c4c043c",
+        "size": 1357
+      },
+      {
+        "name": "quic_initial_steamcommunity_com.bin",
+        "sha": "7c0013b92920c337438b6f3e447152d8033606cf",
+        "size": 1200
+      },
+      {
+        "name": "quic_initial_steamstatic_com.bin",
+        "sha": "85644f49294fda9352bcdf2423a76c17bdc30fd5",
+        "size": 1357
+      },
+      {
+        "name": "quic_initial_tencent_com.bin",
+        "sha": "7a7c04ee3ed2e7cf6e02290d69761c7b7b37c524",
+        "size": 1231
+      },
+      {
+        "name": "quic_initial_www_google_com.bin",
+        "sha": "80a07cc8870c88be6d8ac7f9bf9dc9bb1979468b",
+        "size": 1200
+      },
+      {
+        "name": "stun.bin",
+        "sha": "a97b5acbe80be0452011387fa9ae33afb8f87249",
+        "size": 100
+      },
+      {
+        "name": "stun2.bin",
+        "sha": "5f8619f0949c535c0cb5ca52e6271de54d02182e",
+        "size": 120
+      },
+      {
+        "name": "tls_clienthello_4pda_to.bin",
+        "sha": "21ac37804ff14244d20868d3a5ca62ef0247a9aa",
+        "size": 284
+      },
+      {
+        "name": "tls_clienthello_5ka_ru.bin",
+        "sha": "53113a698bc46c3d54ccf0d467f77bc15999b8b3",
+        "size": 654
+      },
+      {
+        "name": "tls_clienthello_awswaf_com.bin",
+        "sha": "ebc48bc6d45eaab7524650b04c11ef3c864fcf8e",
+        "size": 1100
+      },
+      {
+        "name": "tls_clienthello_max_ru.bin",
+        "sha": "64a1af8bd27d0aee0d06b3293aeeeb163999418b",
+        "size": 664
+      },
+      {
+        "name": "tls_clienthello_retext_ai.bin",
+        "sha": "7f5623c5ec73d29bceace973c02c36f4a5fec8cd",
+        "size": 1783
+      },
+      {
+        "name": "tls_clienthello_sochi_park.bin",
+        "sha": "e5fbaa4ff73fca95045c666fda0c52ebe670f817",
+        "size": 244
+      },
+      {
+        "name": "tls_clienthello_steam_chat_com.bin",
+        "sha": "2aa913dae8036202acd7e58554ea71ec188557ab",
+        "size": 1100
+      },
+      {
+        "name": "tls_clienthello_steamstatic_com.bin",
+        "sha": "31cd3e97d85da57312b5fcf83af20ac2bf66bf93",
+        "size": 1100
+      },
+      {
+        "name": "tls_clienthello_teamspeak_com.bin",
+        "sha": "7aaa8d01f37b78349bc7377a5ef3a0d8a6f79798",
+        "size": 1100
+      },
+      {
+        "name": "tls_clienthello_www_google_com.bin",
+        "sha": "62985b63657c9343b805f915e5774a4e26a554d5",
+        "size": 681
+      },
+      {
+        "name": "tls_clienthello_www_sferum_ru.bin",
+        "sha": "3e787b80c73df4914cb232a53da16cac469f2329",
+        "size": 661
+      }
+    ]
+  }
+}
