@@ -232,15 +232,20 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
   }
 
   Future<void> _updateLists() async {
-    if (_updating || _saving) return;
+    if (_updating || _saving || _lists.isEmpty) return;
     setState(() {
       _updating = true;
       _error = null;
       _notice = null;
     });
-    var updated = 0;
+
+    final staged = <String, String>{};
+    final applied = <String>[];
     final details = <String>[];
+    final rollbackFailures = <String>[];
+
     try {
+      // Download and validate every upstream file before touching the disk.
       for (final entry in _sources.entries) {
         final current = await helperClient.readZapretList(entry.key);
         final response = await _http.get<String>(entry.value);
@@ -248,38 +253,67 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
         if (upstream == null || upstream.trim().length < 20) {
           throw StateError('Источник вернул пустой или слишком короткий файл: ${entry.key}');
         }
-        final merged = _mergeList(upstream, current.content, entry.key);
+
+        final upstreamCount = upstream
+            .split(RegExp(r'\r?\n'))
+            .where((line) => line.trim().isNotEmpty && !line.trim().startsWith('#'))
+            .length;
         final oldCount = current.content
             .split(RegExp(r'\r?\n'))
             .where((line) => line.trim().isNotEmpty && !line.trim().startsWith('#'))
             .length;
-        final newCount = merged
-            .split(RegExp(r'\r?\n'))
-            .where((line) => line.trim().isNotEmpty && !line.trim().startsWith('#'))
-            .length;
-        if (oldCount > 0 && newCount * 2 < oldCount) {
-          throw StateError('Обновление ${entry.key} отклонено: число записей резко уменьшилось ($newCount вместо $oldCount).');
+        if (upstreamCount == 0 || (oldCount > 0 && upstreamCount * 2 < oldCount)) {
+          throw StateError(
+            'Обновление ${entry.key} отклонено: источник содержит $upstreamCount записей при $oldCount в установленном файле. '
+            'Возможно, источник вернул неполный список.',
+          );
         }
-        final saved = await helperClient.writeZapretList(entry.key, merged);
-        updated++;
+
+        final merged = _mergeList(upstream, current.content, entry.key);
+        if (utf8.encode(merged).length > 2 * 1024 * 1024) {
+          throw StateError('Обновлённый файл ${entry.key} превышает лимит 2 МиБ.');
+        }
+        staged[entry.key] = merged;
+      }
+
+      // Apply staged files. If one write fails, restore every earlier file
+      // from its just-created .bak so the list set remains consistent.
+      for (final entry in staged.entries) {
+        final saved = await helperClient.writeZapretList(entry.key, entry.value);
+        applied.add(entry.key);
         details.add('${saved.filename}: ${saved.entries} записей');
       }
+
       if (!mounted) return;
       await _loadLists(select: _selected);
       if (!mounted) return;
       setState(() {
         _updating = false;
-        _notice = 'Обновлено файлов: $updated. ${details.join(' · ')}. Пользовательские списки не изменялись.';
+        _notice = 'Обновлено файлов: ${applied.length}. ${details.join(' · ')}. Пользовательские файлы *-user.txt не перезаписывались.';
       });
     } catch (error) {
+      // Roll back already-applied files in reverse order. A rollback failure
+      // is reported explicitly rather than hidden behind the original error.
+      for (final filename in applied.reversed) {
+        try {
+          await helperClient.restoreZapretList(filename);
+        } catch (rollbackError) {
+          rollbackFailures.add('$filename: $rollbackError');
+        }
+      }
       if (!mounted) return;
       setState(() {
         _updating = false;
         _error = error is HelperException ? error.message : error.toString();
-        if (updated > 0) {
-          _notice = 'До ошибки успешно обновлено файлов: $updated. Для каждого сохранённого файла создан .bak.';
-        }
+        _notice = applied.isEmpty
+            ? null
+            : rollbackFailures.isEmpty
+                ? 'Обновление не завершилось. Изменённые файлы автоматически возвращены из .bak.'
+                : 'Не удалось полностью откатить изменения: ${rollbackFailures.join('; ')}';
       });
+      if (applied.isNotEmpty && rollbackFailures.isEmpty) {
+        await _loadLists(select: _selected);
+      }
     }
   }
 
