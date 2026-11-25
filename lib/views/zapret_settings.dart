@@ -7,6 +7,7 @@ import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:material_ui/material_ui.dart';
 
 class ZapretSettingsView extends ConsumerStatefulWidget {
   const ZapretSettingsView({super.key});
@@ -48,6 +49,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
   String? _error;
   String? _notice;
   bool _checkingComponents = false;
+  bool _updatingHelper = false;
   Map<String, String> _componentUpdates = const {};
 
   @override
@@ -351,6 +353,29 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
     }
   }
 
+  Future<void> _updateHelperService() async {
+    if (_updatingHelper) return;
+    setState(() {
+      _updatingHelper = true;
+      _error = null;
+      _notice = null;
+    });
+    try {
+      await ref.read(zapretControllerProvider.notifier).updateHelperService();
+      if (!mounted) return;
+      setState(() {
+        _notice = 'Служба Helper переустановлена. Каталог Zapret2 загружен.';
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = error is HelperException ? error.message : error.toString();
+      });
+    } finally {
+      if (mounted) setState(() => _updatingHelper = false);
+    }
+  }
+
   Future<void> _checkComponentUpdates() async {
     if (_checkingComponents) return;
     setState(() => _checkingComponents = true);
@@ -433,13 +458,32 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
                 ],
                 if (zapret.error != null)
                   Text(zapret.error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton.icon(
-                    onPressed: zapret.busy ? null : () => ref.read(zapretControllerProvider.notifier).refresh(),
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Обновить состояние'),
-                  ),
+                Wrap(
+                  alignment: WrapAlignment.end,
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    TextButton.icon(
+                      onPressed: zapret.busy
+                          ? null
+                          : () => ref.read(zapretControllerProvider.notifier).refresh(),
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Обновить состояние'),
+                    ),
+                    if (!zapret.available || zapret.error != null)
+                      OutlinedButton.icon(
+                        onPressed: zapret.busy || _updatingHelper
+                            ? null
+                            : _updateHelperService,
+                        icon: _updatingHelper
+                            ? const SizedBox.square(
+                                dimension: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.admin_panel_settings_outlined),
+                        label: const Text('Переустановить Helper'),
+                      ),
+                  ],
                 ),
               ],
             ),
@@ -604,7 +648,11 @@ class _Section extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    final colorScheme = context.colorScheme;
+    return Material(
+      color: context.raisedSurfaceLevel.colorOf(colorScheme),
+      shape: AppShape.lg,
+      clipBehavior: Clip.antiAlias,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
