@@ -356,6 +356,13 @@ chineseSimplified.RemoveUserData=是否删除应用程序的用户数据？
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: checkedonce; Check: not IsUpgradeInstallation
 
+[InstallDelete]
+Type: files; Name: "{app}\FlClashXHelperService.exe"
+Type: files; Name: "{app}\FlClashXPreHelperService.exe"
+Type: files; Name: "{app}\FlClashHelperService.exe"
+Type: files; Name: "{app}\FlClashPreHelperService.exe"
+Type: files; Name: "{app}\FlClashZPreHelperService.exe"
+
 [Files]
 Source: "{{SOURCE_DIR}}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{{CLEAR_PROXY_SCRIPT}}"; Flags: dontcopy
