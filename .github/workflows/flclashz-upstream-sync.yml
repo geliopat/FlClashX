@@ -73,11 +73,22 @@ jobs:
             git checkout --detach FETCH_HEAD
           else
             git checkout -b "$candidate"
-            if ! git merge --no-ff --no-edit "$upstream"; then
-              git diff --name-only --diff-filter=U > integration-report/conflicts.txt
-              git merge --abort
-              echo "::error::Merge conflicts. Development and previous releases were not changed."
-              exit 1
+            # Merge without committing so the fork's version can never be
+            # replaced by upstream's pubspec version.
+            if ! git merge --no-ff --no-commit "$upstream"; then
+              if git diff --name-only --diff-filter=U | grep -Fxq pubspec.yaml; then
+                python3 tool/flclashz_sync_versions.py --resolve-pubspec || true
+              fi
+              if [[ -n "$(git diff --name-only --diff-filter=U)" ]] || ! git rev-parse -q --verify MERGE_HEAD >/dev/null; then
+                git diff --name-only --diff-filter=U > integration-report/conflicts.txt
+                git merge --abort || true
+                echo "::error::Merge conflicts. Development and previous releases were not changed."
+                exit 1
+              fi
+            fi
+            python3 tool/flclashz_sync_versions.py --development "$development" --upstream "$upstream"
+            if git rev-parse -q --verify MERGE_HEAD >/dev/null || ! git diff --cached --quiet; then
+              git commit -m "Merge FlClashX upstream and record integrated versions"
             fi
             git push origin "HEAD:refs/heads/$candidate"
           fi

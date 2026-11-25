@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/common/flclashz_upstream_versions.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
@@ -39,7 +40,11 @@ final coreVersionProvider = FutureProvider.autoDispose<String?>((ref) async {
       live = await ref.read(coreHandlerProvider).getCoreVersion();
     } catch (_) {}
   }
-  final version = live.isNotEmpty ? live : coreVersionDefine;
+  final version = live.isNotEmpty
+      ? live
+      : coreVersionDefine.isNotEmpty
+      ? coreVersionDefine
+      : bundledMihomoVersion;
   return version.isEmpty ? null : version;
 });
 
@@ -231,13 +236,18 @@ class _AboutHero extends ConsumerWidget {
             alignment: WrapAlignment.center,
             children: [
               _Pill(
-                label: 'v${globalState.packageInfo.displayVersion}',
+                label: 'FlClashZ v${globalState.packageInfo.displayVersion}',
                 color: colorScheme.primary,
                 foregroundColor: colorScheme.onPrimary,
               ),
+              _Pill(
+                label: 'FlClashX v$flClashXVersion',
+                color: raised,
+                foregroundColor: colorScheme.onSurfaceVariant,
+              ),
               if (coreVersion != null)
                 _Pill(
-                  label: 'core: $coreVersion',
+                  label: 'Mihomo: $coreVersion',
                   color: colorScheme.secondaryContainer,
                   foregroundColor: colorScheme.onSecondaryContainer,
                 ),

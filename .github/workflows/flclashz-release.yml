@@ -64,13 +64,17 @@ jobs:
           m = re.search(r"(?m)^version: (\d+)\.(\d+)\.(\d+)(?:\+\d+)?\s*$", data)
           if not m:
               raise SystemExit("pubspec version is not a stable three-part version")
-          versions = [tuple(map(int, m.groups()))]
+          base = max((1, 0, 0), tuple(map(int, m.groups())))
+          published = []
           for line in pathlib.Path(os.environ["VERSIONS_FILE"]).read_text().splitlines():
               t = re.search(r"/v(\d+)\.(\d+)\.(\d+)$", line)
               if t:
-                  versions.append(tuple(map(int, t.groups())))
-          a, b, c = max(versions)
-          version = f"{a}.{b}.{c + 1}"
+                  published.append(tuple(map(int, t.groups())))
+          # First release is the declared base (1.0.0), not base + 1.
+          # Existing tags and release branches reserve their numbers forever.
+          latest = max(published, default=(0, 0, 0))
+          chosen = base if latest < base else (latest[0], latest[1], latest[2] + 1)
+          version = ".".join(map(str, chosen))
           build = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d%H")
           p.write_text(re.sub(r"(?m)^version: [^\r\n]+", f"version: {version}+{build}", data, count=1), encoding="utf-8")
           print(f"v{version}")
