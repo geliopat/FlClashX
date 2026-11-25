@@ -384,7 +384,8 @@ class SetupAction extends _$SetupAction {
           try {
             restartZapret = await ref.read(zapretControllerProvider.notifier).stopAlongsideMihomo();
           } catch (error) {
-            commonPrint.log('Linked Zapret stop failed: $error', logLevel: LogLevel.warning);
+            commonPrint.log('VPN restart postponed: Zapret stop not confirmed: $error', logLevel: LogLevel.warning);
+            return false;
           }
         }
         if (!_isCurrent(request)) return null;
