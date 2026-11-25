@@ -25,7 +25,7 @@ env:
 
 jobs:
   windows:
-    name: Format, test and build Windows
+    name: Format, test and build Windows Release
     runs-on: windows-2022
     steps:
       - name: Checkout
@@ -86,15 +86,17 @@ jobs:
       - name: Analyze Flutter sources
         run: flutter analyze --no-fatal-infos
 
-      - name: Build Windows debug bundle
-        run: flutter build windows --debug
+      # Debug builds link against the MSVC debug CRT (MSVCP140D/VCRUNTIME140D/UCRTBaseD).
+      # Those DLLs are not redistributable. Build Release for a portable user bundle.
+      - name: Build Windows Release bundle
+        run: flutter build windows --release
 
-      - name: Upload Windows debug bundle
+      - name: Upload Windows Release bundle
         uses: actions/upload-artifact@v6
         with:
-          name: FlClashX-Zapret2-Windows-debug
+          name: FlClashX-Zapret2-Windows-x64-Release
           path: |
-            build/windows/x64/runner/Debug/**
-            build/windows/runner/Debug/**
+            build/windows/x64/runner/Release/**
+            build/windows/runner/Release/**
           if-no-files-found: error
           retention-days: 7
