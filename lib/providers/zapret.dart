@@ -506,7 +506,9 @@ class ZapretController extends Notifier<ZapretState> {
   /// run service checks on the eight best screens. Do not persist test choices.
   Future<void> testStrategies() async {
     if (!Platform.isWindows || state.busy || state.strategies.isEmpty ||
-        ref.read(coreStatusProvider) != CoreStatus.connected) return;
+        ref.read(coreStatusProvider) != CoreStatus.connected) {
+      return;
+    }
     final original = await _client.zapretStatus();
     if (state.busy || !ref.mounted) return;
     final previousTrials = state.trials;
@@ -591,7 +593,9 @@ class ZapretController extends Notifier<ZapretState> {
     if (_checkingFallback || state.busy || !state.running || !state.autoFallback ||
         state.activeStrategyId == null ||
         ref.read(coreStatusProvider) != CoreStatus.connected ||
-        (_fallbackAfter != null && DateTime.now().isBefore(_fallbackAfter!))) return;
+        (_fallbackAfter != null && DateTime.now().isBefore(_fallbackAfter!))) {
+      return;
+    }
     final backup = state.trials.where((trial) =>
         trial.confirmed && trial.id != state.activeStrategyId).firstOrNull;
     if (backup == null) return;

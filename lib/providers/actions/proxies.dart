@@ -662,7 +662,9 @@ class ProxiesAction extends _$ProxiesAction {
     if (_autoDelaysRunning || !ref.mounted || !ref.read(initProvider) ||
         ref.read(coreStatusProvider) != CoreStatus.connected ||
         ref.read(safeModeProvider) || ref.read(zapretControllerProvider).busy ||
-        ref.read(smartHostsProvider).cdnChecking || _delayTestJobs.isNotEmpty) return;
+        ref.read(smartHostsProvider).cdnChecking || _delayTestJobs.isNotEmpty) {
+      return;
+    }
     final intervals = ref.read(autoDelayProvider);
     if (intervals.active == 0 && intervals.others == 0) return;
     final groups = ref.read(groupsProvider);
@@ -684,7 +686,9 @@ class ProxiesAction extends _$ProxiesAction {
       for (final proxy in group.all) {
         // Do not duplicate native URLTest/fallback or provider-managed checks.
         if (automatic.contains(proxy.name) || proxy.providerName?.isNotEmpty == true ||
-            isBuiltinOutbound(proxy.name) || groups.getGroup(proxy.name) != null) continue;
+            isBuiltinOutbound(proxy.name) || groups.getGroup(proxy.name) != null) {
+          continue;
+        }
         final seconds = active.contains(proxy.name) ? intervals.active : intervals.others;
         if (seconds == 0) continue;
         final url = ref.read(realTestUrlProvider(group.testUrl));

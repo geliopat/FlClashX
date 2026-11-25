@@ -12,6 +12,7 @@ import 'package:fl_clash/providers/zapret.dart';
 import 'package:fl_clash/providers/auto_delay.dart';
 import 'package:fl_clash/providers/smart_hosts.dart';
 import 'package:fl_clash/providers/zapret_diagnostics.dart';
+import 'package:fl_clash/providers/zapret_components.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:tray/tray.dart';
@@ -52,6 +53,7 @@ class _TrayManagerState extends ConsumerState<TrayManager> {
         state.mode, state.startWithMihomo, state.strategies,
       )), (_, _) => _requestUpdate());
       ref.listenManual(zapretDiagnosticsProvider, (_, _) {});
+      ref.listenManual(zapretComponentsProvider, (_, _) {});
       ref.listenManual(smartHostsProvider.select((state) => state.revision), (_, _) {
         if (ref.read(initProvider)) {
           unawaited(ref.read(setupActionProvider.notifier).applyProfile(force: true, silence: true).then((ok) async {

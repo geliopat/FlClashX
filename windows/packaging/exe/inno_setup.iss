@@ -79,9 +79,19 @@ begin
   KillProcess('FlClashXPreHelperService.exe');
 end;
 
+procedure StopLegacyClientInInstallDir;
+var
+  Dir: String;
+begin
+  Dir := AddBackslash(ExpandConstant('{app}'));
+  StringChangeEx(Dir, '''', '''''', True);
+  RunHidden('powershell.exe', '-NoProfile -NonInteractive -Command "Get-Process -Name FlClashX,FlClashXPre -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith(''' + Dir + ''', [StringComparison]::OrdinalIgnoreCase) } | Stop-Process -Force"');
+end;
+
 procedure ShutDownApp;
 begin
   KillProcess('{{EXECUTABLE_NAME}}');
+  StopLegacyClientInInstallDir;
   HelperHeld := RunHidden('sc.exe', 'config "' + HelperService + '" start= disabled') = 0;
   RunHidden('net.exe', 'stop "' + HelperService + '"');
   KillProcess(HelperService + '.exe');

@@ -1,9 +1,9 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:fl_clash/core/desktop/helper_client.dart';
 import 'package:fl_clash/providers/providers.dart';
+import 'package:fl_clash/providers/zapret_components.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:fl_clash/pages/editor.dart';
@@ -18,9 +18,6 @@ class ZapretSettingsView extends ConsumerStatefulWidget {
 }
 
 class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
-  static const _installedZapret2 = 'v1.0.7';
-  static const _installedFlowseal = '1.10.4';
-  static const _installedStrategyCommit = '8dd17fcbcca405a50f497a6e2346ca263901d775';
   static const _sources = <String, String>{
     'list-general.txt': 'https://raw.githubusercontent.com/Flowseal/zapret-discord-youtube/main/lists/list-general.txt',
     'list-google.txt': 'https://raw.githubusercontent.com/Flowseal/zapret-discord-youtube/main/lists/list-google.txt',
@@ -49,13 +46,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
   bool _updating = false;
   String? _error;
   String? _notice;
-  bool _checkingComponents = false;
   bool _updatingHelper = false;
-  Map<String, String> _componentUpdates = const {
-    'Zapret2': 'установлено $_installedZapret2 · upstream не проверен',
-    'Flowseal': 'установлено $_installedFlowseal · upstream не проверен',
-    'Lua/BAT source': 'установлено $_installedStrategyCommit · upstream не проверен',
-  };
 
   @override
   void initState() {
@@ -385,52 +376,11 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
     }
   }
 
-  Future<void> _checkComponentUpdates() async {
-    if (_checkingComponents) return;
-    setState(() => _checkingComponents = true);
-    try {
-      final zapret2Response = await _http.get<String>(
-        'https://api.github.com/repos/bol-van/zapret2/releases/latest',
-        options: Options(headers: const {'Accept': 'application/vnd.github+json'}),
-      );
-      final flowsealResponse = await _http.get<String>(
-        'https://api.github.com/repos/Flowseal/zapret-discord-youtube/releases/latest',
-        options: Options(headers: const {'Accept': 'application/vnd.github+json'}),
-      );
-      final strategiesResponse = await _http.get<String>(
-        'https://api.github.com/repos/geliopat/zapret2-gui/commits/main',
-        options: Options(headers: const {'Accept': 'application/vnd.github+json'}),
-      );
-      final zapret2 = jsonDecode(zapret2Response.data ?? '') as Map<String, dynamic>;
-      final flowseal = jsonDecode(flowsealResponse.data ?? '') as Map<String, dynamic>;
-      final strategies = jsonDecode(strategiesResponse.data ?? '') as Map<String, dynamic>;
-      final upstreamStrategySha = strategies['sha'] is String
-          ? strategies['sha'] as String
-          : '';
-      final upstreamStrategyVersion = upstreamStrategySha.length >= 12
-          ? upstreamStrategySha.substring(0, 12)
-          : 'неизвестно';
-      if (!mounted) return;
-      setState(() {
-        _componentUpdates = {
-          'Zapret2': 'установлено $_installedZapret2 · upstream ${(zapret2['tag_name'] as String?) ?? 'неизвестно'}',
-          'Flowseal': 'установлено $_installedFlowseal · upstream ${(flowseal['tag_name'] as String?) ?? 'неизвестно'}',
-          'Lua/BAT source': 'установлено ${_installedStrategyCommit.substring(0, 12)} · upstream $upstreamStrategyVersion',
-        };
-        _checkingComponents = false;
-      });
-    } catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _checkingComponents = false;
-        _error = 'Не удалось проверить версии компонентов: $error';
-      });
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
     final zapret = ref.watch(zapretControllerProvider);
+    final components = ref.watch(zapretComponentsProvider);
     final sections = <Widget>[
       generateSection(
         title: 'Служба Helper',
@@ -476,20 +426,20 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
               'Zapret2 v1.0.7 · Flowseal 1.10.4 · стратегии geliopat/zapret2-gui',
             ),
           ),
-          for (final entry in _componentUpdates.entries)
+          for (final entry in components.versions.entries)
               ListItem(
                 title: Text(entry.key),
                 subtitle: Text(entry.value),
               ),
           ListItem(
-            leading: _checkingComponents
+            leading: components.checking
                 ? const SizedBox.square(
                     dimension: 18,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Icon(Icons.system_update_alt),
             title: const Text('Проверить версии'),
-            onTap: _checkingComponents ? null : _checkComponentUpdates,
+            onTap: components.checking ? null : ref.read(zapretComponentsProvider.notifier).refresh,
           ),
         ],
         footer:

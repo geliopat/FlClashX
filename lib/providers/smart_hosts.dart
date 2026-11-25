@@ -438,7 +438,9 @@ class SmartHostsController extends Notifier<SmartHostsState> {
         final host = item['host'];
         final mbps = item['mbps'];
         if (host is! String || youtubeCluster(host) == null || mbps is! num ||
-            !mbps.isFinite || mbps <= 0 || item['verdict'] != 'measured') continue;
+            !mbps.isFinite || mbps <= 0 || item['verdict'] != 'measured') {
+          continue;
+        }
         measured.add(CdnMeasurement(host, mbps.toDouble(), now, mbps >= _threshold));
       }
       final hasFast = measured.any((record) => record.fast);
