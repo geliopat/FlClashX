@@ -440,7 +440,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
                       for (final item in _lists)
                         DropdownMenuItem(
                           value: item.filename,
-                          child: Text('${item.filename} · ${item.entries} записей'),
+                          child: Text('${item.filename} · ${item.entries} записей${item.userManaged ? ' · пользовательский' : ''}'),
                         ),
                     ],
                     onChanged: _loading ? null : (value) {
