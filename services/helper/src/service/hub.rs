@@ -2842,7 +2842,7 @@ mod tests {
         for host in [
             "127.0.0.1:47890",
             "localhost:47890",
-            "FlClashXHelperService",
+            super::super::identity::helper_name(),
         ] {
             let response = warp::test::request()
                 .path("/logs")
