@@ -141,11 +141,11 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Отмена'),
+            child: Text(AppLocalizations.of(context).cancel),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Восстановить'),
+            child: Text(AppLocalizations.of(context).restore),
           ),
         ],
         child: Text('Текущий $filename будет заменён содержимым $filename.bak. Текущая версия также сохранится в .bak.'),
@@ -340,18 +340,18 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Отмена'),
+            child: Text(AppLocalizations.of(context).cancel),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Продолжить'),
+            child: Text(AppLocalizations.of(context).confirm),
           ),
         ],
         child: const Text(
-          'Служба будет заменена версией из текущей папки FlClashX. '
+          'Служба будет заменена версией из текущей папки FlClashZ. '
           'Во время переустановки Helper остановит Mihomo Core и Zapret, '
           'поэтому VPN и обход временно прервутся. После обновления запусти их снова. '
-          'Не перемещай и не удаляй папку FlClashX после переустановки службы.',
+          'Не перемещай и не удаляй папку FlClashZ после переустановки службы.',
         ),
       ),
     );
@@ -392,7 +392,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Закрыть'),
+            child: Text(AppLocalizations.of(context).close),
           ),
         ],
       ),
@@ -446,14 +446,14 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
             title: Text(AppLocalizations.of(context).forkExcludedIps),
             subtitle: Text('${zapret.protectedIps.length} · автоматически из профиля'),
             onTap: zapret.protectedIps.isEmpty ? null : () => _showProtectionList(
-              'Исключённые IP и подсети', zapret.protectedIps,
+              AppLocalizations.of(context).forkExcludedIps, zapret.protectedIps,
             ),
           ),
           ListItem(
             title: Text(AppLocalizations.of(context).forkExcludedDomains),
             subtitle: Text('${zapret.protectedDomains.length} · автоматически из профиля'),
             onTap: zapret.protectedDomains.isEmpty ? null : () => _showProtectionList(
-              'Исключённые домены', zapret.protectedDomains,
+              AppLocalizations.of(context).forkExcludedDomains, zapret.protectedDomains,
             ),
           ),
           ListItem(
@@ -478,7 +478,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
           if (_error != null)
             ListItem(
               leading: Icon(Icons.error_outline, color: context.colorScheme.error),
-              title: const Text('Ошибка'),
+              title: Text(AppLocalizations.of(context).error),
               subtitle: Text(
                 _error!,
                 style: TextStyle(color: context.colorScheme.error),
@@ -487,12 +487,12 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
           if (_notice != null)
             ListItem(
               leading: Icon(Icons.info_outline, color: context.colorScheme.primary),
-              title: const Text('Результат операции'),
+              title: Text(AppLocalizations.of(context).forkResults),
               subtitle: Text(_notice!),
             ),
           if (_loading && _lists.isEmpty)
             const ListItem(
-              title: Text('Загрузка списков…'),
+              title: Text(AppLocalizations.of(context).loading),
               trailing: SizedBox.square(
                 dimension: 18,
                 child: CircularProgressIndicator(strokeWidth: 2),
