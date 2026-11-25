@@ -19,6 +19,16 @@ void main() {
         ['full-fast', 'full-slow']);
   });
 
+  test('trial labels distinguish complete, partial, failed, screening and errors', () {
+    const mode = ZapretMode.fullBypass;
+    expect(const ZapretTrial('a', mode, 6, 100, confirmed: true, passedTargets: 3).resultLabel, 'Успешно');
+    expect(const ZapretTrial('b', mode, 2, 100, passedTargets: 1).resultLabel, 'Частично успешно');
+    expect(const ZapretTrial('c', mode, 0, 0).resultLabel, 'Не прошла проверку');
+    expect(const ZapretTrial('d', mode, 6, 100, screenedOnly: true, passedTargets: 3).resultLabel, 'Только предварительный отбор');
+    expect(const ZapretTrial('e', mode, 0, 0, error: 'process exited').resultLabel, 'Ошибка запуска/проверки');
+    expect(const ZapretTrial('f', mode, 0, 0, screenedOnly: true).resultLabel, 'Не прошла предварительный отбор');
+  });
+
   test('classifies a fast successful probe as operational', () {
     expect(
       classifyZapretProbe(statusCode: 204, latencyMs: 120).status,
