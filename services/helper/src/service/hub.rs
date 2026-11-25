@@ -1650,15 +1650,15 @@ mod tests {
         ];
         assert_eq!(
             zapret_win_divert_filters(&args),
-            vec!["--wf-tcp-out=80,443", "--wf-udp-out=443"],
+            vec!["--wf-tcp-out=80,443".to_string(), "--wf-udp-out=443".to_string()],
         );
         assert_eq!(
             zapret_processing_lists(&args),
             vec![
-                "--hostlist=lists/list-general.txt",
-                "--hostlist-domains=discord.com",
-                "--hostlist-auto=lists/list-auto.txt",
-                "--ipset=lists/ipset-all.txt",
+                "--hostlist=lists/list-general.txt".to_string(),
+                "--hostlist-domains=discord.com".to_string(),
+                "--hostlist-auto=lists/list-auto.txt".to_string(),
+                "--ipset=lists/ipset-all.txt".to_string(),
             ],
         );
     }
