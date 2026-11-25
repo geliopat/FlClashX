@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:fl_clash/common/system.dart';
@@ -134,12 +135,14 @@ class ZapretTrial {
   final bool confirmed;
 }
 
+
 class ZapretController extends Notifier<ZapretState> {
   static const defaultStrategyId = 'flowseal-alt';
   static const _selectedStrategyPreferenceKey = 'zapret.strategyId';
   static const _modePreferenceKey = 'zapret.mode';
   static const _debugPreferenceKey = 'zapret.debugLogs';
   static const _linkedStartPreferenceKey = 'zapret.startWithMihomo';
+  static const _trialHistoryKey = 'zapret.trialHistory.v1';
   static const _pollInterval = Duration(seconds: 3);
   static const _readinessTimeout = Duration(seconds: 3);
 
@@ -227,6 +230,7 @@ class ZapretController extends Notifier<ZapretState> {
         startWithMihomo: preferences.getBool(_linkedStartPreferenceKey) ?? false,
         watchdog: preferences.getBool('zapret.watchdog') ?? true,
         autoFallback: preferences.getBool('zapret.autoFallback') ?? false,
+        trials: _restoreTrials(preferences, strategies.map((item) => item.id).toSet()),
         clearError: strategies.isNotEmpty,
       );
       if (strategies.isNotEmpty && savedId != selectedId) {
@@ -242,6 +246,46 @@ class ZapretController extends Notifier<ZapretState> {
         error: _errorMessage(error),
       );
     }
+  }
+
+  List<ZapretTrial> _restoreTrials(SharedPreferences prefs, Set<String> installed) {
+    try {
+      final saved = prefs.getString(_trialHistoryKey);
+      if (saved == null) return const [];
+      final data = jsonDecode(saved) as Map<String, dynamic>;
+      final at = DateTime.parse(data['at'] as String);
+      if (DateTime.now().difference(at).abs() > const Duration(days: 7)) return const [];
+      return [
+        for (final item in data['trials'] as List)
+          if (installed.contains(item['id']))
+            ZapretTrial(
+              item['id'] as String,
+              ZapretMode.values.byName(item['mode'] as String),
+              item['score'] as int,
+              item['delay'] as int,
+              confirmed: item['confirmed'] == true,
+            ),
+      ];
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  Future<void> _saveTrials(List<ZapretTrial> trials) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_trialHistoryKey, jsonEncode({
+      'at': DateTime.now().toIso8601String(),
+      'trials': [
+        for (final item in trials)
+          {
+            'id': item.id,
+            'mode': item.mode.name,
+            'score': item.score,
+            'delay': item.delay,
+            'confirmed': item.confirmed,
+          },
+      ],
+    }));
   }
 
   Future<void> selectStrategy(String strategyId) async {
@@ -465,6 +509,7 @@ class ZapretController extends Notifier<ZapretState> {
         ref.read(coreStatusProvider) != CoreStatus.connected) return;
     final original = await _client.zapretStatus();
     if (state.busy || !ref.mounted) return;
+    final previousTrials = state.trials;
     final strategies = state.strategies.toList();
     final selectedMode = state.mode;
     _cancelTrial = false;
@@ -526,7 +571,10 @@ class ZapretController extends Notifier<ZapretState> {
       }
       if (ref.mounted) {
         state = state.copyWith(busy: false, clearTestProgress: true,
-            trials: _cancelTrial ? const [] : List.unmodifiable(results), error: failure);
+            trials: _cancelTrial || failure != null ? previousTrials : List.unmodifiable(results), error: failure);
+        if (!_cancelTrial && failure == null) {
+          try { await _saveTrials(results); } catch (_) { /* History is optional. */ }
+        }
         await refresh();
       }
     }
@@ -539,7 +587,7 @@ class ZapretController extends Notifier<ZapretState> {
     await restart();
   }
 
-  Future<void> checkFallback() async {
+  Future<void> checkFallback(Map<ZapretProbeTarget, ZapretProbeResult> checks) async {
     if (_checkingFallback || state.busy || !state.running || !state.autoFallback ||
         state.activeStrategyId == null ||
         ref.read(coreStatusProvider) != CoreStatus.connected ||
@@ -551,10 +599,15 @@ class ZapretController extends Notifier<ZapretState> {
     try {
       final originalId = state.activeStrategyId!;
       final originalMode = state.activeMode == 'strictSplit' ? ZapretMode.strictSplit : ZapretMode.fullBypass;
-      final current = await _verify(originalId, originalMode);
+      const required = [ZapretProbeTarget.youtube, ZapretProbeTarget.discordGateway, ZapretProbeTarget.discordVoice];
+      final current = required.map((target) => checks[target]).toList();
+      if (current.any((item) => item == null || item.status == ZapretProbeStatus.checking)) {
+        _failedChecks = 0;
+        return;
+      }
       if (state.busy || state.activeStrategyId != originalId || !state.running) return;
       if (!state.autoFallback || ref.read(coreStatusProvider) != CoreStatus.connected) return;
-      if (current.confirmed) {
+      if (current.every((item) => item?.message == 'DIRECT · HTTP 2xx')) {
         _failedChecks = 0;
         return;
       }

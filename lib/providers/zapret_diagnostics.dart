@@ -215,7 +215,7 @@ class ZapretDiagnosticsController extends Notifier<ZapretDiagnosticsState> {
       final after = ref.read(zapretControllerProvider);
       if (after.busy || after.pid != before.pid) return;
       state = ZapretDiagnosticsState(results);
-      unawaited(ref.read(zapretControllerProvider.notifier).checkFallback());
+      unawaited(ref.read(zapretControllerProvider.notifier).checkFallback(results));
     } finally {
       _refreshing = false;
     }

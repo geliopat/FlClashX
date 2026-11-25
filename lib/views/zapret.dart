@@ -37,6 +37,16 @@ class ZapretView extends ConsumerWidget {
             subtitle: Text(zapret.running ? 'Запущен' : 'Остановлен'),
           ),
           ListItem(
+            title: Text(zapret.running ? 'Остановить Zapret' : 'Запустить Zapret'),
+            leading: Icon(zapret.running ? Icons.stop_circle_outlined : Icons.play_circle_outline),
+            onTap: zapret.busy || !zapret.available ? null : () => ref.read(zapretControllerProvider.notifier).setEnabled(!zapret.running),
+          ),
+          if (zapret.running)
+            ListItem(
+              title: const Text('Перезапустить Zapret'),
+              onTap: zapret.busy ? null : () => ref.read(zapretControllerProvider.notifier).restart(),
+            ),
+          ListItem(
             title: const Text('Выбранная стратегия'),
             onTap: () => showZapretStrategiesSheet(context),
             subtitle: Text(selectedName ?? 'Не выбрана'),
@@ -115,6 +125,11 @@ class ZapretView extends ConsumerWidget {
           ),
           if (zapret.testProgress != null)
             ListItem(title: const Text('Отменить тестирование'), onTap: ref.read(zapretControllerProvider.notifier).cancelTrials),
+          if (zapret.trials.any((trial) => trial.confirmed))
+            ListItem(
+              title: const Text('Применить лучшую стратегию'),
+              onTap: zapret.busy ? null : () => ref.read(zapretControllerProvider.notifier).applyTrial(zapret.trials.firstWhere((trial) => trial.confirmed)),
+            ),
           for (final trial in zapret.trials)
             ListItem(
               title: Text(trial.id),
