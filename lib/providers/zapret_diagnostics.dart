@@ -1,3 +1,4 @@
+import 'package:fl_clash/l10n/l10n.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -92,6 +93,13 @@ class ZapretProbeResult {
     _ => 0,
   };
 
+  String localizedStatusLabel(AppLocalizations l) => switch (status) {
+    ZapretProbeStatus.operational => l.forkRunning,
+    ZapretProbeStatus.degraded => l.forkDegraded,
+    ZapretProbeStatus.blocked => l.forkNoConnection,
+    ZapretProbeStatus.checking => l.forkUnconfirmed,
+  };
+
   String get statusLabel => switch (status) {
     ZapretProbeStatus.operational => 'Работает',
     ZapretProbeStatus.degraded => 'С ограничениями / высокой задержкой',
@@ -106,9 +114,9 @@ ZapretProbeResult classifyZapretProbe({
   required int latencyMs,
 }) {
   if (statusCode == null) {
-    return const ZapretProbeResult(
+    return ZapretProbeResult(
       status: ZapretProbeStatus.blocked,
-      message: 'Сервер не ответил',
+      message: AppLocalizations().forkNoResponse,
     );
   }
   final accepted = statusCode >= 200 && statusCode < 300;
@@ -118,8 +126,8 @@ ZapretProbeResult classifyZapretProbe({
   final message = !accepted
       ? 'HTTP $statusCode'
       : latencyMs > 450
-          ? 'Высокая задержка'
-          : 'Соединение доступно';
+          ? AppLocalizations().forkHighLatency
+          : AppLocalizations().forkReachable;
   return ZapretProbeResult(
     status: status,
     latencyMs: latencyMs,
@@ -146,7 +154,7 @@ Future<Map<ZapretProbeTarget, ZapretProbeResult>> measureZapretTargets(
 }) async {
   final wanted = targets.toList();
   if (ref.read(coreStatusProvider) != CoreStatus.connected) {
-    return {for (final target in wanted) target: const ZapretProbeResult(message: 'Ядро Mihomo недоступно')};
+    return {for (final target in wanted) target: ZapretProbeResult(message: AppLocalizations().forkCoreUnavailable)};
   }
   try {
     final items = await ref.read(coreHandlerProvider).serviceCheck(ServiceCheckParams(
@@ -164,7 +172,7 @@ Future<Map<ZapretProbeTarget, ZapretProbeResult>> measureZapretTargets(
 }
 
 ZapretProbeResult classifyZapretService(ZapretProbeTarget target, ServiceCheckItem? item) {
-  if (item == null) return const ZapretProbeResult(message: 'Ответ ядра отсутствует');
+  if (item == null) return ZapretProbeResult(message: AppLocalizations().forkNoCoreResponse);
   if (item.delay > 0) {
     if (item.chains.isEmpty || item.chains.any((chain) => chain != 'DIRECT')) {
       return ZapretProbeResult(
@@ -202,7 +210,7 @@ ZapretProbeResult classifyZapretService(ZapretProbeTarget target, ServiceCheckIt
   if (item.status == 'timeout' || item.status == 'failed') {
     return ZapretProbeResult(status: ZapretProbeStatus.blocked, message: 'DIRECT · ${item.status}');
   }
-  return const ZapretProbeResult(message: 'Нет подтверждённого результата');
+  return ZapretProbeResult(message: AppLocalizations().forkNoVerifiedResult);
 }
 
 class ZapretDiagnosticsController extends Notifier<ZapretDiagnosticsState> {

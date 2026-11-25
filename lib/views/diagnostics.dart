@@ -38,8 +38,6 @@ class _DiagnosticsViewState extends ConsumerState<DiagnosticsView> {
   Future<void> _run() async {
     if (_busy) return;
     final l = AppLocalizations.of(context);
-    final ru = Localizations.localeOf(context).languageCode == 'ru';
-    String _t(String ruText, String enText) => ru ? ruText : enText;
     setState(() { _busy = true; _results.clear(); });
     Future<void> check(String name, Future<String> Function() task) async {
       if (!mounted) return;
@@ -66,7 +64,7 @@ class _DiagnosticsViewState extends ConsumerState<DiagnosticsView> {
       await check('Zapret', () async {
         final status = await helperClient.zapretStatus();
         final catalog = await helperClient.zapretStrategies();
-        return '${status.running ? l.forkRunning : l.forkStopped} · ${catalog.length} ${_t('стратегий', 'strategies')}';
+        return '${status.running ? l.forkRunning : l.forkStopped} · ${catalog.length} ${l.forkStrategies}';
       });
       await check(l.forkComponentIntegrity, () async {
         final failures = await checkWindowsComponents();
@@ -82,12 +80,12 @@ class _DiagnosticsViewState extends ConsumerState<DiagnosticsView> {
       });
       await check('TUN', () async {
         if (!ref.read(patchClashConfigProvider).tun.enable || !ref.read(isStartProvider)) {
-          return _t('Не запрошен / VPN выключен', 'Not requested / VPN off');
+          return l.forkTunNotRequested;
         }
         if (ref.read(coreStatusProvider) != CoreStatus.connected) return unavailable;
         return await ref.read(coreHandlerProvider).getTunFailed()
-          ? _t('Ядро сообщает об ошибке TUN', 'Core reports TUN failure')
-          : _t('Ядро не сообщает об ошибке TUN (не тест трафика)', 'No TUN failure reported by core (not a traffic test)');
+          ? l.forkTunFailure
+          : l.forkTunNoFailure;
       });
       await check(l.forkSystemProxy, () async {
         final expected = ref.read(networkSettingProvider).systemProxy && ref.read(isStartProvider);
@@ -106,7 +104,7 @@ class _DiagnosticsViewState extends ConsumerState<DiagnosticsView> {
         final active = drivers.split(RegExp(r'\s+')).contains('Running');
         if (active) return l.forkRunning;
         return running
-            ? _t('Драйвер не найден среди запущенных служб', 'Driver not found among running services')
+            ? l.forkDriverNotFound
             : l.forkStopped;
       });
       await check(l.forkServiceJournal, () async {
@@ -116,7 +114,7 @@ class _DiagnosticsViewState extends ConsumerState<DiagnosticsView> {
       await check(l.forkNetworkChecks, () async {
         final results = ref.read(zapretDiagnosticsProvider);
         final accepted = ZapretProbeTarget.values.where((target) => results.resultOf(target).accepted).length;
-        return '$accepted/${ZapretProbeTarget.values.length} HTTPS · ${_t('последние результаты DIRECT, не доказательство перехвата WinDivert', 'latest DIRECT results, not proof of WinDivert interception')}';
+        return '$accepted/${ZapretProbeTarget.values.length} HTTPS · ${l.forkLatestDirect}';
       });
     } finally {
       if (mounted) setState(() => _busy = false);

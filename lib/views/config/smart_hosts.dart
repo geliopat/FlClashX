@@ -20,12 +20,12 @@ class SmartHostsView extends ConsumerWidget {
         description,
         'Записей: ${state.sourceCounts[id] ?? 0}',
         if (state.cachedSources.contains(id))
-          'Используется сохранённый или встроенный список'
+          AppLocalizations.of(context).forkUseCache
         else if (state.fallbackSources.contains(id))
-          'Загружено с резервного источника',
+          AppLocalizations.of(context).forkFallbackDownloaded,
         if (state.errors[id] != null) 'Ошибка: ${state.errors[id]}',
         if (state.errors[id] != null && state.enabled && state.autoUpdate && state.sources.contains(id))
-          'Автоматические повторы с интервалом 15 минут',
+          AppLocalizations.of(context).forkRetryInterval,
       ].join('\n')),
       trailing: Switch(
         value: state.sources.contains(id),
@@ -67,7 +67,7 @@ class SmartHostsView extends ConsumerWidget {
               ),
               ListItem(
                 title: Text(AppLocalizations.of(context).forkUpdateNow),
-                subtitle: Text(state.lastUpdate == null ? 'Ещё не обновлялись' : 'Последняя успешная загрузка: ${state.lastUpdate!.toLocal().toString().split('.').first}'),
+                subtitle: Text(state.lastUpdate == null ? AppLocalizations.of(context).forkNoUpdate : 'Последняя успешная загрузка: ${state.lastUpdate!.toLocal().toString().split('.').first}'),
                 onTap: state.updating || !state.enabled ? null : controller.refresh,
                 trailing: state.updating ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2)) : null,
               ),
@@ -114,7 +114,7 @@ class SmartHostsView extends ConsumerWidget {
           generateSection(
             title: AppLocalizations.of(context).forkYouTubeOptimization,
             items: [
-              source('youtube', 'Использовать общественный список', 'Проблемные CDN из списка Zapret2 GUI перенаправляются на 127.0.0.2'),
+              source('youtube', AppLocalizations.of(context).forkCommunityList, 'Проблемные CDN из списка Zapret2 GUI перенаправляются на 127.0.0.2'),
               ListItem(
                 title: Text(AppLocalizations.of(context).forkSlowCdn),
                 trailing: Switch(value: state.blockSlowCdn,
@@ -122,7 +122,7 @@ class SmartHostsView extends ConsumerWidget {
               ),
               ListItem(
                 title: Text(AppLocalizations.of(context).forkAutoCdn),
-                subtitle: const Text('Раз в сутки, по умолчанию выключено'),
+                subtitle: Text(AppLocalizations.of(context).forkDailyOff),
                 trailing: Switch(value: state.autoCdn,
                     onChanged: state.cdnChecking ? null : (value) => controller.configure(autoCdn: value)),
               ),
@@ -142,7 +142,7 @@ class SmartHostsView extends ConsumerWidget {
               ),
               ListItem(
                 title: Text(AppLocalizations.of(context).forkCheckCdn),
-                subtitle: Text(state.cdnMessage ?? 'Реальный видеопоток через DIRECT'),
+                subtitle: Text(state.cdnMessage ?? AppLocalizations.of(context).forkRealDirect),
                 onTap: state.cdnChecking || state.updating ? null : controller.checkCdn,
                 trailing: state.cdnChecking ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2)) : null,
               ),
@@ -166,7 +166,7 @@ class SmartHostsView extends ConsumerWidget {
                   keyMaxLength: 253,
                   valueMaxLength: 64,
                   titleBuilder: (item) => Text(item.key),
-                  subtitleBuilder: (item) => const Text('Не добавлять автоматически'),
+                  subtitleBuilder: (item) => Text(AppLocalizations.of(context).forkExcludeAuto),
                 ),
                 onChanged: (value) {
                   if (value is Map<String, String>) controller.configure(exclusions: value.keys.toSet());
@@ -179,7 +179,7 @@ class SmartHostsView extends ConsumerWidget {
               ),
               ListItem.open(
                 title: Text(AppLocalizations.of(context).forkViewAppliedHosts),
-                subtitle: const Text('Все записи, применённые в Mihomo'),
+                subtitle: Text(AppLocalizations.of(context).forkAllApplied),
                 widget: const _AppliedHostsView(),
               ),
             ],
@@ -208,7 +208,7 @@ class _AppliedHostsViewState extends ConsumerState<_AppliedHostsView> {
 
   Future<({Map<String, String> entries, HostCandidates candidates})> _load() async {
     if (ref.read(coreStatusProvider) != CoreStatus.connected) {
-      throw StateError('Ядро Mihomo недоступно');
+      throw StateError(AppLocalizations.of(context).forkCoreUnavailable);
     }
     final setup = ref.read(setupActionProvider.notifier);
     final before = setup.pushes;
@@ -239,7 +239,7 @@ class _AppliedHostsViewState extends ConsumerState<_AppliedHostsView> {
                     Text('Не удалось получить применённые Hosts: ${snapshot.error}'),
                     TextButton(
                       onPressed: () => setState(() => _entries = _load()),
-                      child: const Text('Повторить'),
+                      child: Text(AppLocalizations.of(context).retry),
                     ),
                   ],
                 ),
@@ -286,7 +286,7 @@ class _SmartHostsEntriesState extends State<_SmartHostsEntries> {
           if (index == 0) {
             return ListItem(
               title: Text(AppLocalizations.of(context).forkOnlyConflicts),
-              subtitle: Text('Конфликтов: ${widget.entries.keys.where(_conflict).length}'),
+              subtitle: Text('${AppLocalizations.of(context).forkConflicts}: ${widget.entries.keys.where(_conflict).length}'),
               trailing: Switch(value: _conflictsOnly, onChanged: (value) => setState(() => _conflictsOnly = value)),
             );
           }
@@ -297,8 +297,8 @@ class _SmartHostsEntriesState extends State<_SmartHostsEntries> {
             title: Text(entry.key),
             subtitle: Text([
               entry.value,
-              matching.isEmpty ? AppLocalizations.of(context).forkUnknownSource : 'Совпадает с: ${matching.join(', ')}',
-              if (_conflict(entry.key)) 'Конфликт:',
+              matching.isEmpty ? AppLocalizations.of(context).forkUnknownSource : '${AppLocalizations.of(context).forkSourceMatches}: ${matching.join(', ')}',
+              if (_conflict(entry.key)) '${AppLocalizations.of(context).forkConflict}:',
               if (_conflict(entry.key))
                 for (final item in candidates.entries) '${_source(item.key)}: ${item.value}',
             ].join('\n'), maxLines: 12),

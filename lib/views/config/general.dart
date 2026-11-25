@@ -660,7 +660,7 @@ class GeneralView extends ConsumerWidget {
               items: [
                 ListItem(
                   title: Text(AppLocalizations.of(context).forkVerboseEngine),
-                  subtitle: const Text('Применяется при следующем запуске Zapret'),
+                  subtitle: Text(AppLocalizations.of(context).forkNextZapretStart),
                   trailing: Switch(
                     value: ref.watch(
                       zapretControllerProvider.select((state) => state.debugLogs),
@@ -677,7 +677,7 @@ class GeneralView extends ConsumerWidget {
                   onTap: () async => system.openDirectory(await crashFileLogger.directoryPath),
                 ),
               ],
-              footer: 'Отладка показывает необработанный вывод winws/winws2.',
+              footer: AppLocalizations.of(context).forkEngineDebugTip,
             ),
           generateSection(
             title: AppLocalizations.of(context).forkResetSettings,
@@ -698,10 +698,10 @@ class ZapretProbeIntervalItem extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return ListItem<int>.options(
-      title: const Text('Интервал HTTPS-проверок Zapret'),
+      title: Text(AppLocalizations.of(context).forkHttpsInterval),
       options: ZapretProbeInterval.values,
       value: ref.watch(zapretProbeIntervalProvider),
-      textBuilder: (value) => value == 0 ? 'Отключено' : '$value сек.',
+      textBuilder: (value) => value == 0 ? AppLocalizations.of(context).forkDisabled : '$value сек.',
       onChanged: (value) => ref.read(zapretProbeIntervalProvider.notifier).update(value),
     );
   }
@@ -713,7 +713,7 @@ class MihomoWatchdogItem extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return ListItem(
       title: const Text('Watchdog Mihomo'),
-      subtitle: const Text('Восстановление ядра после аварийного завершения'),
+      subtitle: Text(AppLocalizations.of(context).forkCoreRecovery),
       trailing: Switch(
         value: ref.watch(mihomoWatchdogProvider),
         onChanged: ref.read(mihomoWatchdogProvider.notifier).setEnabled,
@@ -730,10 +730,10 @@ class AutoDelayIntervalItem extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final intervals = ref.watch(autoDelayProvider);
     return ListItem<int>.options(
-      title: Text(active ? 'Интервал проверки выбранных серверов' : 'Интервал проверки остальных серверов'),
+      title: Text(active ? AppLocalizations.of(context).forkSelectedPingInterval : AppLocalizations.of(context).forkOtherPingInterval),
       options: AutoDelayController.values,
       value: active ? intervals.active : intervals.others,
-      textBuilder: (value) => value == 0 ? 'Отключено' : '$value сек.',
+      textBuilder: (value) => value == 0 ? AppLocalizations.of(context).forkDisabled : '$value сек.',
       onChanged: (value) => ref.read(autoDelayProvider.notifier).set(
         active: active ? value : null, others: active ? null : value),
     );

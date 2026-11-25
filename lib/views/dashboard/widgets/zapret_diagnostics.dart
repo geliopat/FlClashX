@@ -1,3 +1,4 @@
+import 'package:fl_clash/l10n/l10n.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
@@ -54,22 +55,22 @@ class ZapretDiagnosticsCard extends ConsumerWidget {
     );
     final colors = DashboardColors.of(context);
     return DashboardCard(
-      semanticLabel: 'Сетевые задержки YouTube, GoogleVideo и Discord',
+      semanticLabel: AppLocalizations.of(context).forkHttpsLatency,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           DashboardCardHeader(
             glyph: AppGlyphs.speed,
-            title: 'Сетевые задержки · HTTPS',
+            title: AppLocalizations.of(context).forkHttpsLatency,
             trailing: [
               DashboardIconButton(
                 glyph: AppGlyphs.filter,
-                tooltip: 'Выбрать стратегию Zapret',
+                tooltip: AppLocalizations.of(context).forkChooseStrategy,
                 onPressed: () => showZapretStrategiesSheet(context),
               ),
               DashboardIconButton(
                 glyph: AppGlyphs.refresh,
-                tooltip: 'Проверить сейчас',
+                tooltip: AppLocalizations.of(context).forkCheckNow,
                 onPressed: () =>
                     ref.read(zapretDiagnosticsProvider.notifier).refresh(),
               ),
@@ -87,7 +88,7 @@ class ZapretDiagnosticsCard extends ConsumerWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      zapret.running ? 'Активная стратегия' : 'Выбрана стратегия',
+                      zapret.running ? AppLocalizations.of(context).forkActiveStrategy : AppLocalizations.of(context).forkSelectedStrategy,
                       style: AppTextStyle.footnote.of(context).copyWith(
                         color: context.colorScheme.onSurfaceVariant,
                       ),
@@ -96,7 +97,7 @@ class ZapretDiagnosticsCard extends ConsumerWidget {
                   const SizedBox(width: 8),
                   Flexible(
                     child: Text(
-                      displayedStrategyName ?? (zapret.running ? 'Не определена' : 'Не выбрана'),
+                      displayedStrategyName ?? (zapret.running ? AppLocalizations.of(context).forkUndefined : AppLocalizations.of(context).forkNotSelected),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       textAlign: TextAlign.end,
@@ -208,10 +209,10 @@ class _ProbeLine extends StatelessWidget {
       ZapretProbeStatus.checking => scheme.onSurfaceVariant,
     };
     final statusLabel = switch (result.status) {
-      ZapretProbeStatus.operational => 'Работает',
-      ZapretProbeStatus.degraded => 'Замедлено',
-      ZapretProbeStatus.blocked => 'Нет ответа',
-      ZapretProbeStatus.checking => 'Проверка',
+      ZapretProbeStatus.operational => AppLocalizations.of(context).forkRunning,
+      ZapretProbeStatus.degraded => AppLocalizations.of(context).forkSlow,
+      ZapretProbeStatus.blocked => AppLocalizations.of(context).forkNoReply,
+      ZapretProbeStatus.checking => AppLocalizations.of(context).forkChecking,
     };
     final value = result.latencyMs == null
         ? statusLabel

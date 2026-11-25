@@ -1,3 +1,4 @@
+import 'package:fl_clash/l10n/l10n.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -31,6 +32,16 @@ enum ZapretAutoTuneMode {
   final String description;
   final int controlRuns;
 
+  String localizedLabel(AppLocalizations l) => switch (this) {
+    ZapretAutoTuneMode.veryFast => l.forkVeryFast,
+    ZapretAutoTuneMode.fast => l.forkFast,
+    ZapretAutoTuneMode.full => l.forkFull,
+  };
+  String localizedDescription(AppLocalizations l) => switch (this) {
+    ZapretAutoTuneMode.veryFast => l.forkVeryFastDesc,
+    ZapretAutoTuneMode.fast => l.forkFastDesc,
+    ZapretAutoTuneMode.full => l.forkFullDesc,
+  };
   bool get screenFirst => this != ZapretAutoTuneMode.full;
   bool shouldStop(ZapretTrial trial) => this == ZapretAutoTuneMode.veryFast &&
       !trial.screenedOnly && trial.error == null && trial.confirmed && trial.score == 6;
@@ -205,6 +216,13 @@ class ZapretTrial {
     error: item['error'] as String?,
     details: List<String>.from(item['details'] as List? ?? const []),
   );
+
+  String localizedResultLabel(AppLocalizations l) {
+    if (error != null) return l.forkTrialError;
+    if (confirmed) return l.forkSuccess;
+    if (screenedOnly) return passedTargets == 0 ? l.forkScreenFailed : l.forkScreenOnly;
+    return score > 0 ? l.forkPartialSuccess : l.forkTestFailed;
+  }
 
   String get resultLabel {
     if (error != null) return 'Ошибка запуска/проверки';

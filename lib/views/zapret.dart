@@ -42,14 +42,14 @@ class ZapretView extends ConsumerWidget {
             children: [
               for (final mode in ZapretAutoTuneMode.values)
                 ListItem(
-                  title: Text(mode.label),
-                  subtitle: Text(mode.description),
+                  title: Text(mode.localizedLabel(AppLocalizations.of(context))),
+                  subtitle: Text(mode.localizedDescription(AppLocalizations.of(context))),
                   onTap: () => Navigator.of(ctx).pop(mode),
                 ),
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Отмена')),
+            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(AppLocalizations.of(context).cancel)),
           ],
         ),
       );
@@ -68,7 +68,7 @@ class ZapretView extends ConsumerWidget {
           content: SizedBox(width: 650, child: SingleChildScrollView(
             child: SelectableText(values.join('\n\n'), style: const TextStyle(fontFamily: 'monospace')),
           )),
-          actions: [TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Закрыть'))],
+          actions: [TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(AppLocalizations.of(context).close))],
         ),
       ),
     );
@@ -102,8 +102,8 @@ class ZapretView extends ConsumerWidget {
             onTap: zapret.busy ? null : () => showZapretStrategiesSheet(context),
             subtitle: Text(
               zapret.running && zapret.activeStrategyId != zapret.selectedStrategyId
-                  ? 'Выбрана: ${selectedName ?? zapret.selectedStrategyId}\nРаботает: ${activeName ?? zapret.activeStrategyId ?? 'Не определена'}'
-                  : selectedName ?? 'Не выбрана',
+                  ? 'Выбрана: ${selectedName ?? zapret.selectedStrategyId}\nРаботает: ${activeName ?? zapret.activeStrategyId ?? AppLocalizations.of(context).forkUndefined}'
+                  : selectedName ?? AppLocalizations.of(context).forkNotSelected,
               maxLines: 3,
             ),
           ),
@@ -196,7 +196,7 @@ class ZapretView extends ConsumerWidget {
               ),
               trailing: Text(
                 diagnostics.resultOf(target).latencyMs == null
-                    ? diagnostics.resultOf(target).status.name
+                    ? diagnostics.resultOf(target).localizedStatusLabel(AppLocalizations.of(context))
                     : '${diagnostics.resultOf(target).latencyMs} ms',
                 style: Theme.of(context).textTheme.labelMedium?.copyWith(
                       color: context.colorScheme.onSurfaceVariant,
@@ -260,10 +260,10 @@ class _ZapretHistoryViewState extends State<_ZapretHistoryView> {
               Card(child: ListItem(
                 title: Text(_runDate(run.at)),
                 subtitle: Text([
-                  run.tuneMode?.label ?? AppLocalizations.of(context).forkPreviousRun,
+                  run.tuneMode?.localizedLabel(AppLocalizations.of(context)) ?? AppLocalizations.of(context).forkPreviousRun,
                   if (run.duration != null) 'Длительность: ${run.duration!.inSeconds} с',
                   'Проверено: ${run.trials.length}${run.totalStrategies == null ? '' : '/${run.totalStrategies}'} · успешно: ${run.trials.where((trial) => trial.confirmed).length}',
-                  if (run.failure != null) 'Завершено с ошибкой',
+                  if (run.failure != null) AppLocalizations.of(context).forkCompletedWithError,
                 ].join('\n')),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => BaseNavigator.push<void>(context, ZapretResultsView(run: run)),
@@ -298,8 +298,8 @@ class ZapretResultsView extends ConsumerWidget {
           title: Text(AppLocalizations.of(context).forkApplyStrategy),
           content: Text('${nameOf(trial)} · ${trial.delay} мс'),
           actions: [
-            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Отмена')),
-            TextButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Применить')),
+            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(AppLocalizations.of(context).cancel)),
+            TextButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(AppLocalizations.of(context).submit)),
           ],
         ),
       );
@@ -350,9 +350,9 @@ class ZapretResultsView extends ConsumerWidget {
                       if (run == null && zapret.activeStrategyId == trial.id)
                         const Icon(Icons.check_circle_outline),
                       if (run == null && trial.confirmed)
-                        TextButton(onPressed: zapret.busy ? null : () => apply(trial), child: const Text('Применить')),
+                        TextButton(onPressed: zapret.busy ? null : () => apply(trial), child: Text(AppLocalizations.of(context).submit)),
                     ]),
-                    Text('${trial.resultLabel} · ${trial.score}/${trial.screenedOnly ? 2 : 6} баллов · '
+                    Text('${trial.localizedResultLabel(AppLocalizations.of(context))} · ${trial.score}/${trial.screenedOnly ? 2 : 6} баллов · '
                         '${trial.delay > 0 ? '${trial.delay} мс (среднее)' : 'Нет задержки'}'),
                     if (trial.screenedOnly)
                       const Text('Discord и GoogleVideo не проверялись'),
