@@ -12,9 +12,9 @@ import 'package:material_ui/material_ui.dart';
 
 @immutable
 class Person {
-  const Person({required this.avatar, required this.name, this.link});
+  const Person({this.avatar, required this.name, this.link});
 
-  final String avatar;
+  final String? avatar;
   final String name;
   final String? link;
 }
@@ -25,11 +25,15 @@ const _forkAuthors = [
     name: 'pluralplay',
     link: 'https://github.com/pluralplay',
   ),
+  Person(
+    name: 'geliopat',
+    link: 'https://github.com/geliopat',
+  ),
 ];
 
 const _upstreamRepository = 'chen08209/FlClash';
 const _coreRepository = 'MetaCubeX/mihomo';
-const _telegram = 'https://t.me/flclashx';
+const _flClashXRepository = 'pluralplay/FlClashX';
 
 /// The running core's version when it answers, else the one this build was
 /// made with, else nothing.
@@ -133,6 +137,12 @@ class AboutView extends ConsumerWidget {
               ),
               _buildLinkItem(
                 glyph: AppGlyphs.link,
+                title: 'FlClashX',
+                url: 'https://github.com/$_flClashXRepository',
+                label: 'github.com/$_flClashXRepository',
+              ),
+              _buildLinkItem(
+                glyph: AppGlyphs.link,
                 title: appLocalizations.originalRepository,
                 url: 'https://github.com/$_upstreamRepository',
                 label: 'github.com/$_upstreamRepository',
@@ -142,12 +152,6 @@ class AboutView extends ConsumerWidget {
                 title: appLocalizations.core,
                 url: 'https://github.com/$_coreRepository',
                 label: 'github.com/$_coreRepository',
-              ),
-              _buildLinkItem(
-                glyph: AppGlyphs.send,
-                title: 'Telegram',
-                url: _telegram,
-                label: 't.me/flclashx',
               ),
             ],
           ),
@@ -375,7 +379,12 @@ class _Avatar extends StatelessWidget {
       children: [
         CircleAvatar(
           radius: size / 2,
-          foregroundImage: AssetImage(person.avatar),
+          foregroundImage: person.avatar == null
+              ? null
+              : AssetImage(person.avatar!),
+          child: person.avatar == null
+              ? Text(person.name.substring(0, 1).toUpperCase())
+              : null,
         ),
         const SizedBox(height: 4),
         Text(
