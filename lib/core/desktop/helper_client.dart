@@ -514,7 +514,15 @@ final class HelperClient {
       if (value is! List) {
         throw HelperException(code: 'invalidResponse', message: 'Helper вернул некорректный список файлов Zapret', details: value);
       }
-      return value.map(HelperZapretListInfo.fromJson).toList(growable: false);
+      try {
+        return value.map(HelperZapretListInfo.fromJson).toList(growable: false);
+      } on FormatException catch (error) {
+        throw HelperException(
+          code: 'invalidResponse',
+          message: 'Helper вернул некорректные данные списка файлов Zapret',
+          details: error.message,
+        );
+      }
     } on HelperException {
       rethrow;
     } on DioException catch (error) {
@@ -553,7 +561,15 @@ final class HelperClient {
         options: _options(ResponseType.json, receiveTimeout: const Duration(seconds: 8)),
       );
       final data = _responseMap(response, operation: 'Restore Zapret list');
-      return HelperZapretListInfo.fromJson(data);
+      try {
+        return HelperZapretListInfo.fromJson(data);
+      } on FormatException catch (error) {
+        throw HelperException(
+          code: 'invalidResponse',
+          message: 'Helper вернул некорректные данные восстановления списка Zapret',
+          details: error.message,
+        );
+      }
     } on HelperException {
       rethrow;
     } on DioException catch (error) {
@@ -571,7 +587,15 @@ final class HelperClient {
         options: _options(ResponseType.json, receiveTimeout: const Duration(seconds: 8)),
       );
       final data = _responseMap(response, operation: 'Save Zapret list');
-      return HelperZapretListInfo.fromJson(data);
+      try {
+        return HelperZapretListInfo.fromJson(data);
+      } on FormatException catch (error) {
+        throw HelperException(
+          code: 'invalidResponse',
+          message: 'Helper вернул некорректные данные сохранения списка Zapret',
+          details: error.message,
+        );
+      }
     } on HelperException {
       rethrow;
     } on DioException catch (error) {
