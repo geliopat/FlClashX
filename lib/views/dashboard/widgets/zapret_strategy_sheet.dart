@@ -3,10 +3,10 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/core/desktop/helper_client.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
-import 'package:fl_clash/views/dashboard/style.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:material_ui/material_ui.dart' show DecorationListItem;
 
 import 'card.dart';
 
@@ -211,101 +211,59 @@ class _ZapretStrategyList extends ConsumerWidget {
       );
     }
     final state = ref.watch(zapretControllerProvider);
-    final colors = DashboardColors.of(context);
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: strategies.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 6),
-      itemBuilder: (context, index) {
-        final strategy = strategies[index];
-        final selected = strategy.id == state.selectedStrategyId;
-        final active = strategy.id == state.activeStrategyId;
-        final borderColor = active
-            ? context.colorScheme.success
-            : selected
-                ? context.colorScheme.primary
-                : context.colorScheme.outlineVariant;
-        return Material(
-          color: selected || active
-              ? colors.tone
-              : colors.card,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(DashboardCorner.tab),
-            side: BorderSide(
-              color: borderColor.withValues(alpha: selected || active ? 0.75 : 0.35),
-            ),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: () async {
-              try {
-                await ref
-                    .read(zapretControllerProvider.notifier)
-                    .selectStrategy(strategy.id);
-                if (context.mounted) Navigator.of(context).maybePop();
-              } catch (error) {
-                dialogs.showNotifier(
-                  error.toString(),
-                  level: MessageLevel.error,
-                );
-              }
-            },
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          strategy.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTextStyle.subheadline.of(
-                            context,
-                            emphasized: true,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          strategy.description,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTextStyle.footnote.of(context).copyWith(
-                                color: context.colorScheme.onSurfaceVariant,
-                              ),
-                        ),
-                        const SizedBox(height: 5),
-                        Text(
-                          strategy.engine,
-                          style: AppTextStyle.caption1.of(context).copyWith(
-                                color: context.colorScheme.onSurfaceVariant,
-                              ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  if (active)
-                    Tooltip(
+    return FrostedGroup(
+      child: ListView.builder(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        itemCount: strategies.length,
+        itemBuilder: (context, index) {
+          final strategy = strategies[index];
+          final selected = strategy.id == state.selectedStrategyId;
+          final active = strategy.id == state.activeStrategyId;
+          return ItemPositionProvider(
+            position: ItemPosition.get(index, strategies.length),
+            child: DecorationListItem(
+              isSelected: selected || active,
+              title: Text(
+                strategy.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              subtitle: Text(
+                '${strategy.description} · ${strategy.engine}',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              trailing: active
+                  ? Tooltip(
                       message: 'Сейчас работает',
                       child: Icon(
                         Icons.play_circle_fill_rounded,
                         color: context.colorScheme.success,
                       ),
                     )
-                  else if (selected)
-                    Icon(
-                      Icons.check_circle_rounded,
-                      color: context.colorScheme.primary,
-                    ),
-                ],
-              ),
+                  : selected
+                      ? Icon(
+                          Icons.check_circle_rounded,
+                          color: context.colorScheme.primary,
+                        )
+                      : null,
+              onPressed: () async {
+                try {
+                  await ref
+                      .read(zapretControllerProvider.notifier)
+                      .selectStrategy(strategy.id);
+                  if (context.mounted) Navigator.of(context).maybePop();
+                } catch (error) {
+                  dialogs.showNotifier(
+                    error.toString(),
+                    level: MessageLevel.error,
+                  );
+                }
+              },
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 }
