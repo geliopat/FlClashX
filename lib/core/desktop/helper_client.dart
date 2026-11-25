@@ -539,6 +539,23 @@ final class HelperClient {
     }
   }
 
+  Future<HelperZapretListInfo> restoreZapretList(String filename) async {
+    try {
+      final response = await _dio.post<Object?>(
+        '$baseUrl/zapret/lists/${Uri.encodeComponent(filename)}/restore',
+        options: _options(ResponseType.json, receiveTimeout: const Duration(seconds: 8)),
+      );
+      final data = _responseMap(response, operation: 'Restore Zapret list');
+      return HelperZapretListInfo.fromJson(data);
+    } on HelperException {
+      rethrow;
+    } on DioException catch (error) {
+      throw _mapZapretDioException(error, operation: 'restore list');
+    } catch (error) {
+      throw HelperException(code: 'transportError', message: 'Не удалось восстановить список Zapret', details: error.toString());
+    }
+  }
+
   Future<HelperZapretListInfo> writeZapretList(String filename, String content) async {
     try {
       final response = await _dio.put<Object?>(
