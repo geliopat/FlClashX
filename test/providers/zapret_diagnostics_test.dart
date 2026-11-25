@@ -1,3 +1,4 @@
+import 'package:fl_clash/l10n/l10n.dart';
 import 'package:fl_clash/models/core.dart';
 import 'package:fl_clash/providers/zapret_diagnostics.dart';
 import 'package:fl_clash/providers/zapret.dart';
@@ -109,12 +110,12 @@ void main() {
 
   test('trial labels distinguish complete, partial, failed, screening and errors', () {
     const mode = ZapretMode.fullBypass;
-    expect(const ZapretTrial('a', mode, 6, 100, confirmed: true, passedTargets: 3).resultLabel, 'Успешно');
-    expect(const ZapretTrial('b', mode, 2, 100, passedTargets: 1).resultLabel, 'Частично успешно');
-    expect(const ZapretTrial('c', mode, 0, 0).resultLabel, 'Не прошла проверку');
-    expect(const ZapretTrial('d', mode, 6, 100, screenedOnly: true, passedTargets: 3).resultLabel, 'Только предварительный отбор');
-    expect(const ZapretTrial('e', mode, 0, 0, error: 'process exited').resultLabel, 'Ошибка запуска/проверки');
-    expect(const ZapretTrial('f', mode, 0, 0, screenedOnly: true).resultLabel, 'Не прошла предварительный отбор');
+    expect(const ZapretTrial('a', mode, 6, 100, confirmed: true, passedTargets: 3).resultLabel, AppLocalizations().forkSuccess);
+    expect(const ZapretTrial('b', mode, 2, 100, passedTargets: 1).resultLabel, AppLocalizations().forkPartialSuccess);
+    expect(const ZapretTrial('c', mode, 0, 0).resultLabel, AppLocalizations().forkTestFailed);
+    expect(const ZapretTrial('d', mode, 6, 100, screenedOnly: true, passedTargets: 3).resultLabel, AppLocalizations().forkScreenOnly);
+    expect(const ZapretTrial('e', mode, 0, 0, error: 'process exited').resultLabel, AppLocalizations().forkTrialError);
+    expect(const ZapretTrial('f', mode, 0, 0, screenedOnly: true).resultLabel, AppLocalizations().forkScreenFailed);
   });
 
   test('classifies a fast successful probe as operational', () {

@@ -450,6 +450,30 @@ class AppLocalizations {
   String get forkAdditional => Intl.message("additional", name: 'forkAdditional', desc: '', args: []);
   String get forkLastError => Intl.message("Last error", name: 'forkLastError', desc: '', args: []);
   String get forkStrategyLaunchFailed => Intl.message("Strategy failed to start", name: 'forkStrategyLaunchFailed', desc: '', args: []);
+  String get forkHelperBusy => Intl.message("Helper unavailable during a Zapret operation; retry after it finishes", name: 'forkHelperBusy', desc: '', args: []);
+  String get forkCoreNotApplied => Intl.message("Mihomo configuration has not been applied yet", name: 'forkCoreNotApplied', desc: '', args: []);
+  String get forkCoreProtectionMissing => Intl.message("No confirmed Mihomo configuration for Zapret protection", name: 'forkCoreProtectionMissing', desc: '', args: []);
+  String get forkStopUnconfirmed => Intl.message("Helper unavailable: Zapret stop is not confirmed", name: 'forkStopUnconfirmed', desc: '', args: []);
+  String get forkStopPending => Intl.message("Zapret operation did not finish after stopping", name: 'forkStopPending', desc: '', args: []);
+  String get forkStillRunning => Intl.message("Zapret is still running", name: 'forkStillRunning', desc: '', args: []);
+  String get forkCoreBusy => Intl.message("Wait for the current Mihomo operation to finish", name: 'forkCoreBusy', desc: '', args: []);
+  String get forkCoreRecoveryFailed => Intl.message("Could not restore Mihomo after the Helper check or update", name: 'forkCoreRecoveryFailed', desc: '', args: []);
+  String get forkCoreRecoveredZapretStopped => Intl.message("Mihomo recovered, but Zapret did not start", name: 'forkCoreRecoveredZapretStopped', desc: '', args: []);
+  String get forkHelperCheckedZapretStopped => Intl.message("Helper checked, but Zapret did not start", name: 'forkHelperCheckedZapretStopped', desc: '', args: []);
+  String get forkHelperCheckedStartCore => Intl.message("Helper checked. Start Mihomo before starting Zapret", name: 'forkHelperCheckedStartCore', desc: '', args: []);
+  String get forkLaunchUnavailable => Intl.message("Zapret cannot be started right now", name: 'forkLaunchUnavailable', desc: '', args: []);
+  String get forkHelperUpdatedCatalogMissing => Intl.message("Helper updated, but the Zapret2 catalog is not yet available", name: 'forkHelperUpdatedCatalogMissing', desc: '', args: []);
+  String get forkHelperUnavailableReinstall => Intl.message("Helper unavailable. Restart the client and check service installation.", name: 'forkHelperUnavailableReinstall', desc: '', args: []);
+  String get forkInvalidGithubResponse => Intl.message("Invalid GitHub response", name: 'forkInvalidGithubResponse', desc: '', args: []);
+  String get forkInvalidSourceEntries => Intl.message("Source contains no valid entries", name: 'forkInvalidSourceEntries', desc: '', args: []);
+  String get forkPrimarySource => Intl.message("Primary", name: 'forkPrimarySource', desc: '', args: []);
+  String get forkBackupSource => Intl.message("Fallback", name: 'forkBackupSource', desc: '', args: []);
+  String get forkCustomSourceValidation => Intl.message("A unique name and HTTPS URL without credentials are required", name: 'forkCustomSourceValidation', desc: '', args: []);
+  String get forkHttpsOnly => Intl.message("Only HTTPS sources are allowed", name: 'forkHttpsOnly', desc: '', args: []);
+  String get forkEmptyResponse => Intl.message("Empty response", name: 'forkEmptyResponse', desc: '', args: []);
+  String get forkInvalidRedirect => Intl.message("Invalid redirect", name: 'forkInvalidRedirect', desc: '', args: []);
+  String get forkSourceTooLarge => Intl.message("Source exceeds 10 MiB", name: 'forkSourceTooLarge', desc: '', args: []);
+  String get forkTooManyRedirects => Intl.message("Too many redirects", name: 'forkTooManyRedirects', desc: '', args: []);
   String get forkArchiveSaved => Intl.message("Archive saved", name: 'forkArchiveSaved', desc: '', args: []);
 
   /// `Rule`

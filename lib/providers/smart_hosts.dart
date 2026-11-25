@@ -62,7 +62,7 @@ Future<({String raw, bool fallback})> fetchSmartHostSource(
         final data = jsonDecode(raw);
         if (data is! Map || data['encoding'] != 'base64' ||
             data['content'] is! String) {
-          throw const FormatException('Некорректный ответ GitHub');
+          throw FormatException(AppLocalizations().forkInvalidGithubResponse);
         }
         raw = utf8.decode(base64Decode(
           (data['content'] as String).replaceAll(RegExp(r'\s'), ''),
@@ -72,11 +72,11 @@ Future<({String raw, bool fallback})> fetchSmartHostSource(
           ? parseYoutubeNodes(raw)
           : parseSmartHosts(raw, includeAdblock: true);
       if (valid.isEmpty) {
-        throw StateError('Источник не содержит корректных записей');
+        throw StateError(AppLocalizations().forkInvalidSourceEntries);
       }
       return (raw: raw, fallback: index > 0);
     } catch (error) {
-      failures.add('${index == 0 ? "Основной" : "Резервный $index"}: $error');
+      failures.add('${index == 0 ? AppLocalizations().forkPrimarySource : '${AppLocalizations().forkBackupSource} $index'}: $error');
     }
   }
   throw StateError(failures.join('; '));
@@ -537,7 +537,7 @@ class SmartHostsController extends Notifier<SmartHostsState> {
             smartHostSourceUrls.containsKey(entry.key) ||
             uri == null || uri.scheme != 'https' || uri.host.isEmpty ||
             uri.userInfo.isNotEmpty) {
-          throw const FormatException('Нужны уникальное имя и HTTPS URL без учётных данных');
+          throw FormatException(AppLocalizations().forkCustomSourceValidation);
         }
         validated[entry.key] = entry.value;
       }
@@ -675,7 +675,7 @@ class SmartHostsController extends Notifier<SmartHostsState> {
     var uri = Uri.parse(url);
     for (var hop = 0; hop <= 5; hop++) {
       if (uri.scheme != 'https' || uri.userInfo.isNotEmpty) {
-        throw const FormatException('Разрешены только HTTPS-источники');
+        throw FormatException(AppLocalizations().forkHttpsOnly);
       }
       final response = await _client.getUri<ResponseBody>(
         uri,
@@ -687,12 +687,12 @@ class SmartHostsController extends Notifier<SmartHostsState> {
         ),
       );
       final body = response.data;
-      if (body == null) throw const FormatException('Пустой ответ');
+      if (body == null) throw FormatException(AppLocalizations().forkEmptyResponse);
       final code = response.statusCode ?? 0;
       if (code >= 300 && code < 400) {
         await body.stream.listen(null).cancel();
         final location = response.headers.value('location');
-        if (location == null) throw const FormatException('Некорректное перенаправление');
+        if (location == null) throw FormatException(AppLocalizations().forkInvalidRedirect);
         uri = uri.resolve(location);
         continue;
       }
@@ -703,13 +703,13 @@ class SmartHostsController extends Notifier<SmartHostsState> {
       final bytes = <int>[];
       await for (final chunk in body.stream) {
         if (bytes.length + chunk.length > _maxBytes) {
-          throw StateError('Источник превышает 10 МиБ');
+          throw StateError(AppLocalizations().forkSourceTooLarge);
         }
         bytes.addAll(chunk);
       }
       return utf8.decode(bytes);
     }
-    throw StateError('Слишком много перенаправлений');
+    throw StateError(AppLocalizations().forkTooManyRedirects);
   }
 
   Future<void> refresh() => _refreshSources(Set.of(_sources));

@@ -100,12 +100,7 @@ class ZapretProbeResult {
     ZapretProbeStatus.checking => l.forkUnconfirmed,
   };
 
-  String get statusLabel => switch (status) {
-    ZapretProbeStatus.operational => 'Работает',
-    ZapretProbeStatus.degraded => 'С ограничениями / высокой задержкой',
-    ZapretProbeStatus.blocked => 'Нет соединения',
-    ZapretProbeStatus.checking => 'Нет подтверждения',
-  };
+  String get statusLabel => localizedStatusLabel(AppLocalizations());
 }
 
 /// Uses the same 450 ms threshold and HTTP success handling as zapret2-gui.

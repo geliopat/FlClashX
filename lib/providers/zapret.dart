@@ -23,13 +23,13 @@ final zapretControllerProvider =
 enum ZapretMode { strictSplit, fullBypass }
 
 enum ZapretAutoTuneMode {
-  veryFast('Очень быстрый', 'Отбор YouTube, до 5 финалистов, остановка при 6/6', 1),
-  fast('Быстрый', 'Отбор YouTube, до 5 финалистов, два контрольных прогона', 2),
-  full('Полный', 'Все стратегии, два полных прогона каждой', 2);
+  veryFast(1),
+  fast(2),
+  full(2);
 
-  const ZapretAutoTuneMode(this.label, this.description, this.controlRuns);
-  final String label;
-  final String description;
+  const ZapretAutoTuneMode(this.controlRuns);
+  String get label => localizedLabel(AppLocalizations());
+  String get description => localizedDescription(AppLocalizations());
   final int controlRuns;
 
   String localizedLabel(AppLocalizations l) => switch (this) {
@@ -224,16 +224,7 @@ class ZapretTrial {
     return score > 0 ? l.forkPartialSuccess : l.forkTestFailed;
   }
 
-  String get resultLabel {
-    if (error != null) return 'Ошибка запуска/проверки';
-    if (confirmed) return 'Успешно';
-    if (screenedOnly) {
-      return passedTargets == 0
-          ? 'Не прошла предварительный отбор'
-          : 'Только предварительный отбор';
-    }
-    return score > 0 ? 'Частично успешно' : 'Не прошла проверку';
-  }
+  String get resultLabel => localizedResultLabel(AppLocalizations());
 }
 
 
@@ -462,7 +453,7 @@ class ZapretController extends Notifier<ZapretState> {
     // Do not replace it while an active trial still owns the engine.
     if (state.busy) {
       _cancelTrial = true;
-      throw StateError('Helper недоступен во время операции Zapret; повтори перезапуск после её завершения');
+      throw StateError(AppLocalizations().forkHelperBusy);
     }
     ++_lifecycleRevision;
     _lifecycleStopping = true;
@@ -557,11 +548,11 @@ class ZapretController extends Notifier<ZapretState> {
     final id = ref.read(currentProfileIdProvider);
     final known = _infrastructure;
     if (_profileBlocked || _profileApplying) {
-      throw StateError('Конфигурация Mihomo ещё не применена');
+      throw StateError(AppLocalizations().forkCoreNotApplied);
     }
     // Never substitute a freshly downloaded but not yet applied profile.
     if (known != null && _infrastructureProfileId == id) return known;
-    throw StateError('Нет подтверждённой конфигурации Mihomo для защиты Zapret');
+    throw StateError(AppLocalizations().forkCoreProtectionMissing);
   }
 
   Future<void> refreshInfrastructure() async {
@@ -769,7 +760,7 @@ class ZapretController extends Notifier<ZapretState> {
     await loadStrategies();
     await refresh();
     if (ref.mounted && revision == _lifecycleRevision && !state.available) {
-      throw HelperException(code: 'helperZapretStillUnavailable', message: state.error ?? 'Каталог Zapret недоступен');
+      throw HelperException(code: 'helperZapretStillUnavailable', message: state.error ?? AppLocalizations().forkCatalogUnavailable);
     }
     if (ref.mounted && revision == _lifecycleRevision && !_launchBlocked &&
         state.available && !state.busy && !state.running) {
@@ -788,7 +779,7 @@ class ZapretController extends Notifier<ZapretState> {
     final readiness = await _client.readiness(timeout: _readinessTimeout, logFailure: false);
     if (readiness != HelperReadiness.ready) {
       if (wasRunning || state.busy) {
-        throw StateError('Helper недоступен: остановка Zapret не подтверждена');
+        throw StateError(AppLocalizations().forkStopUnconfirmed);
       }
       return false;
     }
@@ -801,11 +792,11 @@ class ZapretController extends Notifier<ZapretState> {
     }
     if (!ref.mounted) return wasRunning || before.running;
     if (state.busy) {
-      throw StateError('Операция Zapret не завершилась после остановки');
+      throw StateError(AppLocalizations().forkStopPending);
     }
     // Confirm again after all Dart workers have drained.
     final stopped = await _client.stopZapret();
-    if (stopped.running) throw StateError('Zapret продолжает работать');
+    if (stopped.running) throw StateError(AppLocalizations().forkStillRunning);
     await refresh();
     return wasRunning || before.running;
   }
@@ -946,7 +937,7 @@ class ZapretController extends Notifier<ZapretState> {
       }
       if (!ref.mounted) return;
       if (_coreRestarting || _profileApplying || ref.read(safeModeProvider)) {
-        throw StateError('Дождись завершения текущей операции Mihomo');
+        throw StateError(AppLocalizations().forkCoreBusy);
       }
       if (restartAll || needsRepair || ref.read(coreStatusProvider) != CoreStatus.connected) {
         final restored = await ref.read(coreActionProvider.notifier)
@@ -955,7 +946,7 @@ class ZapretController extends Notifier<ZapretState> {
         if (!restored || ref.read(coreStatusProvider) != CoreStatus.connected) {
           throw const HelperException(
             code: 'helperUpdateFailed',
-            message: 'Не удалось восстановить Mihomo после проверки Helper',
+            message: AppLocalizations().forkCoreRecoveryFailed,
           );
         }
         if (restartAll) {
@@ -964,7 +955,7 @@ class ZapretController extends Notifier<ZapretState> {
           if (expectedZapret && ref.read(isStartProvider) && !state.running) {
             await refresh();
             if (ref.mounted && ref.read(isStartProvider) && !state.running) {
-              throw StateError(state.error ?? 'Mihomo восстановлен, но Zapret не запущен');
+              throw StateError(state.error ?? AppLocalizations().forkCoreRecoveredZapretStopped);
             }
           }
           return;
@@ -975,7 +966,7 @@ class ZapretController extends Notifier<ZapretState> {
         if (!state.available) {
           throw HelperException(
             code: 'helperZapretStillUnavailable',
-            message: state.error ?? 'Каталог стратегий Zapret недоступен',
+            message: state.error ?? AppLocalizations().forkCatalogUnavailable,
           );
         }
         // The core restart already restores a previously running Zapret.
@@ -987,15 +978,15 @@ class ZapretController extends Notifier<ZapretState> {
         if (!ref.mounted) return;
         if (!state.running) {
           throw StateError(ref.read(isStartProvider)
-              ? 'Helper проверен, но Zapret не запущен'
-              : 'Helper проверен. Включи Mihomo перед запуском Zapret');
+              ? AppLocalizations().forkHelperCheckedZapretStopped
+              : AppLocalizations().forkHelperCheckedStartCore);
         }
         return;
       }
       if (!state.available) await loadStrategies();
       if (!ref.mounted) return;
       if (!state.available || _launchBlocked) {
-        throw StateError(state.error ?? 'Запуск Zapret сейчас недоступен');
+        throw StateError(state.error ?? AppLocalizations().forkLaunchUnavailable);
       }
       await restart(reason: 'dashboard');
     } catch (error) {
@@ -1390,7 +1381,7 @@ class ZapretController extends Notifier<ZapretState> {
       if (!restored) {
         throw const HelperException(
           code: 'helperUpdateFailed',
-          message: 'Не удалось восстановить Mihomo после обновления Helper',
+          message: AppLocalizations().forkCoreRecoveryFailed,
         );
       }
       if (!ref.mounted) return;
@@ -1400,7 +1391,7 @@ class ZapretController extends Notifier<ZapretState> {
         throw HelperException(
           code: 'helperZapretStillUnavailable',
           message: state.error ??
-              'Служба обновлена, но каталог стратегий Zapret2 пока недоступен.',
+              AppLocalizations().forkHelperUpdatedCatalogMissing,
         );
       }
     } catch (error) {
@@ -1420,7 +1411,7 @@ class ZapretController extends Notifier<ZapretState> {
     if (readiness != HelperReadiness.ready) {
       throw const HelperException(
         code: 'helperUnavailable',
-        message: 'Служба Helper недоступна. Перезапусти клиент и проверь установку службы.',
+        message: AppLocalizations().forkHelperUnavailableReinstall,
       );
     }
   }
