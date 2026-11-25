@@ -437,6 +437,11 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
         title: 'Служба Helper',
         items: [
           ListItem(
+            title: const Text('Watchdog Zapret'),
+            subtitle: const Text('Восстановление процесса после сбоя, до трёх попыток'),
+            trailing: Switch(value: zapret.watchdog, onChanged: ref.read(zapretControllerProvider.notifier).setWatchdog),
+          ),
+          ListItem(
             title: const Text('Запуск Zapret при старте Mihomo'),
             subtitle: const Text('Движки можно останавливать независимо'),
             trailing: Switch(

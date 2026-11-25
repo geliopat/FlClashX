@@ -4,7 +4,7 @@ part of '../action.dart';
 class CoreAction extends _$CoreAction {
   CoreController get _core => ref.read(coreHandlerProvider);
 
-  static const crashRestartLimit = 2;
+  static const crashRestartLimit = 3;
   static const crashRestartWindow = Duration(seconds: 5);
 
   int _requestedRestartRevision = 0;

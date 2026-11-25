@@ -2,6 +2,9 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:fl_clash/common/system.dart';
+import 'package:fl_clash/models/models.dart';
+import 'package:fl_clash/providers/core.dart';
+import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/core/desktop/helper_client.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -18,6 +21,10 @@ class ZapretState {
   final bool busy;
   final bool debugLogs;
   final bool startWithMihomo;
+  final bool watchdog;
+  final bool autoFallback;
+  final String? testProgress;
+  final List<ZapretTrial> trials;
   final int? pid;
   final Duration elapsed;
   final int cleanedProcesses;
@@ -37,6 +44,10 @@ class ZapretState {
     this.busy = false,
     this.debugLogs = false,
     this.startWithMihomo = false,
+    this.watchdog = true,
+    this.autoFallback = false,
+    this.testProgress,
+    this.trials = const [],
     this.pid,
     this.elapsed = Duration.zero,
     this.cleanedProcesses = 0,
@@ -57,6 +68,11 @@ class ZapretState {
     bool? busy,
     bool? debugLogs,
     bool? startWithMihomo,
+    bool? watchdog,
+    bool? autoFallback,
+    String? testProgress,
+    bool clearTestProgress = false,
+    List<ZapretTrial>? trials,
     int? pid,
     Duration? elapsed,
     bool clearPid = false,
@@ -81,6 +97,10 @@ class ZapretState {
       busy: busy ?? this.busy,
       debugLogs: debugLogs ?? this.debugLogs,
       startWithMihomo: startWithMihomo ?? this.startWithMihomo,
+      watchdog: watchdog ?? this.watchdog,
+      autoFallback: autoFallback ?? this.autoFallback,
+      testProgress: clearTestProgress ? null : testProgress ?? this.testProgress,
+      trials: trials ?? this.trials,
       pid: clearPid ? null : pid ?? this.pid,
       elapsed: elapsed ?? this.elapsed,
       cleanedProcesses: cleanedProcesses ?? this.cleanedProcesses,
@@ -104,6 +124,15 @@ class ZapretState {
     }
     return false;
   }
+}
+
+class ZapretTrial {
+  const ZapretTrial(this.id, this.mode, this.score, this.delay, {this.confirmed = false});
+  final String id;
+  final ZapretMode mode;
+  final int score;
+  final int delay;
+  final bool confirmed;
 }
 
 class ZapretController extends Notifier<ZapretState> {
@@ -134,6 +163,15 @@ class ZapretController extends Notifier<ZapretState> {
     return _uptime.elapsed;
   }
   var _refreshing = false;
+  bool _cancelTrial = false;
+  bool _wantedRunning = false;
+  String? _wantedStrategy;
+  ZapretMode _wantedMode = ZapretMode.fullBypass;
+  int _recoveryAttempts = 0;
+  DateTime? _recoveryAfter;
+  int _failedChecks = 0;
+  DateTime? _fallbackAfter;
+  bool _checkingFallback = false;
 
   @override
   ZapretState build() {
@@ -190,6 +228,8 @@ class ZapretController extends Notifier<ZapretState> {
         mode: selectedMode,
         debugLogs: preferences.getBool(_debugPreferenceKey) ?? false,
         startWithMihomo: preferences.getBool(_linkedStartPreferenceKey) ?? false,
+        watchdog: preferences.getBool('zapret.watchdog') ?? true,
+        autoFallback: preferences.getBool('zapret.autoFallback') ?? false,
         clearError: strategies.isNotEmpty,
       );
       if (strategies.isNotEmpty && savedId != selectedId) {
@@ -208,6 +248,7 @@ class ZapretController extends Notifier<ZapretState> {
   }
 
   Future<void> selectStrategy(String strategyId) async {
+    if (state.busy) return;
     if (!state.strategies.any((item) => item.id == strategyId)) {
       throw ArgumentError.value(strategyId, 'strategyId', 'Unknown Zapret strategy');
     }
@@ -217,7 +258,7 @@ class ZapretController extends Notifier<ZapretState> {
   }
 
   Future<void> setMode(ZapretMode mode) async {
-    if (!state.supportsSplitMode) return;
+    if (state.busy || !state.supportsSplitMode) return;
     state = state.copyWith(mode: mode, clearError: true);
     final preferences = await SharedPreferences.getInstance();
     await preferences.setString(_modePreferenceKey, mode.name);
@@ -252,7 +293,14 @@ class ZapretController extends Notifier<ZapretState> {
     _refreshing = true;
     try {
       final response = await _client.zapretStatus();
-      if (!ref.mounted) return;
+      if (!ref.mounted || state.busy) return;
+      if (response.running) {
+        _wantedRunning = true;
+        _wantedStrategy = response.strategyId;
+        _wantedMode = response.mode == 'strictSplit' ? ZapretMode.strictSplit : ZapretMode.fullBypass;
+        if (state.elapsed >= const Duration(seconds: 30)) _recoveryAttempts = 0;
+        _recoveryAfter = null;
+      }
       state = state.copyWith(
         available: state.strategies.isNotEmpty,
         running: response.running,
@@ -270,6 +318,12 @@ class ZapretController extends Notifier<ZapretState> {
         processingLists: response.processingLists,
         clearError: state.strategies.isNotEmpty,
       );
+      if (!response.running && _wantedRunning && state.watchdog && _recoveryAttempts < 3) {
+        _recoveryAfter ??= DateTime.now().add(const Duration(seconds: 5));
+        if (!DateTime.now().isBefore(_recoveryAfter!)) {
+          unawaited(_recover());
+        }
+      }
     } on HelperException catch (error) {
       if (!ref.mounted) return;
       state = state.copyWith(
@@ -304,6 +358,11 @@ class ZapretController extends Notifier<ZapretState> {
 
   Future<void> setEnabled(bool enabled) async {
     if (!Platform.isWindows || state.busy) return;
+    _wantedRunning = enabled;
+    _recoveryAttempts = 0;
+    _recoveryAfter = null;
+    _wantedStrategy = state.selectedStrategyId;
+    _wantedMode = state.supportsSplitMode ? state.mode : ZapretMode.fullBypass;
     state = state.copyWith(busy: true, clearError: true);
     try {
       await _requireHelper();
@@ -347,6 +406,11 @@ class ZapretController extends Notifier<ZapretState> {
   /// before it starts the selected winws.exe or winws2.exe profile.
   Future<void> restart() async {
     if (!Platform.isWindows || state.busy) return;
+    _wantedRunning = true;
+    _wantedStrategy = state.selectedStrategyId;
+    _wantedMode = state.supportsSplitMode ? state.mode : ZapretMode.fullBypass;
+    _recoveryAttempts = 0;
+    _recoveryAfter = null;
     state = state.copyWith(busy: true, clearError: true);
     try {
       await _requireHelper();
@@ -381,6 +445,192 @@ class ZapretController extends Notifier<ZapretState> {
       if (ref.mounted) {
         state = state.copyWith(busy: false);
       }
+    }
+  }
+
+  Future<void> setWatchdog(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('zapret.watchdog', value);
+    if (ref.mounted) state = state.copyWith(watchdog: value);
+  }
+
+  Future<void> setAutoFallback(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('zapret.autoFallback', value);
+    _failedChecks = 0;
+    if (ref.mounted) state = state.copyWith(autoFallback: value);
+  }
+
+  Future<void> _recover() async {
+    if (state.busy || !_wantedRunning || !state.watchdog || _wantedStrategy == null) return;
+    _recoveryAttempts++;
+    _recoveryAfter = DateTime.now().add(const Duration(seconds: 5));
+    state = state.copyWith(busy: true);
+    try {
+      await _requireHelper();
+      await _client.startZapret(strategyId: _wantedStrategy!, mode: _wantedMode.name, debug: state.debugLogs);
+    } catch (error) {
+      if (ref.mounted) state = state.copyWith(error: _errorMessage(error));
+    } finally {
+      if (ref.mounted) state = state.copyWith(busy: false);
+    }
+  }
+
+  void cancelTrials() => _cancelTrial = true;
+
+  Future<int?> _screen() async {
+    final result = await ref.read(coreHandlerProvider).getDelay(
+      'https://www.youtube.com/generate_204', 'DIRECT', const Duration(seconds: 4));
+    return result?.value;
+  }
+
+  Future<ZapretTrial> _verify(String id, ZapretMode mode) async {
+    final core = ref.read(coreHandlerProvider);
+    final items = await core.serviceCheck(const ServiceCheckParams(
+      proxyName: 'DIRECT', names: ['youtube', 'discord'], timeout: 6000));
+    final good = items.where((item) => item.status == 'available' &&
+        item.delay > 0 && item.chains.isNotEmpty &&
+        item.chains.first == 'DIRECT').toList();
+    final score = good.fold<int>(0, (sum, item) => sum + (item.delay <= 450 ? 2 : 1));
+    final delay = good.fold<int>(0, (sum, item) => sum + item.delay);
+    final status = await _client.zapretStatus();
+    return ZapretTrial(id, mode, status.running && status.strategyId == id ? score : 0,
+        delay, confirmed: status.running && status.strategyId == id &&
+        good.map((item) => item.name).toSet().containsAll(['youtube', 'discord']));
+  }
+
+  /// Two-phase adaptation of Zapret2 GUI: screen all installed profiles, then
+  /// run service checks on the eight best screens. Do not persist test choices.
+  Future<void> testStrategies() async {
+    if (!Platform.isWindows || state.busy || state.strategies.isEmpty ||
+        ref.read(coreStatusProvider) != CoreStatus.connected) return;
+    final original = await _client.zapretStatus();
+    if (state.busy || !ref.mounted) return;
+    final originalWanted = _wantedRunning;
+    final originalWantedId = _wantedStrategy;
+    final originalWantedMode = _wantedMode;
+    final strategies = state.strategies.toList();
+    final selectedMode = state.mode;
+    _cancelTrial = false;
+    state = state.copyWith(busy: true, trials: const [], testProgress: 'Подготовка');
+    final screened = <ZapretTrial>[];
+    final results = <ZapretTrial>[];
+    String? failure;
+    try {
+      for (var i = 0; i < strategies.length && !_cancelTrial; i++) {
+        final item = strategies[i];
+        final mode = item.supportsSplitMode ? selectedMode : ZapretMode.fullBypass;
+        state = state.copyWith(testProgress: 'YouTube ${i + 1}/${strategies.length}: ${item.name}');
+        try {
+          await _client.restartZapret(strategyId: item.id, mode: mode.name);
+          await Future<void>.delayed(const Duration(seconds: 1));
+          final delay = await _screen();
+          final status = await _client.zapretStatus();
+          if (delay != null && delay > 0 && status.running && status.strategyId == item.id) {
+            screened.add(ZapretTrial(item.id, mode, delay <= 450 ? 2 : 1, delay));
+          }
+        } catch (_) {
+          // Unavailable candidate; continue without replacing the original selection.
+        }
+      }
+      screened.sort((a, b) {
+        final score = b.score.compareTo(a.score);
+        return score != 0 ? score : a.delay.compareTo(b.delay);
+      });
+      final finalists = screened.take(8).toList();
+      for (var i = 0; i < finalists.length && !_cancelTrial; i++) {
+        final item = finalists[i];
+        state = state.copyWith(testProgress: 'Проверка ${i + 1}/${finalists.length}: ${item.id}');
+        try {
+          await _client.restartZapret(strategyId: item.id, mode: item.mode.name);
+          await Future<void>.delayed(const Duration(seconds: 1));
+          results.add(await _verify(item.id, item.mode));
+        } catch (_) {
+          results.add(ZapretTrial(item.id, item.mode, 0, 0));
+        }
+      }
+      results.sort((a, b) {
+        final verified = (b.confirmed ? 1 : 0).compareTo(a.confirmed ? 1 : 0);
+        if (verified != 0) return verified;
+        final score = b.score.compareTo(a.score);
+        return score != 0 ? score : a.delay.compareTo(b.delay);
+      });
+    } catch (error) {
+      failure = _errorMessage(error);
+    } finally {
+      try {
+        if (original.running && original.strategyId != null) {
+          await _client.restartZapret(strategyId: original.strategyId!,
+              mode: original.mode ?? 'fullBypass', debug: state.debugLogs);
+        } else {
+          await _client.stopZapret();
+        }
+      } catch (error) {
+        failure = 'Не удалось восстановить исходную стратегию: $error';
+      }
+      _wantedRunning = original.running || originalWanted;
+      _wantedStrategy = original.strategyId ?? originalWantedId;
+      _wantedMode = original.mode == 'strictSplit' ? ZapretMode.strictSplit : originalWantedMode;
+      if (ref.mounted) {
+        state = state.copyWith(busy: false, clearTestProgress: true,
+            trials: _cancelTrial ? const [] : List.unmodifiable(results), error: failure);
+        await refresh();
+      }
+    }
+  }
+
+  Future<void> applyTrial(ZapretTrial trial) async {
+    if (state.busy || !trial.confirmed) return;
+    await selectStrategy(trial.id);
+    await setMode(trial.mode);
+    await restart();
+  }
+
+  Future<void> checkFallback() async {
+    if (_checkingFallback || state.busy || !state.running || !state.autoFallback ||
+        state.activeStrategyId == null ||
+        ref.read(coreStatusProvider) != CoreStatus.connected ||
+        (_fallbackAfter != null && DateTime.now().isBefore(_fallbackAfter!))) return;
+    final backup = state.trials.where((trial) =>
+        trial.confirmed && trial.id != state.activeStrategyId).firstOrNull;
+    if (backup == null) return;
+    _checkingFallback = true;
+    try {
+      final originalId = state.activeStrategyId!;
+      final originalMode = state.activeMode == 'strictSplit' ? ZapretMode.strictSplit : ZapretMode.fullBypass;
+      final current = await _verify(originalId, originalMode);
+      if (state.busy || state.activeStrategyId != originalId || !state.running) return;
+      if (current.confirmed) {
+        _failedChecks = 0;
+        return;
+      }
+      if (++_failedChecks < 3) return;
+      _failedChecks = 0;
+      _fallbackAfter = DateTime.now().add(const Duration(minutes: 5));
+      state = state.copyWith(busy: true);
+      var accepted = false;
+      try {
+        await _client.restartZapret(strategyId: backup.id, mode: backup.mode.name, debug: state.debugLogs);
+        await Future<void>.delayed(const Duration(seconds: 1));
+        accepted = (await _verify(backup.id, backup.mode)).confirmed;
+        if (accepted) {
+          _wantedStrategy = backup.id;
+          _wantedMode = backup.mode;
+        }
+      } finally {
+        try {
+          if (!accepted) await _client.restartZapret(strategyId: originalId, mode: originalMode.name, debug: state.debugLogs);
+        } finally {
+          if (ref.mounted) {
+            state = state.copyWith(busy: false);
+            await refresh();
+          }
+        }
+      }
+    } catch (error) {
+      if (ref.mounted) state = state.copyWith(error: _errorMessage(error));
+    } finally {
+      _checkingFallback = false;
     }
   }
 

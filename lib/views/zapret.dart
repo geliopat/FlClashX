@@ -106,6 +106,31 @@ class ZapretView extends ConsumerWidget {
       ),
       const ListSectionGap(),
       generateSection(
+        title: 'Автоподбор стратегий',
+        items: [
+          ListItem(
+            title: Text(zapret.testProgress ?? 'Проверить все стратегии'),
+            subtitle: const Text('Проверка DIRECT через Mihomo, затем подтверждение YouTube и Discord. Исходное состояние восстанавливается.'),
+            onTap: zapret.busy ? null : () => ref.read(zapretControllerProvider.notifier).testStrategies(),
+          ),
+          if (zapret.testProgress != null)
+            ListItem(title: const Text('Отменить тестирование'), onTap: ref.read(zapretControllerProvider.notifier).cancelTrials),
+          for (final trial in zapret.trials)
+            ListItem(
+              title: Text(trial.id),
+              subtitle: Text(trial.confirmed ? 'Подтверждено · ${trial.delay} мс · ${trial.score}/4' : 'Не подтверждено'),
+              onTap: zapret.busy || !trial.confirmed ? null : () => ref.read(zapretControllerProvider.notifier).applyTrial(trial),
+            ),
+          ListItem(
+            title: const Text('Автоматический переход на резервную стратегию'),
+            subtitle: const Text('Три неудачные проверки, только подтверждённые кандидаты, откат при неудаче'),
+            trailing: Switch(value: zapret.autoFallback,
+              onChanged: ref.read(zapretControllerProvider.notifier).setAutoFallback),
+          ),
+        ],
+      ),
+      const ListSectionGap(),
+      generateSection(
         title: 'Сетевые проверки',
         items: [
           for (final target in ZapretProbeTarget.values)

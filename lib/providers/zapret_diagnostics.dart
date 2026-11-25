@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:fl_clash/providers/zapret.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -169,7 +170,7 @@ class ZapretDiagnosticsController extends Notifier<ZapretDiagnosticsState> {
   }
 
   Future<void> refresh() async {
-    if (!Platform.isWindows || !ref.mounted || _refreshing) return;
+    if (!Platform.isWindows || !ref.mounted || _refreshing || ref.read(zapretControllerProvider).busy) return;
     _refreshing = true;
     try {
       final measured = await Future.wait(
@@ -182,6 +183,7 @@ class ZapretDiagnosticsController extends Notifier<ZapretDiagnosticsState> {
     } finally {
       _refreshing = false;
     }
+    if (ref.mounted) unawaited(ref.read(zapretControllerProvider.notifier).checkFallback());
   }
 
   Future<(ZapretProbeTarget, ZapretProbeResult)> _measure(

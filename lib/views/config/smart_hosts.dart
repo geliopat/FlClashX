@@ -86,7 +86,7 @@ class SmartHostsView extends ConsumerWidget {
                   subtitleBuilder: (item) => Text(item.value),
                 ),
                 onChanged: (value) async {
-                  if (value == null) return;
+                  if (value is! Map<String, String>) return;
                   try {
                     await controller.configure(customSources: value);
                   } catch (error) {
@@ -121,7 +121,7 @@ class SmartHostsView extends ConsumerWidget {
                   subtitleBuilder: (item) => const Text('Не добавлять автоматически'),
                 ),
                 onChanged: (value) {
-                  if (value != null) controller.configure(exclusions: value.keys.toSet());
+                  if (value is Map<String, String>) controller.configure(exclusions: value.keys.toSet());
                 },
               ),
               ListItem.open(
