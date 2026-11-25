@@ -164,7 +164,6 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
       context: context,
       child: CommonDialog(
         title: 'Восстановить резервную копию?',
-        child: Text('Текущий $filename будет заменён содержимым $filename.bak. Текущая версия также сохранится в .bak.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -175,6 +174,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
             child: const Text('Восстановить'),
           ),
         ],
+        child: Text('Текущий $filename будет заменён содержимым $filename.bak. Текущая версия также сохранится в .bak.'),
       ),
     );
     if (confirmed != true || !mounted) return;
@@ -358,22 +358,22 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
       context: context,
       child: CommonDialog(
         title: 'Переустановить службу Helper?',
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Отмена'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Продолжить'),
+          ),
+        ],
         child: const Text(
           'Служба будет заменена версией из текущей папки FlClashX. '
           'Во время переустановки Helper остановит Mihomo Core и Zapret, '
           'поэтому VPN и обход временно прервутся. После обновления запусти их снова. '
           'Не перемещай и не удаляй папку FlClashX после переустановки службы.',
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Отмена'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Продолжить'),
-          ),
-        ],
       ),
     );
     if (confirmed != true || !mounted) return;
@@ -585,7 +585,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
         items: [
           const ListItem(
             title: Text('Версии в этой сборке'),
-            subtitle: const Text(
+            subtitle: Text(
               'Zapret2 v1.0.7 · Flowseal 1.10.4 · стратегии geliopat/zapret2-gui',
             ),
           ),
