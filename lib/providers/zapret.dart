@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:fl_clash/common/system.dart';
+import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/core/desktop/helper_client.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -306,6 +308,42 @@ class ZapretController extends Notifier<ZapretState> {
       rethrow;
     } finally {
       if (ref.mounted) {
+        state = state.copyWith(busy: false);
+      }
+    }
+  }
+
+  /// Replaces an older Windows Helper service with the executable
+  /// shipped beside the currently running FlClashX instance.
+  Future<void> updateHelperService() async {
+    if (!Platform.isWindows || state.busy) return;
+    state = state.copyWith(busy: true, clearError: true);
+    try {
+      final result = await system.updateHelperService();
+      if (result == AuthorizeCode.error) {
+        throw const HelperException(
+          code: 'helperUpdateFailed',
+          message: 'Не удалось обновить службу Helper. Проверь подтверждение UAC и повтори попытку.',
+        );
+      }
+      if (!ref.mounted) return;
+      state = state.copyWith(busy: false);
+      await loadStrategies();
+      await refresh();
+      if (!state.available) {
+        throw HelperException(
+          code: 'helperZapretStillUnavailable',
+          message: state.error ??
+              'Служба обновлена, но каталог стратегий Zapret2 пока недоступен.',
+        );
+      }
+    } catch (error) {
+      if (ref.mounted) {
+        state = state.copyWith(error: _errorMessage(error));
+      }
+      rethrow;
+    } finally {
+      if (ref.mounted && state.busy) {
         state = state.copyWith(busy: false);
       }
     }
