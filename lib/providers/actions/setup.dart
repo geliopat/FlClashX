@@ -972,14 +972,20 @@ class SetupAction extends _$SetupAction {
   /// The optimized profile path stores an overlay rather than the complete
   /// configuration. Expand the same base/overlay pair used by Mihomo so
   /// protection also includes server addresses omitted from that overlay.
+  Future<String> _zapretEffectiveYaml(BuiltProfile? profile) async {
+    final base = profile?.base;
+    return base == null ? profile?.yaml ?? '' : await _core.buildProfile(base);
+  }
+
   Future<void> _syncZapretInfrastructure(BuiltProfile profile, int? profileId) async {
     if (!system.isWindows || ref.read(safeModeProvider)) return;
     try {
-      final base = profile.base;
-      final yaml = base == null ? profile.yaml : await _core.buildProfile(base);
+      final yaml = await _zapretEffectiveYaml(profile);
       if (!ref.mounted || profileId != ref.read(currentProfileIdProvider)) return;
-      ref.read(zapretControllerProvider.notifier)
-          .updateInfrastructureFromYaml(yaml, profileId);
+      final controller = ref.read(zapretControllerProvider.notifier);
+      final transition = await controller.beginProfileApply(yaml, profileId);
+      await controller.finishProfileApply(transition,
+        yaml: yaml, profileId: profileId, accepted: true);
     } catch (error) {
       commonPrint.log('Zapret infrastructure refresh failed: $error', logLevel: LogLevel.warning);
     }
@@ -1053,7 +1059,16 @@ class SetupAction extends _$SetupAction {
     var setupFailed = false;
     await globalState.loadingRun(
       () async {
+        ZapretController? zapret;
+        ({int revision, bool restore, bool wasStopping, bool changed})? transition;
+        var protectionYaml = '';
+        var accepted = false;
         try {
+          if (system.isWindows && !ref.read(safeModeProvider)) {
+            protectionYaml = await _zapretEffectiveYaml(realProfile);
+            zapret = ref.read(zapretControllerProvider.notifier);
+            transition = await zapret.beginProfileApply(protectionYaml, profile?.id);
+          }
           if (setupParams.base == null) {
             final configFilePath = await appPath.configFilePath;
             await File(configFilePath).writeAsStringAtomically(yamlString);
@@ -1076,20 +1091,30 @@ class SetupAction extends _$SetupAction {
             await globalState.safeRun(() => onUpdated?.call());
             throw MessageException(message);
           }
+          accepted = !profileFailed;
         } catch (e, s) {
           setupFailed = true;
           if (preloadInvoke != null) {
             handoffFailure = (e, s);
           }
           rethrow;
+        } finally {
+          if (zapret != null && transition != null) {
+            try {
+              await zapret.finishProfileApply(transition,
+                yaml: protectionYaml, profileId: profile?.id, accepted: accepted);
+            } catch (error) {
+              // Core apply has already completed. Surface the Zapret error
+              // without rolling back or misreporting the Mihomo config.
+              commonPrint.log('Zapret infrastructure reconciliation failed: $error',
+                logLevel: LogLevel.warning);
+            }
+          }
         }
         globalState.lastConfigMd5 = yamlMd5;
         globalState.lastConfigCounts =
             realProfile?.counts ?? configCountsOf(const {});
         _appliedInputs = inputs;
-        if (realProfile != null) {
-          await _syncZapretInfrastructure(realProfile, profile?.id);
-        }
         if (system.isAndroid) {
           await preferences.saveAppliedConfigMd5(yamlMd5);
         }
