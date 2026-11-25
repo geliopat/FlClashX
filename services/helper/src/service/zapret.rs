@@ -1485,7 +1485,7 @@ mod tests {
     }
 
     #[test]
-    fn full_bypass_lua_keeps_general_and_youtube_quic_sections() {
+    fn full_bypass_lua_keeps_ungated_tcp_and_youtube_quic_sections() {
         let args = StrategyBuilder::build_lua_preset_args(
             TunnelMode::Full,
             "1024-65535",
@@ -1499,7 +1499,9 @@ mod tests {
         );
 
         assert!(args.iter().any(|arg| arg == "--new=quic"));
-        assert!(args.iter().any(|arg| arg.contains("list-general.txt")));
+        assert!(args.iter().any(|arg| arg == "--filter-tcp=80,443,2053,2083,2087,2096,8443"));
+        assert!(!args.iter().any(|arg| arg.contains("list-general.txt")));
+        assert!(!args.iter().any(|arg| arg.starts_with("--hostlist-auto=")));
     }
 
     #[test]
