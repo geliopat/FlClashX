@@ -12,8 +12,10 @@ class AutoDelayController extends Notifier<AutoDelayIntervals> {
       final prefs = await SharedPreferences.getInstance();
       final active = prefs.getInt('delay.activeInterval');
       final others = prefs.getInt('delay.otherInterval');
-      if (ref.mounted) state = (active: values.contains(active) ? active! : 15,
-          others: values.contains(others) ? others! : 60);
+      if (ref.mounted) {
+        state = (active: values.contains(active) ? active! : 15,
+            others: values.contains(others) ? others! : 60);
+      }
     });
     return (active: 15, others: 60);
   }
