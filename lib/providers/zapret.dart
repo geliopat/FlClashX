@@ -24,6 +24,7 @@ class ZapretState {
   final bool watchdog;
   final bool autoFallback;
   final String? testProgress;
+  final String? testSummary;
   final List<ZapretTrial> trials;
   final int? pid;
   final Duration elapsed;
@@ -47,6 +48,7 @@ class ZapretState {
     this.watchdog = true,
     this.autoFallback = false,
     this.testProgress,
+    this.testSummary,
     this.trials = const [],
     this.pid,
     this.elapsed = Duration.zero,
@@ -72,6 +74,8 @@ class ZapretState {
     bool? autoFallback,
     String? testProgress,
     bool clearTestProgress = false,
+    String? testSummary,
+    bool clearTestSummary = false,
     List<ZapretTrial>? trials,
     int? pid,
     Duration? elapsed,
@@ -100,6 +104,7 @@ class ZapretState {
       watchdog: watchdog ?? this.watchdog,
       autoFallback: autoFallback ?? this.autoFallback,
       testProgress: clearTestProgress ? null : testProgress ?? this.testProgress,
+      testSummary: clearTestSummary ? null : testSummary ?? this.testSummary,
       trials: trials ?? this.trials,
       pid: clearPid ? null : pid ?? this.pid,
       elapsed: elapsed ?? this.elapsed,
@@ -169,6 +174,8 @@ class ZapretController extends Notifier<ZapretState> {
   }
   var _refreshing = false;
   bool _cancelTrial = false;
+  bool _lifecycleStopping = false;
+  int _lifecycleRevision = 0;
   int _failedChecks = 0;
   DateTime? _fallbackAfter;
   bool _checkingFallback = false;
@@ -288,21 +295,41 @@ class ZapretController extends Notifier<ZapretState> {
     }));
   }
 
-  Future<void> selectStrategy(String strategyId) async {
-    if (state.busy) return;
-    if (!state.strategies.any((item) => item.id == strategyId)) {
-      throw ArgumentError.value(strategyId, 'strategyId', 'Unknown Zapret strategy');
-    }
-    state = state.copyWith(selectedStrategyId: strategyId, clearError: true);
-    final preferences = await SharedPreferences.getInstance();
-    await preferences.setString(_selectedStrategyPreferenceKey, strategyId);
-  }
+  Future<void> selectStrategy(String strategyId) =>
+      _applySelection(strategyId, state.mode);
 
   Future<void> setMode(ZapretMode mode) async {
-    if (state.busy || !state.supportsSplitMode) return;
-    state = state.copyWith(mode: mode, clearError: true);
-    final preferences = await SharedPreferences.getInstance();
-    await preferences.setString(_modePreferenceKey, mode.name);
+    if (!state.supportsSplitMode) return;
+    await _applySelection(state.selectedStrategyId, mode);
+  }
+
+  Future<void> _applySelection(String strategyId, ZapretMode mode,
+      {bool startIfStopped = false}) async {
+    if (state.busy) return;
+    final strategy = state.strategies.where((item) => item.id == strategyId).firstOrNull;
+    if (strategy == null) {
+      throw ArgumentError.value(strategyId, 'strategyId', 'Unknown Zapret strategy');
+    }
+    final effectiveMode = strategy.supportsSplitMode ? mode : ZapretMode.fullBypass;
+    final previousId = state.selectedStrategyId;
+    final previousMode = state.mode;
+    final wasRunning = state.running;
+    state = state.copyWith(selectedStrategyId: strategyId, mode: effectiveMode, clearError: true);
+    try {
+      if (wasRunning && (state.activeStrategyId != strategyId || state.activeMode != effectiveMode.name)) {
+        await restart();
+      } else if (!wasRunning && startIfStopped) {
+        await setEnabled(true);
+      }
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setString(_selectedStrategyPreferenceKey, strategyId);
+      await preferences.setString(_modePreferenceKey, effectiveMode.name);
+    } catch (error) {
+      if (ref.mounted) {
+        state = state.copyWith(selectedStrategyId: previousId, mode: previousMode, error: _errorMessage(error));
+      }
+      rethrow;
+    }
   }
 
   Future<void> setStartWithMihomo(bool enabled) async {
@@ -311,16 +338,38 @@ class ZapretController extends Notifier<ZapretState> {
     if (ref.mounted) state = state.copyWith(startWithMihomo: enabled);
   }
 
-  /// Called once after an actual new Mihomo run starts. Never follows stop.
-  Future<void> startAlongsideMihomo() async {
+  /// Start only after the new Mihomo run is ready. A later stop supersedes this.
+  Future<void> startAlongsideMihomo({bool force = false}) async {
     if (!Platform.isWindows || !ref.mounted) return;
+    final revision = ++_lifecycleRevision;
     final preferences = await SharedPreferences.getInstance();
-    if (preferences.getBool(_linkedStartPreferenceKey) != true || !ref.mounted) return;
+    if ((!force && preferences.getBool(_linkedStartPreferenceKey) != true) || !ref.mounted) return;
     if (state.strategies.isEmpty) await loadStrategies();
     await refresh();
-    if (ref.mounted && state.available && !state.busy && !state.running) {
+    if (ref.mounted && revision == _lifecycleRevision && state.available && !state.busy && !state.running) {
+      _lifecycleStopping = false;
       await setEnabled(true);
     }
+  }
+
+  /// Cancel trials and suppress restoration before stopping the service.
+  Future<bool> stopAlongsideMihomo() async {
+    if (!Platform.isWindows || !ref.mounted) return false;
+    ++_lifecycleRevision;
+    _lifecycleStopping = true;
+    _cancelTrial = true;
+    final wasRunning = state.running;
+    final deadline = DateTime.now().add(const Duration(seconds: 25));
+    while (ref.mounted && state.busy && DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+    if (!ref.mounted) return wasRunning;
+    final readiness = await _client.readiness(timeout: _readinessTimeout, logFailure: false);
+    if (readiness != HelperReadiness.ready) return wasRunning;
+    final before = await _client.zapretStatus();
+    await _client.stopZapret();
+    if (ref.mounted) await refresh();
+    return wasRunning || before.running;
   }
 
   Future<void> setDebugLogs(bool enabled) async {
@@ -350,7 +399,6 @@ class ZapretController extends Notifier<ZapretState> {
         clearActiveMode: !response.running,
         winDivertFilters: response.winDivertFilters,
         processingLists: response.processingLists,
-        clearError: state.strategies.isNotEmpty,
       );
     } on HelperException catch (error) {
       if (!ref.mounted) return;
@@ -386,6 +434,7 @@ class ZapretController extends Notifier<ZapretState> {
 
   Future<void> setEnabled(bool enabled) async {
     if (!Platform.isWindows || state.busy) return;
+    if (enabled) _lifecycleStopping = false;
     state = state.copyWith(busy: true, clearError: true);
     try {
       await _requireHelper();
@@ -430,6 +479,7 @@ class ZapretController extends Notifier<ZapretState> {
   /// before it starts the selected winws.exe or winws2.exe profile.
   Future<void> restart() async {
     if (!Platform.isWindows || state.busy) return;
+    _lifecycleStopping = false;
     state = state.copyWith(busy: true, clearError: true);
     try {
       await _requireHelper();
@@ -485,95 +535,99 @@ class ZapretController extends Notifier<ZapretState> {
 
   void cancelTrials() => _cancelTrial = true;
 
-  Future<int?> _screen() async {
-    final results = await measureZapretTargets(ref, [ZapretProbeTarget.youtube]);
-    final result = results[ZapretProbeTarget.youtube];
-    return result?.message == 'DIRECT · HTTP 2xx' ? result?.latencyMs : null;
-  }
-
   Future<ZapretTrial> _verify(String id, ZapretMode mode) async {
     const targets = [ZapretProbeTarget.youtube, ZapretProbeTarget.discordGateway, ZapretProbeTarget.discordVoice];
+    final before = await _client.zapretStatus();
+    if (!before.running || before.strategyId != id || before.pid == null) {
+      throw StateError('Движок стратегии не запущен: $id');
+    }
     final items = await measureZapretTargets(ref, targets);
-    final good = items.values.where((item) => item.message == 'DIRECT · HTTP 2xx' && item.latencyMs != null).toList();
+    final good = items.values.where((item) => item.message == 'DIRECT · HTTP 2xx' && item.latencyMs != null && item.latencyMs! > 0).toList();
     final score = good.fold<int>(0, (sum, item) => sum + (item.latencyMs! <= 450 ? 2 : 1));
-    final delay = good.fold<int>(0, (sum, item) => sum + item.latencyMs!);
+    final delay = good.isEmpty ? 0 : (good.fold<int>(0, (sum, item) => sum + item.latencyMs!) / good.length).round();
     final status = await _client.zapretStatus();
-    return ZapretTrial(id, mode, status.running && status.strategyId == id ? score : 0,
-        delay, confirmed: status.running && status.strategyId == id && good.length == targets.length);
+    final sameProcess = status.running && status.strategyId == id && status.pid == before.pid;
+    return ZapretTrial(id, mode, sameProcess ? score : 0,
+        delay, confirmed: sameProcess && good.length == targets.length);
   }
 
-  /// Two-phase adaptation of Zapret2 GUI: screen all installed profiles, then
-  /// run service checks on the eight best screens. Do not persist test choices.
   Future<void> testStrategies() async {
     if (!Platform.isWindows || state.busy || state.strategies.isEmpty ||
         ref.read(coreStatusProvider) != CoreStatus.connected) {
+      if (ref.mounted && !state.busy) {
+        state = state.copyWith(testSummary: 'Нужны подключённое ядро Mihomo и каталог стратегий.');
+      }
       return;
     }
-    final original = await _client.zapretStatus();
-    if (state.busy || !ref.mounted) return;
+    _lifecycleStopping = false;
+    _cancelTrial = false;
     final previousTrials = state.trials;
     final strategies = state.strategies.toList();
     final selectedMode = state.mode;
-    _cancelTrial = false;
-    state = state.copyWith(busy: true, trials: const [], testProgress: 'Подготовка');
-    final screened = <ZapretTrial>[];
+    state = state.copyWith(busy: true, trials: const [], testProgress: 'Подготовка', clearTestSummary: true, clearError: true);
     final results = <ZapretTrial>[];
+    HelperZapretStatus? original;
+    var attempted = 0;
+    var launchFailures = 0;
+    String? lastLaunchFailure;
     String? failure;
     try {
+      original = await _client.zapretStatus();
       for (var i = 0; i < strategies.length && !_cancelTrial; i++) {
         final item = strategies[i];
         final mode = item.supportsSplitMode ? selectedMode : ZapretMode.fullBypass;
-        state = state.copyWith(testProgress: 'YouTube ${i + 1}/${strategies.length}: ${item.name}');
+        attempted++;
+        state = state.copyWith(testProgress: '${i + 1}/${strategies.length}: ${item.name}');
         try {
-          await _client.restartZapret(strategyId: item.id, mode: mode.name, watchdog: false);
-          await Future<void>.delayed(const Duration(seconds: 1));
-          final delay = await _screen();
-          final status = await _client.zapretStatus();
-          if (delay != null && delay > 0 && status.running && status.strategyId == item.id) {
-            screened.add(ZapretTrial(item.id, mode, delay <= 450 ? 2 : 1, delay));
+          final started = await _client.restartZapret(strategyId: item.id, mode: mode.name, watchdog: false);
+          if (!started.running || started.strategyId != item.id) throw StateError('Стратегия не запустилась');
+          await Future<void>.delayed(const Duration(milliseconds: 1500));
+          if (_cancelTrial) break;
+          final first = await _verify(item.id, mode);
+          if (_cancelTrial) break;
+          if (!first.confirmed) {
+            results.add(first);
+            continue;
           }
-        } catch (_) {
-          // Unavailable candidate; continue without replacing the original selection.
-        }
-      }
-      screened.sort((a, b) {
-        final score = b.score.compareTo(a.score);
-        return score != 0 ? score : a.delay.compareTo(b.delay);
-      });
-      final finalists = screened.take(8).toList();
-      for (var i = 0; i < finalists.length && !_cancelTrial; i++) {
-        final item = finalists[i];
-        state = state.copyWith(testProgress: 'Проверка ${i + 1}/${finalists.length}: ${item.id}');
-        try {
-          await _client.restartZapret(strategyId: item.id, mode: item.mode.name, watchdog: false);
-          await Future<void>.delayed(const Duration(seconds: 1));
-          results.add(await _verify(item.id, item.mode));
-        } catch (_) {
-          results.add(ZapretTrial(item.id, item.mode, 0, 0));
+          final second = await _verify(item.id, mode);
+          results.add(ZapretTrial(item.id, mode, ((first.score + second.score) / 2).round(),
+              ((first.delay + second.delay) / 2).round(), confirmed: second.confirmed));
+        } catch (error) {
+          launchFailures++;
+          lastLaunchFailure = _errorMessage(error);
+          results.add(ZapretTrial(item.id, mode, 0, 0));
+          if (error is HelperException && error.code == 'zapretConflict') {
+            failure = lastLaunchFailure;
+            break;
+          }
         }
       }
       results.sort((a, b) {
         final verified = (b.confirmed ? 1 : 0).compareTo(a.confirmed ? 1 : 0);
         if (verified != 0) return verified;
-        final score = b.score.compareTo(a.score);
-        return score != 0 ? score : a.delay.compareTo(b.delay);
+        if (a.confirmed) return a.delay.compareTo(b.delay);
+        return b.score.compareTo(a.score);
       });
     } catch (error) {
       failure = _errorMessage(error);
     } finally {
       try {
-        if (original.running && original.strategyId != null) {
+        if (_lifecycleStopping || original == null || !original.running || original.strategyId == null) {
+          await _client.stopZapret();
+        } else {
           await _client.restartZapret(strategyId: original.strategyId!,
               mode: original.mode ?? 'fullBypass', debug: state.debugLogs, watchdog: state.watchdog);
-        } else {
-          await _client.stopZapret();
         }
       } catch (error) {
-        failure = 'Не удалось восстановить исходную стратегию: $error';
+        failure = 'Не удалось восстановить исходное состояние: ${_errorMessage(error)}';
       }
       if (ref.mounted) {
+        final confirmed = results.where((item) => item.confirmed).length;
+        final summary = _cancelTrial ? 'Тест отменён' :
+            'Проверено $attempted/${strategies.length} · подтверждено $confirmed · ошибок запуска/проверки $launchFailures'
+            '${lastLaunchFailure == null ? '' : '\nПоследняя ошибка: $lastLaunchFailure'}';
         state = state.copyWith(busy: false, clearTestProgress: true,
-            trials: _cancelTrial || failure != null ? previousTrials : List.unmodifiable(results), error: failure);
+            testSummary: summary, trials: _cancelTrial ? previousTrials : List.unmodifiable(results), error: failure);
         if (!_cancelTrial && failure == null) {
           try { await _saveTrials(results); } catch (_) { /* History is optional. */ }
         }
@@ -584,13 +638,11 @@ class ZapretController extends Notifier<ZapretState> {
 
   Future<void> applyTrial(ZapretTrial trial) async {
     if (state.busy || !trial.confirmed) return;
-    await selectStrategy(trial.id);
-    await setMode(trial.mode);
-    await restart();
+    await _applySelection(trial.id, trial.mode, startIfStopped: true);
   }
 
   Future<void> checkFallback(Map<ZapretProbeTarget, ZapretProbeResult> checks) async {
-    if (_checkingFallback || state.busy || !state.running || !state.autoFallback ||
+    if (_lifecycleStopping || _checkingFallback || state.busy || !state.running || !state.autoFallback ||
         state.activeStrategyId == null ||
         ref.read(coreStatusProvider) != CoreStatus.connected ||
         (_fallbackAfter != null && DateTime.now().isBefore(_fallbackAfter!))) {
@@ -624,7 +676,7 @@ class ZapretController extends Notifier<ZapretState> {
         await _client.restartZapret(strategyId: backup.id, mode: backup.mode.name, debug: state.debugLogs, watchdog: false);
         await Future<void>.delayed(const Duration(seconds: 1));
         accepted = (await _verify(backup.id, backup.mode)).confirmed;
-        if (accepted) {
+        if (accepted && !_lifecycleStopping) {
           await _client.setZapretWatchdog(state.watchdog);
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString(_selectedStrategyPreferenceKey, backup.id);
@@ -633,7 +685,11 @@ class ZapretController extends Notifier<ZapretState> {
         }
       } finally {
         try {
-          if (!accepted) await _client.restartZapret(strategyId: originalId, mode: originalMode.name, debug: state.debugLogs, watchdog: state.watchdog);
+          if (_lifecycleStopping) {
+            await _client.stopZapret();
+          } else if (!accepted) {
+            await _client.restartZapret(strategyId: originalId, mode: originalMode.name, debug: state.debugLogs, watchdog: state.watchdog);
+          }
         } finally {
           if (ref.mounted) {
             state = state.copyWith(busy: false);
