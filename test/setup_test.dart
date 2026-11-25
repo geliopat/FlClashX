@@ -11,11 +11,11 @@ void main() {
     test('Windows stable and pre apps resolve to the same Helper service', () {
       expect(
         helperServiceFor(pre: false, isWindows: true),
-        'FlClashXHelperService',
+        'FlClashZHelperService',
       );
       expect(
         helperServiceFor(pre: true, isWindows: true),
-        'FlClashXHelperService',
+        'FlClashZHelperService',
       );
       expect(
         helperServiceFor(pre: true, isWindows: false),
@@ -340,13 +340,19 @@ hooks:
         'windows/packaging/exe/inno_setup.iss',
       ).readAsStringSync();
 
-      expect(script, contains('procedure RetirePreHelperService;'));
-      expect(script, contains('config "FlClashXPreHelperService" start= disabled'));
-      expect(script, contains('stop "FlClashXPreHelperService"'));
-      expect(script, contains('delete "FlClashXPreHelperService"'));
+      expect(script, contains('procedure RetireLegacyHelpers;'));
+      for (final name in [
+        'FlClashXHelperService',
+        'FlClashXPreHelperService',
+        'FlClashHelperService',
+        'FlClashPreHelperService',
+        'FlClashZPreHelperService',
+      ]) {
+        expect(script, contains("RetireNamedHelper('$name');"));
+      }
       expect(
         script,
-        matches(RegExp(r'procedure ShutDownApp;[\s\S]+?RetirePreHelperService;')),
+        matches(RegExp(r'procedure ShutDownApp;[\s\S]+?RetireLegacyHelpers;')),
       );
     });
 
@@ -394,7 +400,7 @@ hooks:
         final pre = render(setup.preDesktop);
         expect(pre, isNot(contains('D915C0D1-2F5B-4676-97D5-6D55F3EF45A4')));
         expect(pre, contains(r'DefaultDirName={autopf}\FlClashX Pre'));
-        expect(pre, contains("HelperService = 'FlClashXHelperService';"));
+        expect(pre, contains("HelperService = 'FlClashZHelperService';"));
         expect(pre, isNot(contains("HelperService = 'FlClashXPreHelperService';")));
         expect(pre, contains('AdoptLegacy = False;'));
         expect(pre, contains("KillProcess('FlClashXPre.exe');"));
@@ -409,7 +415,7 @@ hooks:
         final stable = render(setup.stableDesktop);
         expect(stable, contains('AppId=D915C0D1-2F5B-4676-97D5-6D55F3EF45A4'));
         expect(stable, contains(r'DefaultDirName={autopf}\FlClashX'));
-        expect(stable, contains("HelperService = 'FlClashXHelperService';"));
+        expect(stable, contains("HelperService = 'FlClashZHelperService';"));
         expect(stable, contains('AdoptLegacy = True;'));
         expect(stable, contains("KillProcess('FlClashX.exe');"));
         expect(stable, contains(r"{userappdata}\com.follow\clashx')"));
