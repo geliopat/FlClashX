@@ -4,6 +4,7 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/flclashz_upstream_versions.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/providers/providers.dart';
+import 'package:fl_clash/providers/zapret_components.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/ui/ui.dart';
@@ -127,6 +128,18 @@ class AboutView extends ConsumerWidget {
                 : null,
           ),
           const SizedBox(height: 8),
+          generateSection(
+            title: 'Компоненты Zapret',
+            items: [
+              for (final entry in installedZapretComponents.entries)
+                ListItem(
+                  title: Text(entry.key),
+                  subtitle: Text(entry.value),
+                ),
+            ],
+            footer: 'Компоненты обновляются вместе с релизом FlClashZ.',
+          ),
+          const ListSectionGap(),
           generateSection(
             title: appLocalizations.more,
             items: [

@@ -4,7 +4,6 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:fl_clash/core/desktop/helper_client.dart';
 import 'package:fl_clash/providers/providers.dart';
-import 'package:fl_clash/providers/zapret_components.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:fl_clash/pages/editor.dart';
@@ -470,18 +469,6 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
         ],
         footer: 'hosts, proxies, DNS, fake-ip и route-exclude-address. '
             'Списки создаются отдельно, настройки профиля не меняются.',
-      ),
-      const ListSectionGap(),
-      generateSection(
-        title: 'Компоненты Zapret',
-        items: [
-          for (final entry in installedZapretComponents.entries)
-            ListItem(
-              title: Text(entry.key),
-              subtitle: Text(entry.value),
-            ),
-        ],
-        footer: 'Компоненты обновляются вместе с релизом FlClashZ.',
       ),
       const ListSectionGap(),
       generateSection(
