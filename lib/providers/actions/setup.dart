@@ -969,6 +969,22 @@ class SetupAction extends _$SetupAction {
     return fallback;
   }
 
+  /// The optimized profile path stores an overlay rather than the complete
+  /// configuration. Expand the same base/overlay pair used by Mihomo so
+  /// protection also includes server addresses omitted from that overlay.
+  Future<void> _syncZapretInfrastructure(BuiltProfile profile, int? profileId) async {
+    if (!system.isWindows || ref.read(safeModeProvider)) return;
+    try {
+      final base = profile.base;
+      final yaml = base == null ? profile.yaml : await _core.buildProfile(base);
+      if (!ref.mounted || profileId != ref.read(currentProfileIdProvider)) return;
+      ref.read(zapretControllerProvider.notifier)
+          .updateInfrastructureFromYaml(yaml, profileId);
+    } catch (error) {
+      commonPrint.log('Zapret infrastructure refresh failed: $error', logLevel: LogLevel.warning);
+    }
+  }
+
   Future<_SetupTaskResult> _setupConfig({
     bool force = false,
     bool silence = false,
@@ -1018,6 +1034,7 @@ class SetupAction extends _$SetupAction {
       _appliedInputs = inputs;
       globalState.lastConfigCounts = realProfile.counts;
       await preloadInvoke?.call();
+      await _syncZapretInfrastructure(realProfile, profile?.id);
       return _SetupTaskResult.completed;
     }
     // Go answers a config it rejects by running its built-in default, which
@@ -1070,6 +1087,9 @@ class SetupAction extends _$SetupAction {
         globalState.lastConfigCounts =
             realProfile?.counts ?? configCountsOf(const {});
         _appliedInputs = inputs;
+        if (realProfile != null) {
+          await _syncZapretInfrastructure(realProfile, profile?.id);
+        }
         if (system.isAndroid) {
           await preferences.saveAppliedConfigMd5(yamlMd5);
         }
