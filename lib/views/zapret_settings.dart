@@ -143,6 +143,50 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
     }
   }
 
+  Future<void> _restoreBackup() async {
+    final filename = _selected;
+    if (filename == null || _saving || _updating || _loading) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Восстановить резервную копию?'),
+        content: Text('Текущий $filename будет заменён содержимым $filename.bak. Текущая версия также сохранится в .bak.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Восстановить'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() {
+      _saving = true;
+      _error = null;
+      _notice = null;
+    });
+    try {
+      await helperClient.restoreZapretList(filename);
+      if (!mounted) return;
+      await _loadLists(select: filename);
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _notice = 'Резервная копия $filename.bak восстановлена. Предыдущая версия сохранена в новой .bak.';
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _error = error is HelperException ? error.message : error.toString();
+      });
+    }
+  }
+
   String _mergeList(String upstream, String existing, String filename) {
     final seen = <String>{};
     final lines = <String>[];
@@ -441,6 +485,11 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
                         onPressed: _loading || _saving || _updating ? null : _updateLists,
                         icon: _updating ? const SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.cloud_download),
                         label: const Text('Обновить списки'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: _loading || _saving || _updating ? null : _restoreBackup,
+                        icon: const Icon(Icons.restore),
+                        label: const Text('Откатить .bak'),
                       ),
                     ],
                   ),
