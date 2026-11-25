@@ -89,7 +89,12 @@ class ProxiesAction extends _$ProxiesAction {
       ref.listen(groupsProvider, (_, _) => unawaited(_autoDelayTick()));
       ref.listen(currentProfileIdProvider, (_, _) {
         cancelDelayTests();
-        _lastDelayTest.clear();
+      });
+      ref.listen(isStartProvider, (previous, running) {
+        if (running && previous != true) {
+          _lastDelayTest.clear();
+          unawaited(_autoDelayTick());
+        }
       });
     }
     ref.listen(coreStatusProvider, (_, next) {
