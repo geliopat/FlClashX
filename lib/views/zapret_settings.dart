@@ -670,10 +670,9 @@ class _Section extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = context.colorScheme;
-    return Material(
-      color: context.raisedSurfaceLevel.colorOf(colorScheme),
-      shape: AppShape.lg,
+    return FrostedSurface(
+      color: context.raisedSurfaceLevel.colorOf(context.colorScheme),
+      radius: AppRadius.xl,
       clipBehavior: Clip.antiAlias,
       child: Padding(
         padding: const EdgeInsets.all(16),
