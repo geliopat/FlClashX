@@ -695,14 +695,14 @@ final class HelperClient {
         receiveTimeout: const Duration(seconds: 5)).copyWith(headers: _zapretHeaders()));
   }
 
-  Future<HelperZapretStatus> startZapret({required String strategyId, required String mode, bool debug = false, bool? watchdog, Map<String, List<String>>? infrastructure}) =>
-      _zapretAction('start', operation: 'start', strategyId: strategyId, mode: mode, debug: debug, watchdog: watchdog, infrastructure: infrastructure);
+  Future<HelperZapretStatus> startZapret({required String strategyId, required String mode, bool debug = false, bool? watchdog, Map<String, List<String>>? infrastructure, String? reason}) =>
+      _zapretAction('start', operation: 'start', strategyId: strategyId, mode: mode, debug: debug, watchdog: watchdog, infrastructure: infrastructure, reason: reason);
 
   Future<HelperZapretStatus> stopZapret() =>
       _zapretAction('stop', operation: 'stop');
 
-  Future<HelperZapretStatus> restartZapret({required String strategyId, required String mode, bool debug = false, bool? watchdog, Map<String, List<String>>? infrastructure}) =>
-      _zapretAction('restart', operation: 'restart', strategyId: strategyId, mode: mode, debug: debug, watchdog: watchdog, infrastructure: infrastructure);
+  Future<HelperZapretStatus> restartZapret({required String strategyId, required String mode, bool debug = false, bool? watchdog, Map<String, List<String>>? infrastructure, String? reason}) =>
+      _zapretAction('restart', operation: 'restart', strategyId: strategyId, mode: mode, debug: debug, watchdog: watchdog, infrastructure: infrastructure, reason: reason);
 
   Future<HelperZapretStatus> _zapretAction(
     String route, {
@@ -712,13 +712,14 @@ final class HelperClient {
     bool debug = false,
     bool? watchdog,
     Map<String, List<String>>? infrastructure,
+    String? reason,
   }) async {
     try {
       final response = await _dio.post<Object?>(
         '$baseUrl/zapret/$route',
         data: strategyId == null
             ? null
-            : {'strategyId': strategyId, 'mode': mode ?? 'fullBypass', if (debug) 'debug': true, 'watchdog': ?watchdog, 'infrastructure': ?infrastructure},
+            : {'strategyId': strategyId, 'mode': mode ?? 'fullBypass', if (debug) 'debug': true, 'watchdog': ?watchdog, 'infrastructure': ?infrastructure, if (reason != null) 'reason': reason},
         options: _options(
           ResponseType.json,
           receiveTimeout: operation == 'stop'

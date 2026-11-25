@@ -140,6 +140,8 @@ struct ZapretStatusResponse {
 struct ZapretStartRequest {
     strategy_id: String,
     #[serde(default)]
+    reason: Option<String>,
+    #[serde(default)]
     debug: bool,
     #[serde(default)]
     watchdog: Option<bool>,
@@ -723,8 +725,11 @@ fn ensure_zapret_watchdog() {
                 intent.mode,
                 intent.debug,
                 &intent.infrastructure,
+                "watchdog",
             );
-            if response.status() != StatusCode::OK {
+            if response.status() == StatusCode::OK {
+                zapret_log("info", "Watchdog: replacement process started".into());
+            } else {
                 zapret_log(
                     "error",
                     format!("Watchdog recovery: HTTP {}", response.status()),
@@ -760,6 +765,7 @@ fn launch_zapret_with_intent(
         request.mode,
         request.debug,
         &request.infrastructure,
+        zapret_reason(request.reason.as_deref(), restart),
     );
     if response.status() == StatusCode::OK {
         if let Some(enabled) = request.watchdog {
@@ -797,6 +803,7 @@ fn launch_zapret_with_intent(
         request.mode,
         request.debug,
         &request.infrastructure,
+        zapret_reason(request.reason.as_deref(), restart),
     )
 }
 
@@ -1102,7 +1109,10 @@ fn stop_managed_zapret(managed: &mut Option<ManagedZapret>) -> Result<(), Error>
     let Some(zapret) = managed.as_mut() else {
         return Ok(());
     };
+    let pid = zapret.child.id();
+    let strategy = zapret.strategy_id.clone();
     if wait_for_child_exit(&mut zapret.child, Duration::ZERO)? {
+        zapret_log("info", format!("Process already exited: strategy {strategy}, PID {pid}"));
         *managed = None;
         return Ok(());
     }
@@ -1112,8 +1122,30 @@ fn stop_managed_zapret(managed: &mut Option<ManagedZapret>) -> Result<(), Error>
             "Zapret2 engine did not exit after termination",
         ));
     }
+    zapret_log("info", format!("Process stopped: strategy {strategy}, PID {pid}"));
     *managed = None;
     Ok(())
+}
+
+fn zapret_reason(reason: Option<&str>, restart: bool) -> &'static str {
+    match reason {
+        Some("manual") => "manual",
+        Some("dashboard") => "dashboard",
+        Some("mihomo_start") => "Mihomo start",
+        Some("mihomo_restore") => "Mihomo recovery",
+        Some("profile_apply") => "profile apply",
+        Some("infrastructure_refresh") => "infrastructure refresh",
+        Some("infrastructure_changed") => "infrastructure changed",
+        Some("strategy_change") => "strategy change",
+        Some("trial_screen") => "auto-tune screening",
+        Some("trial_verify") => "auto-tune verification",
+        Some("trial_restore") => "auto-tune restore",
+        Some("fallback") => "automatic fallback",
+        Some("fallback_restore") => "fallback restore",
+        Some("watchdog") => "watchdog",
+        _ if restart => "restart (unspecified)",
+        _ => "start (unspecified)",
+    }
 }
 
 #[cfg(windows)]
@@ -1123,6 +1155,7 @@ fn launch_zapret(
     mode: super::zapret::ZapretLaunchMode,
     debug: bool,
     infrastructure: &super::zapret::ZapretInfrastructure,
+    reason: &str,
 ) -> warp::reply::Response {
     if SHUTTING_DOWN.load(Ordering::SeqCst) {
         return error_response(
@@ -1239,6 +1272,9 @@ fn launch_zapret(
         );
     }
     infrastructure.apply(&mut args);
+    if let Some(previous) = managed.as_ref() {
+        zapret_log("info", format!("Replacing PID {}: {reason}", previous.child.id()));
+    }
     if let Err(error) = stop_managed_zapret(&mut managed) {
         return error_response(
             "zapretStopFailed",
@@ -1298,7 +1334,7 @@ fn launch_zapret(
         thread::spawn(move || {
             for line in io::BufReader::new(stderr).lines() {
                 match line {
-                    Ok(output) => zapret_log("stderr", format!("[{log_strategy}] {output}")),
+                    Ok(output) => zapret_log("stderr", format!("[{log_strategy}, PID {pid}] {output}")),
                     Err(_) => break,
                 }
             }
@@ -1322,7 +1358,7 @@ fn launch_zapret(
     };
     zapret_log(
         "info",
-        format!("Started {engine}, strategy {strategy_id}, mode {mode:?}, PID {pid}"),
+        format!("Started {engine}, strategy {strategy_id}, mode {mode:?}, PID {pid}; reason: {reason}"),
     );
     *managed = Some(ManagedZapret {
         child,
@@ -1362,6 +1398,7 @@ fn stop_zapret(pid: u32, sequence: u64) -> warp::reply::Response {
     }
     *lock_surviving_poison(&ZAPRET_INTENT) = None;
     let mut managed = lock_surviving_poison(&MANAGED_ZAPRET);
+    let had_process = managed.is_some();
     if let Err(error) = stop_managed_zapret(&mut managed) {
         return error_response(
             "zapretStopFailed",
@@ -1388,7 +1425,9 @@ fn stop_zapret(pid: u32, sequence: u64) -> warp::reply::Response {
             );
         }
     }
-    zapret_log("info", "Zapret stopped".to_string());
+    if had_process || cleaned > 0 {
+        zapret_log("info", "Zapret stop confirmed".into());
+    }
     json_response(
         &ZapretStatusResponse {
             running: false,
@@ -1510,6 +1549,7 @@ fn launch_zapret(
     _mode: super::zapret::ZapretLaunchMode,
     _debug: bool,
     _infrastructure: &super::zapret::ZapretInfrastructure,
+    _reason: &str,
 ) -> warp::reply::Response {
     error_response(
         "unsupportedPlatform",
@@ -1574,10 +1614,15 @@ fn error_response(
     message: impl Into<String>,
     status: StatusCode,
 ) -> warp::reply::Response {
+    let message = message.into();
+    #[cfg(windows)]
+    if code.to_ascii_lowercase().contains("zapret") && code != "zapretStatusFailed" {
+        zapret_log("error", format!("{code}: {message}"));
+    }
     json_response(
         &ErrorResponse {
             code,
-            message: message.into(),
+            message,
             details: None,
         },
         status,
@@ -3024,5 +3069,18 @@ mod tests {
         let served = tokio::time::timeout(Duration::from_millis(200), drain.serve(pending())).await;
 
         assert!(served.is_err(), "the server ended before any shutdown");
+    }
+}
+
+#[cfg(test)]
+mod zapret_log_reason_tests {
+    use super::zapret_reason;
+
+    #[test]
+    fn reason_labels_are_bounded_and_legacy_clients_work() {
+        assert_eq!(zapret_reason(Some("trial_screen"), true), "auto-tune screening");
+        assert_eq!(zapret_reason(Some("infrastructure_changed"), true), "infrastructure changed");
+        assert_eq!(zapret_reason(None, false), "start (unspecified)");
+        assert_eq!(zapret_reason(Some("arbitrary\nmessage"), true), "restart (unspecified)");
     }
 }
