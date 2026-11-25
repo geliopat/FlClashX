@@ -186,12 +186,14 @@ class CoreAction extends _$CoreAction {
     final setupAction = ref.read(setupActionProvider.notifier);
     final bool wasRunning = running ?? ref.read(isStartProvider);
     var restartZapret = false;
+    final zapret = system.isWindows ? ref.read(zapretControllerProvider.notifier) : null;
     try {
-      if (system.isWindows) {
+      if (zapret != null) {
         try {
-          restartZapret = await ref.read(zapretControllerProvider.notifier).stopAlongsideMihomo();
+          restartZapret = await zapret.beginCoreRestart();
         } catch (error) {
-          commonPrint.log('Linked Zapret stop failed: $error', logLevel: LogLevel.warning);
+          commonPrint.log('Mihomo restart postponed: Zapret stop not confirmed: $error', logLevel: LogLevel.warning);
+          return false;
         }
       }
       ref.read(coreStatusProvider.notifier).value = CoreStatus.connecting;
@@ -224,8 +226,9 @@ class CoreAction extends _$CoreAction {
           appliedRevision = revision;
         }
       } while (_relaunchRequested);
-      if (applied && system.isWindows && ref.read(isStartProvider) && !ref.read(safeModeProvider)) {
-        await ref.read(zapretControllerProvider.notifier).startAlongsideMihomo(force: restartZapret).catchError((Object error) {
+      zapret?.endCoreRestart();
+      if (applied && zapret != null && ref.read(isStartProvider) && !ref.read(safeModeProvider)) {
+        await zapret.startAlongsideMihomo(force: restartZapret).catchError((Object error) {
           commonPrint.log('Linked Zapret restart failed: $error', logLevel: LogLevel.warning);
         });
       }
@@ -234,6 +237,7 @@ class CoreAction extends _$CoreAction {
       ref.read(coreStatusProvider.notifier).value = CoreStatus.disconnected;
       rethrow;
     } finally {
+      zapret?.endCoreRestart();
       _relaunchRequested = false;
       _restartOperation = null;
     }
