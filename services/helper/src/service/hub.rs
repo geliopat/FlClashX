@@ -39,8 +39,8 @@ use windows_sys::Win32::System::JobObjects::{
 };
 #[cfg(windows)]
 use windows_sys::Win32::System::Threading::{
-    OpenProcess, QueryFullProcessImageNameW, TerminateProcess, PROCESS_QUERY_LIMITED_INFORMATION,
-    PROCESS_TERMINATE, WaitForSingleObject,
+    OpenProcess, QueryFullProcessImageNameW, TerminateProcess, WaitForSingleObject,
+    PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_TERMINATE,
 };
 
 #[cfg(not(any(
@@ -537,7 +537,9 @@ struct ZapretOwner {
 #[cfg(windows)]
 impl Drop for ZapretOwner {
     fn drop(&mut self) {
-        unsafe { CloseHandle(self.process); }
+        unsafe {
+            CloseHandle(self.process);
+        }
     }
 }
 
@@ -550,23 +552,35 @@ impl ZapretOwner {
 
     fn open(pid: u32, sequence: u64) -> Result<Self, Error> {
         // SYNCHRONIZE is required to wait on a process handle.
-        let process = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | 0x00100000, 0, pid) };
+        let process =
+            unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | 0x00100000, 0, pid) };
         if process == 0 {
             return Err(Error::last_os_error());
         }
-        let owner = Self { pid, process, sequence };
+        let owner = Self {
+            pid,
+            process,
+            sequence,
+        };
         let actual = process_image_path(process)
             .ok_or_else(|| Error::other("Cannot identify Zapret owner"))?;
         let actual = fs::canonicalize(actual)?;
         let helper = fs::canonicalize(std::env::current_exe()?)?;
-        let valid_name = actual.file_name().and_then(|name| name.to_str())
-            .is_some_and(|name| name.eq_ignore_ascii_case("FlClashZ.exe")
-                || name.eq_ignore_ascii_case("FlClashZPre.exe"));
-        let same_directory = actual.parent().zip(helper.parent())
-            .is_some_and(|(a, b)| a.to_string_lossy().eq_ignore_ascii_case(&b.to_string_lossy()));
-        if !owner.alive() || !valid_name || !same_directory
-        {
-            return Err(Error::other("Zapret owner is not the running FlClashZ client"));
+        let valid_name = actual
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| {
+                name.eq_ignore_ascii_case("FlClashZ.exe")
+                    || name.eq_ignore_ascii_case("FlClashZPre.exe")
+            });
+        let same_directory = actual.parent().zip(helper.parent()).is_some_and(|(a, b)| {
+            a.to_string_lossy()
+                .eq_ignore_ascii_case(&b.to_string_lossy())
+        });
+        if !owner.alive() || !valid_name || !same_directory {
+            return Err(Error::other(
+                "Zapret owner is not the running FlClashZ client",
+            ));
         }
         Ok(owner)
     }
@@ -587,7 +601,12 @@ fn reap_dead_zapret_owner() -> Result<(), Error> {
 }
 
 #[cfg(windows)]
-fn validate_zapret_command(owner_pid: u32, last: u64, pid: u32, sequence: u64) -> Result<(), Error> {
+fn validate_zapret_command(
+    owner_pid: u32,
+    last: u64,
+    pid: u32,
+    sequence: u64,
+) -> Result<(), Error> {
     if owner_pid != pid {
         return Err(Error::other("Another FlClashZ process owns Zapret"));
     }
@@ -719,10 +738,19 @@ fn ensure_zapret_watchdog() {
 }
 
 #[cfg(windows)]
-fn launch_zapret_with_intent(restart: bool, pid: u32, sequence: u64, request: ZapretStartRequest) -> warp::reply::Response {
+fn launch_zapret_with_intent(
+    restart: bool,
+    pid: u32,
+    sequence: u64,
+    request: ZapretStartRequest,
+) -> warp::reply::Response {
     let _operation = lock_surviving_poison(&ZAPRET_OPERATION);
     if let Err(error) = accept_zapret_command(pid, sequence) {
-        return error_response("zapretOwnerConflict", error.to_string(), StatusCode::CONFLICT);
+        return error_response(
+            "zapretOwnerConflict",
+            error.to_string(),
+            StatusCode::CONFLICT,
+        );
     }
     // Owner monitoring must run even when the recovery watchdog is disabled.
     ensure_zapret_watchdog();
@@ -756,7 +784,12 @@ fn launch_zapret_with_intent(restart: bool, pid: u32, sequence: u64, request: Za
 }
 
 #[cfg(not(windows))]
-fn launch_zapret_with_intent(restart: bool, _pid: u32, _sequence: u64, request: ZapretStartRequest) -> warp::reply::Response {
+fn launch_zapret_with_intent(
+    restart: bool,
+    _pid: u32,
+    _sequence: u64,
+    request: ZapretStartRequest,
+) -> warp::reply::Response {
     let _ = request.watchdog;
     launch_zapret(
         restart,
@@ -768,10 +801,18 @@ fn launch_zapret_with_intent(restart: bool, _pid: u32, _sequence: u64, request: 
 }
 
 #[cfg(windows)]
-fn update_zapret_watchdog(request: ZapretWatchdogRequest, pid: u32, sequence: u64) -> warp::reply::Response {
+fn update_zapret_watchdog(
+    request: ZapretWatchdogRequest,
+    pid: u32,
+    sequence: u64,
+) -> warp::reply::Response {
     let _operation = lock_surviving_poison(&ZAPRET_OPERATION);
     if let Err(error) = accept_zapret_command(pid, sequence) {
-        return error_response("zapretOwnerConflict", error.to_string(), StatusCode::CONFLICT);
+        return error_response(
+            "zapretOwnerConflict",
+            error.to_string(),
+            StatusCode::CONFLICT,
+        );
     }
     *lock_surviving_poison(&ZAPRET_WATCHDOG) = request.enabled;
     if let Some(intent) = lock_surviving_poison(&ZAPRET_INTENT).as_mut() {
@@ -783,7 +824,11 @@ fn update_zapret_watchdog(request: ZapretWatchdogRequest, pid: u32, sequence: u6
 }
 
 #[cfg(not(windows))]
-fn update_zapret_watchdog(request: ZapretWatchdogRequest, _pid: u32, _sequence: u64) -> warp::reply::Response {
+fn update_zapret_watchdog(
+    request: ZapretWatchdogRequest,
+    _pid: u32,
+    _sequence: u64,
+) -> warp::reply::Response {
     let _ = request.enabled;
     error_response(
         "unsupportedPlatform",
@@ -862,13 +907,20 @@ fn process_image_matches(handle: HANDLE, expected_exe_name: &str, zapret_root: &
 }
 
 #[cfg(windows)]
-fn find_winws_processes(zapret_root: &Path, include_local: bool, include_external: bool) -> Vec<String> {
+fn find_winws_processes(
+    zapret_root: &Path,
+    include_local: bool,
+    include_external: bool,
+) -> Vec<String> {
     let targets = ["winws2.exe", "winws.exe", "winws2-split.exe"];
     let mut conflicts = Vec::new();
     unsafe {
         let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
         if snapshot == 0 || snapshot == -1isize {
-            return vec![format!("Cannot enumerate winws processes: {}", Error::last_os_error())];
+            return vec![format!(
+                "Cannot enumerate winws processes: {}",
+                Error::last_os_error()
+            )];
         }
         let mut entry: PROCESSENTRY32W = std::mem::zeroed();
         entry.dwSize = std::mem::size_of::<PROCESSENTRY32W>() as u32;
@@ -894,12 +946,18 @@ fn find_winws_processes(zapret_root: &Path, include_local: bool, include_externa
                                     .push(format!("{image_path} (PID {})", entry.th32ProcessID));
                             }
                         } else {
-                            conflicts.push(format!("{name} (PID {}, image path unavailable)", entry.th32ProcessID));
+                            conflicts.push(format!(
+                                "{name} (PID {}, image path unavailable)",
+                                entry.th32ProcessID
+                            ));
                         }
                         let _ = CloseHandle(process);
                     } else {
                         // The process may have exited; a fresh launch can retry.
-                        conflicts.push(format!("{name} (PID {}, cannot inspect)", entry.th32ProcessID));
+                        conflicts.push(format!(
+                            "{name} (PID {}, cannot inspect)",
+                            entry.th32ProcessID
+                        ));
                     }
                 }
                 if Process32NextW(snapshot, &mut entry) == 0 {
@@ -952,8 +1010,12 @@ fn kill_stray_winws2_processes(exclude_pid: Option<u32>) -> usize {
                             let confirmed = targets
                                 .iter()
                                 .any(|target| process_image_matches(process, target, &zapret_root));
-                            if confirmed && TerminateProcess(process, 1) != 0
-                                && WaitForSingleObject(process, CORE_EXIT_TIMEOUT.as_millis() as u32) == 0
+                            if confirmed
+                                && TerminateProcess(process, 1) != 0
+                                && WaitForSingleObject(
+                                    process,
+                                    CORE_EXIT_TIMEOUT.as_millis() as u32,
+                                ) == 0
                             {
                                 terminated += 1;
                             }
@@ -1080,13 +1142,11 @@ fn launch_zapret(
     if !restart {
         match zapret_status_response(&mut managed, 0) {
             Ok(status) => {
-                let same_strategy = managed
-                    .as_ref()
-                    .is_some_and(|active| {
-                        active.strategy_id == strategy_id
-                            && active.mode == mode
-                            && &active.infrastructure == infrastructure
-                    });
+                let same_strategy = managed.as_ref().is_some_and(|active| {
+                    active.strategy_id == strategy_id
+                        && active.mode == mode
+                        && &active.infrastructure == infrastructure
+                });
                 if same_strategy {
                     return status;
                 }
@@ -1294,7 +1354,11 @@ fn launch_zapret(
 fn stop_zapret(pid: u32, sequence: u64) -> warp::reply::Response {
     let _operation = lock_surviving_poison(&ZAPRET_OPERATION);
     if let Err(error) = accept_zapret_command(pid, sequence) {
-        return error_response("zapretOwnerConflict", error.to_string(), StatusCode::CONFLICT);
+        return error_response(
+            "zapretOwnerConflict",
+            error.to_string(),
+            StatusCode::CONFLICT,
+        );
     }
     *lock_surviving_poison(&ZAPRET_INTENT) = None;
     let mut managed = lock_surviving_poison(&MANAGED_ZAPRET);
@@ -1317,7 +1381,11 @@ fn stop_zapret(pid: u32, sequence: u64) -> warp::reply::Response {
         // ours. A remaining local process, however, is not a successful stop.
         let remaining = find_winws_processes(&bin_dir, true, false);
         if !remaining.is_empty() {
-            return error_response("zapretStopFailed", format!("Cannot confirm local Zapret exit: {}", remaining.join("; ")), StatusCode::CONFLICT);
+            return error_response(
+                "zapretStopFailed",
+                format!("Cannot confirm local Zapret exit: {}", remaining.join("; ")),
+                StatusCode::CONFLICT,
+            );
         }
     }
     zapret_log("info", "Zapret stopped".to_string());
@@ -1472,7 +1540,9 @@ async fn launch_zapret_request(
     sequence: u64,
     request: ZapretStartRequest,
 ) -> Result<warp::reply::Response, Rejection> {
-    match tokio::task::spawn_blocking(move || launch_zapret_with_intent(restart, pid, sequence, request))
+    match tokio::task::spawn_blocking(move || {
+        launch_zapret_with_intent(restart, pid, sequence, request)
+    })
     .await
     {
         Ok(response) => Ok(response),
@@ -1753,7 +1823,8 @@ fn ping_response(result: Result<PathBuf, Error>) -> warp::reply::Response {
         warp::reply::with_status(value, status),
         PROTOCOL_VERSION_HEADER,
         PROTOCOL_VERSION,
-    ).into_response();
+    )
+    .into_response();
     #[cfg(windows)]
     {
         // The digest was captured before the service accepted connections.
@@ -1972,9 +2043,7 @@ pub(super) fn routes() -> impl Filter<Extract = (impl Reply,), Error = Infallibl
         .clone()
         .and(warp::get())
         .map(get_zapret_logs);
-    let api_zapret_logs_clear = zapret_logs_path
-        .and(warp::delete())
-        .map(clear_zapret_logs);
+    let api_zapret_logs_clear = zapret_logs_path.and(warp::delete()).map(clear_zapret_logs);
 
     let api_zapret_strategies = warp::path("zapret")
         .and(warp::path("strategies"))

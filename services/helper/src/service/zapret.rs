@@ -195,7 +195,9 @@ impl ZapretInfrastructure {
                         && label.len() <= 63
                         && !label.starts_with('-')
                         && !label.ends_with('-')
-                        && label.bytes().all(|ch| ch.is_ascii_alphanumeric() || ch == b'-')
+                        && label
+                            .bytes()
+                            .all(|ch| ch.is_ascii_alphanumeric() || ch == b'-')
                 });
             if !valid {
                 return Err(Error::new(
@@ -231,10 +233,7 @@ impl ZapretInfrastructure {
             "mihomo-hostlist-exclude.txt",
             self.domains.join("\n"),
         )?;
-        super::zapret_lists::write_infrastructure(
-            "mihomo-ipset-exclude.txt",
-            self.ips.join("\n"),
-        )?;
+        super::zapret_lists::write_infrastructure("mihomo-ipset-exclude.txt", self.ips.join("\n"))?;
         Ok(())
     }
 

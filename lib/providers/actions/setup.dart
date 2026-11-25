@@ -1067,8 +1067,9 @@ class SetupAction extends _$SetupAction {
         try {
           if (system.isWindows && !ref.read(safeModeProvider)) {
             protectionYaml = await _zapretEffectiveYaml(realProfile);
-            zapret = ref.read(zapretControllerProvider.notifier);
-            transition = await zapret.beginProfileApply(protectionYaml, profile?.id);
+            final controller = ref.read(zapretControllerProvider.notifier);
+            zapret = controller;
+            transition = await controller.beginProfileApply(protectionYaml, profile?.id);
           }
           if (setupParams.base == null) {
             final configFilePath = await appPath.configFilePath;
