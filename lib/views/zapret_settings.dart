@@ -259,17 +259,15 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
             .split(RegExp(r'\r?\n'))
             .where((line) => line.trim().isNotEmpty && !line.trim().startsWith('#'))
             .length;
-        final oldCount = current.content
-            .split(RegExp(r'\r?\n'))
-            .where((line) => line.trim().isNotEmpty && !line.trim().startsWith('#'))
-            .length;
-        if (upstreamCount == 0 || (oldCount > 0 && upstreamCount * 2 < oldCount)) {
+        if (upstreamCount == 0) {
           throw StateError(
-            'Обновление ${entry.key} отклонено: источник содержит $upstreamCount записей при $oldCount в установленном файле. '
-            'Возможно, источник вернул неполный список.',
+            'Обновление ${entry.key} отклонено: источник не содержит записей.',
           );
         }
 
+        // The upstream GUI merges local rows after downloading. Do not compare
+        // the upstream count with the installed file: that file may contain
+        // many valid local additions which are intentionally retained.
         final merged = _mergeList(upstream, current.content, entry.key);
         if (utf8.encode(merged).length > 2 * 1024 * 1024) {
           throw StateError('Обновлённый файл ${entry.key} превышает лимит 2 МиБ.');
