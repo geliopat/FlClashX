@@ -300,18 +300,32 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
         if (applied.contains(entry.key)) continue;
         try {
           final current = await helperClient.readZapretList(entry.key);
-          if (current.content == entry.value && current.content != originals[entry.key]) {
+          if (current.content == entry.value &&
+              current.content != originals[entry.key]) {
             applied.add(entry.key);
+          } else if (current.content != originals[entry.key]) {
+            rollbackFailures.add(
+              '${entry.key}: файл изменился параллельно; автоматический откат пропущен, чтобы не затереть чужую правку.',
+            );
           }
-        } catch (_) {
-          // The original error and any rollback failures are reported below.
+        } catch (verificationError) {
+          rollbackFailures.add(
+            '${entry.key}: не удалось проверить результат записи: $verificationError',
+          );
         }
       }
 
-      // Roll back already-applied files in reverse order. A rollback failure
-      // is reported explicitly rather than hidden behind the original error.
+      // Roll back already-applied files in reverse order. Before restoring,
+      // verify that nobody has changed the file since this updater wrote it.
       for (final filename in applied.reversed) {
         try {
+          final current = await helperClient.readZapretList(filename);
+          if (current.content != staged[filename]) {
+            rollbackFailures.add(
+              '$filename: файл изменился после обновления; автоматический откат пропущен.',
+            );
+            continue;
+          }
           await helperClient.restoreZapretList(filename);
         } catch (rollbackError) {
           rollbackFailures.add('$filename: $rollbackError');
