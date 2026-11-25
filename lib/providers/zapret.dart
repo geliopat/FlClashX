@@ -17,6 +17,7 @@ class ZapretState {
   final bool running;
   final bool busy;
   final int? pid;
+  final Duration elapsed;
   final int cleanedProcesses;
   final String? activeStrategyId;
   final String? activeEngine;
@@ -33,6 +34,7 @@ class ZapretState {
     this.running = false,
     this.busy = false,
     this.pid,
+    this.elapsed = Duration.zero,
     this.cleanedProcesses = 0,
     this.activeStrategyId,
     this.activeEngine,
@@ -50,6 +52,7 @@ class ZapretState {
     bool? running,
     bool? busy,
     int? pid,
+    Duration? elapsed,
     bool clearPid = false,
     int? cleanedProcesses,
     String? activeStrategyId,
@@ -71,6 +74,7 @@ class ZapretState {
       running: running ?? this.running,
       busy: busy ?? this.busy,
       pid: clearPid ? null : pid ?? this.pid,
+      elapsed: elapsed ?? this.elapsed,
       cleanedProcesses: cleanedProcesses ?? this.cleanedProcesses,
       activeStrategyId: clearActiveStrategy
           ? null
@@ -103,12 +107,36 @@ class ZapretController extends Notifier<ZapretState> {
 
   final HelperClient _client = helperClient;
   Timer? _poller;
+  Timer? _clock;
+  final Stopwatch _uptime = Stopwatch();
+  int? _observedPid;
+
+  Duration _observeProcess(bool running, int? pid) {
+    if (!running) {
+      _uptime.stop();
+      _uptime.reset();
+      _observedPid = null;
+    } else if (!_uptime.isRunning || pid != _observedPid) {
+      _uptime.reset();
+      _uptime.start();
+      _observedPid = pid;
+    }
+    return _uptime.elapsed;
+  }
   var _refreshing = false;
 
   @override
   ZapretState build() {
-    ref.onDispose(() => _poller?.cancel());
+    ref.onDispose(() {
+      _poller?.cancel();
+      _clock?.cancel();
+    });
     if (Platform.isWindows) {
+      _clock = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (ref.mounted && state.running) {
+          state = state.copyWith(elapsed: _uptime.elapsed);
+        }
+      });
       scheduleMicrotask(() {
         if (!ref.mounted) return;
         unawaited(loadStrategies());
@@ -192,6 +220,7 @@ class ZapretController extends Notifier<ZapretState> {
       state = state.copyWith(
         available: state.strategies.isNotEmpty,
         running: response.running,
+        elapsed: _observeProcess(response.running, response.pid),
         pid: response.pid,
         clearPid: !response.running,
         cleanedProcesses: response.cleanedProcesses,
@@ -210,6 +239,7 @@ class ZapretController extends Notifier<ZapretState> {
       state = state.copyWith(
         available: error.code != 'zapretUnsupported',
         running: false,
+        elapsed: _observeProcess(false, null),
         clearPid: true,
         clearActiveStrategy: true,
         clearActiveEngine: true,
@@ -222,6 +252,7 @@ class ZapretController extends Notifier<ZapretState> {
       if (!ref.mounted) return;
       state = state.copyWith(
         running: false,
+        elapsed: _observeProcess(false, null),
         clearPid: true,
         clearActiveStrategy: true,
         clearActiveEngine: true,
@@ -250,6 +281,7 @@ class ZapretController extends Notifier<ZapretState> {
       state = state.copyWith(
         available: true,
         running: response.running,
+        elapsed: _observeProcess(response.running, response.pid),
         pid: response.pid,
         clearPid: !response.running,
         cleanedProcesses: response.cleanedProcesses,
@@ -289,6 +321,7 @@ class ZapretController extends Notifier<ZapretState> {
       state = state.copyWith(
         available: true,
         running: response.running,
+        elapsed: _observeProcess(response.running, response.pid),
         pid: response.pid,
         clearPid: !response.running,
         cleanedProcesses: response.cleanedProcesses,

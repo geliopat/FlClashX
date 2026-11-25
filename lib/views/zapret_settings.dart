@@ -5,7 +5,9 @@ import 'package:dio/dio.dart';
 import 'package:fl_clash/core/desktop/helper_client.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/widgets/widgets.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:fl_clash/pages/editor.dart';
+import 'package:fl_clash/views/dashboard/widgets/zapret_strategy_sheet.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class ZapretSettingsView extends ConsumerStatefulWidget {
@@ -49,7 +51,11 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
   String? _notice;
   bool _checkingComponents = false;
   bool _updatingHelper = false;
-  Map<String, String> _componentUpdates = const {};
+  Map<String, String> _componentUpdates = const {
+    'Zapret2': 'установлено $_installedZapret2 · upstream не проверен',
+    'Flowseal': 'установлено $_installedFlowseal · upstream не проверен',
+    'Lua/BAT source': 'установлено $_installedStrategyCommit · upstream не проверен',
+  };
 
   @override
   void initState() {
@@ -83,7 +89,11 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
           (currentSelection != null &&
                   lists.any((item) => item.filename == currentSelection)
               ? currentSelection
-              : lists.first.filename);
+              : (lists.isEmpty ? null : lists.first.filename));
+      if (filename == null) {
+        if (mounted) setState(() { _lists = lists; _selected = null; _loading = false; });
+        return;
+      }
       final data = await helperClient.readZapretList(filename);
       if (!mounted) return;
       setState(() {
@@ -124,34 +134,6 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
       setState(() {
         _loading = false;
         _listLoaded = false;
-        _error = error is HelperException ? error.message : error.toString();
-      });
-    }
-  }
-
-  Future<void> _saveList() async {
-    final filename = _selected;
-    if (filename == null || !_listLoaded || _saving || _loading) return;
-    setState(() {
-      _saving = true;
-      _error = null;
-      _notice = null;
-    });
-    try {
-      final result = await helperClient.writeZapretList(filename, _editor.text);
-      if (!mounted) return;
-      setState(() {
-        _saving = false;
-        _lists = [
-          for (final item in _lists)
-            if (item.filename == result.filename) result else item,
-        ];
-        _notice = 'Список сохранён. Резервная копия: $filename.bak';
-      });
-    } catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _saving = false;
         _error = error is HelperException ? error.message : error.toString();
       });
     }
@@ -252,7 +234,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
         final current = await helperClient.readZapretList(entry.key);
         final response = await _http.get<String>(entry.value);
         final upstream = response.data;
-        if (upstream == null || upstream.trim().length < 20) {
+        if (upstream == null || (entry.key != 'ipset-all.txt' && upstream.trim().length < 20)) {
           throw StateError('Источник вернул пустой или слишком короткий файл: ${entry.key}');
         }
 
@@ -260,10 +242,15 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
             .split(RegExp(r'\r?\n'))
             .where((line) => line.trim().isNotEmpty && !line.trim().startsWith('#'))
             .length;
-        if (upstreamCount == 0) {
+        if (upstreamCount == 0 && entry.key != 'ipset-all.txt') {
           throw StateError(
             'Обновление ${entry.key} отклонено: источник не содержит записей.',
           );
+        }
+
+        if (entry.key == 'ipset-all.txt' && upstreamCount == 0) {
+          details.add('ipset-all.txt: пустой шаблон, локальный файл сохранён');
+          continue;
         }
 
         // The upstream GUI merges local rows after downloading. Do not compare
@@ -472,6 +459,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
           ),
           ListItem(
             title: const Text('Выбранная стратегия'),
+            onTap: () => showZapretStrategiesSheet(context),
             subtitle: Text(zapret.running
                 ? activeName ?? 'Не определена'
                 : selectedName ?? 'Не выбрана'),
@@ -485,6 +473,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
             ),
             ListItem(
               title: const Text('Режим'),
+              onTap: () => showZapretStrategiesSheet(context),
               subtitle: Text(
                 activeSupportsSplitMode
                     ? zapret.activeMode ?? 'Не определён'
@@ -497,9 +486,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
                 zapret.winDivertFilters.isEmpty
                     ? 'Не переданы'
                     : zapret.winDivertFilters.join(' · '),
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      fontFamily: 'monospace',
-                    ),
+                style: TextStyle(fontFamily: 'monospace', color: context.colorScheme.onSurfaceVariant),
               ),
             ),
             ListItem(
@@ -508,9 +495,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
                 zapret.processingLists.isEmpty
                     ? 'Не переданы'
                     : zapret.processingLists.join(' · '),
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      fontFamily: 'monospace',
-                    ),
+                style: TextStyle(fontFamily: 'monospace', color: context.colorScheme.onSurfaceVariant),
               ),
             ),
           ],
@@ -589,8 +574,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
               'Zapret2 v1.0.7 · Flowseal 1.10.4 · стратегии geliopat/zapret2-gui',
             ),
           ),
-          if (_componentUpdates.isNotEmpty)
-            for (final entry in _componentUpdates.entries)
+          for (final entry in _componentUpdates.entries)
               ListItem(
                 title: Text(entry.key),
                 subtitle: Text(entry.value),
@@ -650,45 +634,30 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
                 },
                 onChanged: (value) => unawaited(_selectList(value)),
               ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-              child: SizedBox(
-                height: 260,
-                child: TextField(
-                  controller: _editor,
-                  enabled: _listLoaded && !_loading && !_saving && !_updating,
-                  expands: true,
-                  maxLines: null,
-                  minLines: null,
-                  textAlignVertical: TextAlignVertical.top,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        fontFamily: 'monospace',
-                      ),
-                  decoration: InputDecoration(
-                    filled: true,
-                    fillColor: SurfaceLevel.inset.colorOf(context.colorScheme),
-                    border: OutlineInputBorder(
-                      borderSide: BorderSide(
-                        color: context.colorScheme.outlineVariant,
-                      ),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(
-                        color: context.colorScheme.outlineVariant,
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: BorderSide(
-                        color: context.colorScheme.primary,
-                        width: 1.5,
-                      ),
-                    ),
-                    hintText: 'Одна запись на строку',
-                    alignLabelWithHint: true,
-                  ),
-                ),
+            if (_selected != null)
+              ListItem(
+                title: const Text('Редактировать список'),
+                subtitle: Text(_selected!),
+                onTap: !_listLoaded || _loading || _saving || _updating
+                    ? null
+                    : () async {
+                        final filename = _selected!;
+                        await Navigator.of(context).push<void>(
+                          MaterialPageRoute<void>(
+                            builder: (_) => EditorPage(
+                              title: filename,
+                              content: _editor.text,
+                              onSave: (editorContext, title, content) async {
+                                final text = await content.readText();
+                                await helperClient.writeZapretList(filename, text);
+                                if (editorContext.mounted) Navigator.of(editorContext).pop();
+                              },
+                            ),
+                          ),
+                        );
+                        if (mounted) await _loadLists(select: filename);
+                      },
               ),
-            ),
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
               child: Wrap(
@@ -702,18 +671,6 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
                         : () => _loadLists(),
                     icon: const Icon(Icons.refresh),
                     label: const Text('Перечитать'),
-                  ),
-                  FilledButton.tonalIcon(
-                    onPressed: !_listLoaded || _loading || _saving || _updating
-                        ? null
-                        : _saveList,
-                    icon: _saving
-                        ? const SizedBox.square(
-                            dimension: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.save),
-                    label: const Text('Сохранить'),
                   ),
                   TextButton.icon(
                     onPressed: _lists.isEmpty || _loading || _saving || _updating

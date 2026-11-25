@@ -4,7 +4,7 @@ import 'package:fl_clash/core/desktop/helper_client.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/ui/ui.dart';
 import 'package:fl_clash/widgets/widgets.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class ZapretStatusButton extends ConsumerWidget {
@@ -42,18 +42,21 @@ class ZapretStatusButton extends ConsumerWidget {
           )
         : ZapretMark(running: state.running);
     final iconOnly = state.running || ViewScope.isMobileOf(context);
+    const style = ElasticPress.buttonStyle;
     return Tooltip(
       message: state.error ?? 'Zapret',
       child: FadeScaleBox(
         alignment: Alignment.centerRight,
         child: iconOnly
             ? IconButton.filled(
+                style: style,
                 onPressed: state.busy || !state.available
                     ? null
                     : () => _restart(context, ref),
                 icon: icon,
               )
             : FilledButton.icon(
+                style: style,
                 onPressed: state.busy || !state.available
                     ? null
                     : () => _restart(context, ref),
@@ -172,12 +175,9 @@ class ProviderZapretButton extends ConsumerWidget {
                         spacing: 8,
                         children: [
                           ZapretMark(running: state.running, color: ink),
-                          Text(
-                            'Zapret',
-                            style: AppTextStyle.subheadline.of(
-                              context,
-                              emphasized: true,
-                            ),
+                          if (state.running) Text(
+                            getTimeText(state.elapsed),
+                            style: AppTextStyle.headline.of(context),
                           ),
                         ],
                       ),
