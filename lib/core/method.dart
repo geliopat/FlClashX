@@ -31,6 +31,7 @@ enum CoreMethod {
   asyncTestDelay,
   outboundIp,
   serviceCheck,
+  zapretCdnCheck,
   getConnections,
   getConnectionCount,
   closeConnections,

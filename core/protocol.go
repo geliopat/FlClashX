@@ -37,6 +37,7 @@ const (
 
 	outboundIpMethod               CoreMethod = "outboundIp"
 	serviceCheckMethod             CoreMethod = "serviceCheck"
+	zapretCdnCheckMethod           CoreMethod = "zapretCdnCheck"
 	getConnectionsMethod           CoreMethod = "getConnections"
 	getConnectionCountMethod       CoreMethod = "getConnectionCount"
 	closeConnectionsMethod         CoreMethod = "closeConnections"
@@ -228,6 +229,7 @@ type ProbeResult struct {
 	header    http.Header
 	lowerBody string
 	hits      []RouteHit
+	sampleMicros int64
 }
 
 type Traffic struct {
