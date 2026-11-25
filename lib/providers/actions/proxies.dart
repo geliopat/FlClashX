@@ -679,7 +679,7 @@ class ProxiesAction extends _$ProxiesAction {
       return false;
     }
     final zapret = ref.read(zapretControllerProvider);
-    return !zapret.busy && !zapret.dashboardRestarting &&
+    return !zapret.busy && !zapret.dashboardRestarting && !zapret.componentUpdating &&
         !ref.read(smartHostsProvider).cdnChecking;
   }
 

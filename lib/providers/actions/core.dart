@@ -158,6 +158,10 @@ class CoreAction extends _$CoreAction {
 
   /// [running] stands in for a run that a crash rolled back.
   Future<bool> restartCore({bool? running, bool repairHelper = false}) {
+    if (system.isWindows && !ref.read(safeModeProvider) &&
+        ref.read(zapretControllerProvider).componentUpdating) {
+      return Future.error(StateError('Выполняется обновление компонентов Zapret'));
+    }
     _requestedRestartRevision++;
     final activeOperation = _restartOperation;
     if (activeOperation != null) {

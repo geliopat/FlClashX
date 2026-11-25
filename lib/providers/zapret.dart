@@ -9,6 +9,7 @@ import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/providers/state.dart' show isStartProvider;
 import 'package:fl_clash/providers/zapret_infrastructure.dart';
 import 'package:fl_clash/providers/zapret_diagnostics.dart';
+import 'package:fl_clash/providers/zapret_component_update.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/core/desktop/helper_client.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -39,6 +40,7 @@ class ZapretState {
   final bool running;
   final bool busy;
   final bool dashboardRestarting;
+  final bool componentUpdating;
   final bool debugLogs;
   final bool startWithMihomo;
   final bool watchdog;
@@ -66,6 +68,7 @@ class ZapretState {
     this.running = false,
     this.busy = false,
     this.dashboardRestarting = false,
+    this.componentUpdating = false,
     this.debugLogs = false,
     this.startWithMihomo = false,
     this.watchdog = true,
@@ -94,6 +97,7 @@ class ZapretState {
     bool? running,
     bool? busy,
     bool? dashboardRestarting,
+    bool? componentUpdating,
     bool? debugLogs,
     bool? startWithMihomo,
     bool? watchdog,
@@ -128,6 +132,7 @@ class ZapretState {
       running: running ?? this.running,
       busy: busy ?? this.busy,
       dashboardRestarting: dashboardRestarting ?? this.dashboardRestarting,
+      componentUpdating: componentUpdating ?? this.componentUpdating,
       debugLogs: debugLogs ?? this.debugLogs,
       startWithMihomo: startWithMihomo ?? this.startWithMihomo,
       watchdog: watchdog ?? this.watchdog,
@@ -274,7 +279,7 @@ class ZapretController extends Notifier<ZapretState> {
   bool _profileBlocked = false;
   bool _desiredRunning = false;
 
-  bool get _launchBlocked => _lifecycleStopping || _coreRestarting ||
+  bool get _launchBlocked => state.componentUpdating || _lifecycleStopping || _coreRestarting ||
       _profileApplying || _profileBlocked || ref.read(safeModeProvider) ||
       ref.read(coreStatusProvider) != CoreStatus.connected;
 
@@ -558,7 +563,7 @@ class ZapretController extends Notifier<ZapretState> {
 
   Future<void> _applySelection(String strategyId, ZapretMode mode,
       {bool startIfStopped = false}) async {
-    if (state.busy) return;
+    if (state.busy || state.componentUpdating) return;
     final strategy = state.strategies.where((item) => item.id == strategyId).firstOrNull;
     if (strategy == null) {
       throw ArgumentError.value(strategyId, 'strategyId', 'Unknown Zapret strategy');
@@ -705,7 +710,7 @@ class ZapretController extends Notifier<ZapretState> {
   }
 
   Future<void> setEnabled(bool enabled) async {
-    if (!Platform.isWindows || state.busy) return;
+    if (!Platform.isWindows || state.busy || state.componentUpdating) return;
     if (enabled && _launchBlocked) return;
     if (!enabled) _desiredRunning = false;
     state = state.copyWith(busy: true, clearError: true);
@@ -760,7 +765,7 @@ class ZapretController extends Notifier<ZapretState> {
   /// core restart: it may own both processes.
   Future<void> restartFromDashboard() async {
     if (!Platform.isWindows || !ref.mounted || state.busy ||
-        state.dashboardRestarting || _coreRestarting || _profileApplying ||
+        state.dashboardRestarting || state.componentUpdating || _coreRestarting || _profileApplying ||
         ref.read(safeModeProvider)) {
       return;
     }
@@ -1171,10 +1176,121 @@ class ZapretController extends Notifier<ZapretState> {
     }
   }
 
+  Future<void> installComponentUpdate(
+    ZapretComponentPackage package,
+    ZapretComponentUpdate kind,
+  ) async {
+    final transaction = ZapretComponentTransaction(
+      zapretComponentDirectory, package, kind,
+    );
+    await _withStoppedEngine(transaction.apply, rollback: transaction.rollback);
+  }
+
+  Future<void> recoverComponentUpdate() async {
+    await _withStoppedEngine(
+      () => restoreZapretComponents(zapretComponentDirectory),
+    );
+  }
+
+  /// Keep Mihomo alive, gate other Zapret starts and restore only the exact
+  /// previously running strategy. A later VPN stop supersedes restoration.
+  Future<void> _withStoppedEngine(
+    Future<void> Function() apply, {
+    Future<void> Function()? rollback,
+  }) async {
+    if (!Platform.isWindows || !ref.mounted || !ref.read(initProvider) ||
+        ref.read(safeModeProvider) || state.busy || state.dashboardRestarting ||
+        state.componentUpdating || _coreRestarting || _profileApplying ||
+        ref.read(coreActionProvider.notifier).isRestarting) {
+      throw StateError('Сейчас обновление компонентов недоступно');
+    }
+    state = state.copyWith(componentUpdating: true, clearError: true);
+    final priorStopping = _lifecycleStopping;
+    HelperZapretStatus? before;
+    int? revision;
+    var stopped = false;
+    bool canRestore() => ref.mounted && before?.running == true &&
+        !priorStopping && revision == _lifecycleRevision &&
+        !_coreRestarting && !_profileApplying && !_profileBlocked &&
+        ref.read(coreStatusProvider) == CoreStatus.connected &&
+        !ref.read(safeModeProvider);
+
+    Future<void> resume() async {
+      if (!canRestore()) return;
+      final protection = await _readInfrastructure();
+      if (!canRestore()) return;
+      final previous = before!;
+      final id = previous.strategyId;
+      if (id == null || id.isEmpty) {
+        throw StateError('Неизвестна ранее запущенная стратегия');
+      }
+      final launched = await _client.startZapret(
+        strategyId: id,
+        mode: previous.mode ?? ZapretMode.fullBypass.name,
+        debug: state.debugLogs,
+        watchdog: false,
+        infrastructure: protection.toJson(),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 1500));
+      if (!canRestore()) {
+        await _client.stopZapret();
+        return;
+      }
+      final status = await _client.zapretStatus();
+      if (!launched.running || launched.pid == null || !status.running ||
+          status.pid != launched.pid || status.strategyId != id) {
+        throw StateError('Движок не прошёл проверку запуска после обновления');
+      }
+      await _client.setZapretWatchdog(state.watchdog);
+      if (!canRestore()) {
+        await _client.stopZapret();
+        return;
+      }
+      _desiredRunning = true;
+    }
+
+    try {
+      await _requireHelper();
+      before = await _client.zapretStatus();
+      final stopping = stopAlongsideMihomo();
+      revision = _lifecycleRevision;
+      await stopping;
+      stopped = true;
+      await apply();
+      await resume();
+      if (ref.mounted) await loadStrategies();
+    } catch (error) {
+      Object? recoveryError;
+      if (stopped) {
+        try {
+          final status = await _client.stopZapret();
+          if (status.running) throw StateError('Не подтверждена остановка Zapret');
+          await rollback?.call();
+          if (!await zapretUpdateMarker(zapretComponentDirectory).exists()) {
+            await resume();
+          }
+        } catch (failure) {
+          recoveryError = failure;
+        }
+      }
+      final message = recoveryError == null
+          ? _errorMessage(error)
+          : '${_errorMessage(error)}; восстановление: ${_errorMessage(recoveryError)}';
+      if (ref.mounted) state = state.copyWith(error: message);
+      throw StateError(message);
+    } finally {
+      if (ref.mounted) {
+        if (revision == _lifecycleRevision) _lifecycleStopping = priorStopping;
+        state = state.copyWith(componentUpdating: false);
+        await refresh();
+      }
+    }
+  }
+
   /// Replaces an older Windows Helper service with the executable
   /// shipped beside the currently running FlClashZ instance.
   Future<void> updateHelperService() async {
-    if (!Platform.isWindows || state.busy || ref.read(safeModeProvider)) return;
+    if (!Platform.isWindows || state.busy || state.componentUpdating || ref.read(safeModeProvider)) return;
     state = state.copyWith(clearError: true);
     try {
       // Run repair inside the core restart worker, which gates Zapret and

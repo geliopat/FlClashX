@@ -12,7 +12,7 @@ class ZapretStatusButton extends ConsumerWidget {
 
   Future<void> _restart(BuildContext context, WidgetRef ref) async {
     final status = ref.read(zapretControllerProvider);
-    if (!ref.read(initProvider) || status.busy || status.dashboardRestarting ||
+    if (!ref.read(initProvider) || status.busy || status.dashboardRestarting || status.componentUpdating ||
         ref.read(safeModeProvider)) {
       return;
     }
@@ -38,7 +38,7 @@ class ZapretStatusButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(zapretControllerProvider);
-    final busy = state.busy || state.dashboardRestarting;
+    final busy = state.busy || state.dashboardRestarting || state.componentUpdating;
     final safeMode = ref.watch(safeModeProvider);
     final initialized = ref.watch(initProvider);
     final icon = busy
@@ -117,7 +117,7 @@ class ProviderZapretButton extends ConsumerWidget {
   static const _duration = Duration(milliseconds: 300);
 
   Future<void> _toggle(WidgetRef ref, ZapretState state) async {
-    if (state.busy || state.dashboardRestarting || !state.available) return;
+    if (state.busy || state.dashboardRestarting || state.componentUpdating || !state.available) return;
     try {
       await ref
           .read(zapretControllerProvider.notifier)
@@ -165,7 +165,7 @@ class ProviderZapretButton extends ConsumerWidget {
                     width: 1.5,
                   ),
                 ),
-                onPressed: state.busy || state.dashboardRestarting || !state.available
+                onPressed: state.busy || state.dashboardRestarting || state.componentUpdating || !state.available
                     ? null
                     : () => _toggle(ref, state),
                 child: state.busy

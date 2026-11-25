@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:fl_clash/core/desktop/helper_client.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/providers/zapret_components.dart';
+import 'package:fl_clash/providers/zapret_component_update.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:fl_clash/pages/editor.dart';
@@ -48,6 +49,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
   String? _error;
   String? _notice;
   bool _updatingHelper = false;
+  bool _updatingComponents = false;
 
   @override
   void initState() {
@@ -331,8 +333,84 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
     }
   }
 
+  Future<void> _updateComponents(ZapretComponentUpdate kind) async {
+    if (_updatingComponents || _updating || _saving || _updatingHelper) return;
+    final name = switch (kind) {
+      ZapretComponentUpdate.zapret2 => 'Zapret2 и совместимые Lua/BAT',
+      ZapretComponentUpdate.flowseal => 'Flowseal',
+      ZapretComponentUpdate.strategies => 'стратегии и payload',
+      ZapretComponentUpdate.all => 'все компоненты и списки',
+    };
+    final confirmed = await showFloatingDialog<bool>(
+      context: context,
+      child: CommonDialog(
+        title: 'Обновить $name?',
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Отмена')),
+          TextButton(onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Обновить')),
+        ],
+        child: const Text(
+          'Используется подписанный совместимый пакет FlClashZ. '
+          'Zapret временно остановится, будет создана резервная копия. '
+          'Mihomo и пользовательские списки не заменяются.',
+        ),
+      ),
+    );
+    if (confirmed != true || !mounted || _updatingComponents) return;
+    setState(() {
+      _updatingComponents = true;
+      _error = null;
+      _notice = 'Загрузка и проверка пакета…';
+    });
+    try {
+      final package = await downloadZapretComponentPackage();
+      if (!mounted) return;
+      setState(() => _notice = 'Установка компонентов…');
+      await ref.read(zapretControllerProvider.notifier)
+          .installComponentUpdate(package, kind);
+      if (!mounted) return;
+      await ref.read(zapretComponentsProvider.notifier).refresh();
+      if (!mounted) return;
+      setState(() => _notice = 'Проверенные компоненты установлены.');
+      if (kind == ZapretComponentUpdate.all) {
+        await _updateLists();
+        if (!mounted) return;
+        setState(() {
+          _notice = _error == null
+              ? 'Компоненты обновлены. ${_notice ?? ''}'
+              : 'Компоненты обновлены, списки — с ошибкой. ${_notice ?? ''}';
+        });
+      }
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _updatingComponents = false);
+    }
+  }
+
+  Future<void> _recoverComponents() async {
+    if (_updatingComponents || _updating || _saving || _updatingHelper) return;
+    setState(() {
+      _updatingComponents = true;
+      _error = null;
+      _notice = null;
+    });
+    try {
+      await ref.read(zapretControllerProvider.notifier).recoverComponentUpdate();
+      if (!mounted) return;
+      await ref.read(zapretComponentsProvider.notifier).refresh();
+      if (mounted) setState(() => _notice = 'Резервная копия компонентов восстановлена.');
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _updatingComponents = false);
+    }
+  }
+
   Future<void> _updateHelperService() async {
-    if (_updatingHelper) return;
+    if (_updatingHelper || _updatingComponents) return;
     final confirmed = await showFloatingDialog<bool>(
       context: context,
       child: CommonDialog(
@@ -403,6 +481,10 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
   Widget build(BuildContext context) {
     final zapret = ref.watch(zapretControllerProvider);
     final components = ref.watch(zapretComponentsProvider);
+    final updating = _updatingComponents || zapret.componentUpdating ||
+        zapret.busy || zapret.dashboardRestarting || _updatingHelper || _updating || _saving;
+    final canUpdate = !updating && ref.watch(initProvider) && !ref.watch(safeModeProvider);
+    final pending = zapretUpdateMarker(zapretComponentDirectory).existsSync();
     final sections = <Widget>[
       generateSection(
         title: 'Служба Helper',
@@ -432,7 +514,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : null,
-              onTap: zapret.busy || _updatingHelper
+              onTap: zapret.busy || _updatingHelper || _updatingComponents || zapret.componentUpdating
                   ? null
                   : _updateHelperService,
             ),
@@ -492,11 +574,42 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
                   )
                 : const Icon(Icons.system_update_alt),
             title: const Text('Проверить версии'),
-            onTap: components.checking ? null : ref.read(zapretComponentsProvider.notifier).refresh,
+            onTap: components.checking || updating ? null : ref.read(zapretComponentsProvider.notifier).refresh,
           ),
+          for (final action in const [
+            (ZapretComponentUpdate.zapret2, 'Обновить Zapret2', 'Движок, зависимости и совместимые Lua/BAT'),
+            (ZapretComponentUpdate.flowseal, 'Обновить Flowseal', 'winws и проверка совместимости зависимостей'),
+            (ZapretComponentUpdate.strategies, 'Обновить стратегии', 'Lua/BAT и payload-файлы'),
+            (ZapretComponentUpdate.all, 'Обновить всё', 'Компоненты и затем списки'),
+          ])
+            ListItem(
+              leading: const Icon(Icons.cloud_download),
+              title: Text(action.$2),
+              subtitle: Text(action.$3),
+              onTap: canUpdate && !pending &&
+                  (action.$1 != ZapretComponentUpdate.all || _lists.isNotEmpty)
+                  ? () => _updateComponents(action.$1) : null,
+            ),
+          ListItem(
+            leading: const Icon(Icons.refresh),
+            title: const Text('Обновить списки'),
+            onTap: canUpdate && !pending && _lists.isNotEmpty ? _updateLists : null,
+          ),
+          if (pending)
+            ListItem(
+              leading: const Icon(Icons.restore),
+              title: const Text('Восстановить прерванное обновление'),
+              onTap: canUpdate ? _recoverComponents : null,
+            ),
+          if (_updatingComponents || zapret.componentUpdating)
+            const ListItem(
+              title: Text('Обновление компонентов…'),
+              trailing: SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+            ),
         ],
         footer:
-            'Проверка новых версий выполняется отдельно. Замена winws/winws2, DLL, драйверов WinDivert и Lua/BAT пока не автоматизирована: обновление требует остановки движка, проверки SHA256 и возможности отката.',
+            'Обновления используют подписанные совместимые пакеты FlClashZ. '
+            'Новый каталог аргументов Helper требует новой сборки.',
       ),
       const ListSectionGap(),
       generateSection(
@@ -543,7 +656,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
               ListItem(
                 title: const Text('Редактировать список'),
                 subtitle: Text(_selected!),
-                onTap: !_listLoaded || _loading || _saving || _updating
+                onTap: !_listLoaded || _loading || _saving || _updating || _updatingComponents || zapret.componentUpdating
                     ? null
                     : () async {
                         final filename = _selected!;
@@ -570,14 +683,14 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
                 alignment: WrapAlignment.end,
                 children: [
                   TextButton.icon(
-                    onPressed: _loading || _saving || _updating
+                    onPressed: _loading || _saving || _updating || _updatingComponents || zapret.componentUpdating
                         ? null
                         : () => _loadLists(),
                     icon: const Icon(Icons.refresh),
                     label: const Text('Перечитать'),
                   ),
                   TextButton.icon(
-                    onPressed: _lists.isEmpty || _loading || _saving || _updating
+                    onPressed: _lists.isEmpty || _loading || _saving || _updating || _updatingComponents || zapret.componentUpdating
                         ? null
                         : _updateLists,
                     icon: _updating
@@ -589,7 +702,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
                     label: const Text('Обновить списки'),
                   ),
                   TextButton.icon(
-                    onPressed: !_listLoaded || _loading || _saving || _updating
+                    onPressed: !_listLoaded || _loading || _saving || _updating || _updatingComponents || zapret.componentUpdating
                         ? null
                         : _restoreBackup,
                     icon: const Icon(Icons.restore),
