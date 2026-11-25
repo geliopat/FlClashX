@@ -505,7 +505,7 @@ class Windows {
         verifyBundledCore: _verifyBundledCore,
         verifyHelperBinary: true,
       );
-      if (result != AuthorizeCode.error && await _hasRetiredHelper()) {
+      if (result == AuthorizeCode.success && await _hasRetiredHelper()) {
         commonPrint.log('Legacy Helper services remain after installation',
             logLevel: LogLevel.error);
         return AuthorizeCode.error;
