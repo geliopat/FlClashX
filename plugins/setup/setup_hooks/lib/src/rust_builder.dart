@@ -51,9 +51,12 @@ class RustBuilder {
       'helper${target.executableExtension}',
     );
     final destDir = p.join(_outputPath, target.platformDir);
+    final helperName = target.goos == 'windows'
+        ? config.windowsHelperName
+        : config.helperName;
     final destPath = p.join(
       destDir,
-      '${config.helperName}${target.executableExtension}',
+      '${helperName}${target.executableExtension}',
     );
     return cache.run(
       key: '${target.platformDir}-${target.goarch}-helper-release',

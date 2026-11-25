@@ -431,7 +431,7 @@ class Windows {
     'FlClashXPreHelperService',
     'FlClashHelperService',
     'FlClashPreHelperService',
-    'FlClashZHelperService',
+    'FlClashXHelperService',
     'FlClashZPreHelperService',
   ];
 

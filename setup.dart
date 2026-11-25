@@ -241,6 +241,8 @@ const preDesktop = DesktopIdentity(
   windowsDataDir: r'com.follow\clashx.pre',
 );
 
+const windowsHelperName = 'FlClashZHelperService';
+
 const _preWindowsAppId = '3B6E2F0A-9C41-4D57-8A2E-7F1D5C0B9E63';
 
 DesktopIdentity desktopIdentityOf(String env) =>
@@ -642,7 +644,7 @@ Future<void> _packageWindows(
   final identity = DesktopIdentity(
     pre: legacy.pre,
     executable: legacy.pre ? 'FlClashZPre' : 'FlClashZ',
-    helper: legacy.helper,
+    helper: windowsHelperName,
     displayName: legacy.pre ? 'FlClashZ Pre' : 'FlClashZ',
     bundleId: legacy.bundleId,
     packageName: legacy.packageName,
@@ -779,7 +781,7 @@ String renderInnoSetup(
     'EXECUTABLE_NAME': identity.pre
         ? '${identity.executable}.exe'
         : (config['executable_name'] ?? '$_appName.exe') as String,
-    'HELPER_SERVICE': stableDesktop.helper,
+    'HELPER_SERVICE': windowsHelperName,
     'USER_DATA_DIR': identity.windowsDataDir,
     'ADOPT_LEGACY': identity.pre ? 'False' : 'True',
     'LANGUAGES': languages.join('\n'),

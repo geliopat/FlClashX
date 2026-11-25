@@ -54,6 +54,9 @@ const CORE_PIPE_PREFIX: &str = r"\\.\pipe\FlClashCore_";
 const CORE_SOCKET_PREFIX: &str = "/tmp/FlClashSocket_";
 #[cfg(target_os = "linux")]
 const CORE_SOCKET_SUFFIX: &str = ".sock";
+#[cfg(windows)]
+const PROTOCOL_VERSION_HEADER: &str = "x-flclashz-helper-protocol";
+#[cfg(not(windows))]
 const PROTOCOL_VERSION_HEADER: &str = "x-flclashx-helper-protocol";
 #[cfg(windows)]
 const PROTOCOL_VERSION: &str = "11";
@@ -545,12 +548,16 @@ impl ZapretOwner {
             return Err(Error::last_os_error());
         }
         let owner = Self { pid, process, sequence };
-        let expected = std::env::current_exe()?.with_file_name("FlClashZ.exe");
         let actual = process_image_path(process)
             .ok_or_else(|| Error::other("Cannot identify Zapret owner"))?;
-        if !owner.alive()
-            || !fs::canonicalize(actual)?.to_string_lossy().eq_ignore_ascii_case(
-                &fs::canonicalize(expected)?.to_string_lossy())
+        let actual = fs::canonicalize(actual)?;
+        let helper = fs::canonicalize(std::env::current_exe()?)?;
+        let valid_name = actual.file_name().and_then(|name| name.to_str())
+            .is_some_and(|name| name.eq_ignore_ascii_case("FlClashZ.exe")
+                || name.eq_ignore_ascii_case("FlClashZPre.exe"));
+        let same_directory = actual.parent().zip(helper.parent())
+            .is_some_and(|(a, b)| a.to_string_lossy().eq_ignore_ascii_case(&b.to_string_lossy()));
+        if !owner.alive() || !valid_name || !same_directory
         {
             return Err(Error::other("Zapret owner is not the running FlClashZ client"));
         }
@@ -2280,7 +2287,7 @@ mod tests {
 
     #[tokio::test]
     async fn ping_returns_running_helper_path_for_verified_core() {
-        let response = ping_response(Ok(PathBuf::from("FlClashXHelperService.exe")));
+        let response = ping_response(Ok(PathBuf::from("FlClashZHelperService.exe")));
 
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(
@@ -2291,7 +2298,7 @@ mod tests {
             warp::hyper::body::to_bytes(response.into_body())
                 .await
                 .unwrap(),
-            "FlClashXHelperService.exe"
+            "FlClashZHelperService.exe"
         );
     }
 

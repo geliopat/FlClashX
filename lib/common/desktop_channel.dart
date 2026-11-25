@@ -18,7 +18,7 @@ final bool isPreDesktopApp =
 String helperServiceFor({required bool pre, bool? isWindows}) {
   // Windows has one machine-wide Helper. A pre-release replaces the stable
   // service instead of registering a second listener on another port.
-  if (isWindows ?? Platform.isWindows) return 'FlClashXHelperService';
+  if (isWindows ?? Platform.isWindows) return 'FlClashZHelperService';
   return pre ? 'FlClashXPreHelperService' : 'FlClashXHelperService';
 }
 

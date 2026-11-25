@@ -4,6 +4,7 @@ use once_cell::sync::Lazy;
 
 const STABLE_HELPER: &str = "FlClashXHelperService";
 const PRE_HELPER: &str = "FlClashXPreHelperService";
+const WINDOWS_HELPER: &str = "FlClashZHelperService";
 
 /// Linux still derives its per-channel service, port key, unit and socket
 /// from the Helper filename. Windows deliberately uses one shared service.
@@ -32,7 +33,7 @@ pub fn helper_name() -> &'static str {
 }
 
 pub fn windows_helper_name() -> &'static str {
-    STABLE_HELPER
+    WINDOWS_HELPER
 }
 
 #[cfg(any(windows, test))]
@@ -43,7 +44,7 @@ pub fn retired_windows_helper_names() -> &'static [&'static str] {
         PRE_HELPER,
         "FlClashHelperService",
         "FlClashPreHelperService",
-        "FlClashZHelperService",
+        "FlClashXHelperService",
         "FlClashZPreHelperService",
     ]
 }
@@ -94,14 +95,14 @@ mod tests {
         )));
         assert_eq!(helper_name_for(true), "FlClashXPreHelperService");
         assert_eq!(helper_name_for(false), "FlClashXHelperService");
-        assert_eq!(windows_helper_name(), "FlClashXHelperService");
+        assert_eq!(windows_helper_name(), "FlClashZHelperService");
         assert_eq!(
             retired_windows_helper_names(),
             &[
                 "FlClashXPreHelperService",
                 "FlClashHelperService",
                 "FlClashPreHelperService",
-                "FlClashZHelperService",
+                "FlClashXHelperService",
                 "FlClashZPreHelperService",
             ]
         );
