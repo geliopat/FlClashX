@@ -892,7 +892,7 @@ async fn restore_zapret_list(filename: String) -> Result<warp::reply::Response, 
             Ok(error_response("invalidZapretList", error.to_string(), StatusCode::BAD_REQUEST))
         }
         Ok(Err(error)) if error.kind() == std::io::ErrorKind::NotFound => {
-            Ok(error_response("zapretBackupMissing", error.to_string(), StatusCode::NOT_FOUND))
+            Ok(error_response("zapretBackupMissing", error.to_string(), StatusCode::CONFLICT))
         }
         Ok(Err(error)) => Ok(error_response("zapretListRestoreFailed", error.to_string(), StatusCode::CONFLICT)),
         Err(error) => Ok(error_response("zapretListTaskFailed", error.to_string(), StatusCode::INTERNAL_SERVER_ERROR)),
