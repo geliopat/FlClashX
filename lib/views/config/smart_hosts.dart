@@ -103,8 +103,44 @@ class SmartHostsView extends ConsumerWidget {
             title: 'Оптимизация YouTube',
             items: [
               source('youtube', 'Использовать общественный список', 'Проблемные CDN из списка Zapret2 GUI перенаправляются на 127.0.0.2'),
+              ListItem(
+                title: const Text('Блокировать измеренные медленные CDN'),
+                trailing: Switch(value: state.blockSlowCdn,
+                    onChanged: state.cdnChecking ? null : (value) => controller.configure(blockSlowCdn: value)),
+              ),
+              ListItem(
+                title: const Text('Автоматическая проверка скорости CDN'),
+                subtitle: const Text('Раз в сутки, по умолчанию выключено'),
+                trailing: Switch(value: state.autoCdn,
+                    onChanged: state.cdnChecking ? null : (value) => controller.configure(autoCdn: value)),
+              ),
+              ListItem<double>.options(
+                title: const Text('Порог скорости'),
+                options: const [0.5, 1.0, 1.5, 2.0, 3.0, 5.0],
+                value: state.cdnThreshold,
+                textBuilder: (value) => '$value Мбит/с',
+                onChanged: (value) => controller.configure(cdnThreshold: value),
+              ),
+              ListItem<int>.options(
+                title: const Text('Срок хранения измерений'),
+                options: const [1, 3, 7, 14, 30],
+                value: state.cdnTtlDays,
+                textBuilder: (value) => '$value дн.',
+                onChanged: (value) => controller.configure(cdnTtlDays: value),
+              ),
+              ListItem(
+                title: const Text('Проверить скорость CDN'),
+                subtitle: Text(state.cdnMessage ?? 'Реальный видеопоток через DIRECT'),
+                onTap: state.cdnChecking || state.updating ? null : controller.checkCdn,
+                trailing: state.cdnChecking ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2)) : null,
+              ),
+              for (final record in state.cdnMeasurements)
+                ListItem(title: Text(record.host),
+                    subtitle: Text('${record.fast ? "Быстрый" : "Медленный"} · ${record.mbps.toStringAsFixed(2)} Мбит/с')),
+              ListItem(title: const Text('Сбросить измерения'),
+                  onTap: state.cdnChecking ? null : controller.resetCdn),
             ],
-            footer: 'Список зависит от провайдера и может устаревать. Локальное измерение скорости CDN пока не подключено.',
+            footer: 'Измерение использует подписанные ссылки видеопотоков и до 3 МиБ на узел. Неизвестный результат не создаёт блокировок. Старые измерения истекают автоматически.',
           ),
           const ListSectionGap(),
           generateSection(

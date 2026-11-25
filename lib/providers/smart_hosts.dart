@@ -4,6 +4,10 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:fl_clash/common/path.dart';
+import 'package:fl_clash/enum/enum.dart';
+import 'package:fl_clash/providers/core.dart';
+import 'package:fl_clash/providers/app.dart';
+import 'package:fl_clash/providers/zapret.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -84,6 +88,28 @@ Map<String, dynamic> mergeSmartHosts(
   return {...config, 'hosts': hosts};
 }
 
+String? youtubeCluster(String host) {
+  if (!_youtubeNode.hasMatch(host)) return null;
+  return host.substring(host.indexOf('---') + 3);
+}
+
+class CdnMeasurement {
+  const CdnMeasurement(this.host, this.mbps, this.checkedAt, this.fast);
+  final String host;
+  final double mbps;
+  final DateTime checkedAt;
+  final bool fast;
+
+  Map<String, dynamic> toJson() => {
+    'host': host, 'mbps': mbps, 'checkedAt': checkedAt.millisecondsSinceEpoch, 'fast': fast,
+  };
+
+  factory CdnMeasurement.fromJson(Map value) => CdnMeasurement(
+    value['host'] as String, (value['mbps'] as num).toDouble(),
+    DateTime.fromMillisecondsSinceEpoch(value['checkedAt'] as int), value['fast'] == true,
+  );
+}
+
 class SmartHostsState {
   const SmartHostsState({
     this.enabled = false,
@@ -99,6 +125,13 @@ class SmartHostsState {
     this.lastUpdate,
     this.updating = false,
     this.revision = 0,
+    this.blockSlowCdn = false,
+    this.autoCdn = false,
+    this.cdnThreshold = 1.5,
+    this.cdnTtlDays = 7,
+    this.cdnChecking = false,
+    this.cdnMeasurements = const [],
+    this.cdnMessage,
   });
   final bool enabled;
   final Set<String> sources;
@@ -113,6 +146,13 @@ class SmartHostsState {
   final DateTime? lastUpdate;
   final bool updating;
   final int revision;
+  final bool blockSlowCdn;
+  final bool autoCdn;
+  final double cdnThreshold;
+  final int cdnTtlDays;
+  final bool cdnChecking;
+  final List<CdnMeasurement> cdnMeasurements;
+  final String? cdnMessage;
 }
 
 final smartHostsProvider = NotifierProvider<SmartHostsController, SmartHostsState>(SmartHostsController.new);
@@ -139,6 +179,14 @@ class SmartHostsController extends Notifier<SmartHostsState> {
   Set<String> _sources = {};
   Set<String> _exclusions = {};
   Map<String, String> _custom = {};
+  bool _blockSlow = false;
+  bool _autoCdn = false;
+  double _threshold = 1.5;
+  int _ttlDays = 7;
+  bool _cdnChecking = false;
+  DateTime? _lastCdn;
+  String? _cdnMessage;
+  final _cdnMeasurements = <String, CdnMeasurement>{};
 
   @override
   SmartHostsState build() {
@@ -148,7 +196,11 @@ class SmartHostsController extends Notifier<SmartHostsState> {
     });
     if (Platform.isWindows) {
       scheduleMicrotask(_load);
-      _timer = Timer.periodic(const Duration(minutes: 15), (_) => _refreshIfDue());
+      _timer = Timer.periodic(const Duration(minutes: 15), (_) {
+        _publish();
+        unawaited(_refreshIfDue());
+        unawaited(_checkCdnIfDue());
+      });
     }
     return const SmartHostsState();
   }
@@ -172,6 +224,19 @@ class SmartHostsController extends Notifier<SmartHostsState> {
       _sources = (json['sources'] as List? ?? []).whereType<String>().toSet();
       _exclusions = (json['exclusions'] as List? ?? []).whereType<String>().toSet();
       _custom = Map<String, String>.from(json['custom'] as Map? ?? {});
+      _blockSlow = json['blockSlowCdn'] == true;
+      _autoCdn = json['autoCdn'] == true;
+      _threshold = (json['cdnThreshold'] as num? ?? 1.5).toDouble().clamp(0.5, 5.0).toDouble();
+      _ttlDays = (json['cdnTtlDays'] as int? ?? 7).clamp(1, 30).toInt();
+      final lastCdn = json['lastCdn'];
+      _lastCdn = lastCdn is int ? DateTime.fromMillisecondsSinceEpoch(lastCdn) : null;
+      for (final item in json['cdnMeasurements'] as List? ?? []) {
+        try {
+          final record = CdnMeasurement.fromJson(item as Map);
+          final cluster = youtubeCluster(record.host);
+          if (cluster != null) _cdnMeasurements[cluster] = record;
+        } catch (_) {}
+      }
       final last = json['last'];
       _last = last is int ? DateTime.fromMillisecondsSinceEpoch(last) : null;
       for (final id in _urls.keys) {
@@ -201,6 +266,12 @@ class SmartHostsController extends Notifier<SmartHostsState> {
       'custom': _custom,
       'exclusions': _exclusions.toList(),
       'last': _last?.millisecondsSinceEpoch,
+      'blockSlowCdn': _blockSlow,
+      'autoCdn': _autoCdn,
+      'cdnThreshold': _threshold,
+      'cdnTtlDays': _ttlDays,
+      'lastCdn': _lastCdn?.millisecondsSinceEpoch,
+      'cdnMeasurements': _cdnMeasurements.values.map((record) => record.toJson()).toList(),
     }));
   }
 
@@ -208,6 +279,7 @@ class SmartHostsController extends Notifier<SmartHostsState> {
     if (!ref.mounted) return;
     final entries = <String, String>{};
     final counts = <String, int>{};
+    _cdnMeasurements.removeWhere((_, record) => DateTime.now().difference(record.checkedAt) >= Duration(days: _ttlDays));
     for (final id in _urls.keys) {
       final raw = _rawCache[id] ?? (id == 'youtube' ? _bundledYoutubeNodes : '');
       final parsed = id == 'youtube'
@@ -217,8 +289,19 @@ class SmartHostsController extends Notifier<SmartHostsState> {
       if (!_enabled || !_sources.contains(id)) continue;
       for (final entry in parsed.entries) {
         if (_exclusions.any((key) => protectedHostMatches(key, entry.key))) continue;
+        if (id == 'youtube' && _cdnMeasurements[youtubeCluster(entry.key)]?.fast == true) continue;
         if (entries.length >= _maxEntries) break;
         entries.putIfAbsent(entry.key, () => entry.value);
+      }
+    }
+    if (_enabled && _blockSlow) {
+      for (final entry in _cdnMeasurements.entries) {
+        if (entry.value.fast) continue;
+        for (final host in {entry.value.host, for (var rr = 1; rr <= 20; rr++) 'rr$rr---${entry.key}'}) {
+          if (entries.length >= _maxEntries) break;
+          if (_exclusions.any((key) => protectedHostMatches(key, host))) continue;
+          entries.putIfAbsent(host, () => '127.0.0.2');
+        }
       }
     }
     if (entries.length != state.entries.length ||
@@ -239,6 +322,13 @@ class SmartHostsController extends Notifier<SmartHostsState> {
       lastUpdate: _last,
       updating: _updating,
       revision: _revision,
+      blockSlowCdn: _blockSlow,
+      autoCdn: _autoCdn,
+      cdnThreshold: _threshold,
+      cdnTtlDays: _ttlDays,
+      cdnChecking: _cdnChecking,
+      cdnMeasurements: List.unmodifiable(_cdnMeasurements.values),
+      cdnMessage: _cdnMessage,
     );
   }
 
@@ -251,8 +341,20 @@ class SmartHostsController extends Notifier<SmartHostsState> {
     int? intervalHours,
     Map<String, String>? customSources,
     Set<String>? exclusions,
+    bool? blockSlowCdn,
+    bool? autoCdn,
+    double? cdnThreshold,
+    int? cdnTtlDays,
   }) async {
-    if (!_loaded || _updating) return;
+    if (!_loaded || _updating || _cdnChecking) return;
+    _blockSlow = blockSlowCdn ?? _blockSlow;
+    _autoCdn = autoCdn ?? _autoCdn;
+    if (cdnThreshold != null && cdnThreshold != _threshold) {
+      _threshold = cdnThreshold;
+      _cdnMeasurements.clear();
+      _lastCdn = null;
+    }
+    _ttlDays = cdnTtlDays ?? _ttlDays;
     _enabled = enabled ?? _enabled;
     _adblock = includeAdblock ?? _adblock;
     _auto = autoUpdate ?? _auto;
@@ -292,6 +394,71 @@ class SmartHostsController extends Notifier<SmartHostsState> {
     await _save();
     if (_enabled && _sources.any((id) => !_rawCache.containsKey(id))) {
       unawaited(refresh());
+    }
+    unawaited(_checkCdnIfDue());
+  }
+
+  Future<void> resetCdn() async {
+    if (_cdnChecking) return;
+    _cdnMeasurements.clear();
+    _lastCdn = null;
+    _cdnMessage = null;
+    _publish();
+    await _save();
+  }
+
+  Future<void> _checkCdnIfDue() async {
+    if (!_loaded || !_enabled || !_autoCdn || _updating || _cdnChecking) return;
+    if (_lastCdn == null || DateTime.now().difference(_lastCdn!) >= const Duration(hours: 24)) {
+      await checkCdn();
+    }
+  }
+
+  Future<void> checkCdn() async {
+    if (!_loaded || _cdnChecking || _updating || ref.read(zapretControllerProvider).busy) return;
+    if (ref.read(coreStatusProvider) != CoreStatus.connected) {
+      _cdnMessage = 'Ядро Mihomo недоступно';
+      _publish();
+      return;
+    }
+    _cdnChecking = true;
+    _cdnMessage = 'Измерение DIRECT';
+    _publish();
+    try {
+      final pid = ref.read(zapretControllerProvider).pid;
+      final results = await ref.read(coreHandlerProvider).zapretCdnCheck();
+      if (!ref.mounted) return;
+      if (ref.read(zapretControllerProvider).pid != pid || ref.read(zapretControllerProvider).busy) {
+        _cdnMessage = 'Стратегия изменилась во время проверки; результат отброшен';
+        return;
+      }
+      final measured = <CdnMeasurement>[];
+      final now = DateTime.now();
+      for (final item in results) {
+        final host = item['host'];
+        final mbps = item['mbps'];
+        if (host is! String || youtubeCluster(host) == null || mbps is! num ||
+            !mbps.isFinite || mbps <= 0 || item['verdict'] != 'measured') continue;
+        measured.add(CdnMeasurement(host, mbps.toDouble(), now, mbps >= _threshold));
+      }
+      final hasFast = measured.any((record) => record.fast);
+      for (final record in measured) {
+        if (!record.fast && !hasFast) continue;
+        final cluster = youtubeCluster(record.host)!;
+        final previous = _cdnMeasurements[cluster];
+        if (previous != null && previous.checkedAt == now && previous.fast && !record.fast) continue;
+        _cdnMeasurements[cluster] = record;
+      }
+      _lastCdn = now;
+      _cdnMessage = measured.isEmpty
+          ? 'Нет достоверных измерений; списки не изменены'
+          : 'Измерено: ${measured.length}; быстрых: ${measured.where((record) => record.fast).length}';
+      await _save();
+    } catch (error) {
+      _cdnMessage = 'Ошибка измерения: $error';
+    } finally {
+      _cdnChecking = false;
+      _publish();
     }
   }
 
@@ -339,7 +506,7 @@ class SmartHostsController extends Notifier<SmartHostsState> {
   }
 
   Future<void> refresh() async {
-    if (!_loaded || !_enabled || _updating || _sources.isEmpty) return;
+    if (!_loaded || !_enabled || _updating || _cdnChecking || _sources.isEmpty) return;
     _updating = true;
     _publish();
     try {

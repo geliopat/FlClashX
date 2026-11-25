@@ -51,7 +51,11 @@ class _TrayManagerState extends ConsumerState<TrayManager> {
       ref.listenManual(zapretDiagnosticsProvider, (_, _) {});
       ref.listenManual(smartHostsProvider.select((state) => state.revision), (_, _) {
         if (ref.read(initProvider)) {
-          ref.read(setupActionProvider.notifier).applyProfileDebounce(force: true, silence: true);
+          unawaited(ref.read(setupActionProvider.notifier).applyProfile(force: true, silence: true).then((ok) async {
+            if (ok && mounted) await ref.read(coreActionProvider.notifier).clearDnsCacheOnNetworkChange();
+          }).catchError((Object error) {
+            commonPrint.log('Smart Hosts apply failed: $error', logLevel: LogLevel.warning);
+          }));
         }
       });
     }
