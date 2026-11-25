@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:fl_clash/common/system.dart';
 import 'package:fl_clash/providers/app.dart';
+import 'package:fl_clash/providers/action.dart';
 import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/providers/zapret_infrastructure.dart';
 import 'package:fl_clash/providers/zapret_diagnostics.dart';
@@ -213,11 +214,37 @@ class ZapretController extends Notifier<ZapretState> {
   bool _desiredRunning = false;
 
   bool get _launchBlocked => _lifecycleStopping || _coreRestarting ||
-      _profileApplying || _profileBlocked;
+      _profileApplying || _profileBlocked || ref.read(safeModeProvider) ||
+      ref.read(coreStatusProvider) != CoreStatus.connected;
 
-  Future<bool> beginCoreRestart() {
+  Future<bool> beginCoreRestart({bool repairHelper = false}) async {
     _coreRestarting = true;
-    return stopAlongsideMihomo();
+    final restore = state.running || _desiredRunning;
+    final readiness = await _client.readiness(
+      timeout: _readinessTimeout, logFailure: false,
+    );
+    if (readiness == HelperReadiness.ready) {
+      final stopped = await stopAlongsideMihomo();
+      if (repairHelper) {
+        await windows!.ensureHelperReady(forceReinstall: true);
+        // Verify the new service is reachable and no local engine survived.
+        await stopAlongsideMihomo();
+      }
+      return restore || stopped;
+    }
+    // A dead or outdated service cannot answer the normal stop command.
+    // Do not replace it while an active trial still owns the engine.
+    if (state.busy) {
+      _cancelTrial = true;
+      throw StateError('Helper недоступен во время операции Zapret; повтори перезапуск после её завершения');
+    }
+    ++_lifecycleRevision;
+    _lifecycleStopping = true;
+    _cancelTrial = true;
+    _desiredRunning = false;
+    await windows!.ensureHelperReady(forceReinstall: repairHelper);
+    await stopAlongsideMihomo();
+    return restore;
   }
 
   void endCoreRestart() {
@@ -502,8 +529,11 @@ class ZapretController extends Notifier<ZapretState> {
     if (!ref.mounted || revision != _lifecycleRevision || _coreRestarting) return;
     _lifecycleStopping = false;
     if (_launchBlocked || (!force && preferences.getBool(_linkedStartPreferenceKey) != true)) return;
-    if (state.strategies.isEmpty) await loadStrategies();
+    await loadStrategies();
     await refresh();
+    if (ref.mounted && revision == _lifecycleRevision && !state.available) {
+      throw HelperException(code: 'helperZapretStillUnavailable', message: state.error ?? 'Каталог Zapret недоступен');
+    }
     if (ref.mounted && revision == _lifecycleRevision && !_launchBlocked &&
         state.available && !state.busy && !state.running) {
       await setEnabled(true);
@@ -574,7 +604,7 @@ class ZapretController extends Notifier<ZapretState> {
     } on HelperException catch (error) {
       if (!ref.mounted) return;
       state = state.copyWith(
-        available: error.code != 'zapretUnsupported',
+        available: false,
         running: false,
         elapsed: _observeProcess(false, null),
         clearPid: true,
@@ -588,6 +618,7 @@ class ZapretController extends Notifier<ZapretState> {
     } catch (error) {
       if (!ref.mounted) return;
       state = state.copyWith(
+        available: false,
         running: false,
         elapsed: _observeProcess(false, null),
         clearPid: true,
@@ -962,18 +993,20 @@ class ZapretController extends Notifier<ZapretState> {
   /// Replaces an older Windows Helper service with the executable
   /// shipped beside the currently running FlClashZ instance.
   Future<void> updateHelperService() async {
-    if (!Platform.isWindows || state.busy) return;
-    state = state.copyWith(busy: true, clearError: true);
+    if (!Platform.isWindows || state.busy || ref.read(safeModeProvider)) return;
+    state = state.copyWith(clearError: true);
     try {
-      final result = await system.updateHelperService();
-      if (result == AuthorizeCode.error) {
+      // Run repair inside the core restart worker, which gates Zapret and
+      // restores the user's run intent only after the new service is ready.
+      final restored = await ref.read(coreActionProvider.notifier)
+          .restartCore(repairHelper: true);
+      if (!restored) {
         throw const HelperException(
           code: 'helperUpdateFailed',
-          message: 'Не удалось обновить службу Helper. Проверь подтверждение UAC и повтори попытку.',
+          message: 'Не удалось восстановить Mihomo после обновления Helper',
         );
       }
       if (!ref.mounted) return;
-      state = state.copyWith(busy: false);
       await loadStrategies();
       await refresh();
       if (!state.available) {
@@ -988,10 +1021,6 @@ class ZapretController extends Notifier<ZapretState> {
         state = state.copyWith(error: _errorMessage(error));
       }
       rethrow;
-    } finally {
-      if (ref.mounted && state.busy) {
-        state = state.copyWith(busy: false);
-      }
     }
   }
 

@@ -156,15 +156,18 @@ class CoreAction extends _$CoreAction {
   }
 
   /// [running] stands in for a run that a crash rolled back.
-  Future<bool> restartCore({bool? running}) {
+  Future<bool> restartCore({bool? running, bool repairHelper = false}) {
     _requestedRestartRevision++;
     final activeOperation = _restartOperation;
     if (activeOperation != null) {
-      return activeOperation;
+      // An explicit repair requested during a relaunch must not be ignored.
+      return repairHelper
+          ? activeOperation.catchError((_) => false).then((_) => restartCore(running: running, repairHelper: true))
+          : activeOperation;
     }
 
     _restartsBegun++;
-    final operation = _runRestartWorker(running: running);
+    final operation = _runRestartWorker(running: running, repairHelper: repairHelper);
     _restartOperation = operation;
     return operation;
   }
@@ -182,18 +185,19 @@ class CoreAction extends _$CoreAction {
   @protected
   bool get coreIsEmbedded => coreLib != null;
 
-  Future<bool> _runRestartWorker({bool? running}) async {
+  Future<bool> _runRestartWorker({bool? running, required bool repairHelper}) async {
     final setupAction = ref.read(setupActionProvider.notifier);
     final bool wasRunning = running ?? ref.read(isStartProvider);
     var restartZapret = false;
-    final zapret = system.isWindows ? ref.read(zapretControllerProvider.notifier) : null;
+    final zapret = system.isWindows && !ref.read(safeModeProvider)
+        ? ref.read(zapretControllerProvider.notifier) : null;
     try {
       if (zapret != null) {
         try {
-          restartZapret = await zapret.beginCoreRestart();
+          restartZapret = await zapret.beginCoreRestart(repairHelper: repairHelper);
         } catch (error) {
-          commonPrint.log('Mihomo restart postponed: Zapret stop not confirmed: $error', logLevel: LogLevel.warning);
-          return false;
+          commonPrint.log('Mihomo restart postponed: Helper/Zapret preparation failed: $error', logLevel: LogLevel.warning);
+          rethrow;
         }
       }
       ref.read(coreStatusProvider.notifier).value = CoreStatus.connecting;
