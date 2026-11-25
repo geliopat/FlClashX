@@ -60,6 +60,13 @@ const PROTOCOL_VERSION_HEADER: &str = "x-flclashz-helper-protocol";
 const PROTOCOL_VERSION_HEADER: &str = "x-flclashx-helper-protocol";
 #[cfg(windows)]
 const PROTOCOL_VERSION: &str = "11";
+#[cfg(windows)]
+const HELPER_SHA256_HEADER: &str = "x-flclashz-helper-sha256";
+#[cfg(windows)]
+static RUNNING_HELPER_SHA256: Lazy<Result<String, Error>> = Lazy::new(|| {
+    let mut file = File::open(std::env::current_exe()?)?;
+    sha256_file(&mut file)
+});
 #[cfg(not(windows))]
 const PROTOCOL_VERSION: &str = "6";
 const EXPECTED_CORE_SHA256: &str = env!("CORE_SHA256");
@@ -1742,12 +1749,21 @@ fn ping_response(result: Result<PathBuf, Error>) -> warp::reply::Response {
         Ok(path) => (path.to_string_lossy().into_owned(), StatusCode::OK),
         Err(error) => (error.to_string(), StatusCode::CONFLICT),
     };
-    warp::reply::with_header(
+    let response = warp::reply::with_header(
         warp::reply::with_status(value, status),
         PROTOCOL_VERSION_HEADER,
         PROTOCOL_VERSION,
-    )
-    .into_response()
+    ).into_response();
+    #[cfg(windows)]
+    {
+        // The digest was captured before the service accepted connections.
+        // A new bundled Helper must not be mistaken for an older live image.
+        if let Ok(hash) = &*RUNNING_HELPER_SHA256 {
+            return warp::reply::with_header(response, HELPER_SHA256_HEADER, hash.as_str())
+                .into_response();
+        }
+    }
+    response
 }
 
 fn ping_core_sha256_mismatch() -> warp::reply::Response {
@@ -2064,6 +2080,10 @@ pub(super) fn routes() -> impl Filter<Extract = (impl Reply,), Error = Infallibl
 pub(super) fn ensure_core_sha256_configured() -> anyhow::Result<()> {
     if EXPECTED_CORE_SHA256.is_empty() {
         anyhow::bail!("expected Core SHA256 is empty");
+    }
+    #[cfg(windows)]
+    if let Err(error) = &*RUNNING_HELPER_SHA256 {
+        anyhow::bail!("cannot verify running Helper executable: {error}");
     }
     Ok(())
 }
