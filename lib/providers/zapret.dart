@@ -201,12 +201,12 @@ class ZapretController extends Notifier<ZapretState> {
 
   /// Pause processing BEFORE the core can start using newly introduced
   /// infrastructure addresses. Keep the launch gate closed during the apply.
-  Future<({int revision, bool restore, bool wasStopping})> beginProfileApply(
+  Future<({int revision, bool restore, bool wasStopping, bool changed})> beginProfileApply(
       String yaml, int? profileId) async {
     final next = ZapretInfrastructure.fromYaml(yaml);
     final changed = _infrastructure?.fingerprint != next.fingerprint ||
         _infrastructureProfileId != profileId;
-    _profileApplying = true;
+    _profileApplying = changed;
     final wasStopping = _lifecycleStopping;
     var restore = false;
     try {
@@ -214,7 +214,7 @@ class ZapretController extends Notifier<ZapretState> {
         restore = _desiredRunning || state.running;
         restore = await stopAlongsideMihomo() || restore;
       }
-      return (revision: _lifecycleRevision, restore: restore, wasStopping: wasStopping);
+      return (revision: _lifecycleRevision, restore: restore, wasStopping: wasStopping, changed: changed);
     } catch (_) {
       _profileApplying = false;
       _profileBlocked = true;
@@ -223,7 +223,7 @@ class ZapretController extends Notifier<ZapretState> {
   }
 
   Future<void> finishProfileApply(
-    ({int revision, bool restore, bool wasStopping}) transition, {
+    ({int revision, bool restore, bool wasStopping, bool changed}) transition, {
     required String yaml,
     required int? profileId,
     required bool accepted,
@@ -236,11 +236,14 @@ class ZapretController extends Notifier<ZapretState> {
         _infrastructure = null;
         _infrastructureProfileId = null;
         _profileBlocked = true;
+        if (!transition.changed && (_desiredRunning || state.running || state.busy)) {
+          await stopAlongsideMihomo();
+        }
       }
     } finally {
       _profileApplying = false;
     }
-    if (transition.revision != _lifecycleRevision || transition.wasStopping) return;
+    if (!transition.changed || transition.revision != _lifecycleRevision || transition.wasStopping) return;
     _lifecycleStopping = false;
     if (accepted && transition.restore && !_launchBlocked) {
       await setEnabled(true);
@@ -857,9 +860,10 @@ class ZapretController extends Notifier<ZapretState> {
         await _client.restartZapret(strategyId: backup.id, mode: backup.mode.name,
           debug: state.debugLogs, watchdog: false, infrastructure: protection.toJson());
         await Future<void>.delayed(const Duration(seconds: 1));
-        accepted = (await _verify(backup.id, backup.mode)).confirmed;
+        accepted = (await _verify(backup.id, backup.mode)).confirmed && !_launchBlocked;
         if (accepted && !_launchBlocked) {
           await _client.setZapretWatchdog(state.watchdog);
+          if (_launchBlocked) return;
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString(_selectedStrategyPreferenceKey, backup.id);
           await prefs.setString(_modePreferenceKey, backup.mode.name);
