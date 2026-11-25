@@ -865,6 +865,7 @@ class _FlowsealViewState extends State<FlowsealView> {
       final rootPath = await Directory(_root).resolveSymbolicLinks();
       final sourceFile = File(logPath);
       if (!await sourceFile.exists()) {
+        if (!mounted) return;
         await dialogs.showAlert(
           title: 'Лог Flowseal',
           message: const TextSpan(
@@ -895,21 +896,21 @@ class _FlowsealViewState extends State<FlowsealView> {
 
       var logContent = utf8.decode(bytes, allowMalformed: true);
       if (offset > 0) {
-        final firstLineBreak = logContent.indexOf('\\n');
+        final firstLineBreak = logContent.indexOf('\n');
         logContent = firstLineBreak < 0
             ? ''
             : logContent.substring(firstLineBreak + 1);
       }
-      final lines = logContent.split(RegExp(r'\\r?\\n'));
+      final lines = logContent.split(RegExp(r'\r?\n'));
       final omittedLines = lines.length > 500 ? lines.length - 500 : 0;
       final visibleLines = omittedLines > 0
           ? lines.sublist(omittedLines)
           : lines;
-      final logText = visibleLines.join('\\n').trim();
+      final logText = visibleLines.join('\n').trim();
       final wasTrimmed = offset > 0 || omittedLines > 0;
       final displayText = logText.isEmpty
           ? 'Лог пока пуст.'
-          : '${wasTrimmed ? 'Показана последняя часть файла (лимит: 512 КиБ / 500 строк).\\n\\n' : ''}$logText';
+          : '${wasTrimmed ? 'Показана последняя часть файла (лимит: 512 КиБ / 500 строк).\n\n' : ''}$logText';
 
       if (!mounted) return;
       await dialogs.showCommonDialog<void>(
