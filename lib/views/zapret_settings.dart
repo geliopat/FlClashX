@@ -452,6 +452,10 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
     final activeName = active.isEmpty ? null : active.first.name;
     final activeSupportsSplitMode =
         active.isNotEmpty && active.first.supportsSplitMode;
+    final selected = zapret.strategies.where(
+      (item) => item.id == zapret.selectedStrategyId,
+    );
+    final selectedName = selected.isEmpty ? null : selected.first.name;
 
     final sections = <Widget>[
       generateSection(
@@ -471,10 +475,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
             title: const Text('Выбранная стратегия'),
             subtitle: Text(zapret.running
                 ? activeName ?? 'Не определена'
-                : zapret.strategies
-                    .where((item) => item.id == zapret.selectedStrategyId)
-                    .map((item) => item.name)
-                    .firstOrNull ?? 'Не выбрана'),
+                : selectedName ?? 'Не выбрана'),
           ),
           if (zapret.running) ...[
             ListItem(
@@ -551,7 +552,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
             ),
         ],
       ),
-      ListSectionGap(),
+      const ListSectionGap(),
       generateSection(
         title: 'Сетевые проверки',
         items: [
