@@ -677,6 +677,21 @@ Future<void> _packageWindows(
     await build.copyTree(built, bundle);
     File(p.join(bundle, 'FlClashZ.exe')).renameSync(p.join(bundle, '${identity.executable}.exe'));
   }
+  // An incremental Windows build may still contain the old Helper binary.
+  // Do not ship two versions in ZIP or EXE packages.
+  for (final name in [
+    'FlClashXHelperService.exe',
+    'FlClashXPreHelperService.exe',
+    'FlClashHelperService.exe',
+    'FlClashPreHelperService.exe',
+    'FlClashZPreHelperService.exe',
+  ]) {
+    final stale = File(p.join(bundle, name));
+    if (stale.existsSync()) stale.deleteSync();
+  }
+  if (!File(p.join(bundle, '$windowsHelperName.exe')).existsSync()) {
+    throw StateError('Missing Windows Helper in the package: $windowsHelperName.exe');
+  }
   if (targets.contains('zip')) {
     final zip = build.dist(artifactName('windows', build.arch, '.zip'));
     if (File(zip).existsSync()) File(zip).deleteSync();
