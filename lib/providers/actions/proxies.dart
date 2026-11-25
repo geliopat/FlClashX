@@ -83,11 +83,18 @@ class ProxiesAction extends _$ProxiesAction {
       _autoDelayTimer = Timer.periodic(const Duration(seconds: 5), (_) => unawaited(_autoDelayTick()));
       ref.listen(autoDelayProvider, (_, _) => unawaited(_autoDelayTick()));
       ref.listen(selectedMapProvider, (_, _) => unawaited(_autoDelayTick()));
+      ref.listen(initProvider, (_, initialized) {
+        if (initialized) unawaited(_autoDelayTick());
+      });
+      ref.listen(groupsProvider, (_, _) => unawaited(_autoDelayTick()));
+      ref.listen(currentProfileIdProvider, (_, _) {
+        cancelDelayTests();
+        _lastDelayTest.clear();
+      });
     }
     ref.listen(coreStatusProvider, (_, next) {
       if (next != CoreStatus.connected) {
         cancelDelayTests();
-        _lastDelayTest.clear();
       } else if (system.isWindows) {
         unawaited(_autoDelayTick());
       }
@@ -95,6 +102,7 @@ class ProxiesAction extends _$ProxiesAction {
   }
 
   void cancelDelayTests() {
+    _lastDelayTest.clear();
     for (final job in _delayTestJobs) {
       job.cancelled = true;
       job.held.clear();
@@ -319,7 +327,6 @@ class ProxiesAction extends _$ProxiesAction {
   }
 
   void setDelay(Delay delay) {
-    _lastDelayTest[delayTestKey(delay.url, delay.name)] = DateTime.now();
     _bufferedDelays.add(delay);
     _scheduleDelayFlush();
   }
@@ -658,61 +665,65 @@ class ProxiesAction extends _$ProxiesAction {
     return targets;
   }
 
-  Future<void> _autoDelayTick() async {
-    if (_autoDelaysRunning || !ref.mounted || !ref.read(initProvider) ||
+  bool get _canAutoDelay {
+    if (!ref.mounted || !ref.read(initProvider) ||
         ref.read(coreStatusProvider) != CoreStatus.connected ||
-        ref.read(safeModeProvider) || ref.read(zapretControllerProvider).busy ||
-        ref.read(smartHostsProvider).cdnChecking || _delayTestJobs.isNotEmpty) {
-      return;
+        ref.read(safeModeProvider) ||
+        ref.read(coreActionProvider.notifier).isRestarting ||
+        _delayTestJobs.isNotEmpty) {
+      return false;
     }
-    final intervals = ref.read(autoDelayProvider);
-    if (intervals.active == 0 && intervals.others == 0) return;
-    final groups = ref.read(groupsProvider);
-    final selected = ref.read(selectedMapProvider);
-    final automatic = <String>{
-      for (final group in groups)
-        if (group.type.isComputedSelected || group.type == GroupType.LoadBalance)
-          for (final proxy in group.all) proxy.name,
-    };
-    final active = <String>{
-      for (final group in groups)
-        computeRealSelectedProxyState(group.name, groups: groups, selectedMap: selected).proxyName,
-    };
-    final now = DateTime.now();
-    final batches = <_DelayTestBatch>[];
-    for (final group in groups) {
-      if (group.type != GroupType.Selector) continue;
-      final candidates = <Proxy>[];
-      for (final proxy in group.all) {
-        // Do not duplicate native URLTest/fallback or provider-managed checks.
-        if (automatic.contains(proxy.name) || proxy.providerName?.isNotEmpty == true ||
-            isBuiltinOutbound(proxy.name) || groups.getGroup(proxy.name) != null) {
-          continue;
-        }
-        final seconds = active.contains(proxy.name) ? intervals.active : intervals.others;
-        if (seconds == 0) continue;
-        final url = ref.read(realTestUrlProvider(group.testUrl));
-        final key = delayTestKey(url, proxy.name);
-        final last = _lastDelayTest[key];
-        if (last == null || now.difference(last) >= Duration(seconds: seconds)) {
-          candidates.add(proxy);
-        }
-      }
-      if (candidates.isNotEmpty) batches.add((proxies: candidates, testUrl: group.testUrl));
-    }
-    if (batches.isEmpty) return;
+    final zapret = ref.read(zapretControllerProvider);
+    return !zapret.busy && !zapret.dashboardRestarting &&
+        !ref.read(smartHostsProvider).cdnChecking;
+  }
+
+  Future<void> _autoDelayTick() async {
+    if (_autoDelaysRunning || !_canAutoDelay) return;
     _autoDelaysRunning = true;
     try {
-      await _runDelayTests(batches);
+      final setup = ref.read(setupActionProvider.notifier);
+      final revision = setup.pushes;
+      final profileId = ref.read(currentProfileIdProvider);
+      if (revision.isOdd || !await setup.inputsApplied() ||
+          !_canAutoDelay || revision != setup.pushes ||
+          profileId != ref.read(currentProfileIdProvider)) {
+        return;
+      }
+      final intervals = ref.read(autoDelayProvider);
+      if (intervals.active == 0 && intervals.others == 0) return;
+      final groups = ref.read(groupsProvider);
+      final selected = ref.read(selectedMapProvider);
+      final active = <String>{
+        for (final group in groups)
+          computeRealSelectedProxyState(group.name, groups: groups,
+              selectedMap: selected).proxyName,
+      };
+      final now = DateTime.now();
+      final targets = _resolveDelayTestTargets(autoDelayBatches(groups))
+          .where((target) => autoDelayDue(
+                now: now,
+                last: _lastDelayTest[target.key],
+                seconds: active.contains(target.proxyName)
+                    ? intervals.active : intervals.others,
+              )).toList();
+      // Active nodes should not wait behind a large inactive catalog.
+      targets.sort((a, b) => (active.contains(b.proxyName) ? 1 : 0)
+          .compareTo(active.contains(a.proxyName) ? 1 : 0));
+      await _runResolvedDelayTests(targets);
     } catch (error) {
-      commonPrint.log('Automatic delay check: $error', logLevel: LogLevel.debug);
+      if (ref.mounted) {
+        commonPrint.log('Automatic delay check: $error', logLevel: LogLevel.warning);
+      }
     } finally {
       _autoDelaysRunning = false;
     }
   }
 
-  Future<void> _runDelayTests(List<_DelayTestBatch> batches) async {
-    final targets = _resolveDelayTestTargets(batches);
+  Future<void> _runDelayTests(List<_DelayTestBatch> batches) =>
+      _runResolvedDelayTests(_resolveDelayTestTargets(batches));
+
+  Future<void> _runResolvedDelayTests(List<_DelayTestTarget> targets) async {
     if (targets.isEmpty) {
       return;
     }
@@ -763,6 +774,8 @@ class ProxiesAction extends _$ProxiesAction {
         job.timeout,
       );
       if (delay != null && !job.cancelled) {
+        // Native Mihomo events update the UI, but must not postpone our timer.
+        _lastDelayTest[target.key] = DateTime.now();
         setDelay(delay);
       }
       // Each test queued behind would wait out the same guard.

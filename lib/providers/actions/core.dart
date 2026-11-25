@@ -9,6 +9,7 @@ class CoreAction extends _$CoreAction {
 
   int _requestedRestartRevision = 0;
   Future<bool>? _restartOperation;
+  bool get isRestarting => _restartOperation != null;
   int _restartsBegun = 0;
   bool _relaunchRequested = false;
   int _failedRestarts = 0;

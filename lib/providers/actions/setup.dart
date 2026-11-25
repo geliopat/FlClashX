@@ -1048,6 +1048,9 @@ class SetupAction extends _$SetupAction {
     // has no proxies, so until this push succeeds no applied config is known.
     _appliedInputs = null;
     _pushes++;
+    if (system.isWindows) {
+      ref.read(proxiesActionProvider.notifier).cancelDelayTests();
+    }
     globalState.lastConfigMd5 = null;
     globalState.lastConfigCounts = null;
     if (system.isAndroid) {
