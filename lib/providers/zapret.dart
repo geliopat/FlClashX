@@ -143,12 +143,31 @@ class ZapretState {
 }
 
 class ZapretTrial {
-  const ZapretTrial(this.id, this.mode, this.score, this.delay, {this.confirmed = false});
+  const ZapretTrial(this.id, this.mode, this.score, this.delay, {
+    this.confirmed = false,
+    this.passedTargets = 0,
+    this.screenedOnly = false,
+    this.error,
+    this.details = const [],
+  });
   final String id;
   final ZapretMode mode;
   final int score;
   final int delay;
   final bool confirmed;
+  final int passedTargets;
+  final bool screenedOnly;
+  final String? error;
+  final List<String> details;
+
+  String get resultLabel {
+    if (error != null) return 'Ошибка запуска/проверки';
+    if (confirmed) return 'Успешно';
+    if (screenedOnly) return passedTargets == 0
+        ? 'Не прошла предварительный отбор'
+        : 'Только предварительный отбор';
+    return passedTargets > 0 ? 'Частично успешно' : 'Не прошла проверку';
+  }
 }
 
 
@@ -158,6 +177,8 @@ List<ZapretTrial> shortlistZapretTrials(Iterable<ZapretTrial> trials, {int limit
     ..sort((a, b) {
       final reachable = (b.confirmed ? 1 : 0).compareTo(a.confirmed ? 1 : 0);
       if (reachable != 0) return reachable;
+      final passed = b.passedTargets.compareTo(a.passedTargets);
+      if (!a.confirmed && passed != 0) return passed;
       final score = b.score.compareTo(a.score);
       if (!a.confirmed && score != 0) return score;
       final delay = (a.delay > 0 ? a.delay : 1 << 30)
@@ -173,7 +194,7 @@ class ZapretController extends Notifier<ZapretState> {
   static const _modePreferenceKey = 'zapret.mode';
   static const _debugPreferenceKey = 'zapret.debugLogs';
   static const _linkedStartPreferenceKey = 'zapret.startWithMihomo';
-  static const _trialHistoryKey = 'zapret.trialHistory.v2';
+  static const _trialHistoryKey = 'zapret.trialHistory.v3';
   static const _pollInterval = Duration(seconds: 3);
   static const _readinessTimeout = Duration(seconds: 3);
 
@@ -455,6 +476,10 @@ class ZapretController extends Notifier<ZapretState> {
               item['score'] as int,
               item['delay'] as int,
               confirmed: item['confirmed'] == true,
+              passedTargets: item['passedTargets'] as int? ?? 0,
+              screenedOnly: item['screenedOnly'] == true,
+              error: item['error'] as String?,
+              details: List<String>.from(item['details'] as List? ?? const []),
             ),
       ];
     } catch (_) {
@@ -474,6 +499,10 @@ class ZapretController extends Notifier<ZapretState> {
             'score': item.score,
             'delay': item.delay,
             'confirmed': item.confirmed,
+            'passedTargets': item.passedTargets,
+            'screenedOnly': item.screenedOnly,
+            'error': item.error,
+            'details': item.details,
           },
       ],
     }));
@@ -768,8 +797,18 @@ class ZapretController extends Notifier<ZapretState> {
     final delay = good.isEmpty ? 0 : (good.fold<int>(0, (sum, item) => sum + item.latencyMs!) / good.length).round();
     final status = await _client.zapretStatus();
     final sameProcess = status.running && status.strategyId == id && status.pid == before.pid;
+    final details = [
+      for (final target in targets)
+        '${target.label}: ${items[target]?.message ?? 'Нет результата'}'
+        '${items[target]?.latencyMs == null ? '' : ' · ${items[target]!.latencyMs} мс'}',
+      if (!sameProcess) 'Движок остановился или сменил PID во время проверки',
+    ];
     return ZapretTrial(id, mode, sameProcess ? score : 0,
-        delay, confirmed: sameProcess && good.length == targets.length);
+        sameProcess ? delay : 0,
+        confirmed: sameProcess && good.length == targets.length,
+        passedTargets: sameProcess ? good.length : 0,
+        error: sameProcess ? null : 'Движок завершился во время проверки',
+        details: details);
   }
 
   Future<void> testStrategies() async {
@@ -817,13 +856,19 @@ class ZapretController extends Notifier<ZapretState> {
           if (_cancelTrial || _launchBlocked) break;
           final first = await _verify(item.id, mode, timeoutMs: 2000, expectedPid: started.pid);
           if (_cancelTrial || _launchBlocked) break;
-          preliminary.add(first);
+          if (first.error == null) preliminary.add(first);
+          if (first.error != null) {
+            launchFailures++;
+            lastLaunchFailure = first.error;
+          }
           // Screening alone never makes a strategy eligible for activation.
-          results.add(ZapretTrial(item.id, mode, first.score, first.delay));
+          results.add(ZapretTrial(item.id, mode, first.score, first.delay,
+            passedTargets: first.passedTargets, screenedOnly: true,
+            error: first.error, details: first.details));
         } catch (error) {
           launchFailures++;
           lastLaunchFailure = _errorMessage(error);
-          results.add(ZapretTrial(item.id, mode, 0, 0));
+          results.add(ZapretTrial(item.id, mode, 0, 0, error: lastLaunchFailure));
           if (error is HelperException && error.code == 'zapretConflict') {
             failure = lastLaunchFailure;
             break;
@@ -855,7 +900,14 @@ class ZapretController extends Notifier<ZapretState> {
             if (_cancelTrial || _launchBlocked) break;
             result = ZapretTrial(candidate.id, candidate.mode,
               ((first.score + second.score) / 2).round(),
-              ((first.delay + second.delay) / 2).round(), confirmed: second.confirmed);
+              second.confirmed ? ((first.delay + second.delay) / 2).round() : second.delay,
+              confirmed: second.confirmed, passedTargets: second.passedTargets,
+              error: second.error,
+              details: ['Контроль 1:', ...first.details, 'Контроль 2:', ...second.details]);
+          }
+          if (result.error != null) {
+            launchFailures++;
+            lastLaunchFailure = result.error;
           }
           results.removeWhere((trial) => trial.id == candidate.id);
           results.add(result);
@@ -863,19 +915,17 @@ class ZapretController extends Notifier<ZapretState> {
           launchFailures++;
           lastLaunchFailure = _errorMessage(error);
           results.removeWhere((trial) => trial.id == candidate.id);
-          results.add(ZapretTrial(candidate.id, candidate.mode, 0, 0));
+          results.add(ZapretTrial(candidate.id, candidate.mode, 0, 0, error: lastLaunchFailure, details: candidate.details));
           if (error is HelperException && error.code == 'zapretConflict') {
             failure = lastLaunchFailure;
             break;
           }
         }
       }
-      results.sort((a, b) {
-        final verified = (b.confirmed ? 1 : 0).compareTo(a.confirmed ? 1 : 0);
-        if (verified != 0) return verified;
-        if (a.confirmed) return a.delay.compareTo(b.delay);
-        return b.score.compareTo(a.score);
-      });
+      final ranked = shortlistZapretTrials(results, limit: results.length);
+      results
+        ..clear()
+        ..addAll(ranked);
     } catch (error) {
       failure = _errorMessage(error);
     } finally {
@@ -901,9 +951,8 @@ class ZapretController extends Notifier<ZapretState> {
         failure = 'Не удалось восстановить исходное состояние: ${_errorMessage(error)}';
       }
       if (ref.mounted) {
-        final confirmed = results.where((item) => item.confirmed).length;
-        final summary = _cancelTrial ? 'Тест отменён' :
-            'Отбор $attempted/${strategies.length} · контроль $verified/$finalists · подтверждено $confirmed · ошибок запуска/проверки $launchFailures'
+        final summary = _cancelTrial ? 'Тест отменён · предыдущие результаты сохранены' :
+            'Отбор $attempted/${strategies.length} · контроль $verified/$finalists · операций с ошибками $launchFailures'
             '${lastLaunchFailure == null ? '' : '\nПоследняя ошибка: $lastLaunchFailure'}';
         state = state.copyWith(busy: false, clearTestProgress: true,
             testSummary: summary, trials: _cancelTrial ? previousTrials : List.unmodifiable(results), error: failure);
