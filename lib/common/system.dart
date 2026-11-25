@@ -450,7 +450,7 @@ class Windows {
         '$root\\System32\\sc.exe',
         ['query', service],
       );
-      if (result.exitCode == 0) return true;
+      if (result.exitCode == 0 || result.exitCode == 1072) return true;
       if (result.exitCode != 1060) {
         throw StateError('Cannot inspect Helper service $service: ${result.exitCode}');
       }
@@ -503,6 +503,7 @@ class Windows {
         _installAndWait,
         forceReinstall: forceReinstall || retired,
         verifyCoreOnMismatch: _verifyBundledCore,
+        verifyHelperBinary: true,
       );
       if (result != AuthorizeCode.error && await _hasRetiredHelper()) {
         commonPrint.log('Legacy Helper services remain after installation',
@@ -525,8 +526,9 @@ Future<AuthorizeCode> registerHelperService(
   ElevatedHelperInstaller install, {
   bool forceReinstall = false,
   Future<bool> Function()? verifyCoreOnMismatch,
+  bool verifyHelperBinary = false,
 }) async {
-  final readiness = await helperClient.readiness();
+  final readiness = await helperClient.readiness(verifyHelperBinary: verifyHelperBinary);
   switch (readiness) {
     case HelperReadiness.ready:
       if (!forceReinstall) {
@@ -581,7 +583,9 @@ Future<AuthorizeCode> registerHelperService(
     return AuthorizeCode.error;
   }
 
-  final isRunning = await _waitForHelperService();
+  final isRunning = await _waitForHelperService(
+    verifyHelperBinary: verifyHelperBinary,
+  );
   commonPrint.log(
     isRunning
         ? 'helper service installation completed'
@@ -593,6 +597,7 @@ Future<AuthorizeCode> registerHelperService(
 
 Future<bool> _waitForHelperService({
   Duration timeout = const Duration(seconds: 6),
+  bool verifyHelperBinary = false,
 }) async {
   const interval = Duration(seconds: 1);
   final stopwatch = Stopwatch()..start();
@@ -600,7 +605,10 @@ Future<bool> _waitForHelperService({
     final remaining = timeout - stopwatch.elapsed;
     if (remaining <= Duration.zero) return false;
     final isRunning =
-        await helperClient.readiness(timeout: remaining, logFailure: false) ==
+        await helperClient.readiness(
+          timeout: remaining, logFailure: false,
+          verifyHelperBinary: verifyHelperBinary,
+        ) ==
         HelperReadiness.ready;
     if (isRunning) return true;
     final delay = timeout - stopwatch.elapsed;
