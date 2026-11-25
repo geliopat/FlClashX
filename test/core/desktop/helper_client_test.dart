@@ -194,12 +194,12 @@ void main() {
           expect(options.path, endsWith('/zapret/lists/list-general.txt'));
           return _jsonResponse({
             'filename': 'list-general.txt',
-            'content': 'example.org\\n',
+            'content': 'example.org\n',
           });
         }
         expect(read, isTrue);
         expect(options.method, 'PUT');
-        expect(options.data, {'content': 'example.org\\ncustom.org\\n'});
+        expect(options.data, {'content': 'example.org\ncustom.org\n'});
         return _jsonResponse({
           'filename': 'list-general.txt',
           'bytes': 24,
@@ -212,10 +212,10 @@ void main() {
     final loaded = await client.readZapretList('list-general.txt');
     final saved = await client.writeZapretList(
       'list-general.txt',
-      'example.org\\ncustom.org\\n',
+      'example.org\ncustom.org\n',
     );
 
-    expect(loaded.content, 'example.org\\n');
+    expect(loaded.content, 'example.org\n');
     expect(saved.entries, 2);
   });
 
