@@ -253,11 +253,15 @@ class _ZapretHistoryViewState extends State<_ZapretHistoryView> {
         }
         final runs = snapshot.data ?? const <ZapretTuneRun>[];
         return ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(horizontal: 16).copyWith(
+            top: context.sectionsTopPadding,
+            bottom: 16 + context.bottomInset,
+          ),
           children: [
             if (runs.isEmpty) Center(child: Text(AppLocalizations.of(context).forkEmptyHistory)),
             for (final run in runs)
-              Card(child: ListItem(
+              ListItem(
+                leading: const Icon(Icons.history),
                 title: Text(_runDate(run.at)),
                 subtitle: Text([
                   run.tuneMode?.localizedLabel(AppLocalizations.of(context)) ?? AppLocalizations.of(context).forkPreviousRun,
@@ -267,7 +271,7 @@ class _ZapretHistoryViewState extends State<_ZapretHistoryView> {
                 ].join('\n')),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => BaseNavigator.push<void>(context, ZapretResultsView(run: run)),
-              )),
+              ),
           ],
         );
       },

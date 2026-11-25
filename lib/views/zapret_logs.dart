@@ -11,6 +11,14 @@ import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
+String _levelLabel(AppLocalizations l, String level) => switch (level) {
+  'info' => l.forkInfo,
+  'error' => l.error,
+  'stderr' => l.forkStderr,
+  'debug' => l.forkDebug,
+  _ => level,
+};
+
 class ZapretLogsView extends ConsumerStatefulWidget {
   const ZapretLogsView({super.key});
 
@@ -164,7 +172,7 @@ class _ZapretLogsViewState extends ConsumerState<ZapretLogsView> {
                   header: RecordHeader(children: [
                     RecordTimestamp(entry.time.toLocal().toString().split('.').first),
                     RecordLabel(
-                      label: entry.level,
+                      label: _levelLabel(AppLocalizations.of(context), entry.level),
                       tone: switch (entry.level) {
                         'error' => RecordTone.error,
                         'stderr' => RecordTone.warning,
@@ -247,7 +255,7 @@ class _ServiceJournalViewState extends State<_ServiceJournalView> {
                 onTap: () {},
                 header: RecordHeader(children: [
                   RecordTimestamp(entry.log.time.toLocal().toString().split('.').first),
-                  RecordLabel(label: entry.log.level, tone: entry.log.level == 'error'
+                  RecordLabel(label: _levelLabel(l, entry.log.level), tone: entry.log.level == 'error'
                       ? RecordTone.error : entry.log.level == 'stderr' ? RecordTone.warning : RecordTone.neutral),
                 ]),
                 body: SelectableText('[${entry.component}] ${entry.log.message}', style: RecordTextStyles.of(context).primary),

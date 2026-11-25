@@ -75,6 +75,23 @@ void main() {
     expect(result.passedTargets, 2);
   });
 
+  test('control run labels do not change scores or discard measurements', () {
+    const mode = ZapretMode.fullBypass;
+    const first = ZapretTrial('a', mode, 6, 100, confirmed: true,
+        passedTargets: 3, details: ['YouTube: 100 ms']);
+    const second = ZapretTrial('a', mode, 4, 200, passedTargets: 2,
+        details: ['YouTube: 200 ms']);
+    final result = combineZapretControlRuns(first, second,
+        runLabel: 'Verification');
+    expect(result.details, [
+      'Verification 1:', 'YouTube: 100 ms',
+      'Verification 2:', 'YouTube: 200 ms',
+    ]);
+    expect(result.score, 4);
+    expect(result.delay, 150);
+    expect(result.confirmed, isFalse);
+  });
+
   test('original score awards degraded HTTP one point, not two', () {
     const direct = ['DIRECT'];
     const restricted = ServiceCheckItem(status: 'restricted', delay: 348, chains: direct);

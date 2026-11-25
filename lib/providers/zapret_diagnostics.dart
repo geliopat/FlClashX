@@ -167,7 +167,7 @@ Future<Map<ZapretProbeTarget, ZapretProbeResult>> measureZapretTargets(
         target: classifyZapretService(target, items.where((item) => item.name == 'zapret-${target.name}').firstOrNull),
     };
   } catch (error) {
-    return {for (final target in wanted) target: ZapretProbeResult(message: 'Проверка DIRECT недоступна: $error')};
+    return {for (final target in wanted) target: ZapretProbeResult(message: 'DIRECT · ${AppLocalizations().forkCheckFailed}: $error')};
   }
 }
 
@@ -177,7 +177,7 @@ ZapretProbeResult classifyZapretService(ZapretProbeTarget target, ServiceCheckIt
     if (item.chains.isEmpty || item.chains.any((chain) => chain != 'DIRECT')) {
       return ZapretProbeResult(
         latencyMs: item.delay,
-        message: 'DIRECT не подтверждён · цепочка: ${item.chains.isEmpty ? 'не передана' : item.chains.join(' → ')}',
+        message: '${AppLocalizations().forkDirectUnconfirmed} · ${AppLocalizations().proxyChain}: ${item.chains.isEmpty ? AppLocalizations().forkUnavailable : item.chains.join(' → ')}',
       );
     }
     if (item.status == 'available') {
@@ -197,14 +197,14 @@ ZapretProbeResult classifyZapretService(ZapretProbeTarget target, ServiceCheckIt
         status: ZapretProbeStatus.degraded,
         latencyMs: item.delay,
         accepted: true,
-        message: 'DIRECT · restricted · HTTPS доступен, API ограничен',
+        message: 'DIRECT · restricted · HTTPS: ${AppLocalizations().forkReachable} · API: ${AppLocalizations().forkDegraded}',
       );
     }
     return ZapretProbeResult(
       status: item.status == 'restricted' || item.status == 'unavailable'
           ? ZapretProbeStatus.degraded : ZapretProbeStatus.checking,
       latencyMs: item.delay,
-      message: 'DIRECT · статус сервиса: ${item.status}',
+      message: 'DIRECT · ${AppLocalizations().status}: ${item.status}',
     );
   }
   if (item.status == 'timeout' || item.status == 'failed') {
