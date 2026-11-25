@@ -7,7 +7,6 @@ import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:material_ui/material_ui.dart' show ListItem;
 
 class ZapretSettingsView extends ConsumerStatefulWidget {
   const ZapretSettingsView({super.key});
@@ -161,17 +160,17 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
   Future<void> _restoreBackup() async {
     final filename = _selected;
     if (filename == null || !_listLoaded || _saving || _updating || _loading) return;
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showFloatingDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Восстановить резервную копию?'),
-        content: Text('Текущий $filename будет заменён содержимым $filename.bak. Текущая версия также сохранится в .bak.'),
+      child: CommonDialog(
+        title: 'Восстановить резервную копию?',
+        child: Text('Текущий $filename будет заменён содержимым $filename.bak. Текущая версия также сохранится в .bak.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
             child: const Text('Отмена'),
           ),
-          FilledButton(
+          TextButton(
             onPressed: () => Navigator.of(context).pop(true),
             child: const Text('Восстановить'),
           ),
@@ -355,11 +354,11 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
 
   Future<void> _updateHelperService() async {
     if (_updatingHelper) return;
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showFloatingDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Переустановить службу Helper?'),
-        content: const Text(
+      child: CommonDialog(
+        title: 'Переустановить службу Helper?',
+        child: const Text(
           'Служба будет заменена версией из текущей папки FlClashX. '
           'Во время переустановки Helper остановит Mihomo Core и Zapret, '
           'поэтому VPN и обход временно прервутся. После обновления запусти их снова. '
@@ -370,7 +369,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
             onPressed: () => Navigator.of(dialogContext).pop(false),
             child: const Text('Отмена'),
           ),
-          FilledButton(
+          TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
             child: const Text('Продолжить'),
           ),
@@ -584,8 +583,8 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
       generateSection(
         title: 'Компоненты Zapret',
         items: [
-          ListItem(
-            title: const Text('Версии в этой сборке'),
+          const ListItem(
+            title: Text('Версии в этой сборке'),
             subtitle: const Text(
               'Zapret2 v1.0.7 · Flowseal 1.10.4 · стратегии geliopat/zapret2-gui',
             ),
@@ -748,7 +747,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
     return CommonScaffold(
       title: 'Zapret',
       body: ListView(
-        padding: EdgeInsets.symmetric(horizontal: 16).copyWith(
+        padding: const EdgeInsets.symmetric(horizontal: 16).copyWith(
           top: context.sectionsTopPadding,
           bottom: 16 + context.bottomInset,
         ),
