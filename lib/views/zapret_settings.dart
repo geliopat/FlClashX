@@ -378,6 +378,27 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
   }
 
 
+  Future<void> _showProtectionList(String title, List<String> entries) async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(title),
+        content: SizedBox(
+          width: 650,
+          child: SingleChildScrollView(
+            child: SelectableText(entries.join('\n')),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Закрыть'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final zapret = ref.watch(zapretControllerProvider);
@@ -393,7 +414,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
           ),
           ListItem(
             title: const Text('Запуск Zapret при старте Mihomo'),
-            subtitle: const Text('Движки можно останавливать независимо'),
+            subtitle: const Text('При остановке Mihomo Zapret также останавливается'),
             trailing: Switch(
               value: zapret.startWithMihomo,
               onChanged: ref.read(zapretControllerProvider.notifier).setStartWithMihomo,
@@ -416,6 +437,39 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
                   : _updateHelperService,
             ),
         ],
+      ),
+      const ListSectionGap(),
+      generateSection(
+        title: 'Защита соединений Mihomo',
+        items: [
+          ListItem(
+            title: const Text('Исключённые IP и подсети'),
+            subtitle: Text('${zapret.protectedIps.length} · автоматически из профиля'),
+            onTap: zapret.protectedIps.isEmpty ? null : () => _showProtectionList(
+              'Исключённые IP и подсети', zapret.protectedIps,
+            ),
+          ),
+          ListItem(
+            title: const Text('Исключённые домены'),
+            subtitle: Text('${zapret.protectedDomains.length} · автоматически из профиля'),
+            onTap: zapret.protectedDomains.isEmpty ? null : () => _showProtectionList(
+              'Исключённые домены', zapret.protectedDomains,
+            ),
+          ),
+          ListItem(
+            leading: const Icon(Icons.refresh),
+            title: const Text('Обновить исключения'),
+            onTap: zapret.busy ? null : () async {
+              try {
+                await ref.read(zapretControllerProvider.notifier).refreshInfrastructure();
+              } catch (error) {
+                if (mounted) setState(() => _error = error.toString());
+              }
+            },
+          ),
+        ],
+        footer: 'hosts, proxies, DNS, fake-ip и route-exclude-address. '
+            'Списки создаются отдельно, настройки профиля не меняются.',
       ),
       const ListSectionGap(),
       generateSection(
