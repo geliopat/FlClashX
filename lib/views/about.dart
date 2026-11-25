@@ -129,18 +129,6 @@ class AboutView extends ConsumerWidget {
           ),
           const SizedBox(height: 8),
           generateSection(
-            title: 'Компоненты Zapret',
-            items: [
-              for (final entry in installedZapretComponents.entries)
-                ListItem(
-                  title: Text(entry.key),
-                  subtitle: Text(entry.value),
-                ),
-            ],
-            footer: 'Компоненты обновляются вместе с релизом FlClashZ.',
-          ),
-          const ListSectionGap(),
-          generateSection(
             title: appLocalizations.more,
             items: [
               _buildLinkItem(
@@ -274,6 +262,20 @@ class _AboutHero extends ConsumerWidget {
                 color: raised,
                 foregroundColor: colorScheme.onSurfaceVariant,
               ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            alignment: WrapAlignment.center,
+            children: [
+              for (final entry in installedZapretComponents.entries)
+                _Pill(
+                  label: '${entry.key}: ${entry.value}',
+                  color: raised,
+                  foregroundColor: colorScheme.onSurfaceVariant,
+                ),
             ],
           ),
           const SizedBox(height: 16),
