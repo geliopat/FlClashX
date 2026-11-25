@@ -148,7 +148,9 @@ ZapretProbeResult _fromService(ServiceCheckItem? item) {
   if (item == null) return const ZapretProbeResult(message: 'Ответ ядра отсутствует');
   if (item.delay > 0) {
     if (item.chains.isEmpty || item.chains.any((chain) => chain != 'DIRECT')) {
-      return const ZapretProbeResult(message: 'DIRECT не подтверждён');
+      return ZapretProbeResult(
+        message: 'DIRECT не подтверждён · цепочка: ${item.chains.isEmpty ? 'не передана' : item.chains.join(' → ')}',
+      );
     }
     if (item.status == 'available') {
       return ZapretProbeResult(
@@ -160,7 +162,7 @@ ZapretProbeResult _fromService(ServiceCheckItem? item) {
     return ZapretProbeResult(
       status: ZapretProbeStatus.degraded,
       latencyMs: item.delay,
-      message: 'DIRECT · HTTP: ${item.status}',
+      message: 'DIRECT · статус сервиса: ${item.status}',
     );
   }
   if (item.status == 'timeout' || item.status == 'failed') {
