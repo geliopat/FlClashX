@@ -240,6 +240,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
     });
 
     final staged = <String, String>{};
+    final originals = <String, String>{};
     final applied = <String>[];
     final details = <String>[];
     final rollbackFailures = <String>[];
@@ -273,6 +274,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
         if (utf8.encode(merged).length > 2 * 1024 * 1024) {
           throw StateError('Обновлённый файл ${entry.key} превышает лимит 2 МиБ.');
         }
+        originals[entry.key] = current.content;
         staged[entry.key] = merged;
       }
 
@@ -292,6 +294,20 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
         _notice = 'Обновлено файлов: ${applied.length}. ${details.join(' · ')}. Пользовательские файлы *-user.txt не перезаписывались.';
       });
     } catch (error) {
+      // A request can fail after Helper has already replaced the file but
+      // before the response reaches the client. Detect that ambiguous case.
+      for (final entry in staged.entries) {
+        if (applied.contains(entry.key)) continue;
+        try {
+          final current = await helperClient.readZapretList(entry.key);
+          if (current.content == entry.value && current.content != originals[entry.key]) {
+            applied.add(entry.key);
+          }
+        } catch (_) {
+          // The original error and any rollback failures are reported below.
+        }
+      }
+
       // Roll back already-applied files in reverse order. A rollback failure
       // is reported explicitly rather than hidden behind the original error.
       for (final filename in applied.reversed) {
@@ -301,7 +317,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
           rollbackFailures.add('$filename: $rollbackError');
         }
       }
-      if (applied.isNotEmpty && rollbackFailures.isEmpty && mounted) {
+      if (applied.isNotEmpty && mounted) {
         await _loadLists(select: _selected);
       }
       if (!mounted) return;
