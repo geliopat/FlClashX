@@ -83,6 +83,21 @@ class ZapretProbeResult {
   final String? message;
   // Endpoint-specific reachability, independent of the display label.
   final bool accepted;
+
+  /// Original zapret2-gui ranking: actual HTTP response is degraded or
+  /// operational; missing/unconfirmed routes never earn points.
+  int get score => switch (status) {
+    ZapretProbeStatus.operational => 2,
+    ZapretProbeStatus.degraded => 1,
+    _ => 0,
+  };
+
+  String get statusLabel => switch (status) {
+    ZapretProbeStatus.operational => 'Работает',
+    ZapretProbeStatus.degraded => 'С ограничениями / высокой задержкой',
+    ZapretProbeStatus.blocked => 'Нет соединения',
+    ZapretProbeStatus.checking => 'Нет подтверждения',
+  };
 }
 
 /// Uses the same 450 ms threshold and HTTP success handling as zapret2-gui.
@@ -178,7 +193,8 @@ ZapretProbeResult classifyZapretService(ZapretProbeTarget target, ServiceCheckIt
       );
     }
     return ZapretProbeResult(
-      status: ZapretProbeStatus.degraded,
+      status: item.status == 'restricted' || item.status == 'unavailable'
+          ? ZapretProbeStatus.degraded : ZapretProbeStatus.checking,
       latencyMs: item.delay,
       message: 'DIRECT · статус сервиса: ${item.status}',
     );

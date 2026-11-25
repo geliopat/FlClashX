@@ -20,7 +20,7 @@ void main() {
         const ServiceCheckItem(status: 'timeout', chains: ['DIRECT'])).accepted, isFalse);
   });
 
-  test('shortlist favors complete reachability then latency, bounded to ten', () {
+  test('full results rank by score then latency, separately from screening', () {
     const mode = ZapretMode.fullBypass;
     final trials = [
       const ZapretTrial('partial-fast', mode, 4, 40),
@@ -31,9 +31,63 @@ void main() {
     final selected = shortlistZapretTrials(trials);
     expect(selected, hasLength(10));
     expect(selected.take(3).map((item) => item.id),
-        ['full-fast', 'full-slow', 'partial-fast']);
+        ['full-fast', 'partial-fast', 'full-slow']);
     expect(shortlistZapretTrials(trials, limit: 2).map((item) => item.id),
-        ['full-fast', 'full-slow']);
+        ['full-fast', 'partial-fast']);
+  });
+
+  test('screen finalists are reachable YouTube results only, at most five', () {
+    const mode = ZapretMode.fullBypass;
+    final trials = [
+      const ZapretTrial('blocked', mode, 0, 0, screenedOnly: true),
+      const ZapretTrial('error', mode, 2, 1, screenedOnly: true, error: 'failed'),
+      const ZapretTrial('full', mode, 6, 1, confirmed: true),
+      const ZapretTrial('slow', mode, 1, 500, screenedOnly: true),
+      for (var i = 0; i < 7; i++) ZapretTrial('ok-$i', mode, 2, 100 + i, screenedOnly: true),
+    ];
+    expect(selectZapretFinalists(trials).map((trial) => trial.id),
+        ['ok-0', 'ok-1', 'ok-2', 'ok-3', 'ok-4']);
+  });
+
+  test('only very fast stops at a real full 6/6', () {
+    const mode = ZapretMode.fullBypass;
+    const perfect = ZapretTrial('a', mode, 6, 100, confirmed: true);
+    const restricted = ZapretTrial('a', mode, 5, 100, confirmed: true);
+    const screen = ZapretTrial('a', mode, 2, 100, screenedOnly: true);
+    expect(ZapretAutoTuneMode.veryFast.shouldStop(perfect), isTrue);
+    expect(ZapretAutoTuneMode.veryFast.shouldStop(restricted), isFalse);
+    expect(ZapretAutoTuneMode.veryFast.shouldStop(screen), isFalse);
+    expect(ZapretAutoTuneMode.fast.shouldStop(perfect), isFalse);
+    expect(ZapretAutoTuneMode.full.shouldStop(perfect), isFalse);
+    expect(ZapretAutoTuneMode.full.screenFirst, isFalse);
+    expect(ZapretAutoTuneMode.fast.controlRuns, 2);
+    expect(ZapretAutoTuneMode.veryFast.controlRuns, 1);
+  });
+
+  test('two control runs retain the lower score and require both to pass', () {
+    const mode = ZapretMode.fullBypass;
+    const first = ZapretTrial('a', mode, 6, 100, confirmed: true, passedTargets: 3);
+    const second = ZapretTrial('a', mode, 4, 200, passedTargets: 2);
+    final result = combineZapretControlRuns(first, second);
+    expect(result.score, 4);
+    expect(result.delay, 150);
+    expect(result.confirmed, isFalse);
+    expect(result.passedTargets, 2);
+  });
+
+  test('original score awards degraded HTTP one point, not two', () {
+    const direct = ['DIRECT'];
+    const restricted = ServiceCheckItem(status: 'restricted', delay: 348, chains: direct);
+    expect(classifyZapretService(ZapretProbeTarget.discordVoice, restricted).score, 1);
+    expect(classifyZapretService(ZapretProbeTarget.youtube, restricted).score, 1);
+    expect(classifyZapretService(ZapretProbeTarget.youtube,
+      const ServiceCheckItem(status: 'available', delay: 450, chains: direct)).score, 2);
+    expect(classifyZapretService(ZapretProbeTarget.youtube,
+      const ServiceCheckItem(status: 'available', delay: 451, chains: direct)).score, 1);
+    expect(classifyZapretService(ZapretProbeTarget.youtube,
+      const ServiceCheckItem(status: 'available', delay: 100, chains: ['PROXY'])).score, 0);
+    expect(classifyZapretService(ZapretProbeTarget.youtube,
+      const ServiceCheckItem(status: 'failed', chains: direct)).score, 0);
   });
 
   test('trial labels distinguish complete, partial, failed, screening and errors', () {

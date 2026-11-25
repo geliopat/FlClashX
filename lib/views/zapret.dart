@@ -25,10 +25,36 @@ class ZapretView extends ConsumerWidget {
     final screened = zapret.trials.where((trial) =>
         trial.screenedOnly && trial.error == null && trial.passedTargets > 0).length;
     final partial = zapret.trials.where((trial) =>
-        !trial.confirmed && !trial.screenedOnly && trial.error == null && trial.passedTargets > 0).length;
+        !trial.confirmed && !trial.screenedOnly && trial.error == null && trial.score > 0).length;
     final failed = zapret.trials.length - confirmedTrials - errors - screened - partial;
     Future<void> showAllTrials() async {
       await BaseNavigator.push<void>(context, const ZapretResultsView());
+    }
+
+    Future<void> chooseTestMode() async {
+      final mode = await showDialog<ZapretAutoTuneMode>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Режим автоподбора'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final mode in ZapretAutoTuneMode.values)
+                ListItem(
+                  title: Text(mode.label),
+                  subtitle: Text(mode.description),
+                  onTap: () => Navigator.of(ctx).pop(mode),
+                ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Отмена')),
+          ],
+        ),
+      );
+      if (mode != null && context.mounted) {
+        await ref.read(zapretControllerProvider.notifier).testStrategies(tuneMode: mode);
+      }
     }
 
     Widget details(String title, List<String> values) => ListItem(
@@ -123,9 +149,9 @@ class ZapretView extends ConsumerWidget {
         title: 'Автоподбор стратегий',
         items: [
           ListItem(
-            title: Text(zapret.testProgress ?? 'Проверить все стратегии'),
-            subtitle: const Text('Быстрый отбор всех стратегий и контроль лучших кандидатов через Mihomo DIRECT. YouTube, GoogleVideo и два HTTPS API Discord.'),
-            onTap: zapret.busy ? null : () => ref.read(zapretControllerProvider.notifier).testStrategies(),
+            title: Text(zapret.testProgress ?? 'Запустить автоподбор'),
+            subtitle: const Text('Очень быстрый, быстрый или полный · Mihomo DIRECT'),
+            onTap: zapret.busy ? null : chooseTestMode,
           ),
           if (zapret.testProgress != null)
             ListItem(title: const Text('Отменить тестирование'), onTap: ref.read(zapretControllerProvider.notifier).cancelTrials),
@@ -201,7 +227,7 @@ class ZapretResultsView extends ConsumerWidget {
     final zapret = ref.watch(zapretControllerProvider);
     final ranked = shortlistZapretTrials(zapret.trials, limit: zapret.trials.length);
     final top = shortlistZapretTrials(ranked.where((trial) =>
-        trial.error == null && (trial.confirmed || trial.passedTargets > 0)), limit: 5);
+        !trial.screenedOnly && trial.error == null && trial.score > 0), limit: 5);
     final ranks = {for (final (index, trial) in top.indexed) trial.id: index + 1};
 
     String nameOf(ZapretTrial trial) => zapret.strategies
@@ -241,9 +267,9 @@ class ZapretResultsView extends ConsumerWidget {
             style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           Text(top.isEmpty
-              ? 'Нет стратегий с успешными запросами.'
+              ? 'Нет финалистов с положительной оценкой. Предварительный отбор показан отдельно.'
               : 'Топ-5 выделены цветом и номером. Подтверждённые можно применить.'),
-          const Text('Задержки HTTPS, не ICMP. Три обязательных проверки; GoogleVideo — дополнительная. Discord Voice API: restricted означает доступность HTTPS, а не проверку голосового UDP.'),
+          const Text('Баллы: работает — 2, с ограничениями — 1, нет ответа — 0. Полный тест: 0–6; отбор: только YouTube, 0–2. GoogleVideo — дополнительный. Discord Voice API не проверяет голосовой UDP.'),
           const SizedBox(height: 12),
           for (final trial in ranked)
             Card(
@@ -263,8 +289,10 @@ class ZapretResultsView extends ConsumerWidget {
                       if (trial.confirmed)
                         TextButton(onPressed: zapret.busy ? null : () => apply(trial), child: const Text('Применить')),
                     ]),
-                    Text('${trial.resultLabel} · ${trial.passedTargets}/3 обязательных · '
+                    Text('${trial.resultLabel} · ${trial.score}/${trial.screenedOnly ? 2 : 6} баллов · '
                         '${trial.delay > 0 ? '${trial.delay} мс (среднее)' : 'Нет задержки'}'),
+                    if (trial.screenedOnly)
+                      const Text('Discord и GoogleVideo не проверялись'),
                     if (trial.error != null)
                       Text(trial.error!, style: TextStyle(color: context.colorScheme.error)),
                     for (final detail in trial.details)
