@@ -30,7 +30,8 @@ jobs:
   prepare:
     # Explicit repository opt-in: the current runtime regressions must be
     # fixed and the fork's public signing key must be pinned first.
-    if: (inputs.candidate_ref != '' && vars.FLCLASHZ_RELEASE_ENABLED == 'true') || (github.event_name == 'push' && startsWith(github.event.head_commit.message || '', 'release: FlClashZ v'))
+    if: >-
+      (inputs.candidate_ref != '' && vars.FLCLASHZ_RELEASE_ENABLED == 'true') || (github.event_name == 'push' && startsWith(github.event.head_commit.message || '', 'release: FlClashZ v'))
     runs-on: ubuntu-24.04
     permissions:
       contents: write

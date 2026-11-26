@@ -34,7 +34,8 @@ jobs:
   windows:
     name: Test and build Windows Release
     # Explicit release pushes are validated once by the release workflow.
-    if: inputs.candidate_ref != '' || !startsWith(github.event.head_commit.message || '', 'release: FlClashZ v')
+    if: >-
+      inputs.candidate_ref != '' || !startsWith(github.event.head_commit.message || '', 'release: FlClashZ v')
     runs-on: windows-2022
     env:
       FLCLASHZ_UPDATE_PUBLIC_KEY: ${{ inputs.update_public_key || vars.FLCLASHZ_UPDATE_PUBLIC_KEY }}
