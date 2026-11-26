@@ -57,6 +57,50 @@ void main() {
     }
   });
 
+  test('hidden direct and regional balancers are included at their own URLs', () {
+    const google = 'https://google.com/generate_204';
+    const defaultUrl = 'https://example.org/generate_204';
+    const directName = '🔓 Напрямую';
+    const ruName = '🇷🇺 Автовыбор';
+    const foreignName = '🌍 Автовыбор';
+    const groups = [
+      Group(name: 'Основной', type: GroupType.Selector, now: ruName, all: [
+        Proxy(name: directName, type: 'Selector'),
+        Proxy(name: ruName, type: 'LoadBalance'),
+        Proxy(name: foreignName, type: 'LoadBalance'),
+      ]),
+      Group(name: directName, type: GroupType.Selector, hidden: true,
+          now: 'DIRECT', all: [Proxy(name: 'DIRECT', type: 'Direct')]),
+      Group(name: ruName, type: GroupType.LoadBalance, hidden: true,
+          testUrl: google, now: 'Москва', all: [
+        Proxy(name: 'Москва', type: 'Vless'),
+      ]),
+      Group(name: foreignName, type: GroupType.LoadBalance, hidden: true,
+          testUrl: google, now: 'Хельсинки', all: [
+        Proxy(name: 'Хельсинки', type: 'Vless'),
+      ]),
+    ];
+    final targets = <String>{};
+    for (final batch in autoDelayBatches(groups)) {
+      for (final proxy in batch.proxies) {
+        final resolved = computeRealSelectedProxyState(
+          proxy.name, groups: groups, selectedMap: {},
+        );
+        targets.add(delayTestKey(
+          resolved.testUrl ?? batch.testUrl ?? defaultUrl,
+          resolved.proxyName,
+        ));
+      }
+    }
+    expect(targets, {
+      delayTestKey(defaultUrl, 'DIRECT'),
+      delayTestKey(google, ruName),
+      delayTestKey(google, foreignName),
+      delayTestKey(google, 'Москва'),
+      delayTestKey(google, 'Хельсинки'),
+    });
+  });
+
   test('first check is due, zero disables and interval controls repeat', () {
     final now = DateTime.utc(2026, 11, 26);
     expect(autoDelayDue(now: now, last: null, seconds: 0), isFalse);

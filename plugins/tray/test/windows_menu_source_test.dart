@@ -3,15 +3,11 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 File _resolveSource(String relativePath) {
-  final direct = File(relativePath);
-  if (direct.existsSync()) {
-    return direct;
-  }
   final inPlugin = File('plugins/tray/$relativePath');
   if (inPlugin.existsSync()) {
     return inPlugin;
   }
-  return direct;
+  return File(relativePath);
 }
 
 String _body(String source, String signature) {
