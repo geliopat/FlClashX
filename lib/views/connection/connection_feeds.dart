@@ -2,6 +2,7 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/ui/ui.dart';
+import 'package:fl_clash/ui/title_tabs.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
@@ -20,21 +21,16 @@ class ConnectionFeedsView extends ConsumerStatefulWidget {
 class _ConnectionFeedsViewState extends ConsumerState<ConnectionFeedsView> {
   final _shown = <RequestFeed>{};
 
-  List<CommonPopupMenuItem> _titleMenuItems(RequestFeed feed) {
-    final appLocalizations = context.appLocalizations;
-    return [
-      for (final (option, label) in [
-        (RequestFeed.recent, appLocalizations.recentRequests),
-        (RequestFeed.live, appLocalizations.liveConnections),
-      ])
-        CommonPopupMenuItem(
-          label: label,
-          checked: option == feed,
-          onPressed: () => ref
-              .read(appSettingProvider.notifier)
-              .update((state) => state.copyWith(requestFeed: option)),
-        ),
-    ];
+  Widget _titleTabs(RequestFeed feed) {
+    final l = context.appLocalizations;
+    return PageTitleTabs(
+      labels: [l.recentRequests, l.liveConnections],
+      selectedIndex: feed == RequestFeed.recent ? 0 : 1,
+      onSelected: (index) => ref.read(appSettingProvider.notifier).update(
+        (state) => state.copyWith(requestFeed:
+            index == 0 ? RequestFeed.recent : RequestFeed.live),
+      ),
+    );
   }
 
   @override
@@ -44,7 +40,7 @@ class _ConnectionFeedsViewState extends ConsumerState<ConnectionFeedsView> {
     );
     _shown.add(feed);
     final pageActive = PageActivityScope.isActiveOf(context);
-    final titleMenuItems = _titleMenuItems(feed);
+    final titleTabs = _titleTabs(feed);
     return IndexedStack(
       index: feed.index,
       children: [
@@ -60,10 +56,10 @@ class _ConnectionFeedsViewState extends ConsumerState<ConnectionFeedsView> {
                   excluding: option != feed,
                   child: switch (option) {
                     RequestFeed.recent => RequestsView(
-                      titleMenuItems: titleMenuItems,
+                      titleWidget: titleTabs,
                     ),
                     RequestFeed.live => ConnectionsView(
-                      titleMenuItems: titleMenuItems,
+                      titleWidget: titleTabs,
                     ),
                   },
                 ),

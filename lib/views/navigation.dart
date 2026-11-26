@@ -86,6 +86,14 @@ class Navigation implements NavigationPort {
           builder: (_) => const ZapretLogsView(key: GlobalObjectKey(PageLabel.zapretLogs)),
           modes: [NavigationItemMode.desktop],
         ),
+      if (Platform.isWindows)
+        NavigationItem(
+          glyph: AppGlyphs.logs,
+          label: PageLabel.serviceJournal,
+          builder: (_) => const ZapretLogsView(
+            key: GlobalObjectKey(PageLabel.serviceJournal), journalOnly: true),
+          modes: [NavigationItemMode.desktop],
+        ),
       NavigationItem(
         glyph: AppGlyphs.settings,
         label: PageLabel.tools,

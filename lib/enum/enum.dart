@@ -531,6 +531,7 @@ enum PageLabel {
   dns,
   zapret,
   zapretLogs,
+  serviceJournal,
 }
 
 enum RuleAction {

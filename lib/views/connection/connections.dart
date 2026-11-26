@@ -14,12 +14,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 class ConnectionsView extends ConsumerStatefulWidget {
   final ScrollController? scrollController;
   final List<CommonPopupMenuItem> titleMenuItems;
+  final Widget? titleWidget;
   final Future<List<TrackerInfo>> Function()? connectionsReader;
 
   const ConnectionsView({
     super.key,
     this.scrollController,
     this.titleMenuItems = const [],
+    this.titleWidget,
     @visibleForTesting this.connectionsReader,
   });
 
@@ -131,6 +133,7 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView>
     return CommonScaffold(
       title: appLocalizations.liveConnections,
       titleMenuItems: widget.titleMenuItems,
+      titleWidget: widget.titleWidget,
       onKeywordsUpdate: _listController.updateKeywords,
       searchState: AppBarSearchState(onSearch: _listController.search),
       iconActions: _buildActions(),

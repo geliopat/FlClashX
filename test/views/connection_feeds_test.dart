@@ -47,7 +47,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
   }
 
-  testWidgets('switches between the two feeds from the title menu and keeps '
+  testWidgets('switches between the two feeds from the title tabs and keeps '
       'the choice', (tester) async {
     tester.view.physicalSize = const Size(1400, 1000);
     tester.view.devicePixelRatio = 1;
@@ -64,8 +64,6 @@ void main() {
     expect(find.byType(ConnectionsView), findsOneWidget);
     expect(find.byType(RequestsView), findsNothing);
 
-    await tester.tap(find.text('Live connections'));
-    await tester.pumpAndSettle();
     await tester.tap(find.text('Recent requests'));
     await tester.pumpAndSettle();
 
@@ -92,8 +90,7 @@ void main() {
     );
     await settle(tester);
     Future<void> select(String shown, String next) async {
-      await tester.tap(find.text(shown));
-      await tester.pumpAndSettle();
+      expect(find.text(shown), findsOneWidget);
       await tester.tap(find.text(next));
       await tester.pumpAndSettle();
     }

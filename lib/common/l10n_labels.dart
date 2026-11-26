@@ -19,6 +19,7 @@ extension PageLabelL10n on PageLabel {
       PageLabel.dns => appLocalizations.dnsQueries,
       PageLabel.zapret => 'Zapret',
       PageLabel.zapretLogs => appLocalizations.forkZapretLogs,
+      PageLabel.serviceJournal => appLocalizations.forkServiceJournal,
     };
   }
 }

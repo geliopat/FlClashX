@@ -6,7 +6,7 @@ import 'package:fl_clash/core/desktop/helper_client.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/l10n/l10n.dart';
 import 'package:fl_clash/widgets/widgets.dart';
-import 'package:flutter/material.dart' show DefaultTabController, Tab, TabBar;
+import 'package:fl_clash/ui/title_tabs.dart';
 import 'package:material_ui/material_ui.dart';
 
 String _levelLabel(AppLocalizations l, String level) => switch (level) {
@@ -20,7 +20,9 @@ String _levelLabel(AppLocalizations l, String level) => switch (level) {
 typedef _JournalEntry = ({HelperZapretLog log, String component});
 
 class ZapretLogsView extends StatefulWidget {
-  const ZapretLogsView({super.key});
+  const ZapretLogsView({super.key, this.journalOnly = false});
+
+  final bool journalOnly;
 
   @override
   State<ZapretLogsView> createState() => _ZapretLogsViewState();
@@ -28,7 +30,7 @@ class ZapretLogsView extends StatefulWidget {
 
 class _ZapretLogsViewState extends State<ZapretLogsView> {
   Timer? _timer;
-  int _tab = 0;
+  late int _tab = widget.journalOnly ? 2 : 0;
   bool _loading = false;
   String _query = '';
   String _filter = 'all';
@@ -39,6 +41,10 @@ class _ZapretLogsViewState extends State<ZapretLogsView> {
   @override
   void initState() {
     super.initState();
+    if (widget.journalOnly) {
+      _archive = _loadArchive();
+      return;
+    }
     scheduleMicrotask(_refresh);
     _timer = Timer.periodic(const Duration(seconds: 2), (_) {
       if (_tab == 0) unawaited(_refresh());
@@ -157,7 +163,7 @@ class _ZapretLogsViewState extends State<ZapretLogsView> {
     final l = AppLocalizations.of(context);
     return ListView.separated(
       key: ValueKey(_tab),
-      padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + context.bottomInset),
+      padding: EdgeInsets.fromLTRB(16, context.sectionsTopPadding + 12, 16, 16 + context.bottomInset),
       itemCount: 1 + (filtered.isEmpty ? 1 : filtered.length),
       separatorBuilder: (_, _) => const SizedBox(height: recordListGap),
       itemBuilder: (context, index) {
@@ -196,35 +202,21 @@ class _ZapretLogsViewState extends State<ZapretLogsView> {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    return DefaultTabController(
-      length: 3,
-      child: CommonScaffold(
-        title: l.forkZapretLogs,
-        searchState: AppBarSearchState(onSearch: (query) => setState(() => _query = query)),
-        body: Column(
-          children: [
-            Padding(
-              padding: EdgeInsets.only(top: context.sectionsTopPadding),
-              child: TabBar(
-                isScrollable: true,
-                onTap: _selectTab,
-                tabs: [
-                  Tab(text: l.forkEvents),
-                  Tab(text: l.forkCrashHistory),
-                  Tab(text: l.forkServiceJournal),
-                ],
-              ),
-            ),
-            Expanded(
-              child: _tab == 0
-                  ? _entriesView(context, [
-                      for (final log in _logs.reversed)
-                        (log: log, component: 'Zapret'),
-                    ], error: _error)
-                  : _journal(context),
-            ),
-          ],
-        ),
+    return CommonScaffold(
+      title: widget.journalOnly ? l.forkServiceJournal : l.forkZapretLogs,
+      titleWidget: widget.journalOnly ? null : PageTitleTabs(
+        labels: [l.forkEvents, l.forkCrashHistory],
+        selectedIndex: _tab,
+        onSelected: _selectTab,
+      ),
+      searchState: AppBarSearchState(onSearch: (query) => setState(() => _query = query)),
+      body: Builder(
+        builder: (context) => _tab == 0
+            ? _entriesView(context, [
+                for (final log in _logs.reversed)
+                  (log: log, component: 'Zapret'),
+              ], error: _error)
+            : _journal(context),
       ),
     );
   }
