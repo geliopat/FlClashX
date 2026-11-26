@@ -52,7 +52,7 @@ try {
     Assert ($command -eq ('"' + (Join-Path $target 'FlClashZ.exe') + '" "%1"')) "Wrong handler: $scheme"
   }
   CheckForeign
-  & "$PSScriptRoot/windows_smoke_test.ps1" -Bundle $target
+  & "$PSScriptRoot/windows_smoke_test.ps1" -Bundle $target -RequireExistingConsent
   $process = Start-Process -FilePath $uninstaller -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART') -Wait -PassThru
   Assert ($process.ExitCode -eq 0) "Uninstaller exit code: $($process.ExitCode)"
   $uninstaller = $null

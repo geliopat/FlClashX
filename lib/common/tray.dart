@@ -175,6 +175,7 @@ class AppTray implements TrayPort {
         TrayMenuAction(
           label: running ? appLocalizations.stop : appLocalizations.start,
           icon: running ? 'stop' : 'start',
+          enabled: read(initProvider) && !(zapret?.dashboardRestarting ?? false),
           detail: shortcut(HotAction.start),
           onSelected: () => unawaited(commonAction.toggleTrayRunning()),
         )

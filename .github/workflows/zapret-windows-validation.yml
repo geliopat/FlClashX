@@ -104,7 +104,7 @@ jobs:
           }
 
       - name: Build Windows Release portable ZIP and installer
-        run: dart setup.dart windows --env stable --targets zip,exe -v
+        run: dart setup.dart windows --env stable --arch amd64 --targets zip,exe -v
 
       - name: Verify packaged artifacts
         shell: pwsh

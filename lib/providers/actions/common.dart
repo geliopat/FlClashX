@@ -26,7 +26,8 @@ class CommonAction extends _$CommonAction {
   /// The Windows tray is an explicit request for both components.
   /// It does not change the persistent linked-start preference.
   Future<void> toggleTrayRunning() async {
-    if (_trayOperationInProgress) return;
+    if (_trayOperationInProgress || !ref.read(initProvider)) return;
+    if (ref.read(zapretControllerProvider).dashboardRestarting) return;
     _trayOperationInProgress = true;
     try {
       final zapret = ref.read(zapretControllerProvider);

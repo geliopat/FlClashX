@@ -328,6 +328,7 @@ hooks:
       expect(script, isNot(contains('RetireLegacyHelpers')));
       expect(script, isNot(contains('LegacyUninstallKey')));
       expect(script, isNot(contains('[InstallDelete]')));
+      expect(script, isNot(contains('uninsneveruninstall')));
       expect(script, isNot(contains('ClearStaleProxy')));
       expect(script, contains("FileExists(ExpandConstant('{app}\\FlClashX.exe'))"));
       expect(script, contains('RemoveOwnedAutostart'));

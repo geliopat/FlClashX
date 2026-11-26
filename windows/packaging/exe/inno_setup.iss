@@ -277,14 +277,14 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Source: "{{SOURCE_DIR}}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Registry]
-Root: HKLM; Subkey: "Software\Classes\flclashz"; ValueType: string; ValueName: ""; ValueData: "URL:FlClashZ"; Flags: uninsneveruninstall
-Root: HKLM; Subkey: "Software\Classes\flclashz"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""; Flags: uninsneveruninstall
-Root: HKLM; Subkey: "Software\Classes\flclashz\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{{EXECUTABLE_NAME}},0"; Flags: uninsneveruninstall
-Root: HKLM; Subkey: "Software\Classes\flclashz\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{{EXECUTABLE_NAME}}"" ""%1"""; Flags: uninsneveruninstall
-Root: HKLM; Subkey: "Software\Classes\clashz"; ValueType: string; ValueName: ""; ValueData: "URL:FlClashZ"; Flags: uninsneveruninstall
-Root: HKLM; Subkey: "Software\Classes\clashz"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""; Flags: uninsneveruninstall
-Root: HKLM; Subkey: "Software\Classes\clashz\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{{EXECUTABLE_NAME}},0"; Flags: uninsneveruninstall
-Root: HKLM; Subkey: "Software\Classes\clashz\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{{EXECUTABLE_NAME}}"" ""%1"""; Flags: uninsneveruninstall
+Root: HKLM; Subkey: "Software\Classes\flclashz"; ValueType: string; ValueName: ""; ValueData: "URL:FlClashZ"
+Root: HKLM; Subkey: "Software\Classes\flclashz"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""
+Root: HKLM; Subkey: "Software\Classes\flclashz\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{{EXECUTABLE_NAME}},0"
+Root: HKLM; Subkey: "Software\Classes\flclashz\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{{EXECUTABLE_NAME}}"" ""%1"""
+Root: HKLM; Subkey: "Software\Classes\clashz"; ValueType: string; ValueName: ""; ValueData: "URL:FlClashZ"
+Root: HKLM; Subkey: "Software\Classes\clashz"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""
+Root: HKLM; Subkey: "Software\Classes\clashz\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{{EXECUTABLE_NAME}},0"
+Root: HKLM; Subkey: "Software\Classes\clashz\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{{EXECUTABLE_NAME}}"" ""%1"""
 
 [Icons]
 Name: "{autoprograms}\{{DISPLAY_NAME}}"; Filename: "{app}\{{EXECUTABLE_NAME}}"

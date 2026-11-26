@@ -324,7 +324,10 @@ class Bootstrap {
         ? await windowsDisclaimerConsent.ensure(
             legacyAccepted: legacyAccepted,
             environmentAccepted: _isDisclaimerAcceptedByEnvironment,
-            request: requestDisclaimerConsent,
+            request: () async {
+              await window?.show();
+              return requestDisclaimerConsent();
+            },
           )
         : _isDisclaimerAcceptedByEnvironment || await requestDisclaimerConsent();
     if (!isDisclaimerAccepted) {

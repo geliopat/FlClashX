@@ -248,6 +248,10 @@ bool AcrylicMenu::Open(HWND owner, POINT anchor,
     return false;
   }
   SetCapture(window_);
+  if (!window_ || GetCapture() != window_) {
+    Close();
+    return false;
+  }
   InvalidateRect(window_, nullptr, FALSE);
   return true;
 }

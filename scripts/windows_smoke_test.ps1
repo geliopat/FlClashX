@@ -1,4 +1,4 @@
-param([string]$Bundle = '')
+param([string]$Bundle = '', [switch]$RequireExistingConsent)
 $ErrorActionPreference = 'Stop'
 if (!$Bundle) {
   $Bundle = @('build/windows/x64/runner/Release', 'build/windows/runner/Release') |
@@ -18,6 +18,14 @@ if ($versionInfo.CompanyName -ne 'sweetyyoba.com' -or $versionInfo.ProductName -
 }
 $marker = Join-Path $env:RUNNER_TEMP ("flclashz-smoke-" + [guid]::NewGuid() + ".txt")
 $previous = $env:FLCLASHZ_SMOKE_MARKER
+$previousConsent = $env:FLCLASH_ACCEPT_DISCLAIMER
+if ($RequireExistingConsent) {
+  $consent = Join-Path $env:APPDATA 'sweetyyoba.com\clashz\disclaimer.accepted'
+  if (!(Test-Path -LiteralPath $consent) -or (Get-Content -LiteralPath $consent -Raw).Trim() -ne '1') { throw 'Expected consent from previous portable launch' }
+  Remove-Item Env:FLCLASH_ACCEPT_DISCLAIMER -ErrorAction SilentlyContinue
+} else {
+  $env:FLCLASH_ACCEPT_DISCLAIMER = '1'
+}
 $env:FLCLASHZ_SMOKE_MARKER = $marker
 $process = $null
 try {
@@ -58,7 +66,12 @@ try {
           !(Test-Path -LiteralPath $cache -PathType Container)) {
         throw 'Resolved application data directories do not exist'
       }
-      Write-Host 'Roaming and Local AppData paths passed'
+      $consent = Join-Path $home 'disclaimer.accepted'
+      if (!(Test-Path -LiteralPath $consent) -or (Get-Content -LiteralPath $consent -Raw).Trim() -ne '1') {
+        Start-Sleep -Milliseconds 500
+        continue
+      }
+      Write-Host 'Roaming and Local AppData paths and persisted consent passed'
       Start-Sleep -Seconds 3
       $process.Refresh()
       if ($process.HasExited) { throw 'Application exited after its first frame' }
@@ -76,4 +89,5 @@ try {
   }
   if (Test-Path $marker) { Remove-Item -LiteralPath $marker -Force }
   $env:FLCLASHZ_SMOKE_MARKER = $previous
+  $env:FLCLASH_ACCEPT_DISCLAIMER = $previousConsent
 }

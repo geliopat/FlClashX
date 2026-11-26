@@ -48,6 +48,12 @@ class _Setup extends TestSetupAction {
   final List<String> events;
 
   @override
+  bool get coreNeedsAuthorization => false;
+
+  @override
+  Future<bool> inputsApplied() async => true;
+
+  @override
   Future<bool> setCoreRunning(bool running) async {
     events.add('mihomo:listener:$running');
     return super.setCoreRunning(running);
