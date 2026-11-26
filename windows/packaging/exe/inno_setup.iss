@@ -187,14 +187,14 @@ begin
 end;
 
 // Only remove per-user entries if they still point at this installation.
-procedure RemoveOwnedProtocol(const Scheme: String);
+procedure RemoveOwnedProtocol(Root: Integer; const Scheme: String);
 var
   Key, Command: String;
 begin
   Key := 'Software\Classes\' + Scheme;
-  if RegQueryStringValue(HKEY_CURRENT_USER, Key + '\shell\open\command', '', Command) and
+  if RegQueryStringValue(Root, Key + '\shell\open\command', '', Command) and
      (CompareText(Command, '"' + ExpandConstant('{app}\{{EXECUTABLE_NAME}}') + '" "%1"') = 0) then
-    RegDeleteKeyIncludingSubkeys(HKEY_CURRENT_USER, Key);
+    RegDeleteKeyIncludingSubkeys(Root, Key);
 end;
 
 procedure RemoveOwnedAutostart;
@@ -218,8 +218,10 @@ begin
       ShutDownApp;
       RunHidden('sc.exe', 'delete "' + HelperService + '"');
       RemoveOwnedAutostart;
-      RemoveOwnedProtocol('flclashz');
-      RemoveOwnedProtocol('clashz');
+      RemoveOwnedProtocol(HKEY_CURRENT_USER, 'flclashz');
+      RemoveOwnedProtocol(HKEY_CURRENT_USER, 'clashz');
+      RemoveOwnedProtocol(HKEY_LOCAL_MACHINE, 'flclashz');
+      RemoveOwnedProtocol(HKEY_LOCAL_MACHINE, 'clashz');
     end;
     usPostUninstall:
     begin
@@ -275,14 +277,14 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Source: "{{SOURCE_DIR}}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Registry]
-Root: HKLM; Subkey: "Software\Classes\flclashz"; ValueType: string; ValueName: ""; ValueData: "URL:FlClashZ"; Flags: uninsdeletekey
-Root: HKLM; Subkey: "Software\Classes\flclashz"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""
-Root: HKLM; Subkey: "Software\Classes\flclashz\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{{EXECUTABLE_NAME}},0"
-Root: HKLM; Subkey: "Software\Classes\flclashz\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{{EXECUTABLE_NAME}}"" ""%1"""
-Root: HKLM; Subkey: "Software\Classes\clashz"; ValueType: string; ValueName: ""; ValueData: "URL:FlClashZ"; Flags: uninsdeletekey
-Root: HKLM; Subkey: "Software\Classes\clashz"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""
-Root: HKLM; Subkey: "Software\Classes\clashz\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{{EXECUTABLE_NAME}},0"
-Root: HKLM; Subkey: "Software\Classes\clashz\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{{EXECUTABLE_NAME}}"" ""%1"""
+Root: HKLM; Subkey: "Software\Classes\flclashz"; ValueType: string; ValueName: ""; ValueData: "URL:FlClashZ"; Flags: uninsneveruninstall
+Root: HKLM; Subkey: "Software\Classes\flclashz"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""; Flags: uninsneveruninstall
+Root: HKLM; Subkey: "Software\Classes\flclashz\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{{EXECUTABLE_NAME}},0"; Flags: uninsneveruninstall
+Root: HKLM; Subkey: "Software\Classes\flclashz\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{{EXECUTABLE_NAME}}"" ""%1"""; Flags: uninsneveruninstall
+Root: HKLM; Subkey: "Software\Classes\clashz"; ValueType: string; ValueName: ""; ValueData: "URL:FlClashZ"; Flags: uninsneveruninstall
+Root: HKLM; Subkey: "Software\Classes\clashz"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""; Flags: uninsneveruninstall
+Root: HKLM; Subkey: "Software\Classes\clashz\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{{EXECUTABLE_NAME}},0"; Flags: uninsneveruninstall
+Root: HKLM; Subkey: "Software\Classes\clashz\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{{EXECUTABLE_NAME}}"" ""%1"""; Flags: uninsneveruninstall
 
 [Icons]
 Name: "{autoprograms}\{{DISPLAY_NAME}}"; Filename: "{app}\{{EXECUTABLE_NAME}}"

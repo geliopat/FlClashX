@@ -317,8 +317,8 @@ hooks:
       expect(script, isNot(contains('ClearStaleProxy')));
       expect(script, contains("FileExists(ExpandConstant('{app}\\FlClashX.exe'))"));
       expect(script, contains('RemoveOwnedAutostart'));
-      expect(script, contains("RemoveOwnedProtocol('flclashz')"));
-      expect(script, contains("RemoveOwnedProtocol('clashz')"));
+      expect(script, contains("RemoveOwnedProtocol(HKEY_CURRENT_USER, 'flclashz')"));
+      expect(script, contains("RemoveOwnedProtocol(HKEY_LOCAL_MACHINE, 'clashz')"));
       expect(script, contains('Software\\Classes\\flclashz'));
       expect(script, isNot(contains('Software\\Classes\\flclashx')));
       final dart = File('lib/common/system.dart').readAsStringSync();
@@ -339,9 +339,9 @@ hooks:
         'windows/packaging/exe/inno_setup.iss',
       ).readAsStringSync();
       final config = {
-        'app_id': 'D915C0D1-2F5B-4676-97D5-6D55F3EF45A4',
-        'display_name': 'FlClashX',
-        'executable_name': 'FlClashX.exe',
+        'app_id': 'A1E719DB-1597-4C0E-AC89-05BBED14D43D',
+        'display_name': 'FlClashZ',
+        'executable_name': 'FlClashZ.exe',
       };
 
       String render(setup.DesktopIdentity identity) => setup.renderInnoSetup(
@@ -358,12 +358,12 @@ hooks:
 
       test('installs under its own id, name, Helper and data', () {
         final pre = render(setup.preDesktop);
-        expect(pre, isNot(contains('D915C0D1-2F5B-4676-97D5-6D55F3EF45A4')));
-        expect(pre, contains(r'DefaultDirName={autopf}\FlClashX Pre'));
+        expect(pre, contains('AppId=87F299A5-9634-45C1-915B-24E3A90B56A2'));
+        expect(pre, contains(r'DefaultDirName={autopf}\FlClashZ Pre'));
         expect(pre, contains("HelperService = 'FlClashZHelperService';"));
         expect(pre, isNot(contains("HelperService = 'FlClashXPreHelperService';")));
         expect(pre, isNot(contains('AdoptLegacy')));
-        expect(pre, contains("KillProcess('FlClashXPre.exe');"));
+        expect(pre, contains("KillProcess('FlClashZPre.exe');"));
         expect(pre, contains(r'{userappdata}\sweetyyoba.com\clashz.pre'));
         expect(
           RegExp(r'\{\{([A-Z_]+)\}\}').allMatches(pre).map((m) => m[1]),
@@ -373,11 +373,11 @@ hooks:
 
       test('uses the fork data path in the stable installer', () {
         final stable = render(setup.stableDesktop);
-        expect(stable, contains('AppId=D915C0D1-2F5B-4676-97D5-6D55F3EF45A4'));
-        expect(stable, contains(r'DefaultDirName={autopf}\FlClashX'));
+        expect(stable, contains('AppId=A1E719DB-1597-4C0E-AC89-05BBED14D43D'));
+        expect(stable, contains(r'DefaultDirName={autopf}\FlClashZ'));
         expect(stable, contains("HelperService = 'FlClashZHelperService';"));
         expect(stable, isNot(contains('AdoptLegacy')));
-        expect(stable, contains("KillProcess('FlClashX.exe');"));
+        expect(stable, contains("KillProcess('FlClashZ.exe');"));
         expect(stable, contains(r"{userappdata}\sweetyyoba.com\clashz')"));
       });
 

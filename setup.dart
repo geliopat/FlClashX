@@ -757,8 +757,8 @@ String renderInnoSetup(
   DesktopIdentity identity = stableDesktop,
 }) {
   final displayName = identity.pre
-      ? identity.displayName
-      : (config['display_name'] ?? _appName) as String;
+      ? 'FlClashZ Pre'
+      : (config['display_name'] ?? 'FlClashZ') as String;
   final privileges = (config['privileges_required'] ?? 'admin') as String;
   final locales = (config['locales'] as List?) ?? const [];
   final chineseIsl = p.join(
@@ -794,8 +794,8 @@ String renderInnoSetup(
     'ARCH': arch == 'arm64' ? 'arm64' : 'x64compatible',
     'SOURCE_DIR': sourceDir,
     'EXECUTABLE_NAME': identity.pre
-        ? '${identity.executable}.exe'
-        : (config['executable_name'] ?? '$_appName.exe') as String,
+        ? 'FlClashZPre.exe'
+        : (config['executable_name'] ?? 'FlClashZ.exe') as String,
     'HELPER_SERVICE': windowsHelperName,
     'USER_DATA_DIR': identity.windowsDataDir,
     'LANGUAGES': languages.join('\n'),

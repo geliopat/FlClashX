@@ -337,8 +337,8 @@ void AcrylicMenu::Paint(HWND window) {
         }
         if (static_cast<int>(i) == hover_)
           RoundFill(graphics, RectF(x, y, w, h), static_cast<REAL>(Scale(5)),
-                    Color(pressed_ == hover_ ? 38 : 24, 255, 255, 255));
-        const Color foreground(row.enabled ? 255 : 115, 255, 255, 255);
+                    Color(static_cast<BYTE>(pressed_ == hover_ ? 38 : 24), 255, 255, 255));
+        const Color foreground(static_cast<BYTE>(row.enabled ? 255 : 115), 255, 255, 255);
         SolidBrush brush(foreground);
         const REAL icon = static_cast<REAL>(Scale(kIcon));
         const REAL inset = static_cast<REAL>(Scale(kInset));
@@ -349,7 +349,7 @@ void AcrylicMenu::Paint(HWND window) {
             RectF(text_x, y, static_cast<REAL>(label_width_ + Scale(2)), h),
             &format, &brush);
         if (!row.detail.empty()) {
-          SolidBrush secondary(Color(row.enabled ? 190 : 100, 255, 255, 255));
+          SolidBrush secondary(Color(static_cast<BYTE>(row.enabled ? 190 : 100), 255, 255, 255));
           const REAL detail_x = text_x + static_cast<REAL>(label_width_ + Scale(kDetailGap));
           format.SetAlignment(StringAlignmentFar);
           graphics.DrawString(row.detail.c_str(), -1, render_->font.get(),

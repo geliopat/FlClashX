@@ -115,9 +115,16 @@ jobs:
             }
           }
 
-      - name: Smoke test the compiled Windows application
+      - name: Smoke test portable archive
         shell: pwsh
-        run: ./scripts/windows_smoke_test.ps1
+        run: |
+          $folder = Join-Path $env:RUNNER_TEMP 'flclashz-portable-smoke'
+          Expand-Archive -LiteralPath 'dist/FlClashZ-windows-amd64.zip' -DestinationPath $folder -Force
+          ./scripts/windows_smoke_test.ps1 -Bundle $folder
+
+      - name: Verify install, startup, uninstall and FlClashX isolation
+        shell: pwsh
+        run: ./scripts/windows_installer_test.ps1
 
       - name: Upload Windows Release bundle
         uses: actions/upload-artifact@v6
