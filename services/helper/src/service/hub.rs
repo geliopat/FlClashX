@@ -1919,7 +1919,12 @@ struct ProcessStats {
 #[cfg(windows)]
 impl ProcessStats {
     fn stopped() -> Self {
-        Self { pid: 0, created: Some(0), cpu100ns: Some(0), rss: Some(0) }
+        Self {
+            pid: 0,
+            created: Some(0),
+            cpu100ns: Some(0),
+            rss: Some(0),
+        }
     }
 }
 
@@ -1941,7 +1946,11 @@ fn read_process_stats(handle: HANDLE, pid: u32) -> ProcessStats {
         let mut kernel: FILETIME = std::mem::zeroed();
         let mut user: FILETIME = std::mem::zeroed();
         let times_ok = GetProcessTimes(
-            handle, &mut created, &mut exited, &mut kernel, &mut user
+            handle,
+            &mut created,
+            &mut exited,
+            &mut kernel,
+            &mut user,
         ) != 0;
         let mut memory: PROCESS_MEMORY_COUNTERS = std::mem::zeroed();
         let size = std::mem::size_of::<PROCESS_MEMORY_COUNTERS>() as u32;
@@ -1958,10 +1967,15 @@ fn read_process_stats(handle: HANDLE, pid: u32) -> ProcessStats {
 
 #[cfg(windows)]
 fn managed_process_stats(child: Option<&mut Child>) -> Option<ProcessStats> {
-    let Some(child) = child else { return Some(ProcessStats::stopped()); };
+    let Some(child) = child else {
+        return Some(ProcessStats::stopped());
+    };
     match child.try_wait() {
         Ok(Some(_)) => Some(ProcessStats::stopped()),
-        Ok(None) => Some(read_process_stats(child.as_raw_handle() as HANDLE, child.id())),
+        Ok(None) => Some(read_process_stats(
+            child.as_raw_handle() as HANDLE,
+            child.id(),
+        )),
         Err(_) => None,
     }
 }
@@ -1987,7 +2001,11 @@ fn get_process_stats() -> warp::reply::Response {
 
 #[cfg(not(windows))]
 fn get_process_stats() -> warp::reply::Response {
-    error_response("unsupportedPlatform", "Process statistics are Windows-only", StatusCode::NOT_IMPLEMENTED)
+    error_response(
+        "unsupportedPlatform",
+        "Process statistics are Windows-only",
+        StatusCode::NOT_IMPLEMENTED,
+    )
 }
 
 fn get_logs() -> impl Reply {
