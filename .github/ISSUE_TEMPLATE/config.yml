@@ -1,4 +1,8 @@
+blank_issues_enabled: true
 contact_links:
-  - name: Общение / Communication
-    url: https://t.me/flclashx
-    about: Общение между другими пользователиями в группе Телеграмма / Communicate with other users in the Telegram group
+  - name: Документация FlClashZ / FlClashZ documentation
+    url: https://github.com/geliopat/FlClashZ/blob/fix/zapret2-stability/README.md
+    about: Установка, обновления и настройки / Installation, updates and configuration
+  - name: Заголовки подписки / Subscription headers
+    url: https://github.com/geliopat/FlClashZ/blob/fix/zapret2-stability/docs/headers.md
+    about: Справочник для провайдеров / Provider configuration reference

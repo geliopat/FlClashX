@@ -56,7 +56,8 @@ try {
     # Keep the original zapret2-gui directory structure in the installed bundle.
     # The root copies are retained because the flagship and imported profiles
     # load the shared Lua libraries from the engine working directory.
-    $LuaFiles = @("zapret-lib.lua","zapret-antidpi.lua","zapret-auto.lua","zapret-discord-light.lua","zapret-extsplit.lua","zapret-firstbyte.lua","zapret-ipfrag.lua","zapret-obfs.lua","zapret-pcap.lua","zapret-sites-light.lua","zapret-syndata.lua","zapret-tests.lua","zapret-tspu-max.lua","zapret-yt4k.lua")
+    $LuaFiles = @(Get-ChildItem -LiteralPath $StrategySource -File -Filter "zapret-*.lua" | Sort-Object Name | ForEach-Object { $_.Name })
+    if ($LuaFiles.Count -eq 0) { throw "No bundled Lua strategies found." }
     foreach ($Name in $LuaFiles) {
         $SourcePath = Join-Path $StrategySource $Name
         if (-not (Test-Path $SourcePath -PathType Leaf)) { throw "Bundled Lua strategy is missing: $SourcePath" }
@@ -71,8 +72,9 @@ try {
     }
     Copy-Item -Path $ImportedSource -Destination $StrategyDir -Recurse -Force
     $ImportedBatFiles = @(Get-ChildItem -Path (Join-Path $StrategyDir "imported\kinlay0") -File -Filter "*.bat")
-    if ($ImportedBatFiles.Count -ne 26) {
-        throw "Expected 26 pinned kinlay0 BAT strategies, found $($ImportedBatFiles.Count)."
+    $SourceBatFiles = @(Get-ChildItem -LiteralPath (Join-Path $ImportedSource "kinlay0") -File -Filter "*.bat")
+    if ($SourceBatFiles.Count -eq 0 -or $ImportedBatFiles.Count -ne $SourceBatFiles.Count) {
+        throw "Expected $($SourceBatFiles.Count) pinned kinlay0 BAT strategies, found $($ImportedBatFiles.Count)."
     }
     foreach ($RequiredStrategy in @("zapret-antidpi.lua","zapret-discord-light.lua","zapret-extsplit.lua","zapret-firstbyte.lua","zapret-ipfrag.lua","zapret-sites-light.lua","zapret-syndata.lua","zapret-tspu-max.lua","zapret-yt4k.lua")) {
         if (-not (Test-Path (Join-Path $StrategyDir $RequiredStrategy) -PathType Leaf)) {

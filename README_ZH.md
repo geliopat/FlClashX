@@ -11,7 +11,11 @@
 [![Downloads](https://img.shields.io/github/downloads/geliopat/FlClashZ/total?style=flat-square)](https://github.com/geliopat/FlClashZ/releases)
 [![License](https://img.shields.io/github/license/geliopat/FlClashZ?style=flat-square)](LICENSE)
 
-[![Windows validation](https://github.com/geliopat/FlClashZ/actions/workflows/zapret-windows-validation.yml/badge.svg?branch=fix%2Fzapret2-stability)](https://github.com/geliopat/FlClashZ/actions/workflows/zapret-windows-validation.yml)
+[![下载安装版](https://img.shields.io/badge/%E4%B8%8B%E8%BD%BD%E5%AE%89%E8%A3%85%E7%89%88-EXE-0078D4?style=for-the-badge)](https://github.com/geliopat/FlClashZ/releases/latest/download/FlClashZ-windows-amd64-setup.exe) [![下载便携版](https://img.shields.io/badge/%E4%B8%8B%E8%BD%BD%E4%BE%BF%E6%90%BA%E7%89%88-ZIP-475569?style=for-the-badge)](https://github.com/geliopat/FlClashZ/releases/latest/download/FlClashZ-windows-amd64.zip)
+
+[![v1.0.1 validated](https://img.shields.io/badge/v1.0.1-Windows%20validated-brightgreen?style=flat-square)](https://github.com/geliopat/FlClashZ/actions/runs/45790180974)
+
+[订阅响应头](docs/headers.md) · [Zapret 设置](docs/flclashz-zapret-headers.md) · [同步](docs/upstream-sync.md)
 
 [Русский](README.md) · [English](README_EN.md) · **中文**
 
@@ -21,7 +25,7 @@ FlClashZ 是 [FlClashX](https://github.com/pluralplay/FlClashX) 的独立分支�
 
 ## 下载
 
-软件包发布于 [GitHub Releases](https://github.com/geliopat/FlClashZ/releases)。以下文件链接将在相应稳定版本发布后可用。
+稳定版 [1.0.1](https://github.com/geliopat/FlClashZ/releases/tag/v1.0.1) 已发布。安装版和便携版均已通过构建、启动、安装、运行中升级及与 FlClashX 隔离检查。
 
 | 版本 | 格式 | 下载 |
 | --- | --- | --- |
@@ -68,6 +72,27 @@ flclashz://install-config?url=<URL 编码后的订阅地址>
 稳定版标签形如 `v1.0.1`。默认通过 [Latest 签名清单](https://github.com/geliopat/FlClashZ/releases/latest/download/manifest.json) 检查稳定版更新，其中包含版本、文件 URL、SHA-256 及 Ed25519 签名。指定版本的清单位于 `releases/download/v<版本>/manifest.json`。
 
 安装程序在替换文件前结束正在运行的 FlClashZ，并保留设置。Windows CI 在发布前检查便携版启动、安装、运行中升级以及与 FlClashX 的隔离。
+
+> [!IMPORTANT]
+> 从 1.0.0 升级时，请手动覆盖安装 1.0.1 或更新版本：旧版本没有内置清单验证公钥。自 1.0.1 起已内置公钥。应用内更新与上游源码同步相互独立。
+
+## 组件
+
+| 组件 | 1.0.1 中的版本 | 来源 |
+| --- | --- | --- |
+| FlClashX（基础） | `0.5.8` | [pluralplay/FlClashX](https://github.com/pluralplay/FlClashX) |
+| Mihomo（随 FlClashX 集成） | `v1.19.34` | [MetaCubeX/mihomo](https://github.com/MetaCubeX/mihomo) |
+| Zapret2 | `v1.0.8` | [bol-van/zapret2](https://github.com/bol-van/zapret2) |
+| Flowseal | `1.10.4` | [Flowseal/zapret-discord-youtube](https://github.com/Flowseal/zapret-discord-youtube) |
+| Lua/BAT 策略 | `8dd17fcbcca4` | [geliopat/zapret2-gui](https://github.com/geliopat/zapret2-gui/tree/8dd17fcbcca405a50f497a6e2346ca263901d775) |
+
+## 开发与同步
+
+**仅手动同步。** `main` 是 FlClashX 的纯镜像；`fix/zapret2-stability` 是 FlClashZ 的开发分支。Mihomo 仅随 FlClashX 集成，包括其内核补丁和依赖。
+
+[手动同步](https://github.com/geliopat/FlClashZ/actions/workflows/flclashz-upstream-sync.yml) 创建独立的 `sync/flclashz-*` 候选分支，检查 Zapret2 和 Flowseal 的固定版本，对本项目分支中的策略进行三方合并并记录冲突。无变化时跳过构建。合并和发布均由维护者另行决定。
+
+[同步文档（俄语）](docs/upstream-sync.md) · [Windows 验证](https://github.com/geliopat/FlClashZ/actions/workflows/zapret-windows-validation.yml) · [发布工作流](https://github.com/geliopat/FlClashZ/actions/workflows/flclashz-release.yml)
 
 ## 从源码构建
 

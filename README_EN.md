@@ -11,7 +11,11 @@
 [![Downloads](https://img.shields.io/github/downloads/geliopat/FlClashZ/total?style=flat-square)](https://github.com/geliopat/FlClashZ/releases)
 [![License](https://img.shields.io/github/license/geliopat/FlClashZ?style=flat-square)](LICENSE)
 
-[![Windows validation](https://github.com/geliopat/FlClashZ/actions/workflows/zapret-windows-validation.yml/badge.svg?branch=fix%2Fzapret2-stability)](https://github.com/geliopat/FlClashZ/actions/workflows/zapret-windows-validation.yml)
+[![Download installer](https://img.shields.io/badge/Download_installer-EXE-0078D4?style=for-the-badge)](https://github.com/geliopat/FlClashZ/releases/latest/download/FlClashZ-windows-amd64-setup.exe) [![Download portable](https://img.shields.io/badge/Download_portable-ZIP-475569?style=for-the-badge)](https://github.com/geliopat/FlClashZ/releases/latest/download/FlClashZ-windows-amd64.zip)
+
+[![v1.0.1 validated](https://img.shields.io/badge/v1.0.1-Windows%20validated-brightgreen?style=flat-square)](https://github.com/geliopat/FlClashZ/actions/runs/45790180974)
+
+[Subscription headers](docs/headers.md) · [Zapret configuration](docs/flclashz-zapret-headers.md) · [Synchronization](docs/upstream-sync.md)
 
 [Русский](README.md) · **English** · [中文](README_ZH.md)
 
@@ -23,7 +27,7 @@ FlClashZ is an independent fork of [FlClashX](https://github.com/pluralplay/FlCl
 
 ## Download
 
-Official packages are published on [GitHub Releases](https://github.com/geliopat/FlClashZ/releases). The asset links become available once the corresponding stable release is published.
+Stable release [1.0.1](https://github.com/geliopat/FlClashZ/releases/tag/v1.0.1) is published. Both packages passed build, startup, installation, running-app upgrade and FlClashX isolation checks.
 
 | Edition | Format | Download |
 | --- | --- | --- |
@@ -70,6 +74,27 @@ flclashz://install-config?url=<URL-encoded subscription URL>
 Stable releases use tags such as `v1.0.1`. The default stable update source is the signed [latest manifest](https://github.com/geliopat/FlClashZ/releases/latest/download/manifest.json). It includes the version, asset URLs, SHA-256 hashes and an Ed25519 signature. Version-specific manifests are available under `releases/download/v<version>/manifest.json`.
 
 The installer is designed to stop the running application before replacing files and preserve settings. Windows CI checks portable startup, installation, upgrade while running and FlClashX isolation before release publication.
+
+> [!IMPORTANT]
+> When upgrading from 1.0.0, install 1.0.1 or a newer version manually over the existing installation: the old build had no embedded manifest verification key. The key is included from 1.0.1 onward. In-app updates are independent of upstream source synchronization.
+
+## Components
+
+| Component | Version in 1.0.1 | Source |
+| --- | --- | --- |
+| FlClashX (base) | `0.5.8` | [pluralplay/FlClashX](https://github.com/pluralplay/FlClashX) |
+| Mihomo (via FlClashX) | `v1.19.34` | [MetaCubeX/mihomo](https://github.com/MetaCubeX/mihomo) |
+| Zapret2 | `v1.0.8` | [bol-van/zapret2](https://github.com/bol-van/zapret2) |
+| Flowseal | `1.10.4` | [Flowseal/zapret-discord-youtube](https://github.com/Flowseal/zapret-discord-youtube) |
+| Lua/BAT strategies | `8dd17fcbcca4` | [geliopat/zapret2-gui](https://github.com/geliopat/zapret2-gui/tree/8dd17fcbcca405a50f497a6e2346ca263901d775) |
+
+## Development and synchronization
+
+**Manual synchronization only.** `main` is a clean FlClashX mirror; `fix/zapret2-stability` is the FlClashZ development branch. Mihomo is integrated exclusively through FlClashX, including its core patches and dependencies.
+
+[Manual synchronization](https://github.com/geliopat/FlClashZ/actions/workflows/flclashz-upstream-sync.yml) prepares an isolated `sync/flclashz-*` candidate, checks pinned Zapret2 and Flowseal releases, merges strategies from our fork with a three-way merge and records conflicts. Unchanged components do not trigger a build. Merging and releasing require a separate maintainer decision.
+
+[Sync documentation (Russian)](docs/upstream-sync.md) · [Windows validation](https://github.com/geliopat/FlClashZ/actions/workflows/zapret-windows-validation.yml) · [Release workflow](https://github.com/geliopat/FlClashZ/actions/workflows/flclashz-release.yml)
 
 ## Build from source
 

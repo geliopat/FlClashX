@@ -1,14 +1,12 @@
 name: FlClashZ upstream integration
 
-# Scheduled workflows are read from the default branch. Keep main as an exact
-# upstream mirror; set the FlClashZ development branch as the default branch.
+# main is the clean FlClashX mirror; the default branch is development.
+# Manual only: prepare and validate a candidate; never promote or publish it.
 on:
-  schedule:
-    - cron: '23 4 * * *'
   workflow_dispatch:
     inputs:
       force_validation:
-        description: Validate even if upstream is already integrated
+        description: Revalidate an existing candidate even if inputs are unchanged
         type: boolean
         default: false
 
@@ -27,84 +25,160 @@ jobs:
     outputs:
       sha: ${{ steps.merge.outputs.sha }}
       branch: ${{ steps.merge.outputs.branch }}
+      base: ${{ steps.merge.outputs.base }}
     steps:
       - uses: actions/checkout@v5
         with:
           ref: fix/zapret2-stability
           fetch-depth: 0
-      - name: Synchronize the clean mirror and prepare an isolated candidate
+      - name: Test component synchronization tooling
+        run: python3 -m unittest discover -s tool -p test_flclashz_sync_components.py
+      - name: Synchronize mirrors and prepare an isolated candidate
         id: merge
         shell: bash
         env:
           FORCE_VALIDATION: ${{ inputs.force_validation }}
+          GH_TOKEN: ${{ github.token }}
+          STRATEGY_SYNC_TOKEN: ${{ secrets.FLCLASHZ_SYNC_TOKEN }}
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          development=$(git rev-parse HEAD)
+          echo "base=$development" >> "$GITHUB_OUTPUT"
+          report="$RUNNER_TEMP/integration-report"
+          mkdir -p "$report"
+          printf 'development=%s\n' "$development" > "$report/refs.txt"
+          # Use the trusted development revision of our scripts, not files
+          # provided by the upstream candidate, in this write-capable job.
+          git show "$development:tool/flclashz_sync_versions.py" > "$RUNNER_TEMP/sync_versions.py"
+          git show "$development:tool/flclashz_sync_components.py" > "$RUNNER_TEMP/sync_components.py"
+
           git fetch --no-tags https://github.com/pluralplay/FlClashX.git refs/heads/main:refs/remotes/upstream/main
           git fetch --no-tags origin refs/heads/main:refs/remotes/origin/main
           upstream=$(git rev-parse refs/remotes/upstream/main)
           mirror=$(git rev-parse refs/remotes/origin/main)
-          development=$(git rev-parse HEAD)
-          mkdir -p integration-report
-          printf 'upstream=%s\nmirror=%s\ndevelopment=%s\n' "$upstream" "$mirror" "$development" | tee integration-report/refs.txt
-          if ! git merge-base --is-ancestor "$mirror" "$upstream"; then
-            echo "::error::The clean main mirror has diverged. Refusing to overwrite its history."
-            exit 1
+          printf 'upstream=%s\nmirror=%s\n' "$upstream" "$mirror" >> "$report/refs.txt"
+          if git merge-base --is-ancestor "$mirror" "$upstream"; then
+            if [[ "$mirror" != "$upstream" ]]; then
+              git push origin "$upstream:refs/heads/main"
+            fi
+          else
+            echo "BLOCKED FlClashX mirror: non-fast-forward" | tee "$report/mirror.txt"
           fi
-          if [[ "$mirror" != "$upstream" ]]; then
-            git push origin "$upstream:refs/heads/main"
+          git diff --name-status "$upstream...$development" > "$report/our-changes.txt"
+          git log --oneline "$upstream..$development" > "$report/our-commits.txt"
+
+          git switch --detach "$development"
+          if ! git merge-base --is-ancestor "$upstream" HEAD; then
+            git merge --no-ff --no-commit "$upstream" || true
+            if git rev-parse -q --verify MERGE_HEAD >/dev/null; then
+              # These documents describe FlClashZ, not the upstream project.
+              # Keep our copies even when upstream changed its own README.
+              git restore --source="$development" --staged --worktree -- README.md README_EN.md README_ZH.md
+              if git diff --name-only --diff-filter=U | grep -Fxq pubspec.yaml; then
+                python3 "$RUNNER_TEMP/sync_versions.py" --resolve-pubspec || true
+              fi
+              if [[ -n "$(git diff --name-only --diff-filter=U)" ]]; then
+                git diff --name-only --diff-filter=U > "$report/flclashx-conflicts.txt"
+                git merge --abort
+                echo "BLOCKED FlClashX: source conflicts, retaining development" | tee "$report/flclashx.txt"
+              elif python3 "$RUNNER_TEMP/sync_versions.py" --development "$development" --upstream "$upstream"; then
+                git commit -m "Merge FlClashX upstream and retain FlClashZ version"
+              else
+                git merge --abort
+                echo "BLOCKED FlClashX: incompatible version metadata" | tee "$report/flclashx.txt"
+              fi
+            else
+              echo "BLOCKED FlClashX: cannot merge upstream" | tee "$report/flclashx.txt"
+            fi
           fi
-          git diff --name-status "$upstream...$development" > integration-report/our-changes.txt
-          git log --oneline "$upstream..$development" > integration-report/our-commits.txt
-          if git merge-base --is-ancestor "$upstream" "$development" && [[ "$FORCE_VALIDATION" != true ]]; then
-            echo "Upstream already integrated."
+
+          # Track the official GUI upstream, but import strategies from our
+          # fork only. Cross-repository writes need a separate scoped token.
+          strategy="$RUNNER_TEMP/zapret2-gui"
+          strategy_args=()
+          if git clone --quiet --filter=blob:none --no-checkout --single-branch --branch main https://github.com/geliopat/zapret2-gui.git "$strategy"; then
+            fork_head=$(git -C "$strategy" rev-parse refs/remotes/origin/main)
+            strategy_args=(--strategy-repo "$strategy" --strategy-ref "$fork_head")
+            if git -C "$strategy" fetch --quiet --no-tags https://github.com/mqclass/zapret2-gui.git refs/heads/main:refs/remotes/upstream/main; then
+              gui_upstream=$(git -C "$strategy" rev-parse refs/remotes/upstream/main)
+              printf 'strategy_fork=%s\nstrategy_upstream=%s\n' "$fork_head" "$gui_upstream" >> "$report/refs.txt"
+              if [[ "$fork_head" != "$gui_upstream" ]]; then
+                if git -C "$strategy" merge-base --is-ancestor "$gui_upstream" "$fork_head"; then
+                  echo "Strategy fork already contains upstream" > "$report/strategy-fork.txt"
+                elif ! git -C "$strategy" merge-base --is-ancestor "$fork_head" "$gui_upstream"; then
+                  echo "BLOCKED strategy fork: diverged; merge upstream manually" > "$report/strategy-fork.txt"
+                elif [[ -z "$STRATEGY_SYNC_TOKEN" ]]; then
+                  echo "BLOCKED strategy fork sync: set FLCLASHZ_SYNC_TOKEN or use Sync fork on GitHub" > "$report/strategy-fork.txt"
+                else
+                  # Non-force push; the expected old head must remain an
+                  # ancestor. Never overwrite fork-specific commits.
+                  auth=$(printf 'x-access-token:%s' "$STRATEGY_SYNC_TOKEN" | base64 -w0)
+                  echo "::add-mask::$auth"
+                  if git -C "$strategy" -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" push origin "$gui_upstream:refs/heads/main"; then
+                    strategy_args=(--strategy-repo "$strategy" --strategy-ref "$gui_upstream")
+                    echo "Strategy fork fast-forwarded" > "$report/strategy-fork.txt"
+                  else
+                    echo "BLOCKED strategy fork: cross-repository push failed" > "$report/strategy-fork.txt"
+                  fi
+                  unset auth
+                fi
+              fi
+            fi
+          fi
+          unset STRATEGY_SYNC_TOKEN
+          python3 "$RUNNER_TEMP/sync_components.py" "${strategy_args[@]}" --report "$report/components.txt"
+          git add -- scripts/setup_zapret.ps1 lib/providers/zapret_components.dart services/helper/strategies
+          if ! git diff --cached --quiet; then
+            git diff --cached --check
+            git commit -m "Sync pinned Zapret2, Flowseal and strategy sources"
+          fi
+
+          if [[ "$(git rev-parse HEAD)" == "$development" && "$FORCE_VALIDATION" != true ]]; then
+            echo 'No compatible component changes; skipping Windows build.'
             exit 0
           fi
-          short_upstream=$(git rev-parse --short=12 "$upstream")
-          short_development=$(git rev-parse --short=12 "$development")
-          candidate="sync/flclashz-$short_upstream-$short_development"
-          if git ls-remote --exit-code --heads origin "refs/heads/$candidate" > /dev/null; then
+          tree=$(git rev-parse 'HEAD^{tree}')
+          candidate="sync/flclashz-${development:0:12}-${tree:0:12}"
+          if git ls-remote --exit-code --heads origin "refs/heads/$candidate" >/dev/null; then
             if [[ "$FORCE_VALIDATION" != true ]]; then
-              echo "Candidate already exists: $candidate"
+              echo "Candidate already exists: $candidate (use force_validation to retry)"
               exit 0
             fi
             git fetch --no-tags origin "refs/heads/$candidate"
             git checkout --detach FETCH_HEAD
+            [[ "$(git rev-parse 'HEAD^{tree}')" == "$tree" ]]
+            git merge-base --is-ancestor "$development" HEAD
           else
-            git checkout -b "$candidate"
-            # Merge without committing so the fork's version can never be
-            # replaced by upstream's pubspec version.
-            if ! git merge --no-ff --no-commit "$upstream"; then
-              if git diff --name-only --diff-filter=U | grep -Fxq pubspec.yaml; then
-                python3 tool/flclashz_sync_versions.py --resolve-pubspec || true
-              fi
-              if [[ -n "$(git diff --name-only --diff-filter=U)" ]] || ! git rev-parse -q --verify MERGE_HEAD >/dev/null; then
-                git diff --name-only --diff-filter=U > integration-report/conflicts.txt
-                git merge --abort || true
-                echo "::error::Merge conflicts. Development and previous releases were not changed."
-                exit 1
-              fi
-            fi
-            python3 tool/flclashz_sync_versions.py --development "$development" --upstream "$upstream"
-            if git rev-parse -q --verify MERGE_HEAD >/dev/null || ! git diff --cached --quiet; then
-              git commit -m "Merge FlClashX upstream and record integrated versions"
-            fi
             git push origin "HEAD:refs/heads/$candidate"
           fi
           sha=$(git rev-parse HEAD)
-          git diff --name-status "$upstream" "$sha" > integration-report/candidate-changes.txt
-          git diff --binary "$upstream" "$sha" > integration-report/flclashz.patch
-          printf 'candidate=%s\ncommit=%s\n' "$candidate" "$sha" >> integration-report/refs.txt
+          git diff --name-status "$development" "$sha" > "$report/candidate-changes.txt"
+          git diff --binary "$development" "$sha" > "$report/flclashz.patch"
+          printf 'candidate=%s\ncommit=%s\n' "$candidate" "$sha" >> "$report/refs.txt"
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
           echo "branch=$candidate" >> "$GITHUB_OUTPUT"
+      - name: Report integration decisions
+        if: always()
+        shell: bash
+        run: |
+          report="$RUNNER_TEMP/integration-report"
+          if [[ -d "$report" ]]; then
+            for file in "$report"/*.txt; do
+              [[ -f "$file" ]] || continue
+              printf '\n### %s\n\n```text\n' "$(basename "$file")" >> "$GITHUB_STEP_SUMMARY"
+              head -100 "$file" >> "$GITHUB_STEP_SUMMARY"
+              printf '```\n' >> "$GITHUB_STEP_SUMMARY"
+            done
+          fi
       - name: Preserve the integration report
         if: always()
         uses: actions/upload-artifact@v6
         with:
           name: FlClashZ-integration-report
-          path: integration-report/
-          if-no-files-found: error
+          path: ${{ runner.temp }}/integration-report/
+          if-no-files-found: warn
 
   windows-validation:
     needs: candidate
@@ -124,15 +198,5 @@ jobs:
           SHA: ${{ needs.candidate.outputs.sha }}
         run: |
           printf 'Validated Windows candidate: `%s` (commit `%s`)\n' "$CANDIDATE" "$SHA" >> "$GITHUB_STEP_SUMMARY"
-          echo 'Candidate retained. Release publication requires repository opt-in and a compatible signed update manifest.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Ready for manual review and merge. No development branch promotion or release was performed.' >> "$GITHUB_STEP_SUMMARY"
 
-  release:
-    needs: [candidate, windows-validation]
-    if: needs.windows-validation.result == 'success' && vars.FLCLASHZ_RELEASE_ENABLED == 'true'
-    permissions:
-      contents: write
-    uses: ./.github/workflows/flclashz-release.yml
-    with:
-      candidate_ref: ${{ needs.candidate.outputs.sha }}
-    secrets:
-      UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
