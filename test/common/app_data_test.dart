@@ -53,11 +53,12 @@ void main() {
   });
 
   test(
-    'a reset empties the home directory but keeps the instance lock',
+    'a reset preserves the instance lock and Windows consent',
     () async {
       await mockPreferences();
       final homePath = await appPath.homeDirPath;
       final lock = File(await appPath.lockFilePath)..writeAsStringSync('pid');
+      final consent = File(await appPath.disclaimerConsentPath)..writeAsStringSync('1');
       final config = File(join(homePath, 'config.yaml'))
         ..writeAsStringSync('a');
       final logs = Directory(join(homePath, 'logs'))
@@ -72,6 +73,7 @@ void main() {
       await resetAppData();
 
       expect(lock.existsSync(), isTrue);
+      expect(consent.existsSync(), Platform.isWindows);
       expect(config.existsSync(), isFalse);
       expect(logs.existsSync(), isFalse);
     },

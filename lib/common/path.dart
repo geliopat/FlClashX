@@ -120,6 +120,10 @@ class AppPath {
     return join(mHomeDirPath, 'config.yaml');
   }
 
+  Future<String> get disclaimerConsentPath async {
+    return join(await homeDirPath, 'disclaimer.accepted');
+  }
+
   Future<String> get sharedPreferencesPath async {
     final directory = await _dataDir.value;
     return join(directory.path, 'shared_preferences.json');

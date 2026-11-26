@@ -1,22 +1,16 @@
+import 'dart:io';
+
 import 'package:fl_clash/common/disclaimer_consent.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as p;
 
 void main() {
-  late bool machine;
-  late bool user;
-  late bool allowMachineWrite;
+  late Directory root;
+  late File marker;
   late int prompts;
-  late int elevationRequests;
 
-  WindowsDisclaimerConsent newStore() => WindowsDisclaimerConsent(
-    readMachine: () => machine,
-    readUser: () => user,
-    writeUser: () => user = true,
-    writeMachine: ({required bool allowElevation}) async {
-      if (allowElevation) elevationRequests++;
-      return machine = allowMachineWrite;
-    },
-  );
+  WindowsDisclaimerConsent newStore() =>
+      WindowsDisclaimerConsent(markerPath: () async => marker.path);
 
   Future<bool> accept({bool agree = true, bool legacy = false, bool env = false}) {
     return newStore().ensure(
@@ -29,52 +23,56 @@ void main() {
     );
   }
 
-  setUp(() {
-    machine = false;
-    user = false;
-    allowMachineWrite = true;
+  setUp(() async {
+    root = await Directory.systemTemp.createTemp('disclaimer-test-');
+    marker = File(p.join(root.path, 'clashz', 'disclaimer.accepted'));
     prompts = 0;
-    elevationRequests = 0;
   });
 
-  test('acceptance survives a fresh store and a different Windows user', () async {
+  tearDown(() async {
+    await root.delete(recursive: true);
+  });
+
+  test('consent is written before startup and survives a new store', () async {
     expect(await accept(), isTrue);
-    expect(machine, isTrue);
-    user = false;
+    expect(await marker.readAsString(), '1\n');
     expect(await accept(), isTrue);
     expect(prompts, 1);
-    expect(elevationRequests, 1);
   });
 
   test('refusal persists nothing', () async {
     expect(await accept(agree: false), isFalse);
-    expect(machine, isFalse);
-    expect(user, isFalse);
+    expect(await marker.exists(), isFalse);
     expect(await accept(), isTrue);
     expect(prompts, 2);
   });
 
-  test('a denied elevation retains the user consent without prompting again', () async {
-    allowMachineWrite = false;
-    expect(await accept(), isTrue);
-    expect(user, isTrue);
-    expect(machine, isFalse);
-    expect(await accept(), isTrue);
-    expect(prompts, 1);
-    expect(elevationRequests, 1);
-  });
-
-  test('existing accepted settings migrate without another disclaimer', () async {
+  test('existing settings consent migrates without another dialog', () async {
     expect(await accept(legacy: true), isTrue);
-    expect(machine, isTrue);
+    expect(await marker.exists(), isTrue);
     expect(prompts, 0);
   });
 
-  test('unattended consent never requests elevation', () async {
-    allowMachineWrite = false;
+  test('explicit unattended acceptance is persisted', () async {
     expect(await accept(env: true), isTrue);
+    expect(await accept(), isTrue);
     expect(prompts, 0);
-    expect(elevationRequests, 0);
-    expect(user, isTrue);
+  });
+
+  test('invalid marker requires acceptance again', () async {
+    await marker.parent.create(recursive: true);
+    await marker.writeAsString('invalid');
+    expect(await accept(agree: false), isFalse);
+    expect(await marker.readAsString(), 'invalid');
+    expect(await accept(), isTrue);
+    expect(await marker.readAsString(), '1\n');
+    expect(prompts, 2);
+  });
+
+  test('deleting the marker and settings requires new acceptance', () async {
+    expect(await accept(), isTrue);
+    await marker.delete();
+    expect(await accept(), isTrue);
+    expect(prompts, 2);
   });
 }
