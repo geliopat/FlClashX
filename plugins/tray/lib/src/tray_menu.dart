@@ -8,12 +8,14 @@ final class TrayMenuAction extends TrayMenuItem {
   const TrayMenuAction({
     required this.label,
     this.detail,
+    this.icon,
     this.enabled = true,
     this.onSelected,
   });
 
   final String label;
   final String? detail;
+  final String? icon;
   final bool enabled;
   final TrayMenuItemSelectedCallback? onSelected;
 }

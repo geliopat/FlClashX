@@ -108,6 +108,28 @@ bool IsColorSetChange(UINT message, LPARAM lparam) {
              0;
 }
 
+std::vector<AcrylicRow> AcrylicRows(const flutter::EncodableList& items) {
+  std::vector<AcrylicRow> rows;
+  for (const auto& value : items) {
+    const auto* entry = std::get_if<flutter::EncodableMap>(&value);
+    if (!entry) return {};
+    const auto* type = StringAt(*entry, "type");
+    if (!type || *type == "submenu") return {};
+    AcrylicRow row;
+    row.separator = *type == "separator";
+    row.id = IntAt(*entry, "id", 0);
+    row.enabled = BoolAt(*entry, "enabled", true);
+    row.checked = BoolAt(*entry, "checked", false);
+    if (const auto* label = StringAt(*entry, "label"))
+      row.label = Utf16FromUtf8(*label);
+    if (const auto* detail = StringAt(*entry, "detail"))
+      row.detail = Utf16FromUtf8(*detail);
+    if (const auto* icon = StringAt(*entry, "icon")) row.icon = *icon;
+    rows.push_back(std::move(row));
+  }
+  return rows;
+}
+
 }  // namespace
 
 void TrayPlugin::RegisterWithRegistrar(
@@ -246,6 +268,8 @@ bool TrayPlugin::Show(const flutter::EncodableMap& arguments) {
     if (menu_ == nullptr) {
       menu_ = ::CreatePopupMenu();
     }
+    acrylic_menu_.Close();
+    menu_items_ = *items;
     RebuildMenu(menu_, *items);
   }
 
@@ -278,6 +302,8 @@ void TrayPlugin::RestoreIcon() {
 }
 
 void TrayPlugin::Hide() {
+  acrylic_menu_.Close();
+  menu_items_.clear();
   ::KillTimer(MainWindow(), kRestoreTimerId);
   if (icon_requested_) {
     ::Shell_NotifyIconW(NIM_DELETE, &icon_data_);
@@ -304,7 +330,16 @@ bool TrayPlugin::OpenMenu() {
 
   const HWND window = MainWindow();
   POINT cursor;
-  ::GetCursorPos(&cursor);
+  if (!::GetCursorPos(&cursor)) return false;
+
+  const auto rows = AcrylicRows(menu_items_);
+  if (acrylic_menu_.Open(window, cursor, rows, [this](int command) {
+        flutter::EncodableMap arguments;
+        arguments[flutter::EncodableValue("id")] = flutter::EncodableValue(command);
+        SendEvent("onMenuItemSelected", flutter::EncodableValue(arguments));
+      })) {
+    return true;
+  }
 
   ::SetForegroundWindow(window);
   const int command = ::TrackPopupMenu(

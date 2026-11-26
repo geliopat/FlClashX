@@ -9,6 +9,8 @@
 #include <flutter/plugin_registrar_windows.h>
 #include <flutter/standard_method_codec.h>
 
+#include "acrylic_menu.h"
+
 #include <memory>
 #include <optional>
 #include <string>
@@ -53,6 +55,8 @@ class TrayPlugin : public flutter::Plugin {
 
   NOTIFYICONDATAW icon_data_{};
   HMENU menu_ = nullptr;
+  flutter::EncodableList menu_items_;
+  AcrylicMenu acrylic_menu_;
   std::wstring tool_tip_;
   bool visible_ = false;
   bool icon_requested_ = false;

@@ -140,6 +140,7 @@ class AppTray implements TrayPort {
         (zapret?.busy ?? false);
     final showItem = TrayMenuAction(
       label: appLocalizations.show,
+      icon: 'show',
       detail: shortcut(HotAction.view),
       onSelected: () {
         window?.show();
@@ -147,6 +148,7 @@ class AppTray implements TrayPort {
     );
     final restartItem = TrayMenuAction(
       label: appLocalizations.restart,
+      icon: 'restart',
       enabled: !isWindows ||
           (read(initProvider) && read(coreStatusProvider) != CoreStatus.connecting &&
               !(zapret?.busy ?? false) && !(zapret?.dashboardRestarting ?? false)),
@@ -160,6 +162,7 @@ class AppTray implements TrayPort {
     );
     final exitItem = TrayMenuAction(
       label: appLocalizations.exit,
+      icon: 'exit',
       detail: shortcut(HotAction.exit),
       onSelected: () {
         systemAction.handleExit();
@@ -171,6 +174,7 @@ class AppTray implements TrayPort {
       if (isWindows)
         TrayMenuAction(
           label: running ? appLocalizations.stop : appLocalizations.start,
+          icon: running ? 'stop' : 'start',
           detail: shortcut(HotAction.start),
           onSelected: () => unawaited(commonAction.toggleTrayRunning()),
         )

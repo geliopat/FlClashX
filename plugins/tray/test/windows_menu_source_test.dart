@@ -28,9 +28,22 @@ void main() {
     pluginSource = _resolveSource('windows/tray_plugin.cpp').readAsStringSync();
   });
 
-  test('windows menu clicks come from TrackPopupMenu, not WM_COMMAND', () {
+  test('native fallback still uses TrackPopupMenu, not WM_COMMAND', () {
     expect(pluginSource, contains('TPM_RETURNCMD'));
     expect(pluginSource, isNot(contains('WM_COMMAND')));
+  });
+
+  test('acrylic menu uses measured labels, tint and no outline', () {
+    final source = _resolveSource('windows/acrylic_menu.cpp').readAsStringSync();
+    expect(source, contains('0x65000000'));
+    expect(source, contains('0xfffffffe'));
+    expect(source, contains('MeasureString'));
+    expect(source, contains('label_width_ + (detail_width ?'));
+    expect(source, contains('GetDpiForMonitor'));
+    expect(source, contains('VK_ESCAPE'));
+    expect(source, contains('WM_CAPTURECHANGED'));
+    expect(pluginSource, contains('acrylic_menu_.Open('));
+    expect(pluginSource, contains('TPM_RETURNCMD'));
   });
 
   test('windows puts the detail in the accelerator column', () {
