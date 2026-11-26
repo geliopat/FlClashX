@@ -11,7 +11,11 @@
 [![Downloads](https://img.shields.io/github/downloads/geliopat/FlClashZ/total?style=flat-square)](https://github.com/geliopat/FlClashZ/releases)
 [![License](https://img.shields.io/github/license/geliopat/FlClashZ?style=flat-square)](LICENSE)
 
-[![Windows validation](https://github.com/geliopat/FlClashZ/actions/workflows/zapret-windows-validation.yml/badge.svg?branch=fix%2Fzapret2-stability)](https://github.com/geliopat/FlClashZ/actions/workflows/zapret-windows-validation.yml)
+[![Скачать установщик](https://img.shields.io/badge/%D0%A1%D0%BA%D0%B0%D1%87%D0%B0%D1%82%D1%8C_%D1%83%D1%81%D1%82%D0%B0%D0%BD%D0%BE%D0%B2%D1%89%D0%B8%D0%BA-EXE-0078D4?style=for-the-badge)](https://github.com/geliopat/FlClashZ/releases/latest/download/FlClashZ-windows-amd64-setup.exe) [![Скачать portable](https://img.shields.io/badge/%D0%A1%D0%BA%D0%B0%D1%87%D0%B0%D1%82%D1%8C_portable-ZIP-475569?style=for-the-badge)](https://github.com/geliopat/FlClashZ/releases/latest/download/FlClashZ-windows-amd64.zip)
+
+[![v1.0.1 validated](https://img.shields.io/badge/v1.0.1-Windows%20validated-brightgreen?style=flat-square)](https://github.com/geliopat/FlClashZ/actions/runs/45790180974)
+
+[Документация заголовков](docs/headers.md) · [Управление Zapret](docs/flclashz-zapret-headers.md) · [Синхронизация](docs/upstream-sync.md)
 
 **Русский** · [English](README_EN.md) · [中文](README_ZH.md)
 
@@ -23,7 +27,7 @@ FlClashZ — самостоятельный форк [FlClashX](https://github.c
 
 ## Скачать
 
-Официальные пакеты FlClashZ публикуются в [GitHub Releases](https://github.com/geliopat/FlClashZ/releases). Ссылки на файлы ниже работают после публикации соответствующего стабильного релиза.
+Стабильная версия [1.0.1](https://github.com/geliopat/FlClashZ/releases/tag/v1.0.1) опубликована: установщик и portable прошли проверку сборки, запуска, установки, обновления при работающем приложении и изоляции от FlClashX.
 
 | Вариант | Формат | Ссылка |
 | --- | --- | --- |
@@ -85,6 +89,27 @@ flclashz://install-config?url=<URL-кодированная ссылка на п
 Стабильные релизы имеют теги вида `v1.0.1`. Проверка обновлений по умолчанию использует подписанный [manifest.json](https://github.com/geliopat/FlClashZ/releases/latest/download/manifest.json) из Latest. Манифест содержит версию, ссылки на пакеты, SHA-256 и цифровую подпись Ed25519. Для конкретной версии используется путь `releases/download/v<версия>/manifest.json`.
 
 Установщик завершает работающий FlClashZ перед заменой файлов, сохраняя настройки. Релизная сборка проверяет запуск portable, установку, обновление при работающем приложении и изоляцию FlClashX. Публикация предусмотрена после прохождения проверок и подписания манифеста.
+
+> [!IMPORTANT]
+> При переходе с версии 1.0.0 установите 1.0.1 или более новую версию вручную поверх существующей установки: в старой сборке отсутствовал публичный ключ проверки манифеста. Начиная с 1.0.1 ключ встроен. Автоматическое обновление приложения не связано с синхронизацией исходных репозиториев.
+
+## Компоненты
+
+| Компонент | Версия в 1.0.1 | Источник |
+| --- | --- | --- |
+| FlClashX (основа) | `0.5.8` | [pluralplay/FlClashX](https://github.com/pluralplay/FlClashX) |
+| Mihomo (в составе FlClashX) | `v1.19.34` | [MetaCubeX/mihomo](https://github.com/MetaCubeX/mihomo) |
+| Zapret2 | `v1.0.8` | [bol-van/zapret2](https://github.com/bol-van/zapret2) |
+| Flowseal | `1.10.4` | [Flowseal/zapret-discord-youtube](https://github.com/Flowseal/zapret-discord-youtube) |
+| Стратегии Lua/BAT | `8dd17fcbcca4` | [geliopat/zapret2-gui](https://github.com/geliopat/zapret2-gui/tree/8dd17fcbcca405a50f497a6e2346ca263901d775) |
+
+## Разработка и синхронизация
+
+**Синхронизация только вручную.** `main` — чистое зеркало FlClashX; `fix/zapret2-stability` — основная ветка FlClashZ. Mihomo отдельно не обновляется: изменения ядра, патчи и зависимости приходят вместе с FlClashX.
+
+[Ручная синхронизация](https://github.com/geliopat/FlClashZ/actions/workflows/flclashz-upstream-sync.yml) подготавливает отдельный кандидат `sync/flclashz-*`, проверяет закреплённые версии Zapret2 и Flowseal, переносит стратегии из нашего форка с трёхсторонним слиянием и сохраняет отчёт о конфликтах. При отсутствии изменений сборка пропускается. Слияние и выпуск релиза выполняются только по отдельному решению разработчика.
+
+[Документация синхронизации](docs/upstream-sync.md) · [Проверка Windows](https://github.com/geliopat/FlClashZ/actions/workflows/zapret-windows-validation.yml) · [Выпуск релиза](https://github.com/geliopat/FlClashZ/actions/workflows/flclashz-release.yml)
 
 ## Сборка из исходников
 

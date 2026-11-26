@@ -1,6 +1,6 @@
 name: Багрепорт / Bug report
 title: "[BUG] "
-description: Сообщите о возникшей проблем / Report the issue you are experiencing
+description: Сообщите о возникшей проблеме / Report the issue you are experiencing
 
 body:
   - type: markdown
@@ -8,11 +8,11 @@ body:
       value: |
         ## Прежде чем создать проблему, пожалуйста, убедитесь, что:
         1. Вы указали четкий и краткий заголовок проблемы, чтобы другие могли быстро её найти.
-        2. Вы проверили, что похожей проблемы нет среди [существующих](https://github.com/pluralplay/FlClashX/issues?q=is%3Aissue), в противном случае, обсуждайте её там.
+        2. Вы проверили, что похожей проблемы нет среди [существующих](https://github.com/geliopat/FlClashZ/issues?q=is%3Aissue), в противном случае, обсуждайте её там.
         3. Вы подробно описали проблему, следуя требованиям шаблона, иначе проблема будет закрыта без рассмотрения.
         ## Before submitting the issue, please make sure of the following checklist:
         1. Please be sure to fill in a concise and clear title for the issue so that others can quickly search
-        2. Please make sure there is no similar issue in the [existing issues](https://github.com/pluralplay/FlClashX/issues?q=is%3Aissue), otherwise please discuss under the existing issue
+        2. Please make sure there is no similar issue in the [existing issues](https://github.com/geliopat/FlClashZ/issues?q=is%3Aissue), otherwise please discuss under the existing issue
         3. Please describe the problem in detail according to the template specification, otherwise issue will be closed directly.
   - type: textarea
     id: description
@@ -24,7 +24,29 @@ body:
   - type: textarea
     attributes:
       label: Версия / Version
-      description: Пожалуйста, укажите конкретную версию FlClashX / Please provide the specific version of FlClashX.
+      description: Пожалуйста, укажите конкретную версию FlClashZ / Please provide the specific version of FlClashZ.
+    validations:
+      required: true
+  - type: dropdown
+    id: edition
+    attributes:
+      label: Тип установки / Installation type
+      options:
+        - Installer (EXE)
+        - Portable (ZIP)
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Компонент / Component
+      options:
+        - Mihomo / TUN / DNS
+        - Zapret2 / Flowseal
+        - Strategies / Lists
+        - Profiles / Remnawave
+        - Windows Helper / Installer / Updates
+        - UI / Other
     validations:
       required: true
   - type: textarea
@@ -37,15 +59,13 @@ body:
     attributes:
       label: Операционная система / OS
       options:
-        - Android
-        - Windows
-        - MacOS
-        - Linux
+        - Windows 10 x64
+        - Windows 11 x64
     validations:
       required: true
   - type: textarea
     attributes:
-      label: Логи (не прикрепляйте файл, вставьте содержимое логов напрямую) / Log (Do not upload the log file, paste the log content directly)
-      description: Пожалуйста, предоставьте полный или соответствующий отладочный лог (для этого установите уровень логирования в меню слева ПО-> Настройки-> Уровень логирования-> Debug) / Please provide a complete or relevant Debug log (please adjust it to debug in the left menu of software-> Settings-> Log Level)
+      label: Логи / Logs
+      description: Приложите относящиеся к проблеме логи Mihomo или Zapret. Удалите токены, ключи, ссылки подписок и личные данные. / Include relevant Mihomo or Zapret logs. Redact tokens, keys, subscription URLs and personal information.
     validations:
       required: true
