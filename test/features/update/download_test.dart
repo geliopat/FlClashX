@@ -8,6 +8,7 @@ import 'package:dio/dio.dart';
 import 'package:fl_clash/features/update/asset.dart';
 import 'package:fl_clash/features/update/download.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as p;
 
 const _name = 'FlClashX-macos-arm64.dmg';
 const _base = 'https://github.com/pluralplay/FlClashX/releases/download/v0.5.1';
@@ -94,7 +95,7 @@ void main() {
         adapter,
       ).download(_asset(size: 3000), onProgress: (r, _) => progress.add(r));
       expect(await file.readAsBytes(), payload);
-      expect(file.path, endsWith('/$_name'));
+      expect(p.basename(file.path), _name);
       expect(file.path, startsWith(root.path));
       expect(progress.last, 3000);
       expect(adapter.requested, ['$_base/$_name', '$_cdn?sig=1']);
@@ -253,9 +254,9 @@ void main() {
 
       final left = [
         for (final entity in await leftovers())
-          if (entity is File) entity.path.substring(root.path.length + 1),
+          if (entity is File) p.relative(entity.path, from: root.path),
       ];
-      expect(left, ['0.5.2/$_name']);
+      expect(left, [p.join('0.5.2', _name)]);
     },
   );
 

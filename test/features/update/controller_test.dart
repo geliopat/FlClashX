@@ -9,6 +9,7 @@ import 'package:fl_clash/features/update/controller.dart';
 import 'package:fl_clash/features/update/download.dart';
 import 'package:fl_clash/features/update/platform.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as p;
 
 const _name = 'FlClashX-macos-arm64.dmg';
 const _url = 'https://github.com/pluralplay/FlClashX/releases/download/v0.5.1';
@@ -71,13 +72,15 @@ class _Platform implements UpdatePlatform {
 }
 
 class _Downloader extends UpdateDownloader {
-  _Downloader({required super.root, super.dio, this.keeping});
+  _Downloader({required super.root, super.dio, this.keeping, this.onKept});
 
   final Future<void>? keeping;
+  final void Function(File)? onKept;
 
   @override
   Future<File> keep(File partial, UpdateAsset asset, String slot) async {
     final kept = await super.keep(partial, asset, slot);
+    onKept?.call(kept);
     await keeping;
     return kept;
   }
@@ -126,6 +129,7 @@ void main() {
     bool manifest = false,
     Future<String> Function(String path) hash = sha256OfFile,
     Future<void>? keeping,
+    void Function(File)? onKept,
   }) {
     final controller = UpdateController(
       release: release ?? _release,
@@ -134,6 +138,7 @@ void main() {
         root: () async => root,
         dio: Dio()..httpClientAdapter = adapter,
         keeping: keeping,
+        onKept: onKept,
       ),
       repository: 'pluralplay/FlClashX',
       pre: false,
@@ -319,15 +324,25 @@ void main() {
     'a cancel while the download moves into place leaves it for a retry',
     () async {
       final keeping = Completer<void>();
-      final update = controller(keeping: keeping.future);
+      final moved = Completer<File>();
+      final update = controller(
+        keeping: keeping.future,
+        onKept: moved.complete,
+      );
       final first = update.download();
-      while ((await files()).isEmpty ||
-          !(await files()).single.path.endsWith('/0.5.1/$_name')) {
-        await pumpEventQueue();
+      try {
+        final file = await Future.any<File>([
+          moved.future,
+          first.then<File>((_) => throw StateError(
+            'Download finished before the keep barrier: ${update.value.phase}',
+          )),
+        ]).timeout(const Duration(seconds: 10));
+        expect(p.normalize(file.path), p.join(root.path, '0.5.1', _name));
+        update.cancel();
+      } finally {
+        keeping.complete();
+        await first;
       }
-      update.cancel();
-      keeping.complete();
-      await first;
       expect(update.value.phase, UpdatePhase.idle);
       expect(await files(), hasLength(1));
       update.dispose();
@@ -381,7 +396,7 @@ void main() {
     final update = controller();
     await update.download();
     expect(stale.existsSync(), isFalse);
-    expect((await files()).single.path, endsWith('/0.5.1/$_name'));
+    expect(p.normalize((await files()).single.path), p.join(root.path, '0.5.1', _name));
     update.dispose();
   });
 
