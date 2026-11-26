@@ -15,19 +15,13 @@
       <stop offset="0" stop-color="#DAE6F5"/>
       <stop offset="1" stop-color="#BECBDD"/>
     </linearGradient>
-    <linearGradient id="frame" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="256">
-      <stop offset="0" stop-color="#272728"/>
-      <stop offset="1" stop-color="#1D1D1E"/>
-    </linearGradient>
-    <linearGradient id="inner" gradientUnits="userSpaceOnUse" x1="0" y1="36" x2="0" y2="222">
+    <linearGradient id="inner" gradientUnits="userSpaceOnUse" x1="0" y1="2" x2="0" y2="254">
       <stop offset="0" stop-color="#181819"/>
       <stop offset="1" stop-color="#111213"/>
     </linearGradient>
   </defs>
-  <rect x="2" y="2" width="252" height="252" rx="68" fill="url(#frame)"/>
-  <rect x="34" y="35" width="188" height="188" rx="44" fill="#141415"/>
-  <rect x="35" y="36" width="186" height="186" rx="43" fill="url(#inner)"/>
-  <g fill="none" stroke-width="22.2" stroke-linecap="round">
+  <rect x="2" y="2" width="252" height="252" rx="58" fill="url(#inner)"/>
+  <g transform="translate(128 128) scale(1.35) translate(-128 -129)" fill="none" stroke-width="22.2" stroke-linecap="round">
     <path d="M88 84 H166" stroke="url(#top)"/>
     <path d="M90 172 H172" stroke="url(#bottom)"/>
     <path d="M166 85 L90 176" stroke="#101318" stroke-opacity=".45" stroke-width="24"/>
