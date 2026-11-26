@@ -3,6 +3,7 @@ package core
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -12,12 +13,43 @@ import (
 	"testing"
 
 	"github.com/metacubex/mihomo/common/utils"
+	"github.com/metacubex/mihomo/component/profile/cachefile"
 	"github.com/metacubex/mihomo/config"
 	"github.com/metacubex/mihomo/constant"
 	cp "github.com/metacubex/mihomo/constant/provider"
 	"github.com/metacubex/mihomo/hub"
 	"github.com/metacubex/mihomo/tunnel"
 )
+
+// Mihomo's profile cache is a process-wide singleton. Initialize it in a
+// suite-owned directory before any test temporarily changes HomeDir. On
+// Windows an open bbolt database prevents testing.TempDir from removing it.
+func TestMain(m *testing.M) {
+	home, err := os.MkdirTemp("", "flclashz-core-cache-")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	previous := constant.Path.HomeDir()
+	constant.SetHomeDir(home)
+	cache := cachefile.Cache()
+	constant.SetHomeDir(previous)
+	if cache.DB == nil {
+		fmt.Fprintln(os.Stderr, "could not initialize the suite cache")
+		_ = os.RemoveAll(home)
+		os.Exit(1)
+	}
+	code := m.Run()
+	if err := cache.Close(); err != nil {
+		fmt.Fprintln(os.Stderr, "close suite cache:", err)
+		code = 1
+	}
+	if err := os.RemoveAll(home); err != nil {
+		fmt.Fprintln(os.Stderr, "remove suite cache:", err)
+		code = 1
+	}
+	os.Exit(code)
+}
 
 func TestDefaultSetupParams(t *testing.T) {
 	params := defaultSetupParams()
