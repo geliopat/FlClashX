@@ -3,15 +3,6 @@ name: FlClashZ versioned Windows release
 on:
   push:
     branches: [fix/zapret2-stability]
-  workflow_call:
-    inputs:
-      candidate_ref:
-        description: Validated integration commit
-        type: string
-        required: true
-    secrets:
-      UPDATE_SIGNING_KEY:
-        required: true
   workflow_dispatch:
     inputs:
       candidate_ref:
@@ -28,10 +19,9 @@ concurrency:
 
 jobs:
   prepare:
-    # Explicit repository opt-in: the current runtime regressions must be
-    # fixed and the fork's public signing key must be pinned first.
+    # Publication is explicitly requested via workflow_dispatch or a release commit.
     if: >-
-      (inputs.candidate_ref != '' && vars.FLCLASHZ_RELEASE_ENABLED == 'true') || (github.event_name == 'push' && startsWith(github.event.head_commit.message || '', 'release: FlClashZ v'))
+      (github.event_name == 'workflow_dispatch' && inputs.candidate_ref != '') || (github.event_name == 'push' && startsWith(github.event.head_commit.message || '', 'release: FlClashZ v'))
     runs-on: ubuntu-24.04
     permissions:
       contents: write

@@ -1,10 +1,8 @@
 name: FlClashZ upstream integration
 
 # main is the clean FlClashX mirror; the default branch is development.
-# All source changes are tested on an isolated candidate before promotion.
+# Manual only: prepare and validate a candidate; never promote or publish it.
 on:
-  schedule:
-    - cron: '13,43 * * * *'
   workflow_dispatch:
     inputs:
       force_validation:
@@ -200,39 +198,5 @@ jobs:
           SHA: ${{ needs.candidate.outputs.sha }}
         run: |
           printf 'Validated Windows candidate: `%s` (commit `%s`)\n' "$CANDIDATE" "$SHA" >> "$GITHUB_STEP_SUMMARY"
+          echo 'Ready for manual review and merge. No development branch promotion or release was performed.' >> "$GITHUB_STEP_SUMMARY"
 
-  promote:
-    needs: [candidate, windows-validation]
-    if: needs.windows-validation.result == 'success' && vars.FLCLASHZ_AUTO_MERGE == 'true'
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          ref: ${{ needs.candidate.outputs.sha }}
-          fetch-depth: 0
-      - name: Fast-forward only the exact validated commit
-        shell: bash
-        env:
-          BASE: ${{ needs.candidate.outputs.base }}
-          SHA: ${{ needs.candidate.outputs.sha }}
-        run: |
-          set -euo pipefail
-          git fetch --no-tags origin refs/heads/fix/zapret2-stability:refs/remotes/origin/fix/zapret2-stability
-          actual=$(git rev-parse refs/remotes/origin/fix/zapret2-stability)
-          [[ "$actual" == "$BASE" ]] || { echo "::error::Development changed; create a fresh candidate."; exit 1; }
-          git merge-base --is-ancestor "$BASE" "$SHA"
-          [[ "$(git rev-parse HEAD)" == "$SHA" ]]
-          git push origin "$SHA:refs/heads/fix/zapret2-stability"
-
-  release:
-    needs: [candidate, windows-validation, promote]
-    if: always() && needs.windows-validation.result == 'success' && needs.promote.result == 'success' && vars.FLCLASHZ_RELEASE_ENABLED == 'true'
-    permissions:
-      contents: write
-    uses: ./.github/workflows/flclashz-release.yml
-    with:
-      candidate_ref: ${{ needs.candidate.outputs.sha }}
-    secrets:
-      UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}

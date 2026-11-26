@@ -11,19 +11,34 @@
 | mqclass/zapret2-gui | Отслеживание upstream; импорт только из geliopat/zapret2-gui |
 | geliopat/zapret2-gui | Фиксированный commit; трёхстороннее обновление Lua/BAT с сохранением локальных изменений |
 
-Workflow [FlClashZ upstream integration](../.github/workflows/flclashz-upstream-sync.yml) запускается каждые 30 минут и вручную. Если компоненты не изменились, сборка Windows не запускается. При изменении создаётся ветка `sync/flclashz-<base>-<tree>`; повторяющийся кандидат не собирается снова без `force_validation`.
+Workflow [FlClashZ upstream integration](../.github/workflows/flclashz-upstream-sync.yml) запускается только вручную через Run workflow. Расписания нет. Если компоненты не изменились, сборка Windows не запускается. При изменении создаётся ветка `sync/flclashz-<base>-<tree>`; повторяющийся кандидат не собирается снова без `force_validation`.
 
 Конфликты исходников и компонентов записываются в отчёт Actions. Конфликт одного компонента не препятствует подготовке совместимых изменений остальных. Слияние исходников не заменяет независимый номер версии FlClashZ. Пин источника, SHA-256 и отображаемая версия обновляются вместе.
 
-## Управление
+## Ручное управление
 
-GitHub → Settings → Secrets and variables → Actions.
+1. Откройте Actions → FlClashZ upstream integration → Run workflow. Зеркала источников синхронизируются только в рамках этого явно запущенного задания.
+2. Изучите отчёт, diff и результат Windows validation. Повторная проверка существующего кандидата: `force_validation=true`.
+3. После успешной проверки самостоятельно примите решение о слиянии. Для сохранения точного проверенного коммита используйте fast-forward (без squash и force push):
 
-- Variable `FLCLASHZ_AUTO_MERGE=true` — разрешает fast-forward рабочей ветки только на успешно протестированный кандидат, если рабочая ветка не изменилась с момента подготовки. Без переменной кандидат остаётся для проверки.
-- Secret `FLCLASHZ_SYNC_TOKEN` — необязательный fine-grained PAT только для репозитория `geliopat/zapret2-gui`, Contents: read and write. Нужен для автоматического fast-forward этого отдельного форка. Без токена используйте GitHub Sync fork. Никогда не передавайте токен в исходники или логи.
-- Variable `FLCLASHZ_RELEASE_ENABLED=true` — разрешает публикацию отдельной версии после успешной интеграции и продвижения кандидата; без неё новых Releases автоматически нет. Используется существующий `UPDATE_SIGNING_KEY`.
+```bash
+git fetch origin
+git switch fix/zapret2-stability
+git pull --ff-only origin fix/zapret2-stability
+git merge --ff-only origin/sync/flclashz-<base>-<tree>
+git push origin HEAD:fix/zapret2-stability
+```
 
-Ручная проверка: Actions → FlClashZ upstream integration → Run workflow. Для повторной проверки уже созданного кандидата включите `force_validation`.
+Если рабочая ветка изменилась и fast-forward невозможен, подготовьте нового кандидата и повторите проверку. Не сливайте непроверенные изменения.
+
+4. Для выпуска новой версии отдельно запустите Actions → FlClashZ versioned Windows release → Run workflow, указав SHA принятого коммита. Релизный процесс сам выделит следующий свободный номер версии, проверит и подпишет пакеты. Явно подготовленный коммит с сообщением `release: FlClashZ v<версия>` также запускает существующий релизный процесс. Обычное слияние кандидата релиз не запускает.
+
+### Секреты
+
+- `FLCLASHZ_SYNC_TOKEN` — необязательный fine-grained PAT только для `geliopat/zapret2-gui`, Contents: read and write. Используется только при ручном запуске синхронизации. Без токена используйте Sync fork на GitHub.
+- `UPDATE_SIGNING_KEY` — существующий ключ подписи манифеста релизов.
+
+Переменные `FLCLASHZ_AUTO_MERGE` и `FLCLASHZ_RELEASE_ENABLED` для ручного процесса не нужны. Автоматического продвижения кандидата и публикации после синхронизации нет.
 
 Если обновлённый компонент меняет формат архива, обязательные файлы, API или зависимости, проверка останавливается; нельзя автоматически игнорировать конфликт или отключать тесты. Новые совместимые Lua/BAT попадают в пакет вместе с существующими; неиспользуемые новые форматы и дополнительные зависимости требуют проверки.
 
