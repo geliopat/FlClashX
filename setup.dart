@@ -62,7 +62,10 @@ Future<void> main(List<String> args) async {
     exit(1);
   }
 
-  final env = results['env'] as String;
+  final env = defaultPackageEnvironment(
+    platform: platform,
+    explicit: results.wasParsed('env') ? results['env'] as String : null,
+  );
   final rootDir = Directory.current.path;
   final skipped = packagesNotBuildingAssets(
     File(p.join(rootDir, 'pubspec.yaml')).readAsStringSync(),
@@ -93,13 +96,16 @@ Future<void> main(List<String> args) async {
   exit(exitCode);
 }
 
+String defaultPackageEnvironment({required String platform, String? explicit}) =>
+    explicit ?? (platform == 'windows' ? 'stable' : 'pre');
+
 ArgParser createSetupArgParser() {
   return ArgParser()
     ..addOption(
       'env',
       defaultsTo: 'pre',
       allowed: ['dev', 'pre', 'stable'],
-      help: 'Application environment',
+      help: 'Application environment (Windows defaults to stable)',
     )
     ..addOption(
       'targets',

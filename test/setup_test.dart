@@ -100,6 +100,20 @@ void main() {
       expect(results.rest, ['android']);
     });
 
+    test('Windows packaging defaults to the stable release', () {
+      expect(setup.defaultPackageEnvironment(platform: 'windows'), 'stable');
+      expect(
+        setup.defaultPackageEnvironment(platform: 'windows', explicit: 'pre'),
+        'pre',
+      );
+      expect(setup.defaultPackageEnvironment(platform: 'linux'), 'pre');
+      final state = File('lib/state.dart').readAsStringSync();
+      expect(state, contains('defaultTargetPlatform == TargetPlatform.windows'));
+      final manager = File('lib/manager/app_manager.dart').readAsStringSync();
+      expect(manager, contains('system.isWindows || !globalState.isPre'));
+      expect(manager, contains("return 'SAFE MODE';"));
+    });
+
     test('accepts dev application environment', () {
       final results = setup.createSetupArgParser().parse([
         'android',

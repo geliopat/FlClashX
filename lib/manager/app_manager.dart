@@ -124,7 +124,9 @@ class AppEnvManager extends ConsumerWidget {
     if (safeMode) {
       return 'SAFE MODE';
     }
-    if (!globalState.isPre) {
+    // FlClashZ Windows has its own release identity; reserve the corner for
+    // the actionable recovery warning rather than a channel ribbon.
+    if (system.isWindows || !globalState.isPre) {
       return null;
     }
     return kDebugMode ? 'DEBUG' : globalState.appEnv.toUpperCase();
