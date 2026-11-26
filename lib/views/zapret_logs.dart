@@ -1,15 +1,12 @@
-import 'package:fl_clash/l10n/l10n.dart';
 import 'dart:async';
-import 'dart:io';
 import 'dart:convert';
-import 'package:path/path.dart' as p;
-import 'package:fl_clash/common/common.dart';
-import 'package:fl_clash/common/file_logger.dart';
 
+import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/core/desktop/helper_client.dart';
 import 'package:fl_clash/enum/enum.dart';
+import 'package:fl_clash/l10n/l10n.dart';
 import 'package:fl_clash/widgets/widgets.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/material.dart' show DefaultTabController, Tab, TabBar;
 import 'package:material_ui/material_ui.dart';
 
 String _levelLabel(AppLocalizations l, String level) => switch (level) {
@@ -20,26 +17,32 @@ String _levelLabel(AppLocalizations l, String level) => switch (level) {
   _ => level,
 };
 
-class ZapretLogsView extends ConsumerStatefulWidget {
+typedef _JournalEntry = ({HelperZapretLog log, String component});
+
+class ZapretLogsView extends StatefulWidget {
   const ZapretLogsView({super.key});
 
   @override
-  ConsumerState<ZapretLogsView> createState() => _ZapretLogsViewState();
+  State<ZapretLogsView> createState() => _ZapretLogsViewState();
 }
 
-class _ZapretLogsViewState extends ConsumerState<ZapretLogsView> {
+class _ZapretLogsViewState extends State<ZapretLogsView> {
   Timer? _timer;
+  int _tab = 0;
   bool _loading = false;
   String _query = '';
   String _filter = 'all';
   String? _error;
   List<HelperZapretLog> _logs = const [];
+  Future<List<_JournalEntry>>? _archive;
 
   @override
   void initState() {
     super.initState();
     scheduleMicrotask(_refresh);
-    _timer = Timer.periodic(const Duration(seconds: 2), (_) => _refresh());
+    _timer = Timer.periodic(const Duration(seconds: 2), (_) {
+      if (_tab == 0) unawaited(_refresh());
+    });
   }
 
   @override
@@ -61,159 +64,17 @@ class _ZapretLogsViewState extends ConsumerState<ZapretLogsView> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final logs = _logs.reversed.where((entry) =>
-      (_filter == 'all' || entry.level == _filter) &&
-      entry.message.toLowerCase().contains(_query.toLowerCase())
-    ).toList();
-    return CommonScaffold(
-      title: AppLocalizations.of(context).forkZapretLogs,
-      searchState: AppBarSearchState(onSearch: (query) => setState(() => _query = query)),
-      body: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 16).copyWith(
-          top: context.sectionsTopPadding,
-          bottom: 16 + context.bottomInset,
-        ),
-        children: [
-          generateSection(
-            title: AppLocalizations.of(context).forkHelperJournal,
-            items: [
-              ListItem<String>.options(
-                title: Text(AppLocalizations.of(context).forkFilter),
-                options: const ['all', 'info', 'error', 'stderr', 'debug'],
-                value: _filter,
-                textBuilder: (value) => switch (value) {
-                  'all' => AppLocalizations.of(context).forkAllEvents,
-                  'info' => AppLocalizations.of(context).forkInfo,
-                  'error' => AppLocalizations.of(context).forkErrors,
-                  'stderr' => AppLocalizations.of(context).forkStderr,
-                  _ => AppLocalizations.of(context).forkDebug,
-                },
-                onChanged: (value) => setState(() => _filter = value),
-              ),
-              if (_error != null)
-                ListItem(title: Text(AppLocalizations.of(context).forkLogReadError), subtitle: Text(_error!)),
-            ],
-            footer: AppLocalizations.of(context).forkLogFooter,
-          ),
-          const ListSectionGap(),
-          generateSection(
-            title: AppLocalizations.of(context).forkLocalLogs,
-            items: [
-              ListItem(
-                title: Text(AppLocalizations.of(context).forkOpenZapretLogs),
-                onTap: () async => system.openDirectory(await zapretFileLogger.directoryPath),
-              ),
-              ListItem(
-                title: Text(AppLocalizations.of(context).forkExportTodayLogs),
-                onTap: () async {
-                  try {
-                    final temp = await appPath.shareDirPath;
-                    await Directory(temp).create(recursive: true);
-                    final archive = await zapretFileLogger.archiveToday(temp);
-                    if (!context.mounted) return;
-                    if (archive == null) {
-                      dialogs.showNotifier(AppLocalizations.of(context).forkNoTodayLogs);
-                    } else {
-                      final folder = await appPath.downloadDirPath;
-                      final name = p.basenameWithoutExtension(archive);
-                      var target = File(p.join(folder, '$name.zip'));
-                      for (var suffix = 2; await target.exists(); suffix++) {
-                        target = File(p.join(folder, '${name}_$suffix.zip'));
-                      }
-                      await File(archive).copy(target.path);
-                      if (context.mounted) dialogs.showNotifier('${AppLocalizations.of(context).forkArchiveSaved}: ${target.path}');
-                    }
-                  } catch (_) {
-                    if (context.mounted) dialogs.showNotifier(AppLocalizations.of(context).forkExportLogsFailed);
-                  }
-                },
-              ),
-              ListItem(
-                title: Text(AppLocalizations.of(context).forkCrashHistory),
-                onTap: () => BaseNavigator.push<void>(context, const _ServiceJournalView(crashesOnly: true)),
-              ),
-            ],
-          ),
-          const ListSectionGap(),
-          generateSection(
-            items: [
-              ListItem(
-                title: Text(context.appLocalizations.forkServiceJournal),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => BaseNavigator.push<void>(context, const _ServiceJournalView()),
-              ),
-              ListItem(
-                title: Text(context.appLocalizations.forkExportServiceJournal),
-                onTap: () async {
-                  try {
-                    final content = await helperClient.zapretLogArchive();
-                    final stamp = DateTime.now().millisecondsSinceEpoch;
-                    final file = File(p.join(await appPath.downloadDirPath, 'FlClashZ-service-$stamp.jsonl'));
-                    await file.writeAsString(content, flush: true);
-                    if (context.mounted) dialogs.showNotifier(file.path);
-                  } catch (_) {
-                    if (context.mounted) dialogs.showNotifier(context.appLocalizations.forkJournalUnavailable);
-                  }
-                },
-              ),
-            ],
-          ),
-          const ListSectionGap(),
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Text(AppLocalizations.of(context).forkEvents,
-                style: Theme.of(context).textTheme.titleMedium),
-          ),
-          if (logs.isEmpty) ListItem(title: Text(AppLocalizations.of(context).forkNoEvents)),
-          for (final entry in logs) ...[
-                RecordListItem(
-                  onTap: () {},
-                  header: RecordHeader(children: [
-                    RecordTimestamp(entry.time.toLocal().toString().split('.').first),
-                    RecordLabel(
-                      label: _levelLabel(AppLocalizations.of(context), entry.level),
-                      tone: switch (entry.level) {
-                        'error' => RecordTone.error,
-                        'stderr' => RecordTone.warning,
-                        _ => RecordTone.neutral,
-                      },
-                    ),
-                  ]),
-                  body: SelectableText(entry.message, style: RecordTextStyles.of(context).primary),
-                ),
-                const SizedBox(height: recordListGap),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _ServiceJournalView extends StatefulWidget {
-  const _ServiceJournalView({this.crashesOnly = false});
-  final bool crashesOnly;
-
-  @override
-  State<_ServiceJournalView> createState() => _ServiceJournalViewState();
-}
-
-class _ServiceJournalViewState extends State<_ServiceJournalView> {
-  late Future<List<({HelperZapretLog log, String component})>> _entries = _load();
-  String _query = '';
-
-  Future<List<({HelperZapretLog log, String component})>> _load() async {
+  Future<List<_JournalEntry>> _loadArchive() async {
     final archive = await helperClient.zapretLogArchive();
-    final events = <({HelperZapretLog log, String component})>[];
+    final events = <_JournalEntry>[];
     for (final line in const LineSplitter().convert(archive)) {
       if (line.isEmpty) continue;
       try {
         final decoded = jsonDecode(line);
         final log = HelperZapretLog.fromJson(decoded);
-        final component = decoded is Map ? decoded['component']?.toString() ?? 'Zapret' : 'Zapret';
-        if (widget.crashesOnly && log.level != 'error' &&
-            !log.message.toLowerCase().contains('watchdog')) continue;
+        final component = decoded is Map
+            ? decoded['component']?.toString() ?? 'Zapret'
+            : 'Zapret';
         events.add((log: log, component: component));
       } catch (_) {
         // An interrupted final write cannot hide other events.
@@ -222,48 +83,148 @@ class _ServiceJournalViewState extends State<_ServiceJournalView> {
     return events.reversed.toList(growable: false);
   }
 
+  void _selectTab(int value) {
+    if (_tab == value) return;
+    setState(() {
+      _tab = value;
+      if (value != 0) _archive = _loadArchive();
+    });
+    if (value == 0) unawaited(_refresh());
+  }
+
+  bool _matches(_JournalEntry entry) {
+    final log = entry.log;
+    if (_tab == 1 && log.level != 'error' &&
+        !log.message.toLowerCase().contains('watchdog') &&
+        !log.message.toLowerCase().contains('engine exited')) return false;
+    return (_filter == 'all' || log.level == _filter) &&
+        '${entry.component} ${log.level} ${log.message}'
+            .toLowerCase().contains(_query.toLowerCase());
+  }
+
+  Widget _record(BuildContext context, _JournalEntry entry) {
+    final log = entry.log;
+    return RecordListItem(
+      onTap: () {},
+      header: RecordHeader(children: [
+        RecordTimestamp(log.time.toLocal().toString().split('.').first),
+        RecordLabel(
+          label: _levelLabel(AppLocalizations.of(context), log.level),
+          tone: switch (log.level) {
+            'error' => RecordTone.error,
+            'stderr' => RecordTone.warning,
+            _ => RecordTone.neutral,
+          },
+        ),
+      ]),
+      body: SelectableText(
+        _tab == 0 ? log.message : '[${entry.component}] ${log.message}',
+        style: RecordTextStyles.of(context).primary,
+      ),
+    );
+  }
+
+  Widget _filterSection(BuildContext context, {String? error}) {
+    final l = AppLocalizations.of(context);
+    return generateSection(
+      items: [
+        ListItem<String>.options(
+          title: Text(l.forkFilter),
+          options: const ['all', 'info', 'error', 'stderr', 'debug'],
+          value: _filter,
+          textBuilder: (value) => switch (value) {
+            'all' => l.forkAllEvents,
+            'error' => l.forkErrors,
+            _ => _levelLabel(l, value),
+          },
+          onChanged: (value) => setState(() => _filter = value),
+        ),
+        if (_tab != 0)
+          ListItem(
+            title: Text(l.update),
+            trailing: const Icon(Icons.refresh),
+            onTap: () => setState(() => _archive = _loadArchive()),
+          ),
+        if (error != null)
+          ListItem(title: Text(l.forkLogReadError), subtitle: Text(error)),
+      ],
+      footer: _tab == 0 ? l.forkLogFooter : null,
+    );
+  }
+
+  Widget _entriesView(BuildContext context, List<_JournalEntry> entries, {String? error}) {
+    final filtered = entries.where(_matches).toList(growable: false);
+    final l = AppLocalizations.of(context);
+    return ListView.separated(
+      key: ValueKey(_tab),
+      padding: EdgeInsets.fromLTRB(16, 12, 16, 16 + context.bottomInset),
+      itemCount: 1 + (filtered.isEmpty ? 1 : filtered.length),
+      separatorBuilder: (_, _) => const SizedBox(height: recordListGap),
+      itemBuilder: (context, index) {
+        if (index == 0) return _filterSection(context, error: error);
+        if (filtered.isEmpty) return ListItem(title: Text(l.forkNoEvents));
+        return _record(context, filtered[index - 1]);
+      },
+    );
+  }
+
+  Widget _journal(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return FutureBuilder<List<_JournalEntry>>(
+      future: _archive,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(l.forkJournalUnavailable),
+              TextButton(
+                onPressed: () => setState(() => _archive = _loadArchive()),
+                child: Text(l.retry),
+              ),
+            ],
+          ));
+        }
+        return _entriesView(context, snapshot.data ?? const []);
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    return CommonScaffold(
-      title: widget.crashesOnly ? l.forkCrashHistory : l.forkServiceJournal,
-      searchState: AppBarSearchState(onSearch: (query) => setState(() => _query = query)),
-      body: FutureBuilder<List<({HelperZapretLog log, String component})>>(
-        future: _entries,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(l.forkJournalUnavailable),
-                TextButton(onPressed: () => setState(() => _entries = _load()), child: Text(l.retry)),
-              ],
-            ));
-          }
-          final events = (snapshot.data ?? <({HelperZapretLog log, String component})>[]).where((entry) =>
-            '${entry.component} ${entry.log.level} ${entry.log.message}'.toLowerCase().contains(_query.toLowerCase())).toList();
-          if (events.isEmpty) return Center(child: Text(l.forkNoEvents));
-          return ListView.separated(
-            padding: EdgeInsets.fromLTRB(16, context.contentTopPadding, 16, 16 + context.bottomInset),
-            itemCount: events.length,
-            separatorBuilder: (_, _) => const SizedBox(height: recordListGap),
-            itemBuilder: (_, index) {
-              final entry = events[index];
-              return RecordListItem(
-                onTap: () {},
-                header: RecordHeader(children: [
-                  RecordTimestamp(entry.log.time.toLocal().toString().split('.').first),
-                  RecordLabel(label: _levelLabel(l, entry.log.level), tone: entry.log.level == 'error'
-                      ? RecordTone.error : entry.log.level == 'stderr' ? RecordTone.warning : RecordTone.neutral),
-                ]),
-                body: SelectableText('[${entry.component}] ${entry.log.message}', style: RecordTextStyles.of(context).primary),
-              );
-            },
-          );
-        },
+    return DefaultTabController(
+      length: 3,
+      child: CommonScaffold(
+        title: l.forkZapretLogs,
+        searchState: AppBarSearchState(onSearch: (query) => setState(() => _query = query)),
+        body: Column(
+          children: [
+            Padding(
+              padding: EdgeInsets.only(top: context.sectionsTopPadding),
+              child: TabBar(
+                isScrollable: true,
+                onTap: _selectTab,
+                tabs: [
+                  Tab(text: l.forkEvents),
+                  Tab(text: l.forkCrashHistory),
+                  Tab(text: l.forkServiceJournal),
+                ],
+              ),
+            ),
+            Expanded(
+              child: _tab == 0
+                  ? _entriesView(context, [
+                      for (final log in _logs.reversed)
+                        (log: log, component: 'Zapret'),
+                    ], error: _error)
+                  : _journal(context),
+            ),
+          ],
+        ),
       ),
     );
   }

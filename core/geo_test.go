@@ -351,3 +351,27 @@ func TestAMappedDatabaseWaitsBesideTheLoadedOneUntilTheNextStart(t *testing.T) {
 		t.Fatal("the next start left the staged database waiting")
 	}
 }
+
+func TestGeoCheckDueUsesEachDatabaseAndLastCheck(t *testing.T) {
+	now := time.Now()
+	interval := 24 * time.Hour
+	url := "https://example.test/geo"
+	if !geoCheckDue(now, now.Add(-25*time.Hour), geoCheck{}, url, interval) {
+		t.Fatal("old database must be due")
+	}
+	if geoCheckDue(now, now.Add(-time.Hour), geoCheck{}, url, interval) {
+		t.Fatal("fresh database must not be due")
+	}
+	if geoCheckDue(now, now.Add(-25*time.Hour), geoCheck{url: url, at: now.Add(-time.Hour), ok: true}, url, interval) {
+		t.Fatal("unchanged successful download must reset the check time")
+	}
+	if !geoCheckDue(now, now.Add(-time.Hour), geoCheck{url: url, at: now.Add(-time.Minute), ok: true}, "https://example.test/new", interval) {
+		t.Fatal("a changed resource URL must be checked")
+	}
+	if geoCheckDue(now, time.Time{}, geoCheck{url: url, at: now.Add(-time.Minute)}, url, interval) {
+		t.Fatal("failed request must back off")
+	}
+	if !geoCheckDue(now, time.Time{}, geoCheck{url: url, at: now.Add(-6*time.Minute)}, url, interval) {
+		t.Fatal("failed request must retry")
+	}
+}

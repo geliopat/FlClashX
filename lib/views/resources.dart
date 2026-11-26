@@ -428,7 +428,13 @@ Future<FileInfo?> _geoFileInfo(GeoResource type) async {
     GeoResource.GEOSITE => GEOSITE,
   };
   final homePath = await appPath.homeDirPath;
-  return File(join(homePath, fileName)).getFileInfo();
+  final file = File(join(homePath, fileName));
+  // Windows stages mapped databases until the next Core restart.
+  if (Platform.isWindows && (type == GeoResource.MMDB || type == GeoResource.ASN)) {
+    final pending = File('${file.path}.pending');
+    if (await pending.exists()) return pending.getFileInfo();
+  }
+  return file.getFileInfo();
 }
 
 class _GeoResourceItem extends ConsumerWidget {

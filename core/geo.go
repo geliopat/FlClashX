@@ -231,6 +231,7 @@ func runGeoUpdate(geoType string, resource geoResource) error {
 	sendMessage(GeoUpdateMessage, GeoUpdateStatus{Type: geoType, Updating: true})
 	before := resource.stamp()
 	err := resource.run()
+	recordGeoCheck(geoType, resource, err == nil)
 	if err != nil {
 		logError("updateGeoData(%s) error: %v", geoType, err)
 	}
@@ -310,33 +311,75 @@ func stopGeoUpdaterRun() {
 	}
 }
 
-func runGeoUpdater(ctx context.Context, interval time.Duration) {
-	first := interval - time.Since(lastGeoUpdateTime())
-	if first < 0 {
-		first = 0
+// A successful check with identical bytes is still a check. Keep its time
+// independently from the on-disk modification time. A URL change invalidates
+// the in-process check; failures retry with a bounded delay.
+type geoCheck struct {
+	url  string
+	at   time.Time
+	ok   bool
+}
+
+var geoChecks = struct {
+	sync.Mutex
+	items map[string]geoCheck
+}{items: make(map[string]geoCheck)}
+
+func recordGeoCheck(name string, resource geoResource, ok bool) {
+	if resource.url == nil {
+		return
 	}
-	timer := time.NewTimer(first)
+	geoChecks.Lock()
+	defer geoChecks.Unlock()
+	geoChecks.items[name] = geoCheck{url: resource.url(), at: time.Now(), ok: ok}
+}
+
+func geoCheckDue(now, modified time.Time, last geoCheck, url string, interval time.Duration) bool {
+	if !last.at.IsZero() && last.url != url {
+		return true
+	}
+	if last.url == url && !last.at.IsZero() {
+		if !last.ok {
+			return now.Sub(last.at) >= 5*time.Minute
+		}
+		if last.at.After(modified) {
+			modified = last.at
+		}
+	}
+	return modified.IsZero() || modified.After(now) || now.Sub(modified) >= interval
+}
+
+func runGeoUpdater(ctx context.Context, interval time.Duration) {
+	// Check each resource independently, including the alternate GeoIP format.
+	// Config reloads do not reset a successful check of unchanged content.
+	timer := time.NewTimer(0)
 	defer timer.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-timer.C:
-			updateGeoResources()
-			timer.Reset(interval)
+			for _, name := range []string{"MMDB", "ASN", "GEOIP", "GEOSITE"} {
+				if ctx.Err() != nil {
+					return
+				}
+				resource := geoResources[name]
+				var modified time.Time
+				if info, err := os.Stat(geoFileInUse(resource.path())); err == nil {
+					modified = info.ModTime()
+				}
+				geoChecks.Lock()
+				last := geoChecks.items[name]
+				geoChecks.Unlock()
+				if !geoCheckDue(time.Now(), modified, last, resource.url(), interval) ||
+					!claimUpdateAs(geoUpdateScope+name, true) {
+					continue
+				}
+				_ = runGeoUpdate(name, resource)
+			}
+			timer.Reset(time.Minute)
 		}
 	}
-}
-
-func lastGeoUpdateTime() time.Time {
-	for _, path := range []string{
-		constant.Path.GeoIP(), constant.Path.MMDB(), constant.Path.ASN(), constant.Path.GeoSite(),
-	} {
-		if info, err := os.Stat(geoFileInUse(path)); err == nil {
-			return info.ModTime()
-		}
-	}
-	return time.Time{}
 }
 
 func enabledGeoResources() []string {

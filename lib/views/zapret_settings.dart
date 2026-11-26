@@ -1,8 +1,6 @@
 import 'package:fl_clash/l10n/l10n.dart';
 import 'dart:async';
-import 'dart:convert';
-
-import 'package:dio/dio.dart';
+import 'package:fl_clash/providers/zapret_list_updater.dart';
 import 'package:fl_clash/core/desktop/helper_client.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/widgets/widgets.dart';
@@ -19,26 +17,7 @@ class ZapretSettingsView extends ConsumerStatefulWidget {
 }
 
 class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
-  static const _sources = <String, String>{
-    'list-general.txt': 'https://raw.githubusercontent.com/Flowseal/zapret-discord-youtube/main/lists/list-general.txt',
-    'list-google.txt': 'https://raw.githubusercontent.com/Flowseal/zapret-discord-youtube/main/lists/list-google.txt',
-    'list-exclude.txt': 'https://raw.githubusercontent.com/Flowseal/zapret-discord-youtube/main/lists/list-exclude.txt',
-    'ipset-all.txt': 'https://raw.githubusercontent.com/Flowseal/zapret-discord-youtube/main/lists/ipset-all.txt',
-  };
-
-  static const _gifDomains = <String>[
-    'tenor.com', 'media.tenor.com', 'c.tenor.com', 't.tenor.com',
-    'api.tenor.com', 'tenor.co', 'gifdeliverynetwork.com', 'giphy.com',
-    'media.giphy.com', 'api.giphy.com', 'i.giphy.com',
-  ];
-
   final _editor = TextEditingController();
-  final _http = Dio(BaseOptions(
-    connectTimeout: const Duration(seconds: 8),
-    receiveTimeout: const Duration(seconds: 20),
-    responseType: ResponseType.plain,
-  ));
-
   List<HelperZapretListInfo> _lists = const [];
   String? _selected;
   bool _loading = true;
@@ -63,7 +42,6 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
   @override
   void dispose() {
     _editor.dispose();
-    _http.close(force: true);
     super.dispose();
   }
 
@@ -159,7 +137,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
       _notice = null;
     });
     try {
-      await helperClient.restoreZapretList(filename);
+      await zapretListUpdater.edit(() => helperClient.restoreZapretList(filename));
       if (!mounted) return;
       await _loadLists(select: filename);
       if (!mounted) return;
@@ -176,37 +154,6 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
     }
   }
 
-  String _mergeList(String upstream, String existing, String filename) {
-    final seen = <String>{};
-    final lines = <String>[];
-
-    void addLine(String raw) {
-      final line = raw.trim();
-      if (line.isEmpty) return;
-      if (line.startsWith('#')) {
-        if (!lines.contains(line)) lines.add(line);
-        return;
-      }
-      final key = line.replaceFirst(RegExp(r'^\^'), '').toLowerCase();
-      if (seen.add(key)) lines.add(line);
-    }
-
-    for (final line in upstream.split(RegExp(r'\r?\n'))) {
-      addLine(line);
-    }
-    // Match zapret2-gui: keep local additions when upstream removes an entry.
-    for (final line in existing.split(RegExp(r'\r?\n'))) {
-      addLine(line);
-    }
-    if (filename == 'list-google.txt') addLine('dl.google.com');
-    if (filename == 'list-general.txt') {
-      for (final domain in _gifDomains) {
-        addLine(domain);
-      }
-    }
-    return '${lines.join('\r\n')}\r\n';
-  }
-
   Future<void> _updateLists() async {
     if (_updating || _saving || _lists.isEmpty) return;
     final l = AppLocalizations.of(context);
@@ -215,121 +162,19 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
       _error = null;
       _notice = null;
     });
-
-    final staged = <String, String>{};
-    final originals = <String, String>{};
-    final applied = <String>[];
-    final details = <String>[];
-    final rollbackFailures = <String>[];
-
     try {
-      // Download and validate every upstream file before touching the disk.
-      for (final entry in _sources.entries) {
-        final current = await helperClient.readZapretList(entry.key);
-        final response = await _http.get<String>(entry.value);
-        final upstream = response.data;
-        if (upstream == null || (entry.key != 'ipset-all.txt' && upstream.trim().length < 20)) {
-          throw StateError('${entry.key}: ${l.forkEmptySourceFile}');
-        }
-
-        final upstreamCount = upstream
-            .split(RegExp(r'\r?\n'))
-            .where((line) => line.trim().isNotEmpty && !line.trim().startsWith('#'))
-            .length;
-        if (upstreamCount == 0 && entry.key != 'ipset-all.txt') {
-          throw StateError(
-            '${entry.key}: ${l.forkSourceNoEntries}',
-          );
-        }
-
-        if (entry.key == 'ipset-all.txt' && upstreamCount == 0) {
-          details.add('ipset-all.txt: ${l.forkKeepEmptyTemplate}');
-          continue;
-        }
-
-        // The upstream GUI merges local rows after downloading. Do not compare
-        // the upstream count with the installed file: that file may contain
-        // many valid local additions which are intentionally retained.
-        final merged = _mergeList(upstream, current.content, entry.key);
-        if (utf8.encode(merged).length > 2 * 1024 * 1024) {
-          throw StateError('${entry.key}: ${l.forkListSizeLimit}');
-        }
-        originals[entry.key] = current.content;
-        staged[entry.key] = merged;
-      }
-
-      // Apply staged files. Re-read before each write so an edit made in
-      // another FlClashX instance during download is not silently overwritten.
-      for (final entry in staged.entries) {
-        final current = await helperClient.readZapretList(entry.key);
-        if (current.content != originals[entry.key]) {
-          throw StateError(
-            '${entry.key}: ${l.forkConcurrentEdit}',
-          );
-        }
-        final saved = await helperClient.writeZapretList(entry.key, entry.value);
-        applied.add(entry.key);
-        details.add('${saved.filename}: ${saved.entries}');
-      }
-
+      final result = await zapretListUpdater.update(l);
       if (!mounted) return;
       await _loadLists(select: _selected);
       if (!mounted) return;
       setState(() {
-        _updating = false;
-        _notice = '${l.forkFilesUpdated}: ${applied.length}. ${details.join(' · ')}. ${l.forkUserFilesKept}';
+        _error = result.error;
+        _notice = result.notice;
       });
     } catch (error) {
-      // A request can fail after Helper has already replaced the file but
-      // before the response reaches the client. Detect that ambiguous case.
-      for (final entry in staged.entries) {
-        if (applied.contains(entry.key)) continue;
-        try {
-          final current = await helperClient.readZapretList(entry.key);
-          if (current.content == entry.value &&
-              current.content != originals[entry.key]) {
-            applied.add(entry.key);
-          } else if (current.content != originals[entry.key]) {
-            rollbackFailures.add(
-              '${entry.key}: ${l.forkRollbackConcurrent}',
-            );
-          }
-        } catch (verificationError) {
-          rollbackFailures.add(
-            '${entry.key}: ${l.forkWriteVerificationFailed}: $verificationError',
-          );
-        }
-      }
-
-      // Roll back already-applied files in reverse order. Before restoring,
-      // verify that nobody has changed the file since this updater wrote it.
-      for (final filename in applied.reversed) {
-        try {
-          final current = await helperClient.readZapretList(filename);
-          if (current.content != staged[filename]) {
-            rollbackFailures.add(
-              '$filename: ${l.forkRollbackConcurrent}',
-            );
-            continue;
-          }
-          await helperClient.restoreZapretList(filename);
-        } catch (rollbackError) {
-          rollbackFailures.add('$filename: $rollbackError');
-        }
-      }
-      if (applied.isNotEmpty && mounted) {
-        await _loadLists(select: _selected);
-      }
-      if (!mounted) return;
-      setState(() {
-        _updating = false;
-        _error = error is HelperException ? error.message : error.toString();
-        _notice = rollbackFailures.isNotEmpty
-            ? '${l.forkRollbackUnconfirmed}: ${rollbackFailures.join('; ')}'
-            : applied.isNotEmpty
-                ? l.forkRollbackRestored
-                : null;
-      });
+      if (mounted) setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _updating = false);
     }
   }
 
@@ -519,6 +364,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
                   ? null
                   : () async {
                       final filename = _selected!;
+                      final original = _editor.text;
                       await BaseNavigator.push<void>(
                         context,
                         EditorPage(
@@ -526,7 +372,13 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
                           content: _editor.text,
                           onSave: (editorContext, title, content) async {
                             final text = await content.readText();
-                            await helperClient.writeZapretList(filename, text);
+                            await zapretListUpdater.edit(() async {
+                              final current = await helperClient.readZapretList(filename);
+                              if (current.content != original) {
+                                throw StateError(AppLocalizations.of(context).forkConcurrentEdit);
+                              }
+                              await helperClient.writeZapretList(filename, text);
+                            });
                             if (editorContext.mounted) {
                               Navigator.of(editorContext).pop();
                             }
@@ -539,7 +391,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
           ListItem(
             leading: const Icon(Icons.cloud_download_outlined),
             title: Text(AppLocalizations.of(context).forkUpdateLists),
-            subtitle: Text(AppLocalizations.of(context).forkUpdateListsHint),
+            subtitle: Text('${AppLocalizations.of(context).forkUpdateListsHint} · 12 h'),
             trailing: _updating
                 ? const SizedBox.square(
                     dimension: 18,

@@ -86,7 +86,7 @@ jobs:
         run: flutter test test/core/protocol_contract_test.dart test/core/desktop/rpc_client_test.dart test/core/desktop/lifecycle_test.dart test/common/preferences_store_test.dart
 
       - name: Run linked Windows lifecycle regression tests
-        run: flutter test test/providers/windows_linked_lifecycle_test.dart test/providers/zapret_history_test.dart test/l10n/localization_contract_test.dart
+        run: flutter test test/providers/windows_linked_lifecycle_test.dart test/providers/zapret_history_test.dart test/providers/zapret_list_updater_test.dart test/providers/resources_action_test.dart test/providers/geo_resource_action_test.dart test/l10n/localization_contract_test.dart
 
       - name: Run FlClashZ UI regression tests
         run: flutter test test/views/about_test.dart test/views/dashboard/widget_registry_test.dart test/views/dashboard/wide_test.dart test/widgets/core_status_button_test.dart

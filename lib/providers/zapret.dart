@@ -5,6 +5,7 @@ import 'dart:io';
 
 import 'package:fl_clash/common/system.dart';
 import 'package:fl_clash/common/file_logger.dart';
+import 'package:fl_clash/providers/zapret_list_updater.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/providers/action.dart';
@@ -458,8 +459,47 @@ class ZapretController extends Notifier<ZapretState> {
   final HelperClient _client = helperClient;
   Timer? _poller;
   Timer? _clock;
+  bool _checkingListUpdate = false;
+  DateTime? _listReadinessRetry;
   bool _collectingLogs = false;
   final _seenLogEvents = <String>{};
+
+  Future<void> _maybeUpdateLists() async {
+    if (_checkingListUpdate || !ref.mounted || !ref.read(initProvider) ||
+        ref.read(safeModeProvider) || !state.available || state.busy ||
+        state.dashboardRestarting || _coreRestarting || _profileApplying ||
+        !zapretListUpdater.isDue) return;
+    final now = DateTime.now();
+    if (_listReadinessRetry case final retry? when now.isBefore(retry)) return;
+    _checkingListUpdate = true;
+    try {
+      final readiness = await _client.readiness(
+        timeout: _readinessTimeout, logFailure: false, verifyHelperBinary: true,
+      );
+      if (!ref.mounted || state.busy || ref.read(safeModeProvider)) return;
+      if (readiness != HelperReadiness.ready) {
+        _listReadinessRetry = DateTime.now().add(zapretListRetryInterval);
+        return;
+      }
+      final result = await zapretListUpdater.updateIfDue(AppLocalizations.current);
+      if (result == null) return;
+      zapretFileLogger.enable();
+      zapretFileLogger.write(Log(
+        dateTime: DateTime.now().toIso8601String(),
+        logLevel: result.succeeded ? LogLevel.info : LogLevel.warning,
+        payload: '[Zapret lists] ${result.error ?? ''} ${result.notice ?? ''}',
+      ));
+    } catch (error) {
+      _listReadinessRetry = DateTime.now().add(zapretListRetryInterval);
+      zapretFileLogger.write(Log(
+        dateTime: DateTime.now().toIso8601String(),
+        logLevel: LogLevel.warning,
+        payload: '[Zapret lists] $error',
+      ));
+    } finally {
+      _checkingListUpdate = false;
+    }
+  }
 
   Future<void> collectPersistentLogs() async {
     if (_collectingLogs || !Platform.isWindows) return;
@@ -699,6 +739,7 @@ class ZapretController extends Notifier<ZapretState> {
         if (ref.mounted) {
           unawaited(collectPersistentLogs());
           unawaited(refresh().then((_) {
+            if (ref.mounted) unawaited(_maybeUpdateLists());
             if (ref.mounted) return _syncHeaderOverlay().then((_) {
               if (ref.mounted) return _reconcileInfrastructure();
             });

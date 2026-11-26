@@ -3,9 +3,98 @@ part of '../action.dart';
 @Riverpod(keepAlive: true)
 class ResourcesAction extends _$ResourcesAction {
   var _autoUpdating = false;
+  Timer? _timer;
+  final _newProfiles = <int, Set<String>>{};
+  int? _appliedProfileId;
+  bool _refreshingProfile = false;
 
   @override
-  void build() {}
+  void build() {
+    ref.onDispose(() => _timer?.cancel());
+  }
+
+  /// One timer, also while the window is hidden. Core owns its Geo and
+  /// native provider timers; this pass covers application-managed resources.
+  void startAutoUpdates() {
+    if (!system.isWindows) return;
+    _timer ??= Timer.periodic(const Duration(minutes: 1), (_) {
+      if (ref.mounted && ref.read(initProvider)) unawaited(autoUpdate());
+    });
+  }
+
+  void profileAdded(int id) {
+    _newProfiles.putIfAbsent(id, () => <String>{});
+  }
+
+  Future<void> profileApplied(int? id) async {
+    _appliedProfileId = id;
+    if (id != null && _newProfiles.containsKey(id)) {
+      await _refreshNewProfile();
+    }
+  }
+
+  bool _currentApplied(int id) => ref.mounted &&
+      _appliedProfileId == id &&
+      ref.read(currentProfileIdProvider) == id &&
+      ref.read(coreStatusProvider) == CoreStatus.connected &&
+      !ref.read(safeModeProvider);
+
+  /// Only the applied profile's HTTP providers can be refreshed by the Core.
+  /// Do not switch profiles or reload a config just to fetch its resources.
+  Future<void> _refreshNewProfile() async {
+    final id = _appliedProfileId;
+    if (id == null || _refreshingProfile || !_currentApplied(id)) return;
+    final completed = _newProfiles[id];
+    if (completed == null) return;
+    _refreshingProfile = true;
+    try {
+      final core = ref.read(coreHandlerProvider);
+      final providers = await core.getExternalProviders();
+      if (!_currentApplied(id)) return;
+      var allAccepted = true;
+      // Start geo downloads before waiting for remote providers.
+      if (ref.read(patchClashConfigProvider).geoAutoUpdate) {
+        final geo = ref.read(geoResourceActionProvider.notifier);
+        for (final type in GeoResource.values) {
+          if (!_currentApplied(id)) return;
+          final key = type.updatingKey;
+          if (completed.contains(key)) continue;
+          if (ref.read(updatingKeysProvider).contains(key) ||
+              await _tryUpdate(type.name, () =>
+                  geo.updateGeoResource(type, announceSuccess: false))) {
+            completed.add(key);
+          } else {
+            allAccepted = false;
+          }
+        }
+      }
+      for (final provider in providers) {
+        if (!_currentApplied(id)) return;
+        if (provider.vehicleType.toLowerCase() != 'http') continue;
+        final key = provider.updatingKey;
+        if (completed.contains(key)) continue;
+        if (ref.read(updatingKeysProvider).contains(key)) {
+          allAccepted = false;
+          continue;
+        }
+        if (await _tryUpdate(provider.name, () async {
+          final message = await ref.read(proxiesActionProvider.notifier)
+              .updateProvider(provider, showLoading: true);
+          if (message.isNotEmpty) throw MessageException(message);
+        })) {
+          completed.add(key);
+        } else {
+          allAccepted = false;
+        }
+      }
+      if (allAccepted && _currentApplied(id)) _newProfiles.remove(id);
+    } catch (error) {
+      commonPrint.log('profile resources: ${compactError(error)}',
+          logLevel: LogLevel.warning);
+    } finally {
+      _refreshingProfile = false;
+    }
+  }
 
   Future<void> updateIconSet(IconSet iconSet) {
     return _track(
@@ -101,8 +190,11 @@ class ResourcesAction extends _$ResourcesAction {
 
   /// Geo files are left to the Core, which reads the same two settings.
   Future<void> autoUpdate() async {
+    if (!ref.mounted || ref.read(safeModeProvider)) return;
+    await _refreshNewProfile();
+    if (!ref.mounted) return;
     final setting = ref.read(patchClashConfigProvider);
-    if (!setting.geoAutoUpdate || _autoUpdating) {
+    if (!setting.geoAutoUpdate || setting.geoUpdateInterval <= 0 || _autoUpdating) {
       return;
     }
     _autoUpdating = true;
@@ -125,23 +217,29 @@ class ResourcesAction extends _$ResourcesAction {
           break;
         }
         if (provider.isRemote &&
+            !ref.read(updatingKeysProvider).contains(provider.updatingKey) &&
             isDue((await provider.fileInfo)?.lastModified)) {
           await _tryUpdate(provider.label, () => updateRuleProvider(provider));
         }
       }
+    } catch (error) {
+      commonPrint.log('resource timer: ${compactError(error)}',
+          logLevel: LogLevel.warning);
     } finally {
       _autoUpdating = false;
     }
   }
 
-  Future<void> _tryUpdate(String label, Future<void> Function() update) async {
+  Future<bool> _tryUpdate(String label, Future<void> Function() update) async {
     try {
       await update();
+      return true;
     } catch (e) {
       commonPrint.log(
         'auto update $label: ${compactError(e)}',
         logLevel: LogLevel.warning,
       );
+      return false;
     }
   }
 }

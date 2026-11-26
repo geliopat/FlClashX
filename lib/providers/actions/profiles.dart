@@ -199,6 +199,9 @@ class ProfilesAction extends _$ProfilesAction {
 
   void putProfile(Profile profile) {
     if (ref.read(profilesProvider).getProfile(profile.id) == null) {
+      if (system.isWindows) {
+        ref.read(resourcesActionProvider.notifier).profileAdded(profile.id);
+      }
       ref.read(proxiesActionProvider.notifier).unfoldFirstGroupOnce(profile.id);
     }
     ref.read(profilesProvider.notifier).put(profile);

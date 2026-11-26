@@ -1089,11 +1089,17 @@ class SetupAction extends _$SetupAction {
       globalState.lastConfigCounts = realProfile.counts;
       await preloadInvoke?.call();
       await _syncZapretInfrastructure(realProfile, profile?.id);
+      if (system.isWindows) {
+        unawaited(ref.read(resourcesActionProvider.notifier).profileApplied(profile?.id));
+      }
       return _SetupTaskResult.completed;
     }
     // Go answers a config it rejects by running its built-in default, which
     // has no proxies, so until this push succeeds no applied config is known.
     _appliedInputs = null;
+    if (system.isWindows) {
+      unawaited(ref.read(resourcesActionProvider.notifier).profileApplied(null));
+    }
     _appliedHostCandidates = const {};
     _pushes++;
     if (system.isWindows) {
@@ -1178,6 +1184,9 @@ class SetupAction extends _$SetupAction {
               .resendPicksSince(setupParams.selectedMap);
         }
         await onUpdated?.call();
+        if (system.isWindows && accepted) {
+          unawaited(ref.read(resourcesActionProvider.notifier).profileApplied(profile?.id));
+        }
       },
       silence: true,
       tag: !silence ? LoadingTag.proxies : null,

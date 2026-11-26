@@ -202,6 +202,8 @@ class Bootstrap {
     }
     await _showCrashRecoveryTip();
     await _showPreChannelTip();
+    // Keep the resource timer available even after a startup recovery path.
+    _container.read(resourcesActionProvider.notifier).startAutoUpdates();
     // Complete machine-wide Helper migration before starting either engine.
     // The launcher independently rechecks readiness before spawning Mihomo.
     if (system.isWindows && !_container.read(safeModeProvider)) {
@@ -240,7 +242,8 @@ class Bootstrap {
     }
     _container.read(initProvider.notifier).value = true;
     unawaited(_refreshProfilesAfterStart());
-    unawaited(_container.read(resourcesActionProvider.notifier).autoUpdate());
+    final resources = _container.read(resourcesActionProvider.notifier);
+    unawaited(resources.autoUpdate());
     await bootGuard.markRunning();
     unawaited(_container.read(locationPermissionsProvider.notifier).refresh());
   }
