@@ -31,7 +31,29 @@ import '../helpers/app_paths.dart';
 import '../helpers/preferences.dart';
 import '../helpers/test_profiles.dart';
 
-class _MockCoreHandlerInterface extends Mock implements CoreHandlerInterface {}
+class _MockCoreHandlerInterface extends Mock implements CoreHandlerInterface {
+  static int _responseSequence = 0;
+
+  _MockCoreHandlerInterface() {
+    // The real transport returns a path to a spilled YAML response, not YAML
+    // itself. Model that contract, including a separate file for every call.
+    // Individual tests may still override this stub to test specific results.
+    when(() => buildProfile(any())).thenAnswer((invocation) async {
+      final base = invocation.positionalArguments.single as SetupBase;
+      final file = File(join(
+        await appPath.homeDirPath,
+        coreSpillDirectoryName,
+        'mock-profile-${++_responseSequence}.yaml',
+      ));
+      await file.create(recursive: true);
+      await file.writeAsString(base.overlay.isEmpty ? '{}' : base.overlay);
+      return file.path;
+    });
+    when(() => getTraffic(any())).thenAnswer((_) async => const Traffic());
+    when(() => getTotalTraffic(any())).thenAnswer((_) async => const Traffic());
+    when(() => resetTraffic()).thenAnswer((_) async {});
+  }
+}
 
 // isMissingFile checks the file system before setup refreshes, so its
 // failure tests need appPath to resolve to a real, writable directory.
