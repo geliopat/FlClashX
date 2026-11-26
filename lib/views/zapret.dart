@@ -107,7 +107,12 @@ class ZapretView extends ConsumerWidget {
               maxLines: 3,
             ),
           ),
-          if (zapret.supportsSplitMode)
+          if (zapret.supportsSplitMode && zapret.headerModeManaged)
+            ListItem(
+              title: Text(AppLocalizations.of(context).forkSelectedMode),
+              subtitle: Text(zapret.mode == ZapretMode.strictSplit ? 'STRICT SPLIT' : 'FULL BYPASS'),
+            ),
+          if (zapret.supportsSplitMode && !zapret.headerModeManaged)
             ListItem<ZapretMode>.options(
               title: Text(AppLocalizations.of(context).forkSelectedMode),
               options: ZapretMode.values,
@@ -180,7 +185,7 @@ class ZapretView extends ConsumerWidget {
             title: Text(AppLocalizations.of(context).forkAutoFallback),
             subtitle: Text(AppLocalizations.of(context).forkFallbackHint),
             trailing: Switch(value: zapret.autoFallback,
-              onChanged: ref.read(zapretControllerProvider.notifier).setAutoFallback),
+              onChanged: zapret.headerManaged ? null : ref.read(zapretControllerProvider.notifier).setAutoFallback),
           ),
         ],
       ),

@@ -415,7 +415,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
             subtitle: Text(AppLocalizations.of(context).forkStopWithMihomo),
             trailing: Switch(
               value: zapret.startWithMihomo,
-              onChanged: ref.read(zapretControllerProvider.notifier).setStartWithMihomo,
+              onChanged: zapret.headerManaged ? null : ref.read(zapretControllerProvider.notifier).setStartWithMihomo,
             ),
           ),
             ListItem(

@@ -353,6 +353,7 @@ const providerHeaderNames = {
   'profile-update-interval',
   'x-hwid-max-devices-reached',
   'x-hwid-not-supported',
+  'flclashz-zapret',
 };
 
 const providerHeaderPrefix = 'flclashx-';

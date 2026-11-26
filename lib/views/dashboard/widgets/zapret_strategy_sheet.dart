@@ -35,7 +35,15 @@ class ZapretStrategySheet extends ConsumerWidget {
           bottom: 16 + context.bottomInset,
         ),
         children: [
-          if (state.supportsSplitMode)
+          if (state.supportsSplitMode && state.headerModeManaged)
+            generateSection(
+              title: AppLocalizations.of(context).forkMode,
+              items: [ListItem(
+                title: Text(AppLocalizations.of(context).forkProcessingMode),
+                subtitle: Text(state.mode == ZapretMode.strictSplit ? 'STRICT SPLIT' : 'FULL BYPASS'),
+              )],
+            ),
+          if (state.supportsSplitMode && !state.headerModeManaged)
             generateSection(
               title: AppLocalizations.of(context).forkMode,
               items: [

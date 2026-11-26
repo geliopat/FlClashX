@@ -76,6 +76,11 @@ class ProviderHeaders {
     };
   }
 
+  /// A present header controls all four flags, even if its value is empty.
+  ZapretHeaderSettings? get zapret => parseZapretHeader(
+    _headers['flclashz-zapret'],
+  );
+
   /// Flags of `flclashx-special`, the panel's one-off behaviours.
   Set<String>? get specials {
     final raw = text('flclashx-special');
@@ -194,6 +199,48 @@ class ProviderHeaders {
     }
     return urls;
   }
+}
+
+/// Profile-local Zapret policy. Values are normalized without importing the
+/// controller or permitting any commands, files or executable arguments.
+typedef ZapretHeaderSettings = ({
+  bool autostart,
+  bool autofallback,
+  bool autotune,
+  bool tuneonfail,
+  String? mode,
+  String? tunemode,
+});
+
+ZapretHeaderSettings? parseZapretHeader(String? raw) {
+  if (raw == null) return null;
+  final flags = <String>{};
+  String? mode;
+  String? tunemode;
+  for (final part in raw.split(',')) {
+    final value = part.trim().toLowerCase();
+    final colon = value.indexOf(':');
+    if (colon < 0) {
+      flags.add(value);
+      continue;
+    }
+    final key = value.substring(0, colon).trim();
+    final argument = value.substring(colon + 1).trim();
+    if (key == 'mode' && const {'strictsplit', 'fullbypass'}.contains(argument)) {
+      mode = argument;
+    } else if (key == 'tunemode' &&
+        const {'veryfast', 'fast', 'full'}.contains(argument)) {
+      tunemode = argument;
+    }
+  }
+  return (
+    autostart: flags.contains('autostart'),
+    autofallback: flags.contains('autofallback'),
+    autotune: flags.contains('autotune'),
+    tuneonfail: flags.contains('tuneonfail'),
+    mode: mode,
+    tunemode: tunemode,
+  );
 }
 
 const maxFallbackHosts = 5;

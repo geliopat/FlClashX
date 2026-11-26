@@ -19,6 +19,38 @@ Profile _profile({
 );
 
 void main() {
+  group('flclashz-zapret', () {
+    test('captures header case-insensitively and parses presence flags', () {
+      final headers = providerHeadersOf({'FlClashZ-Zapret': [' AUTOSTART, mode:StrictSplit, AutoFallback, autotune, tunemode:VeryFast, tuneonfail '], 'other': ['ignored']});
+      expect(headers.keys, ['flclashz-zapret']);
+      final policy = ProviderHeaders(headers).zapret!;
+      expect(policy.autostart, isTrue);
+      expect(policy.autofallback, isTrue);
+      expect(policy.autotune, isTrue);
+      expect(policy.tuneonfail, isTrue);
+      expect(policy.mode, 'strictsplit');
+      expect(policy.tunemode, 'veryfast');
+    });
+    test('empty or partial header turns absent flags off; no header is null', () {
+      expect(const ProviderHeaders({}).zapret, isNull);
+      final empty = const ProviderHeaders({'flclashz-zapret': ''}).zapret!;
+      expect((empty.autostart, empty.autofallback, empty.autotune, empty.tuneonfail), (false, false, false, false));
+      final partial = parseZapretHeader('autostart,mode:fullbypass,tunemode:full')!;
+      expect(partial.autostart, isTrue);
+      expect(partial.autofallback, isFalse);
+      expect(partial.mode, 'fullbypass');
+      expect(partial.tunemode, 'full');
+    });
+    test('ignores invalid values and unknown keys, last valid value wins', () {
+      final policy = parseZapretHeader('autostart:false,autotune:true,mode:strictsplit,mode:bad,mode:fullbypass,tunemode:fast,tunemode:bad,unknown')!;
+      expect(policy.autostart, isFalse);
+      expect(policy.autotune, isFalse);
+      expect(policy.mode, 'fullbypass');
+      expect(policy.tunemode, 'fast');
+      expect(parseZapretHeader('mode:bad,tunemode:bad')!.mode, isNull);
+      expect(parseZapretHeader('mode:bad,tunemode:bad')!.tunemode, isNull);
+    });
+  });
   group('LinkOffer.parse', () {
     test('reads the link alone, or with its threshold after a comma', () {
       expect(
