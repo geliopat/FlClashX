@@ -55,8 +55,9 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
     try {
       final lists = await helperClient.zapretLists();
       final currentSelection = _selected;
-      final filename = select ??
-          (currentSelection != null &&
+      final filename = (select != null && lists.any((item) => item.filename == select))
+          ? select
+          : (currentSelection != null &&
                   lists.any((item) => item.filename == currentSelection)
               ? currentSelection
               : (lists.isEmpty ? null : lists.first.filename));
@@ -163,7 +164,9 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
       _notice = null;
     });
     try {
-      final result = await zapretListUpdater.update(l);
+      final result = await zapretListUpdater.update(l, canCommit: () =>
+          mounted && !_updatingHelper && !ref.read(safeModeProvider) &&
+          !ref.read(zapretControllerProvider).busy);
       if (!mounted) return;
       await _loadLists(select: _selected);
       if (!mounted) return;
@@ -205,7 +208,8 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
       _notice = null;
     });
     try {
-      await ref.read(zapretControllerProvider.notifier).updateHelperService();
+      await zapretListUpdater.edit(() =>
+          ref.read(zapretControllerProvider.notifier).updateHelperService());
       if (!mounted) return;
       setState(() {
         _notice = l.forkHelperReinstalled;
@@ -374,7 +378,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
                             final text = await content.readText();
                             await zapretListUpdater.edit(() async {
                               final current = await helperClient.readZapretList(filename);
-                              if (current.content != original) {
+                              if (!sameZapretList(current.content, original)) {
                                 throw StateError(AppLocalizations.of(context).forkConcurrentEdit);
                               }
                               await helperClient.writeZapretList(filename, text);

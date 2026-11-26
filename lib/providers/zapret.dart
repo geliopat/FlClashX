@@ -464,24 +464,31 @@ class ZapretController extends Notifier<ZapretState> {
   bool _collectingLogs = false;
   final _seenLogEvents = <String>{};
 
+  bool _canCommitListUpdate() => ref.mounted && ref.read(initProvider) &&
+      !ref.read(safeModeProvider) && state.available && !state.busy &&
+      !state.dashboardRestarting && !_coreRestarting && !_profileApplying &&
+      !_lifecycleStopping;
+
   Future<void> _maybeUpdateLists() async {
-    if (_checkingListUpdate || !ref.mounted || !ref.read(initProvider) ||
-        ref.read(safeModeProvider) || !state.available || state.busy ||
-        state.dashboardRestarting || _coreRestarting || _profileApplying ||
+    if (_checkingListUpdate || !_canCommitListUpdate() ||
         !zapretListUpdater.isDue) return;
     final now = DateTime.now();
-    if (_listReadinessRetry case final retry? when now.isBefore(retry)) return;
+    if (_listReadinessRetry case final retry? when now.isBefore(retry) &&
+        retry.difference(now) <= zapretListRetryInterval) return;
     _checkingListUpdate = true;
     try {
       final readiness = await _client.readiness(
         timeout: _readinessTimeout, logFailure: false, verifyHelperBinary: true,
       );
-      if (!ref.mounted || state.busy || ref.read(safeModeProvider)) return;
+      if (!_canCommitListUpdate()) return;
       if (readiness != HelperReadiness.ready) {
         _listReadinessRetry = DateTime.now().add(zapretListRetryInterval);
         return;
       }
-      final result = await zapretListUpdater.updateIfDue(AppLocalizations.current);
+      _listReadinessRetry = null;
+      final result = await zapretListUpdater.updateIfDue(
+        AppLocalizations.current, canCommit: _canCommitListUpdate,
+      );
       if (result == null) return;
       zapretFileLogger.enable();
       zapretFileLogger.write(Log(

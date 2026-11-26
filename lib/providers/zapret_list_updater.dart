@@ -9,10 +9,20 @@ const zapretListUpdateInterval = Duration(hours: 12);
 const zapretListRetryInterval = Duration(minutes: 5);
 
 bool zapretListsDue(DateTime now, DateTime? lastSuccess, DateTime? retryAfter) {
-  if (retryAfter != null && now.isBefore(retryAfter)) return false;
+  if (retryAfter != null && now.isBefore(retryAfter) &&
+      retryAfter.difference(now) <= zapretListRetryInterval) return false;
   return lastSuccess == null || now.isBefore(lastSuccess) ||
       !now.isBefore(lastSuccess.add(zapretListUpdateInterval));
 }
+
+// Helper stores LF, including when it receives CRLF.
+String normalizeZapretList(String content) =>
+    content.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+
+bool sameZapretList(String a, String b) =>
+    normalizeZapretList(a) == normalizeZapretList(b);
+
+String zapretListEntryKey(String line) => line.trim().toLowerCase();
 
 class ZapretListUpdateResult {
   const ZapretListUpdateResult({this.error, this.notice});
@@ -68,12 +78,12 @@ class ZapretListUpdater {
     }
   }
 
-  Future<ZapretListUpdateResult> update(AppLocalizations l) {
+  Future<ZapretListUpdateResult> update(AppLocalizations l, {bool Function()? canCommit}) {
     if (_update case final active?) return active;
     if (_editing) {
       return Future.value(ZapretListUpdateResult(error: l.forkConcurrentEdit));
     }
-    return _update = _run(l).then((result) {
+    return _update = _run(l, canCommit).then((result) {
       final now = _now();
       if (result.succeeded) {
         _lastSuccess = now;
@@ -85,9 +95,9 @@ class ZapretListUpdater {
     }).whenComplete(() => _update = null);
   }
 
-  Future<ZapretListUpdateResult?> updateIfDue(AppLocalizations l) async {
+  Future<ZapretListUpdateResult?> updateIfDue(AppLocalizations l, {bool Function()? canCommit}) async {
     if (busy || !zapretListsDue(_now(), _lastSuccess, _retryAfter)) return null;
-    return update(l);
+    return update(l, canCommit: canCommit);
   }
 
   String _mergeList(String upstream, String existing, String filename) {
@@ -101,7 +111,7 @@ class ZapretListUpdater {
         if (!lines.contains(line)) lines.add(line);
         return;
       }
-      final key = line.replaceFirst(RegExp(r'^\^'), '').toLowerCase();
+      final key = zapretListEntryKey(line);
       if (seen.add(key)) lines.add(line);
     }
 
@@ -118,10 +128,10 @@ class ZapretListUpdater {
         addLine(domain);
       }
     }
-    return '${lines.join('\r\n')}\r\n';
+    return '${lines.join('\n')}\n';
   }
 
-  Future<ZapretListUpdateResult> _run(AppLocalizations l) async {
+  Future<ZapretListUpdateResult> _run(AppLocalizations l, bool Function()? canCommit) async {
     final staged = <String, String>{};
     final originals = <String, String>{};
     final applied = <String>[];
@@ -168,13 +178,15 @@ class ZapretListUpdater {
       // Apply staged files. Re-read before each write so an edit made in
       // another editor during download is not silently overwritten.
       for (final entry in staged.entries) {
+        if (canCommit?.call() == false) throw StateError(l.forkCoreBusy);
         final current = await _client.readZapretList(entry.key);
-        if (current.content != originals[entry.key]) {
+        if (canCommit?.call() == false) throw StateError(l.forkCoreBusy);
+        if (!sameZapretList(current.content, originals[entry.key]!)) {
           throw StateError(
             '${entry.key}: ${l.forkConcurrentEdit}',
           );
         }
-        if (current.content == entry.value) continue;
+        if (sameZapretList(current.content, entry.value)) continue;
         attempted.add(entry.key);
         final saved = await _client.writeZapretList(entry.key, entry.value);
         applied.add(entry.key);
@@ -191,10 +203,10 @@ class ZapretListUpdater {
         if (!attempted.contains(entry.key) || applied.contains(entry.key)) continue;
         try {
           final current = await _client.readZapretList(entry.key);
-          if (current.content == entry.value &&
-              current.content != originals[entry.key]) {
+          if (sameZapretList(current.content, entry.value) &&
+              !sameZapretList(current.content, originals[entry.key]!)) {
             applied.add(entry.key);
-          } else if (current.content != originals[entry.key]) {
+          } else if (!sameZapretList(current.content, originals[entry.key]!)) {
             rollbackFailures.add(
               '${entry.key}: ${l.forkRollbackConcurrent}',
             );
@@ -211,13 +223,17 @@ class ZapretListUpdater {
       for (final filename in applied.reversed) {
         try {
           final current = await _client.readZapretList(filename);
-          if (current.content != staged[filename]) {
+          if (!sameZapretList(current.content, staged[filename]!)) {
             rollbackFailures.add(
               '$filename: ${l.forkRollbackConcurrent}',
             );
             continue;
           }
-          await _client.restoreZapretList(filename);
+          await _client.writeZapretList(filename, originals[filename]!);
+          final restored = await _client.readZapretList(filename);
+          if (!sameZapretList(restored.content, originals[filename]!)) {
+            throw StateError(l.forkWriteVerificationFailed);
+          }
         } catch (rollbackError) {
           rollbackFailures.add('$filename: $rollbackError');
         }
