@@ -944,7 +944,7 @@ class ZapretController extends Notifier<ZapretState> {
             .restartCore(repairHelper: needsRepair);
         if (!ref.mounted) return;
         if (!restored || ref.read(coreStatusProvider) != CoreStatus.connected) {
-          throw const HelperException(
+          throw HelperException(
             code: 'helperUpdateFailed',
             message: AppLocalizations().forkCoreRecoveryFailed,
           );
@@ -1379,7 +1379,7 @@ class ZapretController extends Notifier<ZapretState> {
       final restored = await ref.read(coreActionProvider.notifier)
           .restartCore(repairHelper: true);
       if (!restored) {
-        throw const HelperException(
+        throw HelperException(
           code: 'helperUpdateFailed',
           message: AppLocalizations().forkCoreRecoveryFailed,
         );
@@ -1409,7 +1409,7 @@ class ZapretController extends Notifier<ZapretState> {
       verifyHelperBinary: true,
     );
     if (readiness != HelperReadiness.ready) {
-      throw const HelperException(
+      throw HelperException(
         code: 'helperUnavailable',
         message: AppLocalizations().forkHelperUnavailableReinstall,
       );
