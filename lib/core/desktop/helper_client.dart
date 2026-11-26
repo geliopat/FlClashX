@@ -652,6 +652,14 @@ final class HelperClient {
     }
   }
 
+  Future<Map<String, Object?>> processStats() async {
+    final response = await _dio.get<Object?>(
+      '$baseUrl/process-stats',
+      options: _options(ResponseType.json, receiveTimeout: const Duration(seconds: 2)),
+    );
+    return _responseMap(response, operation: 'Process statistics');
+  }
+
   Future<List<HelperZapretLog>> zapretLogs() async {
     final response = await _dio.get<Object?>(
       '$baseUrl/zapret/logs',

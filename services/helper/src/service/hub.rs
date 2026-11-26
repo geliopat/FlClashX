@@ -1904,6 +1904,92 @@ fn clear_zapret_logs() -> warp::reply::Response {
     json_response(&true, StatusCode::OK)
 }
 
+/// Report only the Helper and its own managed children; callers cannot
+/// supply arbitrary PIDs. Existing child handles avoid PID recycling.
+#[cfg(windows)]
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ProcessStats {
+    pid: u32,
+    created: Option<u64>,
+    cpu100ns: Option<u64>,
+    rss: Option<u64>,
+}
+
+#[cfg(windows)]
+impl ProcessStats {
+    fn stopped() -> Self {
+        Self { pid: 0, created: Some(0), cpu100ns: Some(0), rss: Some(0) }
+    }
+}
+
+#[cfg(windows)]
+fn read_process_stats(handle: HANDLE, pid: u32) -> ProcessStats {
+    use windows_sys::Win32::Foundation::FILETIME;
+    use windows_sys::Win32::System::ProcessStatus::{
+        K32GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS,
+    };
+    use windows_sys::Win32::System::Threading::GetProcessTimes;
+    let filetime = |value: FILETIME| {
+        (u64::from(value.dwHighDateTime) << 32) | u64::from(value.dwLowDateTime)
+    };
+    // SAFETY: these are initialized POD output buffers. The caller owns
+    // the process handle for the duration of the read.
+    unsafe {
+        let mut created: FILETIME = std::mem::zeroed();
+        let mut exited: FILETIME = std::mem::zeroed();
+        let mut kernel: FILETIME = std::mem::zeroed();
+        let mut user: FILETIME = std::mem::zeroed();
+        let times_ok = GetProcessTimes(
+            handle, &mut created, &mut exited, &mut kernel, &mut user
+        ) != 0;
+        let mut memory: PROCESS_MEMORY_COUNTERS = std::mem::zeroed();
+        let size = std::mem::size_of::<PROCESS_MEMORY_COUNTERS>() as u32;
+        memory.cb = size;
+        let memory_ok = K32GetProcessMemoryInfo(handle, &mut memory, size) != 0;
+        ProcessStats {
+            pid,
+            created: times_ok.then(|| filetime(created)),
+            cpu100ns: times_ok.then(|| filetime(kernel).saturating_add(filetime(user))),
+            rss: memory_ok.then_some(memory.WorkingSetSize as u64),
+        }
+    }
+}
+
+#[cfg(windows)]
+fn managed_process_stats(child: Option<&mut Child>) -> Option<ProcessStats> {
+    let Some(child) = child else { return Some(ProcessStats::stopped()); };
+    match child.try_wait() {
+        Ok(Some(_)) => Some(ProcessStats::stopped()),
+        Ok(None) => Some(read_process_stats(child.as_raw_handle() as HANDLE, child.id())),
+        Err(_) => None,
+    }
+}
+
+#[cfg(windows)]
+fn get_process_stats() -> warp::reply::Response {
+    use windows_sys::Win32::System::Threading::GetCurrentProcess;
+    // SAFETY: the current-process pseudo-handle is valid and must not be closed.
+    let helper = read_process_stats(unsafe { GetCurrentProcess() }, std::process::id());
+    let mihomo = {
+        let mut managed = lock_surviving_poison(&MANAGED_CORE);
+        managed_process_stats(managed.as_mut().map(|core| &mut core.child))
+    };
+    let zapret = {
+        let mut managed = lock_surviving_poison(&MANAGED_ZAPRET);
+        managed_process_stats(managed.as_mut().map(|zapret| &mut zapret.child))
+    };
+    json_response(
+        &serde_json::json!({"helper": helper, "mihomo": mihomo, "zapret": zapret}),
+        StatusCode::OK,
+    )
+}
+
+#[cfg(not(windows))]
+fn get_process_stats() -> warp::reply::Response {
+    error_response("unsupportedPlatform", "Process statistics are Windows-only", StatusCode::NOT_IMPLEMENTED)
+}
+
 fn get_logs() -> impl Reply {
     let log_buffer = lock_surviving_poison(&LOGS);
     let value = log_buffer
@@ -2135,6 +2221,11 @@ pub(super) fn routes() -> impl Filter<Extract = (impl Reply,), Error = Infallibl
         .and(warp::body::json())
         .and_then(stop_request);
 
+    let api_process_stats = warp::path("process-stats")
+        .and(warp::path::end())
+        .and(warp::get())
+        .map(get_process_stats);
+
     let api_logs = warp::path("logs")
         .and(warp::path::end())
         .and(warp::get())
@@ -2240,6 +2331,7 @@ pub(super) fn routes() -> impl Filter<Extract = (impl Reply,), Error = Infallibl
                 .or(api_start)
                 .or(api_stop)
                 .or(api_logs)
+                .or(api_process_stats)
                 .or(api_zapret_logs)
                 .or(api_zapret_logs_clear)
                 .or(api_zapret_archive)

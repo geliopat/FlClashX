@@ -7,6 +7,7 @@ import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/ui/ui.dart';
+import 'package:fl_clash/ui/sidebar_statistics.dart';
 import 'package:fl_clash/widgets/icon.dart';
 import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
@@ -171,6 +172,7 @@ class _Sidebar extends ConsumerWidget {
         for (final item in items)
           SidebarDestination(glyph: item.glyph, label: item.label.label),
       ],
+      footer: system.isWindows ? const SidebarStatistics() : null,
       pinLastDestination: system.isWindows && items.isNotEmpty &&
           items.last.label == PageLabel.tools,
       selectedIndex: currentIndex,

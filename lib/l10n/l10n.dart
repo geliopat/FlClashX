@@ -121,6 +121,10 @@ class AppLocalizations {
 
   String get forkOpenZapretLogs => Intl.message("Open Zapret log folder", name: 'forkOpenZapretLogs', desc: '', args: []);
 
+  String get forkSidebarSpeed => Intl.message("Speed", name: 'forkSidebarSpeed', desc: '', args: []);
+  String get forkSidebarSession => Intl.message("Session", name: 'forkSidebarSession', desc: '', args: []);
+  String get forkSidebar24Hours => Intl.message("Last 24 hours", name: 'forkSidebar24Hours', desc: '', args: []);
+
   String get forkExportTodayLogs => Intl.message("Export today's logs (ZIP)", name: 'forkExportTodayLogs', desc: '', args: []);
 
   String get forkCrashHistory => Intl.message("Crash and watchdog history", name: 'forkCrashHistory', desc: '', args: []);
