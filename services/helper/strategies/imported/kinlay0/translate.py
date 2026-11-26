@@ -2,7 +2,7 @@
 """Translate the pinned kinlay0 .bat strategies into Rust data.
 
 Reads the 26 vendored .bat files in this directory (pin ce0cddc) and
-regenerates src-tauri/src/engine/imported_strategies.rs. The
+regenerates services/helper/src/service/zapret/imported_strategies.rs. The
 translation is mechanical and total: every token of the engine
 command tail is either carried over verbatim, substituted
 (%LISTS% -> {L}), or dropped by an explicit rule below (service/wf/

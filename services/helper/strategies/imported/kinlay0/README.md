@@ -21,7 +21,7 @@
   Стратегии — компиляция работ сообщества (bol-van, Flowseal и другие),
   kinlay0 — собиратель и портировщик на zapret2.
 - `translate.py` — транслятор, которым из этих .bat сгенерирован модуль
-  `src-tauri/src/engine/imported_strategies.rs`. Перегенерация:
+  `services/helper/src/service/zapret/imported_strategies.rs`. Перегенерация:
   `python3 translate.py` из этой папки.
 
 ## Как стратегии попадают в программу

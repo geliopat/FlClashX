@@ -152,10 +152,29 @@ def merge_bytes(old, own, new, path):
     return result.stdout
 
 
+def require_catalog_review(previous, updated):
+    """Never advance the source pin past a catalog that has not been adapted.
+
+    Lua contents may merge in place, but new or removed Lua files can require
+    Rust launch definitions. Imported BATs are compiled into Rust data, not
+    executed directly; updating them or their translator alone is incorrect.
+    """
+    changed = []
+    for path in sorted(previous.keys() | updated.keys()):
+        if previous.get(path) == updated.get(path):
+            continue
+        if (path.startswith("imported/") and path.lower().endswith((".bat", ".py"))
+                or path.endswith(".lua") and (path not in previous or path not in updated)):
+            changed.append(path)
+    if changed:
+        raise ValueError("Rust strategy catalog requires adaptation: " + ", ".join(changed))
+
+
 def plan_strategies(repo, old, new, target):
     subprocess.run(["git", "-C", str(repo), "merge-base", "--is-ancestor", old, new],
                    check=True)
     previous, updated = strategy_paths(repo, old), strategy_paths(repo, new)
+    require_catalog_review(previous, updated)
     changes = {}
     for path in sorted(previous.keys() | updated.keys()):
         file = target / path
@@ -175,6 +194,15 @@ def update_strategies(setup, versions, repo, ref):
         return setup, versions, {}, f"zapret2-gui: {old[:12]} (unchanged)"
     if not re.fullmatch(r"[0-9a-f]{40}", new):
         raise ValueError("invalid strategy commit")
+    # These upstream Rust files define the compiled strategy registry and
+    # launch API that was ported into our Helper. A change needs explicit
+    # review before claiming a new strategy source version.
+    catalog = ["src-tauri/src/engine/imported_strategies.rs",
+               "src-tauri/src/engine/supervisor.rs"]
+    changed_catalog = git(repo, "diff", "--name-only", old, new, "--", *catalog).strip()
+    if changed_catalog:
+        raise ValueError("upstream launch/catalog changes require review: "
+                         + changed_catalog.replace("\n", ", "))
     changes = plan_strategies(repo, old, new, STRATEGIES)
     tree = set(tree_paths(repo, new))
     for variable, directory in (("BlobFiles", "bin"), ("ListFiles", "lists")):

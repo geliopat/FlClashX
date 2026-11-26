@@ -1470,8 +1470,6 @@ mod tests {
 
     #[test]
     fn flowseal_and_lua_profiles_use_their_own_engine_cli() {
-        let bin = Path::new("C:/FlClashX/zapret");
-        let _ = bin;
         let flowseal = StrategyBuilder::build_flowseal_args_inner(
             "flowseal-alt",
             Path::new("."),

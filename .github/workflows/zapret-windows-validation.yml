@@ -1,10 +1,6 @@
 name: Zapret Windows validation
 
 on:
-  push:
-    branches:
-      - fix/zapret2-stability
-      - 'sync/flclashz-*'
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -33,9 +29,6 @@ env:
 jobs:
   windows:
     name: Test and build Windows Release
-    # Explicit release pushes are validated once by the release workflow.
-    if: >-
-      inputs.candidate_ref != '' || !startsWith(github.event.head_commit.message || '', 'release: FlClashZ v')
     runs-on: windows-2022
     env:
       FLCLASHZ_UPDATE_PUBLIC_KEY: ${{ inputs.update_public_key || vars.FLCLASHZ_UPDATE_PUBLIC_KEY }}
@@ -94,6 +87,9 @@ jobs:
 
       - name: Run linked Windows lifecycle regression tests
         run: flutter test test/providers/windows_linked_lifecycle_test.dart test/providers/zapret_history_test.dart test/l10n/localization_contract_test.dart
+
+      - name: Run FlClashZ UI regression tests
+        run: flutter test test/views/about_test.dart test/views/dashboard/widget_registry_test.dart test/views/dashboard/wide_test.dart test/widgets/core_status_button_test.dart
 
       - name: Run signed manifest and updater tests
         shell: pwsh

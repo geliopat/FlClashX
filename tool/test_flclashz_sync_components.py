@@ -1,5 +1,7 @@
 import unittest
-from flclashz_sync_components import merge_bytes, semver, update_engine
+from flclashz_sync_components import (
+    merge_bytes, require_catalog_review, semver, update_engine,
+)
 
 
 class SyncTests(unittest.TestCase):
@@ -23,6 +25,31 @@ class SyncTests(unittest.TestCase):
     def test_new_and_removed_files(self):
         self.assertEqual(merge_bytes(None, None, b"new", "new.lua"), b"new")
         self.assertIsNone(merge_bytes(b"old", b"old", None, "old.lua"))
+
+    def test_existing_lua_changes_do_not_require_catalog_rewrite(self):
+        require_catalog_review(
+            {"zapret-lib.lua": b"old", "imported/kinlay0/README.md": b"old"},
+            {"zapret-lib.lua": b"new", "imported/kinlay0/README.md": b"new"},
+        )
+
+    def test_catalog_must_match_updated_bat_sources(self):
+        path = "imported/kinlay0/example.bat"
+        for old, new in [
+            ({path: b"old"}, {path: b"new"}),
+            ({}, {path: b"new"}),
+            ({path: b"old"}, {}),
+            ({"imported/kinlay0/translate.py": b"old"},
+             {"imported/kinlay0/translate.py": b"new"}),
+        ]:
+            with self.subTest(old=old, new=new):
+                with self.assertRaisesRegex(ValueError, "catalog requires adaptation"):
+                    require_catalog_review(old, new)
+
+    def test_added_or_removed_lua_requires_catalog_review(self):
+        path = "zapret-new.lua"
+        for old, new in [({}, {path: b"new"}), ({path: b"old"}, {})]:
+            with self.assertRaises(ValueError):
+                require_catalog_review(old, new)
 
     def test_release_pin(self):
         old = ('$Zapret2Url = "https://github.com/bol-van/zapret2/releases/download/v1.0.8/zapret2-v1.0.8.zip"\n'
