@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:fl_clash/common/boot_guard.dart';
+import 'package:fl_clash/common/disclaimer_consent.dart';
 import 'package:fl_clash/common/component_integrity.dart';
 import 'package:fl_clash/common/boot_record.dart';
 import 'package:fl_clash/common/common.dart';
@@ -317,21 +318,35 @@ class Bootstrap {
     final acceptedVersion = _container.read(
       appSettingProvider.select((state) => state.acceptedDisclaimerVersion),
     );
-    if (acceptedVersion >= disclaimerVersion) {
-      return true;
-    }
-    final isDisclaimerAccepted =
-        _isDisclaimerAcceptedByEnvironment || await requestDisclaimerConsent();
+    final legacyAccepted = acceptedVersion >= disclaimerVersion;
+    if (!system.isWindows && legacyAccepted) return true;
+    final isDisclaimerAccepted = system.isWindows
+        ? await windowsDisclaimerConsent.ensure(
+            legacyAccepted: legacyAccepted,
+            environmentAccepted: _isDisclaimerAcceptedByEnvironment,
+            request: requestDisclaimerConsent,
+          )
+        : _isDisclaimerAcceptedByEnvironment || await requestDisclaimerConsent();
     if (!isDisclaimerAccepted) {
       await _container.read(systemActionProvider.notifier).handleExit();
       return false;
     }
-    _container
-        .read(appSettingProvider.notifier)
-        .update(
-          (state) =>
-              state.copyWith(acceptedDisclaimerVersion: disclaimerVersion),
-        );
+    if (!legacyAccepted) {
+      _container
+          .read(appSettingProvider.notifier)
+          .update(
+            (state) =>
+                state.copyWith(acceptedDisclaimerVersion: disclaimerVersion),
+          );
+      // Persist before starting the engines; do not rely on a debounced save.
+      try {
+        if (!await preferences.saveConfig(_container.read(configProvider))) {
+          commonPrint.log('Disclaimer settings write failed', logLevel: LogLevel.warning);
+        }
+      } catch (error) {
+        commonPrint.log('Disclaimer settings write failed: $error', logLevel: LogLevel.warning);
+      }
+    }
     return true;
   }
 }
