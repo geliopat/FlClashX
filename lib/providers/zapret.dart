@@ -48,6 +48,8 @@ enum ZapretAutoTuneMode {
 }
 
 class ZapretState {
+  static const defaultStartWithMihomo = true;
+
   final bool available;
   final bool running;
   final bool busy;
@@ -80,7 +82,7 @@ class ZapretState {
     this.busy = false,
     this.dashboardRestarting = false,
     this.debugLogs = false,
-    this.startWithMihomo = false,
+    this.startWithMihomo = defaultStartWithMihomo,
     this.watchdog = true,
     this.autoFallback = false,
     this.testProgress,
@@ -359,6 +361,11 @@ class ZapretController extends Notifier<ZapretState> {
   static const _modePreferenceKey = 'zapret.mode';
   static const _debugPreferenceKey = 'zapret.debugLogs';
   static const _linkedStartPreferenceKey = 'zapret.startWithMihomo';
+
+  static bool readStartWithMihomo(SharedPreferences preferences) =>
+      preferences.getBool(_linkedStartPreferenceKey) ??
+      ZapretState.defaultStartWithMihomo;
+
   static const _trialHistoryKey = _zapretLatestKey;
   static const _pollInterval = Duration(seconds: 3);
   static const _readinessTimeout = Duration(seconds: 3);
@@ -636,7 +643,7 @@ class ZapretController extends Notifier<ZapretState> {
         selectedStrategyId: selectedId,
         mode: selectedMode,
         debugLogs: preferences.getBool(_debugPreferenceKey) ?? false,
-        startWithMihomo: preferences.getBool(_linkedStartPreferenceKey) ?? false,
+        startWithMihomo: readStartWithMihomo(preferences),
         watchdog: preferences.getBool('zapret.watchdog') ?? true,
         autoFallback: preferences.getBool('zapret.autoFallback') ?? false,
         trials: _restoreTrials(preferences, strategies.map((item) => item.id).toSet()),
@@ -756,7 +763,7 @@ class ZapretController extends Notifier<ZapretState> {
     final preferences = await SharedPreferences.getInstance();
     if (!ref.mounted || revision != _lifecycleRevision || _coreRestarting) return;
     _lifecycleStopping = false;
-    if (_launchBlocked || (!force && preferences.getBool(_linkedStartPreferenceKey) != true)) return;
+    if (_launchBlocked || (!force && !readStartWithMihomo(preferences))) return;
     await loadStrategies();
     await refresh();
     if (ref.mounted && revision == _lifecycleRevision && !state.available) {

@@ -18,6 +18,16 @@ void main() {
 
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
+  test('linked Zapret startup defaults to enabled without overriding user choice', () async {
+    final preferences = await SharedPreferences.getInstance();
+    expect(ZapretState().startWithMihomo, isTrue);
+    expect(ZapretController.readStartWithMihomo(preferences), isTrue);
+    await preferences.setBool('zapret.startWithMihomo', false);
+    expect(ZapretController.readStartWithMihomo(preferences), isFalse);
+    await preferences.setBool('zapret.startWithMihomo', true);
+    expect(ZapretController.readStartWithMihomo(preferences), isTrue);
+  });
+
   test('history persists independent runs and caps retention', () async {
     for (var i = 0; i < 32; i++) {
       await saveZapretTuneRun(run(i));
