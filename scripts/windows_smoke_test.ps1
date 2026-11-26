@@ -43,30 +43,30 @@ try {
         Start-Sleep -Milliseconds 500
         continue
       }
-      $home = Join-Path $env:APPDATA 'sweetyyoba.com\clashz'
+      $appHome = Join-Path $env:APPDATA 'sweetyyoba.com\clashz'
       $cache = Join-Path $env:LOCALAPPDATA 'sweetyyoba.com\clashz'
       $expected = @{
-        home = $home
+        home = $appHome
         cache = $cache
-        preferences = (Join-Path $home 'shared_preferences.json')
-        database = (Join-Path $home 'database.sqlite')
-        config = (Join-Path $home 'config.yaml')
-        profiles = (Join-Path $home 'profiles')
-        providers = (Join-Path $home 'providers')
-        scripts = (Join-Path $home 'scripts')
-        lock = (Join-Path $home 'FlClash.lock')
-        coreCli = (Join-Path $home 'core-cli.json')
+        preferences = (Join-Path $appHome 'shared_preferences.json')
+        database = (Join-Path $appHome 'database.sqlite')
+        config = (Join-Path $appHome 'config.yaml')
+        profiles = (Join-Path $appHome 'profiles')
+        providers = (Join-Path $appHome 'providers')
+        scripts = (Join-Path $appHome 'scripts')
+        lock = (Join-Path $appHome 'FlClash.lock')
+        coreCli = (Join-Path $appHome 'core-cli.json')
       }
       foreach ($key in $expected.Keys) {
         if ($actual.$key -ne $expected[$key]) {
           throw "Incorrect resolved data path ($key): $($actual.$key); expected $($expected[$key])"
         }
       }
-      if (!(Test-Path -LiteralPath $home -PathType Container) -or
+      if (!(Test-Path -LiteralPath $appHome -PathType Container) -or
           !(Test-Path -LiteralPath $cache -PathType Container)) {
         throw 'Resolved application data directories do not exist'
       }
-      $consent = Join-Path $home 'disclaimer.accepted'
+      $consent = Join-Path $appHome 'disclaimer.accepted'
       if (!(Test-Path -LiteralPath $consent) -or (Get-Content -LiteralPath $consent -Raw).Trim() -ne '1') {
         Start-Sleep -Milliseconds 500
         continue
