@@ -26,6 +26,25 @@ class ResourcesAction extends _$ResourcesAction {
     _newProfiles.putIfAbsent(id, () => <String>{});
   }
 
+  void profileRemoved(int id) {
+    _newProfiles.remove(id);
+    if (_appliedProfileId == id) _appliedProfileId = null;
+  }
+
+  /// Geo RPC acknowledgement is not the download result. Only the final
+  /// event may mark a resource complete; failures remain eligible for retry.
+  void geoCompleted(GeoResource type, String? error) {
+    final id = _appliedProfileId;
+    if (id == null || !_currentApplied(id)) return;
+    final completed = _newProfiles[id];
+    if (completed == null) return;
+    if (error == null || error.isEmpty) {
+      completed.add(type.updatingKey);
+    } else {
+      completed.remove(type.updatingKey);
+    }
+  }
+
   Future<void> profileApplied(int? id) async {
     _appliedProfileId = id;
     if (id != null && _newProfiles.containsKey(id)) {
@@ -59,13 +78,12 @@ class ResourcesAction extends _$ResourcesAction {
           if (!_currentApplied(id)) return;
           final key = type.updatingKey;
           if (completed.contains(key)) continue;
-          if (ref.read(updatingKeysProvider).contains(key) ||
-              await _tryUpdate(type.name, () =>
-                  geo.updateGeoResource(type, announceSuccess: false))) {
-            completed.add(key);
-          } else {
-            allAccepted = false;
+          if (!ref.read(updatingKeysProvider).contains(key)) {
+            await _tryUpdate(type.name, () =>
+                geo.updateGeoResource(type, announceSuccess: false));
           }
+          // A concurrent update and an accepted RPC are both still pending.
+          if (!completed.contains(key)) allAccepted = false;
         }
       }
       for (final provider in providers) {
@@ -203,17 +221,24 @@ class ResourcesAction extends _$ResourcesAction {
       bool isDue(DateTime? lastUpdateTime) =>
           lastUpdateTime?.add(interval).isBeforeNow ?? true;
       for (final iconSet in await database.iconSetsDao.query().get()) {
-        if (iconSet.isRemote && isDue(iconSet.lastUpdateTime)) {
+        if (!ref.mounted || ref.read(safeModeProvider)) return;
+        if (iconSet.isRemote &&
+            !ref.read(updatingKeysProvider).contains(iconSet.updatingKey) &&
+            isDue(iconSet.lastUpdateTime)) {
           await _tryUpdate(iconSet.name, () => updateIconSet(iconSet));
         }
       }
       for (final script in await database.scriptsDao.query().get()) {
-        if (script.url != null && isDue(script.lastUpdateTime)) {
+        if (!ref.mounted || ref.read(safeModeProvider)) return;
+        if (script.url != null &&
+            !ref.read(updatingKeysProvider).contains(script.updatingKey) &&
+            isDue(script.lastUpdateTime)) {
           await _tryUpdate(script.label, () => updateScript(script));
         }
       }
       for (final provider in await database.clashProvidersDao.query().get()) {
-        if (ref.read(coreStatusProvider) != CoreStatus.connected) {
+        if (!ref.mounted || ref.read(safeModeProvider) ||
+            ref.read(coreStatusProvider) != CoreStatus.connected) {
           break;
         }
         if (provider.isRemote &&

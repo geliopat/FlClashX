@@ -371,6 +371,9 @@ func TestGeoCheckDueUsesEachDatabaseAndLastCheck(t *testing.T) {
 	if geoCheckDue(now, time.Time{}, geoCheck{url: url, at: now.Add(-time.Minute)}, url, interval) {
 		t.Fatal("failed request must back off")
 	}
+	if !geoCheckDue(now, time.Time{}, geoCheck{url: url, at: now.Add(time.Hour)}, url, interval) {
+		t.Fatal("clock rollback must not suppress failed-check retries")
+	}
 	if !geoCheckDue(now, time.Time{}, geoCheck{url: url, at: now.Add(-6*time.Minute)}, url, interval) {
 		t.Fatal("failed request must retry")
 	}

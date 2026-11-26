@@ -21,6 +21,7 @@ class ProfilesAction extends _$ProfilesAction {
 
   Future<void> deleteProfile(int id) async {
     await ref.read(profilesProvider.notifier).del(id);
+    if (system.isWindows) ref.read(resourcesActionProvider.notifier).profileRemoved(id);
     await clearEffect(id);
     await forgetProxyChains(ref, id);
     final currentProfileId = ref.read(currentProfileIdProvider);

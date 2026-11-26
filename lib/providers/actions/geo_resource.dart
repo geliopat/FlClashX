@@ -103,6 +103,9 @@ class GeoResourceAction extends _$GeoResourceAction {
       _startUpdating(geoResource);
     } else {
       _stopUpdating(geoResource);
+      if (system.isWindows) {
+        ref.read(resourcesActionProvider.notifier).geoCompleted(geoResource, error);
+      }
     }
   }
 

@@ -230,8 +230,14 @@ func handleUpdateGeoData(geoType string) error {
 func runGeoUpdate(geoType string, resource geoResource) error {
 	sendMessage(GeoUpdateMessage, GeoUpdateStatus{Type: geoType, Updating: true})
 	before := resource.stamp()
+	url := ""
+	if resource.url != nil {
+		url = resource.url()
+	}
 	err := resource.run()
-	recordGeoCheck(geoType, resource, err == nil)
+	if resource.url != nil {
+		recordGeoCheck(geoType, url, err == nil)
+	}
 	if err != nil {
 		logError("updateGeoData(%s) error: %v", geoType, err)
 	}
@@ -325,17 +331,14 @@ var geoChecks = struct {
 	items map[string]geoCheck
 }{items: make(map[string]geoCheck)}
 
-func recordGeoCheck(name string, resource geoResource, ok bool) {
-	if resource.url == nil {
-		return
-	}
+func recordGeoCheck(name, url string, ok bool) {
 	geoChecks.Lock()
 	defer geoChecks.Unlock()
-	geoChecks.items[name] = geoCheck{url: resource.url(), at: time.Now(), ok: ok}
+	geoChecks.items[name] = geoCheck{url: url, at: time.Now(), ok: ok}
 }
 
 func geoCheckDue(now, modified time.Time, last geoCheck, url string, interval time.Duration) bool {
-	if !last.at.IsZero() && last.url != url {
+	if !last.at.IsZero() && (last.url != url || last.at.After(now)) {
 		return true
 	}
 	if last.url == url && !last.at.IsZero() {
