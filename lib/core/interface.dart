@@ -566,7 +566,10 @@ abstract class CoreHandlerInterface with CoreInterface {
       method: CoreMethod.getTotalTraffic,
       arguments: onlyStatisticsProxy,
     );
-    return data == null ? const Traffic() : Traffic.fromJson(data);
+    // An unanswered RPC is not a legitimate zero counter. Treating it as one
+    // makes a later successful sample add the entire session a second time.
+    if (data == null) throw StateError('Core did not return total traffic');
+    return Traffic.fromJson(data);
   }
 
   @override

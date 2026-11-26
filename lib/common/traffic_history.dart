@@ -85,6 +85,7 @@ class TrafficHistory {
   DateTime? _lastSave;
   int generation = 0;
   bool loaded = false;
+  bool resetting = false;
 
   Future<File> _file() async =>
       File(p.join(await appPath.homeDirPath, 'traffic-history-v1.json'));
@@ -107,9 +108,9 @@ class TrafficHistory {
   }
 
   Future<void> record({required int generation, Traffic? all, Traffic? proxy}) async {
-    if (generation != this.generation) return;
+    if (resetting || generation != this.generation) return;
     await load();
-    if (generation != this.generation) return;
+    if (resetting || generation != this.generation) return;
     final now = DateTime.now();
     window.record(now, all: all, proxy: proxy);
     revision.value++;
@@ -120,9 +121,14 @@ class TrafficHistory {
     }
   }
 
-  void resetSession() {
+  void beginReset() {
     generation++;
+    resetting = true;
+  }
+
+  void finishReset() {
     window.resetBaseline();
+    resetting = false;
     revision.value++;
     unawaited(flush());
   }

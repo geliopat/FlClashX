@@ -166,9 +166,10 @@ class _SidebarStatisticsState extends ConsumerState<SidebarStatistics> {
       children: [
         Expanded(child: Text(label, style: style, maxLines: 1,
             overflow: TextOverflow.ellipsis)),
-        Text(value, style: style?.copyWith(
-          fontFeatures: const [FontFeature.tabularFigures()],
-        )),
+        Flexible(child: Text(value, maxLines: 1, overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.end, style: style?.copyWith(
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ))),
       ],
     ),
   );
@@ -214,8 +215,11 @@ class _SidebarStatisticsState extends ConsumerState<SidebarStatistics> {
     final theme = Theme.of(context);
     final style = theme.textTheme.bodySmall;
     final heading = theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600);
-    final speed = ref.watch(trafficsProvider.select(
+    final connected = ref.watch(coreStatusProvider) == CoreStatus.connected;
+    final running = ref.watch(runTimeProvider) != null;
+    final sampledSpeed = ref.watch(trafficsProvider.select(
         (state) => state.list.safeLast(const Traffic())));
+    final speed = connected && running ? sampledSpeed : const Traffic();
     final session = ref.watch(totalTrafficProvider);
     final onlyProxy = ref.watch(appSettingProvider.select((s) => s.onlyStatisticsProxy));
     final ram = _names.every((name) => _samples[name]?.rss != null)

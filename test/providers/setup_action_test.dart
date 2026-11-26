@@ -176,7 +176,7 @@ class TestSetupAction extends SetupAction {
   }
 
   @override
-  void resetCoreTraffic() => trafficResets++;
+  Future<void> resetCoreTraffic() async { trafficResets++; }
 
   @override
   Future<bool> applyProfile({

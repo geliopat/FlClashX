@@ -385,8 +385,8 @@ class CoreController {
 
   Future<bool> shutdown() => _interface.shutdown();
 
-  void resetTraffic() {
-    _interface.resetTraffic();
+  Future<void> resetTraffic() async {
+    await _interface.resetTraffic();
   }
 
   void startLog() {

@@ -3,7 +3,7 @@ part of '../action.dart';
 @Riverpod(keepAlive: true)
 class CommonAction extends _$CommonAction {
   CoreController get _core => ref.read(coreHandlerProvider);
-  bool _isUpdatingTraffic = false;
+  Future<void>? _trafficUpdate;
   bool _trayOperationInProgress = false;
 
   @override
@@ -94,12 +94,15 @@ class CommonAction extends _$CommonAction {
     ref.read(profileHeadersActionProvider.notifier).forgetTakenMode();
   }
 
-  Future<void> updateTraffic() async {
-    if (_isUpdatingTraffic) {
-      return;
-    }
-    _isUpdatingTraffic = true;
+  Future<void> updateTraffic() {
+    return _trafficUpdate ??= _updateTraffic().whenComplete(() {
+      _trafficUpdate = null;
+    });
+  }
+
+  Future<void> _updateTraffic() async {
     final generation = trafficHistory.generation;
+    if (system.isWindows && trafficHistory.resetting) return;
     try {
       final onlyStatisticsProxy = ref.read(
         appSettingProvider.select((state) => state.onlyStatisticsProxy),
@@ -127,8 +130,9 @@ class CommonAction extends _$CommonAction {
       if (totalTraffic != null) {
         ref.read(totalTrafficProvider.notifier).value = totalTraffic;
       }
-    } finally {
-      _isUpdatingTraffic = false;
+    } catch (error) {
+      commonPrint.log('Traffic sample: ${compactError(error)}',
+          logLevel: LogLevel.warning);
     }
   }
 

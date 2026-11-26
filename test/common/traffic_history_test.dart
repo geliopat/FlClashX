@@ -24,6 +24,12 @@ void main() {
         const Traffic(up: 20, down: 40));
   });
 
+  test('an expired minute is removed even without new traffic', () {
+    final history = RollingTrafficWindow()..resetBaseline();
+    history.record(start, all: const Traffic(up: 10, down: 30));
+    expect(history.total(start.add(const Duration(hours: 24)), onlyProxy: false), const Traffic());
+  });
+
   test('first sample after reconnect establishes a baseline', () {
     final history = RollingTrafficWindow();
     history.record(start, all: const Traffic(up: 500, down: 900));

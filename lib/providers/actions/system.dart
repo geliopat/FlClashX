@@ -62,6 +62,9 @@ class SystemAction extends _$SystemAction {
         commonPrint.log('Zapret exit stop failed: $error', logLevel: LogLevel.warning);
       }
     }
+    if (system.isWindows && ref.read(coreStatusProvider) == CoreStatus.connected) {
+      await ref.read(commonActionProvider.notifier).updateTraffic();
+    }
     final saveOperation = needSave ? _savePreferencesSafely() : null;
     final tray = trayPort;
     if (tray != null) {

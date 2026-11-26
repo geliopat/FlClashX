@@ -327,7 +327,7 @@ class SetupAction extends _$SetupAction {
     if (!_isCurrent(request)) {
       return true;
     }
-    _clearTraffic();
+    await _clearTraffic(request, capture: answered);
     // A silent Core is gone or hung; running again would proxy traffic to it.
     if (!answered) {
       throw _unanswered(CoreMethod.stopListener);
@@ -335,9 +335,19 @@ class SetupAction extends _$SetupAction {
     return true;
   }
 
-  void _clearTraffic() {
-    if (system.isWindows) trafficHistory.resetSession();
-    resetCoreTraffic();
+  Future<void> _clearTraffic(_RunRequest request, {bool capture = true}) async {
+    if (system.isWindows && capture &&
+        ref.read(coreStatusProvider) == CoreStatus.connected) {
+      await ref.read(commonActionProvider.notifier).updateTraffic();
+      if (!ref.mounted || !_isCurrent(request)) return;
+    }
+    if (system.isWindows) trafficHistory.beginReset();
+    try {
+      await resetCoreTraffic();
+    } finally {
+      if (system.isWindows) trafficHistory.finishReset();
+    }
+    if (!ref.mounted || !_isCurrent(request)) return;
     ref.read(trafficsProvider.notifier).clear();
     ref.read(totalTrafficProvider.notifier).value = const Traffic();
   }
@@ -446,7 +456,7 @@ class SetupAction extends _$SetupAction {
       _keepRunning(request);
       throw _unanswered(CoreMethod.startListener);
     }
-    _clearTraffic();
+    await _clearTraffic(request);
   }
 
   void _keepRunning(_RunRequest request) {
@@ -491,9 +501,7 @@ class SetupAction extends _$SetupAction {
   Future<bool> restartCoreRunning() => _core.restartListener();
 
   @protected
-  void resetCoreTraffic() {
-    _core.resetTraffic();
-  }
+  FutureOr<void> resetCoreTraffic() => _core.resetTraffic();
 
   @visibleForTesting
   Future<void> updateConfig() async {
