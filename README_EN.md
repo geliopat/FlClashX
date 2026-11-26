@@ -32,7 +32,7 @@ Built on FlClash v0.9.2 and the mihomo v1.19.34 core, so everything the original
 
 ### For providers
 
-🧾 **`flclashx-*` subscription headers:** the look of the app and the proxies tab, the cards of the dashboard and their order, a background, app switches, fallback panel addresses, the service name and logo, renew and buy-traffic buttons. See [flclashx.app](https://flclashx.app/#headers).
+🧾 **`flclashz-*` subscription headers:** the look of the app and the proxies tab, the cards of the dashboard and their order, a background, app switches, fallback panel addresses, the service name and logo, renew and buy-traffic buttons. See [FlClashZ header reference](docs/headers.md) (Russian), including Zapret and legacy aliases.
 
 🔒 **Subscription settings belong to the provider:** config keys (ports, mode, TUN, stack, MTU, routes, geo and more) and headers are applied on every subscription update and when switching to the profile. Most of them the user can take over and hand back to the provider; the Android app lists and the dashboard card list always follow the subscription.
 
@@ -64,7 +64,7 @@ Built on FlClash v0.9.2 and the mihomo v1.19.34 core, so everything the original
 
 ### Interface
 
-🪟 **Glass** on dashboard cards, sheets, cards and settings groups; the strength is set in the theme settings or with the `app.glass` key of the `flclashx-view` header.
+🪟 **Glass** on dashboard cards, sheets, cards and settings groups; the strength is set in the theme settings or with the `app.glass` key of the `flclashz-view` header.
 
 📊 **Dashboard:** the status card and the announcement can be moved; the service checks include Gosuslugi, Sberbank, VK, Yandex and Kinopoisk; IP quality of the current exit.
 
@@ -78,7 +78,7 @@ Built on FlClash v0.9.2 and the mihomo v1.19.34 core, so everything the original
 
 ## Subscription headers and parameters
 
-The HTTP headers of the panel's response and the YAML parameters the app understands, with examples and a panel template, are described on [flclashx.app](https://flclashx.app/#headers).
+See [docs/headers.md](docs/headers.md) for supported HTTP response headers and examples (Russian). Upstream YAML parameters are documented at [flclashx.app](https://flclashx.app/#headers).
 
 A setting the subscription sets is shown dimmed. The user can take it over, and then subscription updates and profile switches leave it alone. Right-clicking or long-pressing the row hands it back to the provider, and "Hand settings back to provider" in General → Logs and diagnostics hands back all of them at once.
 

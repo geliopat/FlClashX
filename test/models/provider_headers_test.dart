@@ -19,6 +19,59 @@ Profile _profile({
 );
 
 void main() {
+  group('FlClashZ header names', () {
+    test('new names work for every inherited header', () {
+      const headers = ProviderHeaders({
+        'flclashz-view': 'app.theme:dark',
+        'flclashz-widgets': 'profiles,zapret',
+        'flclashz-background': 'https://example.com/bg.png,25',
+        'flclashz-settings': 'autostart',
+        'flclashz-special': 'denywidgets,hideip',
+        'flclashz-update': 'https://example.com/stable.json',
+        'flclashz-update-pre': 'https://example.com/pre.json',
+        'flclashz-servicename': 'My VPN',
+        'flclashz-servicelogo': 'https://example.com/logo.svg',
+        'flclashz-serverinfo': 'Auto',
+        'flclashz-buyplan': 'https://example.com/plan,3',
+        'flclashz-buytraffic': 'https://example.com/traffic,10',
+        'flclashz-newdomain': 'backup.example.com',
+      });
+      expect(headers.view?.themeMode, ThemeMode.dark);
+      expect(headers.dashboardWidgets, [DashboardWidget.profiles, DashboardWidget.zapret]);
+      expect(headers.background?.visibility, 25);
+      expect(headers.appSwitches, {'autostart'});
+      expect(headers.widgetEditingDenied, isTrue);
+      expect(headers.hideIp, isTrue);
+      expect(headers.updateManifestUrl, 'https://example.com/stable.json');
+      expect(headers.preUpdateManifestUrl, 'https://example.com/pre.json');
+      expect(headers.serviceName, 'My VPN');
+      expect(headers.serviceLogo, 'https://example.com/logo.svg');
+      expect(headers.serverGroup, 'Auto');
+      expect(headers.buyPlan?.threshold, 3);
+      expect(headers.buyTraffic?.threshold, 10);
+      expect(headers.fallbackHosts, ['backup.example.com']);
+    });
+    test('new wins, including empty or invalid, without merging', () {
+      const headers = ProviderHeaders({
+        'flclashx-settings': 'minimize',
+        'flclashz-settings': 'autostart',
+        'flclashx-special': 'denywidgets',
+        'flclashz-special': '',
+        'flclashx-update': 'https://old.example.com/manifest.json',
+        'flclashz-update': 'invalid',
+        'flclashx-view': 'app.theme:dark',
+        'flclashz-view': 'app.theme:light',
+        'flclashx-newdomain': 'backup.example.com',
+        'flclashx-zapret': 'autostart',
+      });
+      expect(headers.appSwitches, {'autostart'});
+      expect(headers.widgetEditingDenied, isFalse);
+      expect(headers.updateManifestUrl, isNull);
+      expect(headers.view?.themeMode, ThemeMode.light);
+      expect(headers.fallbackHosts, ['backup.example.com']);
+      expect(headers.zapret, isNull);
+    });
+  });
   group('flclashz-zapret', () {
     test('captures header case-insensitively and parses presence flags', () {
       final headers = providerHeadersOf({'FlClashZ-Zapret': [' AUTOSTART, mode:StrictSplit, AutoFallback, autotune, tunemode:VeryFast, tuneonfail '], 'other': ['ignored']});

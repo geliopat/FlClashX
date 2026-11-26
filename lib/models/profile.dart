@@ -356,7 +356,8 @@ const providerHeaderNames = {
   'flclashz-zapret',
 };
 
-const providerHeaderPrefix = 'flclashx-';
+const providerHeaderPrefix = 'flclashz-';
+const legacyProviderHeaderPrefix = 'flclashx-';
 
 /// The subscription's own headers, keys lower-cased, first value kept.
 Map<String, String> providerHeadersOf(Map<String, List<String>> headers) {
@@ -364,7 +365,8 @@ Map<String, String> providerHeadersOf(Map<String, List<String>> headers) {
     for (final MapEntry(:key, :value) in headers.entries)
       if (value.isNotEmpty)
         if (providerHeaderNames.contains(key.toLowerCase()) ||
-            key.toLowerCase().startsWith(providerHeaderPrefix))
+            key.toLowerCase().startsWith(providerHeaderPrefix) ||
+            key.toLowerCase().startsWith(legacyProviderHeaderPrefix))
           key.toLowerCase(): value.first,
   };
 }

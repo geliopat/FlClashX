@@ -1,7 +1,7 @@
 import 'clash_config.dart';
 import 'provider_headers.dart';
 
-/// Flags of `flclashx-settings` and the app switch each one drives.
+/// Flags of `flclashz-settings` and the app switch each one drives.
 const appSwitchSettings = {
   'minimize': 'app.minimizeOnExit',
   'autorun': 'app.autoLaunch',
@@ -12,13 +12,13 @@ const appSwitchSettings = {
   'closeconnections': 'app.closeConnections',
 };
 
-/// Driven by `flclashx-special: hideip`.
+/// Driven by `flclashz-special: hideip`.
 const hideIpSetting = 'app.hideIp';
 
-/// Driven by `flclashx-special: novibrate`.
+/// Driven by `flclashz-special: novibrate`.
 const vibrationSetting = 'app.vibration';
 
-/// Cards the user arranged; `flclashx-widgets` replaces them only under
+/// Cards the user arranged; `flclashz-widgets` replaces them only under
 /// `denywidgets`.
 const dashboardWidgetsSetting = 'app.dashboardWidgets';
 
@@ -119,7 +119,7 @@ const proxiesPageKeys = {
   'view.proxies.hidetimeout',
 };
 
-/// The settings a `flclashx-view` header speaks for, by what it names.
+/// The settings a `flclashz-view` header speaks for, by what it names.
 Set<String> managedViewKeysOf(ViewRequest? view) {
   if (view == null) {
     return const {};
