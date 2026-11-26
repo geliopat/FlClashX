@@ -706,7 +706,8 @@ class ProxiesAction extends _$ProxiesAction {
       };
       final now = DateTime.now();
       final targets = _resolveDelayTestTargets(autoDelayBatches(groups))
-          .where((target) => autoDelayDue(
+          .where((target) => isAutoDelayProbeable(target.proxyName) &&
+              autoDelayDue(
                 now: now,
                 last: _lastDelayTest[target.key],
                 seconds: active.contains(target.proxyName)

@@ -7,21 +7,28 @@ import 'package:shared_preferences/shared_preferences.dart';
 typedef AutoDelayIntervals = ({int active, int others});
 typedef AutoDelayBatch = ({List<Proxy> proxies, String? testUrl});
 
-/// Client-side delay checks cover every real node, even when Mihomo also
-/// checks it natively or it comes from a provider. Groups and builtins are
-/// not nodes. The caller deduplicates the resolved (node, URL) targets.
+/// DIRECT is a measurable route. REJECT, REJECT-DROP and PASS do not
+/// provide an outbound route with a useful latency.
+bool isAutoDelayProbeable(String name) =>
+    name == 'DIRECT' || !isBuiltinOutbound(name);
+
+/// Include every member and the group itself, including root-level groups
+/// which are not members of another group. The same resolver as manual
+/// testing deduplicates the effective (outbound, URL) targets.
 List<AutoDelayBatch> autoDelayBatches(List<Group> groups) {
   return [
     for (final group in groups)
       (
         proxies: [
+          Proxy(name: group.name, type: group.type.name),
           for (final proxy in group.all)
-            if (!isBuiltinOutbound(proxy.name) &&
-                groups.getGroup(proxy.name) == null)
-              proxy,
+            if (isAutoDelayProbeable(proxy.name)) proxy,
         ],
         testUrl: group.testUrl,
       ),
+    // DIRECT may also be displayed without being a member of a group.
+    if (groups.isNotEmpty)
+      (proxies: const [Proxy(name: 'DIRECT', type: 'Direct')], testUrl: null),
   ];
 }
 

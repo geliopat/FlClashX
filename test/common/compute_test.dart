@@ -113,6 +113,29 @@ void main() {
       expect(state.proxyName, 'proxy-fast');
     });
 
+    test('balancer keeps its own delay key even inside a selector', () {
+      const groups = [
+        Group(name: 'select', type: GroupType.Selector, now: 'balance',
+            testUrl: 'https://example.com/parent'),
+        Group(name: 'balance', type: GroupType.LoadBalance, now: 'node',
+            testUrl: 'https://example.com/balance',
+            all: [Proxy(name: 'node', type: 'Vless')]),
+      ];
+      final state = computeRealSelectedProxyState(
+        'select', groups: groups, selectedMap: {'balance': 'node'},
+      );
+      expect(state.proxyName, 'balance');
+      expect(state.testUrl, 'https://example.com/balance');
+      final delay = computeProxyDelayState(
+        proxyName: 'select',
+        testUrl: 'https://example.com/default',
+        groups: groups,
+        selectedMap: {},
+        delayMap: {'https://example.com/balance': {'balance': 42}},
+      );
+      expect(delay.delay, 42);
+    });
+
     test('Selector group prefers selectedMap value over realNow', () {
       final groups = [
         const Group(
