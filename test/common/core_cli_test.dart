@@ -56,6 +56,30 @@ void main() {
     expect(await ask(), CoreCliExit.notRunning);
   });
 
+  test('authenticated shutdown invokes the exit callback', () async {
+    final called = <bool>[];
+    await server.start(
+      restartCore: () async => true,
+      shutdownForUpdate: () async { called.add(true); },
+    );
+    final endpoint = CoreCliEndpoint.fromJson(jsonDecode(File(endpointPath).readAsStringSync()))!;
+    Future<Map<String, dynamic>> request(String token) async {
+      final socket = await Socket.connect(InternetAddress.loopbackIPv4, endpoint.port);
+      try {
+        socket.writeln(jsonEncode({'token': token, 'command': 'shutdown-for-update'}));
+        await socket.flush();
+        return jsonDecode(await utf8.decoder.bind(socket).transform(const LineSplitter()).first) as Map<String, dynamic>;
+      } finally {
+        socket.destroy();
+      }
+    }
+    expect((await request('wrong'))['ok'], isFalse);
+    expect(called, isEmpty);
+    expect((await request(endpoint.token))['ok'], isTrue);
+    await Future<void>.delayed(Duration.zero);
+    expect(called, [true]);
+  });
+
   test('a request without the token restarts nothing', () async {
     var restarts = 0;
     await server.start(restartCore: () async => ++restarts > 0);

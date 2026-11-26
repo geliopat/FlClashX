@@ -25,6 +25,7 @@ enum CoreCliExit {
 }
 
 const _restartCommand = 'restart-core';
+const _shutdownCommand = 'shutdown-for-update';
 const _connectTimeout = Duration(seconds: 3);
 // A restart through the Helper can wait out a Core that is slow to stop.
 const _answerTimeout = Duration(seconds: 90);
@@ -112,7 +113,10 @@ class CoreCliServer {
   @visibleForTesting
   int? get port => _server?.port;
 
-  Future<void> start({required Future<bool> Function() restartCore}) async {
+  Future<void> start({
+    required Future<bool> Function() restartCore,
+    Future<void> Function()? shutdownForUpdate,
+  }) async {
     if (_server != null) {
       return;
     }
@@ -133,7 +137,7 @@ class CoreCliServer {
       await staging.writeAsString(jsonEncode(endpoint.toJson()), flush: true);
       await staging.rename(file.path);
       server.listen(
-        (socket) => unawaited(_answer(socket, token, restartCore)),
+        (socket) => unawaited(_answer(socket, token, restartCore, shutdownForUpdate)),
         onError: (Object error) => commonPrint.log('core cli: $error'),
       );
     } catch (error) {
@@ -152,7 +156,9 @@ class CoreCliServer {
     Socket socket,
     String token,
     Future<bool> Function() restartCore,
+    Future<void> Function()? shutdownForUpdate,
   ) async {
+    var shutdownRequested = false;
     try {
       final line = await utf8.decoder
           .bind(socket)
@@ -165,14 +171,24 @@ class CoreCliServer {
         'token': final String sent,
         'command': final command,
       } when sent == token) {
-        answer = command == _restartCommand
-            ? await _restart(restartCore)
-            : {'ok': false, 'error': 'unknown command $command'};
+        if (command == _shutdownCommand && shutdownForUpdate != null) {
+          shutdownRequested = true;
+          answer = {'ok': true};
+        } else {
+          answer = command == _restartCommand
+              ? await _restart(restartCore)
+              : {'ok': false, 'error': 'unknown command $command'};
+        }
       } else {
         answer = {'ok': false, 'error': 'unauthorized'};
       }
       socket.writeln(jsonEncode(answer));
       await socket.flush();
+      if (shutdownRequested && shutdownForUpdate != null) {
+        unawaited(Future<void>.sync(shutdownForUpdate).catchError((Object error) {
+          commonPrint.log('update shutdown failed: $error');
+        }));
+      }
     } catch (error) {
       commonPrint.log('core cli request failed: $error');
     } finally {

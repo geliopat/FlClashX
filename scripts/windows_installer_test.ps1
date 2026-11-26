@@ -11,6 +11,9 @@ $ownKey = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\A1E719DB-15
 $service = 'FlClashXHelperService'
 $created = @()
 $uninstaller = $null
+$liveApp = $null
+$ownCore = $null
+$foreignCore = $null
 function Assert([bool]$condition, [string]$message) {
   if (!$condition) { throw $message }
 }
@@ -52,7 +55,26 @@ try {
     Assert ($command -eq ('"' + (Join-Path $target 'FlClashZ.exe') + '" "%1"')) "Wrong handler: $scheme"
   }
   CheckForeign
+  $liveApp = & "$PSScriptRoot/windows_smoke_test.ps1" -Bundle $target -RequireExistingConsent -KeepRunning
+  Assert ($null -ne $liveApp -and !$liveApp.HasExited) 'App must be running before upgrade'
+  $ownProbeDir = Join-Path $target 'upgrade-probe'
+  New-Item -ItemType Directory -Path $ownProbeDir -Force | Out-Null
+  Copy-Item "$env:SystemRoot\System32\ping.exe" (Join-Path $ownProbeDir 'FlClashCore.exe')
+  Copy-Item "$env:SystemRoot\System32\ping.exe" (Join-Path $foreign 'FlClashCore.exe')
+  $ownCore = Start-Process (Join-Path $ownProbeDir 'FlClashCore.exe') -ArgumentList '-t','127.0.0.1' -WindowStyle Hidden -PassThru
+  $foreignCore = Start-Process (Join-Path $foreign 'FlClashCore.exe') -ArgumentList '-t','127.0.0.1' -WindowStyle Hidden -PassThru
+  Start-Sleep -Seconds 1
+  Assert (!$ownCore.HasExited -and !$foreignCore.HasExited) 'Process probes must be running'
+  $upgradeLog = Join-Path $root 'upgrade.log'
+  $process = Start-Process -FilePath $Installer -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=""$target""","/LOG=""$upgradeLog""") -Wait -PassThru
+  if ($process.ExitCode -ne 0) { Get-Content $upgradeLog -ErrorAction SilentlyContinue; throw "Upgrade exit code: $($process.ExitCode)" }
+  $liveApp.Refresh(); $ownCore.Refresh(); $foreignCore.Refresh()
+  Assert ($liveApp.HasExited) 'Running application survived upgrade'
+  Assert ($ownCore.HasExited) 'Owned orphan Core survived upgrade'
+  Assert (!$foreignCore.HasExited) 'Foreign Core was terminated by upgrade'
+  CheckForeign
   & "$PSScriptRoot/windows_smoke_test.ps1" -Bundle $target -RequireExistingConsent
+  Remove-Item -LiteralPath $ownProbeDir -Recurse -Force
   $process = Start-Process -FilePath $uninstaller -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART') -Wait -PassThru
   Assert ($process.ExitCode -eq 0) "Uninstaller exit code: $($process.ExitCode)"
   $uninstaller = $null
@@ -63,6 +85,13 @@ try {
   CheckForeign
   Write-Host 'Installer and uninstaller passed; FlClashX sentinels preserved.'
 } finally {
+  foreach ($probe in @($liveApp, $ownCore, $foreignCore)) {
+    if ($probe) {
+      $probe.Refresh()
+      if (!$probe.HasExited) { Stop-Process -Id $probe.Id -Force -ErrorAction SilentlyContinue }
+      $probe.Dispose()
+    }
+  }
   if ($uninstaller -and (Test-Path -LiteralPath $uninstaller)) {
     Start-Process -FilePath $uninstaller -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART') -Wait
   }

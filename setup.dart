@@ -799,6 +799,7 @@ String renderInnoSetup(
     'PRIVILEGES_REQUIRED': privileges,
     'ARCH': arch == 'arm64' ? 'arm64' : 'x64compatible',
     'SOURCE_DIR': sourceDir,
+    'UPDATE_SCRIPT': p.join(rootDir, 'windows', 'packaging', 'exe', 'prepare_update.ps1'),
     'EXECUTABLE_NAME': identity.pre
         ? 'FlClashZPre.exe'
         : (config['executable_name'] ?? 'FlClashZ.exe') as String,

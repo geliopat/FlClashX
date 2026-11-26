@@ -23,6 +23,8 @@ ChangesAssociations=yes
 UsePreviousAppDir=yes
 UsePreviousGroup=yes
 UsePreviousTasks=yes
+CloseApplications=yes
+RestartApplications=no
 
 [Code]
 const
@@ -34,6 +36,7 @@ var
   IsUpgrade: Boolean;
   PreviousVersion: String;
   HelperHeld: Boolean;
+  UpdatePrepared: Boolean;
 
 procedure SHChangeNotify(wEventId: Integer; uFlags: Integer; dwItem1: Integer; dwItem2: Integer); external 'SHChangeNotify@shell32.dll stdcall';
 
@@ -79,6 +82,28 @@ begin
   HelperHeld := False;
   RunHidden('sc.exe', 'config "' + HelperService + '" start= auto');
   RunHidden('sc.exe', 'start "' + HelperService + '"');
+end;
+
+function RunUpdateScript(const Phase: String): Integer;
+var
+  Params: String;
+begin
+  Params := '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' +
+    ExpandConstant('{tmp}\prepare_update.ps1') + '" -Phase ' + Phase +
+    ' -InstallDir "' + ExpandConstant('{app}') + '" -AppExe "{{EXECUTABLE_NAME}}"' +
+    ' -ServiceName "' + HelperService + '" -Endpoint "' +
+    ExpandConstant('{userappdata}\{{USER_DATA_DIR}}\core-cli.json') + '" -StateFile "' +
+    ExpandConstant('{tmp}\flclashz-update-state.json') + '"';
+  Result := RunHidden(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'), Params);
+end;
+
+procedure ReleaseUpdate;
+begin
+  if not UpdatePrepared then Exit;
+  if RunUpdateScript('Release') = 0 then
+    UpdatePrepared := False
+  else
+    Log('Failed to restore FlClashZ Helper service configuration');
 end;
 
 function IsAppInstalled(): Boolean;
@@ -131,11 +156,18 @@ begin
     Result := CustomMessage('ForeignInstallDir');
     Exit;
   end;
-  ShutDownApp;
+  ExtractTemporaryFile('prepare_update.ps1');
+  UpdatePrepared := True;
+  if RunUpdateScript('Stop') <> 0 then
+  begin
+    ReleaseUpdate;
+    Result := CustomMessage('UpdateShutdownFailed');
+  end;
 end;
 
 procedure DeinitializeSetup();
 begin
+  ReleaseUpdate;
   ReleaseHelper;
 end;
 
@@ -182,6 +214,7 @@ begin
   if CurStep = ssPostInstall then
   begin
     SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, 0, 0);
+    ReleaseUpdate;
     ReleaseHelper;
   end;
 end;
@@ -248,6 +281,7 @@ english.ContinueHint=Click Next to continue the upgrade, or Cancel to exit.
 english.CurrentVersion=Current version: %1
 english.NewVersion=New version: %1
 english.RemoveUserData=Remove the application's user data?
+english.UpdateShutdownFailed=Could not safely stop FlClashZ. Close it and retry the update.
 english.ForeignInstallDir=Choose a separate folder. This folder belongs to another FlClash application.
 russian.Upgrade=Обновление
 russian.FreshInstall=Новая установка
@@ -258,6 +292,7 @@ russian.ContinueHint=Нажмите «Далее», чтобы продолжи�
 russian.CurrentVersion=Текущая версия: %1
 russian.NewVersion=Новая версия: %1
 russian.RemoveUserData=Удалить пользовательские данные программы?
+russian.UpdateShutdownFailed=Не удалось безопасно завершить FlClashZ. Закройте программу и повторите обновление.
 russian.ForeignInstallDir=Выберите отдельную папку. Эта папка принадлежит другому приложению FlClash.
 chineseSimplified.Upgrade=升级
 chineseSimplified.FreshInstall=全新安装
@@ -268,12 +303,14 @@ chineseSimplified.ContinueHint=点击“下一步”继续升级，或点击“�
 chineseSimplified.CurrentVersion=当前版本：%1
 chineseSimplified.NewVersion=新版本：%1
 chineseSimplified.RemoveUserData=是否删除应用程序的用户数据？
+chineseSimplified.UpdateShutdownFailed=无法安全关闭 FlClashZ。请退出程序后重试更新。
 chineseSimplified.ForeignInstallDir=请选择单独的目录。此目录属于其他 FlClash 应用。
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: checkedonce; Check: not IsUpgradeInstallation
 
 [Files]
+Source: "{{UPDATE_SCRIPT}}"; Flags: dontcopy
 Source: "{{SOURCE_DIR}}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Registry]

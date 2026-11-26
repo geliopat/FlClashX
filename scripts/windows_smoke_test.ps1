@@ -1,4 +1,4 @@
-param([string]$Bundle = '', [switch]$RequireExistingConsent)
+param([string]$Bundle = '', [switch]$RequireExistingConsent, [switch]$KeepRunning)
 $ErrorActionPreference = 'Stop'
 if (!$Bundle) {
   $Bundle = @('build/windows/x64/runner/Release', 'build/windows/runner/Release') |
@@ -76,6 +76,11 @@ try {
       $process.Refresh()
       if ($process.HasExited) { throw 'Application exited after its first frame' }
       Write-Host 'Windows startup and first Flutter frame passed'
+      if ($KeepRunning) {
+        $runningProcess = $process
+        $process = $null
+        return $runningProcess
+      }
       return
     }
     Start-Sleep -Milliseconds 500

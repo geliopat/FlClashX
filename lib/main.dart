@@ -89,6 +89,9 @@ void main(List<String> args) {
           unawaited(
             coreCliServer.start(
               restartCore: () => _restartCoreByCommand(container),
+              shutdownForUpdate: Platform.isWindows
+                  ? () => container.read(systemActionProvider.notifier).handleExit()
+                  : null,
             ),
           );
         }
