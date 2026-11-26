@@ -25,7 +25,39 @@ try {
   while ([DateTime]::UtcNow -lt $deadline) {
     $process.Refresh()
     if ($process.HasExited) { throw "Application exited before startup acknowledgement: $($process.ExitCode)" }
-    if ((Test-Path $marker) -and ((Get-Content -LiteralPath $marker -Raw) -eq 'first-frame-ok')) {
+    if (Test-Path -LiteralPath $marker) {
+      # The acknowledgement is written after a rendered frame. A partial
+      # write is not a valid acknowledgement; allow the next polling cycle.
+      $actual = $null
+      try { $actual = Get-Content -LiteralPath $marker -Raw | ConvertFrom-Json } catch {}
+      if (!$actual -or $actual.status -ne 'first-frame-ok') {
+        Start-Sleep -Milliseconds 500
+        continue
+      }
+      $home = Join-Path $env:APPDATA 'sweetyyoba.com\clashz'
+      $cache = Join-Path $env:LOCALAPPDATA 'sweetyyoba.com\clashz'
+      $expected = @{
+        home = $home
+        cache = $cache
+        preferences = (Join-Path $home 'shared_preferences.json')
+        database = (Join-Path $home 'database.sqlite')
+        config = (Join-Path $home 'config.yaml')
+        profiles = (Join-Path $home 'profiles')
+        providers = (Join-Path $home 'providers')
+        scripts = (Join-Path $home 'scripts')
+        lock = (Join-Path $home 'FlClash.lock')
+        coreCli = (Join-Path $home 'core-cli.json')
+      }
+      foreach ($key in $expected.Keys) {
+        if ($actual.$key -ne $expected[$key]) {
+          throw "Incorrect resolved data path ($key): $($actual.$key); expected $($expected[$key])"
+        }
+      }
+      if (!(Test-Path -LiteralPath $home -PathType Container) -or
+          !(Test-Path -LiteralPath $cache -PathType Container)) {
+        throw 'Resolved application data directories do not exist'
+      }
+      Write-Host 'Roaming and Local AppData paths passed'
       Start-Sleep -Seconds 3
       $process.Refresh()
       if ($process.HasExited) { throw 'Application exited after its first frame' }

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:fl_clash/enum/enum.dart';
@@ -60,11 +61,29 @@ void main(List<String> args) {
           ),
         );
         if (smokeMarker != null && smokeMarker.isNotEmpty) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!startupFailed) {
-              File(smokeMarker).writeAsStringSync('first-frame-ok', flush: true);
-            }
+          final paths = jsonEncode({
+            'status': 'first-frame-ok',
+            'home': await appPath.homeDirPath,
+            'cache': (await appPath.cacheDir.future).path,
+            'preferences': await appPath.sharedPreferencesPath,
+            'database': await appPath.databasePath,
+            'config': await appPath.configFilePath,
+            'profiles': await appPath.profilesPath,
+            'providers': await appPath.providerCacheRootPath,
+            'scripts': await appPath.scriptsDirPath,
+            'lock': await appPath.lockFilePath,
+            'coreCli': await appPath.coreCliPath,
           });
+          if (!startupFailed) {
+            // Awaiting the path futures can pass the first frame. Schedule a
+            // new frame explicitly so acknowledgement is not lost.
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!startupFailed) {
+                File(smokeMarker).writeAsStringSync(paths, flush: true);
+              }
+            });
+            WidgetsBinding.instance.ensureVisualUpdate();
+          }
         }
         if (system.isDesktop) {
           unawaited(
