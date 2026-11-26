@@ -535,7 +535,7 @@ class GeneralView extends ConsumerWidget {
     ];
   }
 
-  List<Widget> _coreItems() {
+  List<Widget> _coreItems(BuildContext context) {
     return [
       _clashToggle(
         title: (l) => 'IPv6',
@@ -645,7 +645,7 @@ class GeneralView extends ConsumerWidget {
             ),
             generateSection(
               title: appLocalizations.core,
-              items: _coreItems(),
+              items: _coreItems(context),
               footer: appLocalizations.ipv6Desc,
             ),
           ],

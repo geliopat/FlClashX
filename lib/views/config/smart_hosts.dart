@@ -208,13 +208,13 @@ class _AppliedHostsViewState extends ConsumerState<_AppliedHostsView> {
 
   Future<({Map<String, String> entries, HostCandidates candidates})> _load() async {
     if (ref.read(coreStatusProvider) != CoreStatus.connected) {
-      throw StateError(AppLocalizations.of(context).forkCoreUnavailable);
+      throw StateError(AppLocalizations().forkCoreUnavailable);
     }
     final setup = ref.read(setupActionProvider.notifier);
     final before = setup.pushes;
     final candidates = setup.appliedHostCandidates;
     final entries = await ref.read(coreHandlerProvider).getAppliedHosts();
-    return (entries: entries, candidates: setup.pushes == before ? candidates : const {});
+    return (entries: entries, candidates: setup.pushes == before ? candidates : const <String, Map<String, String>>{});
   }
 
   @override
