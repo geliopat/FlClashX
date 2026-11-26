@@ -119,7 +119,7 @@ class _LogsViewState extends ConsumerState<LogsView>
       iconActions: _buildActions(),
       onKeywordsUpdate: _listController.updateKeywords,
       searchState: AppBarSearchState(onSearch: _listController.search),
-      title: appLocalizations.logs,
+      title: '${appLocalizations.logs} Mihomo',
       body: ValueListenableBuilder<LogsState>(
         valueListenable: _listController,
         builder: (context, state, _) {

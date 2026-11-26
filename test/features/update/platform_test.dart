@@ -7,6 +7,7 @@ import 'package:fl_clash/features/update/platform.dart';
 import 'package:fl_clash/plugins/app.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as p;
 
 Matcher _fails(UpdateErrorKind kind) =>
     throwsA(isA<UpdateException>().having((e) => e.kind, 'kind', kind));
@@ -144,7 +145,7 @@ void main() {
 
     setUp(() async {
       root = await Directory.systemTemp.createTemp('flclashx_update_macos');
-      bundle = '${root.path}/Applications/FlClashX.app';
+      bundle = p.join(root.path, 'Applications', 'FlClashX.app');
       await Directory(bundle).create(recursive: true);
       image = File('${root.path}/cache/1/FlClashX-macos-arm64.dmg');
       await image.create(recursive: true);
@@ -213,7 +214,9 @@ void main() {
         );
         expect(Directory(bundle).existsSync(), isTrue);
         expect(
-          Directory('${root.path}/Applications').listSync().map((e) => e.path),
+          Directory(p.join(root.path, 'Applications'))
+              .listSync()
+              .map((e) => p.normalize(e.path)),
           [bundle],
         );
       },

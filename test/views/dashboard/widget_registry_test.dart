@@ -29,6 +29,26 @@ void main() {
     ]);
   });
 
+  test('keeps only the widgets selected by the dashboard header', () {
+    final result = withFixedCards(
+      const [speed, profiles],
+      announcement: false,
+    );
+    expect(result, isNot(contains(DashboardWidget.zapret)));
+    expect(
+      DashboardWidget.zapret.removable(providerMode: false),
+      isTrue,
+    );
+    expect(
+      withFixedCards(
+        const [speed, DashboardWidget.zapret, profiles],
+        announcement: false,
+        providerMode: true,
+      ),
+      contains(DashboardWidget.zapret),
+    );
+  });
+
   test('leaves the announcement out while the subscription sends none', () {
     expect(
       withFixedCards(const [speed, announcement, status], announcement: false),

@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
+import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/widgets/widgets.dart';
@@ -16,6 +17,7 @@ import 'style.dart';
 import 'wide.dart';
 import 'widget_registry.dart';
 import 'widgets/core_status_button.dart';
+import 'widgets/zapret_status_button.dart';
 import 'widgets/profile_detail.dart';
 
 class DashboardView extends ConsumerStatefulWidget {
@@ -54,6 +56,13 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
     final platform = widget.platform ?? SupportPlatform.currentPlatform;
     final scale = math.max(1.0, MediaQuery.textScalerOf(context).scale(1));
     final providerMode = ref.watch(providerModeProvider);
+    final zapretWidgetEnabled = ref.watch(
+      currentProfileProvider.select(
+        (profile) =>
+            profile?.headers.dashboardWidgets?.contains(DashboardWidget.zapret) ??
+            false,
+      ),
+    );
     final editable = !ref.watch(widgetEditingDeniedProvider);
     final chosen = ref.watch(
       appSettingProvider.select((state) => state.dashboardWidgetsChosen),
@@ -69,7 +78,9 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
       title: editing
           ? appLocalizations.editDashboard
           : appLocalizations.dashboard,
-      actions: [if (!editing) const CoreStatusButton()],
+      actions: [
+        if (!editing) const CoreStatusButton(),
+      ],
       confirmationAction: editing
           ? IconButtonData(
               glyph: AppGlyphs.check,
@@ -120,6 +131,7 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
               gap: gap,
               editing: editing,
               providerMode: providerMode,
+              zapretWidgetEnabled: zapretWidgetEnabled,
               cardKeyOf: _cardKeyOf,
               onDone: () => _setEditing(false, platform),
             ),
@@ -155,7 +167,7 @@ class _WideCards extends ConsumerWidget {
       cards: withFixedCards([
         for (final widget in saved)
           if (widget.platforms.contains(platform)) widget,
-      ], announcement: announcement),
+      ], announcement: announcement, platform: platform),
       columns: columns,
       gap: gap,
     );
@@ -169,6 +181,7 @@ class _MobileDashboard extends ConsumerWidget {
     required this.gap,
     required this.editing,
     required this.providerMode,
+    required this.zapretWidgetEnabled,
     required this.cardKeyOf,
     required this.onDone,
   });
@@ -180,6 +193,7 @@ class _MobileDashboard extends ConsumerWidget {
   final double gap;
   final bool editing;
   final bool providerMode;
+  final bool zapretWidgetEnabled;
   final GlobalKey Function(DashboardWidget widget) cardKeyOf;
   final VoidCallback onDone;
 
@@ -219,6 +233,7 @@ class _MobileDashboard extends ConsumerWidget {
               ],
               announcement: announcement,
               providerMode: providerMode,
+              platform: platform,
             );
             if (editing) {
               return DashboardEditor(
@@ -284,7 +299,15 @@ class _MobileDashboard extends ConsumerWidget {
         Expanded(child: content),
         Padding(
           padding: EdgeInsets.fromLTRB(side, 0, side, 16 + context.bottomInset),
-          child: const ProviderConnectButton(),
+          child: zapretWidgetEnabled && platform == SupportPlatform.Windows
+              ? const Row(
+                  spacing: 8,
+                  children: [
+                    Expanded(child: ProviderConnectButton()),
+                    Expanded(child: ProviderZapretButton()),
+                  ],
+                )
+              : const ProviderConnectButton(),
         ),
       ],
     );

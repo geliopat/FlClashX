@@ -18,6 +18,9 @@ void main() {
         providerHeadersOf({
           'Announce': ['Hi', 'ignored'],
           'FlClashX-Hex': ['FF5733'],
+          'FlClashZ-View': ['app.theme:dark', 'ignored'],
+          'FlClashZ-Zapret': [''],
+          'FlClashZ-Empty': [],
           'support-url': ['https://help.example.com'],
           'content-type': ['text/yaml'],
           'flclashx-empty': [],
@@ -25,6 +28,8 @@ void main() {
         {
           'announce': 'Hi',
           'flclashx-hex': 'FF5733',
+          'flclashz-view': 'app.theme:dark',
+          'flclashz-zapret': '',
           'support-url': 'https://help.example.com',
         },
       );

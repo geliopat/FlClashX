@@ -20,7 +20,13 @@ class ProviderHeaders {
   final Map<String, String> _headers;
 
   String? text(String name) {
-    final value = _headers[name]?.trim();
+    // Prefer the new header even when it is empty. Never merge policies.
+    final raw = name.startsWith(providerHeaderPrefix) &&
+            name != 'flclashz-zapret'
+        ? _headers[name] ??
+            _headers['$legacyProviderHeaderPrefix${name.substring(providerHeaderPrefix.length)}']
+        : _headers[name];
+    final value = raw?.trim();
     return value == null || value.isEmpty ? null : value;
   }
 
@@ -49,11 +55,11 @@ class ProviderHeaders {
 
   static const maxUpdateIntervalHours = 24 * 366;
 
-  ViewRequest? get view => ViewRequest.parse(text('flclashx-view'));
+  ViewRequest? get view => ViewRequest.parse(text('flclashz-view'));
 
   /// The standard dashboard's cards, comma-separated; null when none exists.
   List<DashboardWidget>? get dashboardWidgets {
-    final raw = text('flclashx-widgets');
+    final raw = text('flclashz-widgets');
     if (raw == null) {
       return null;
     }
@@ -62,11 +68,11 @@ class ProviderHeaders {
   }
 
   PanelBackground? get background =>
-      PanelBackground.parse(text('flclashx-background'));
+      PanelBackground.parse(text('flclashz-background'));
 
   /// Which of the app switches the panel turns on; the rest it turns off.
   Set<String>? get appSwitches {
-    final raw = text('flclashx-settings');
+    final raw = text('flclashz-settings');
     if (raw == null) {
       return null;
     }
@@ -76,9 +82,14 @@ class ProviderHeaders {
     };
   }
 
-  /// Flags of `flclashx-special`, the panel's one-off behaviours.
+  /// A present header controls all four flags, even if its value is empty.
+  ZapretHeaderSettings? get zapret => parseZapretHeader(
+    _headers['flclashz-zapret'],
+  );
+
+  /// Flags of `flclashz-special`, the panel's one-off behaviours.
   Set<String>? get specials {
-    final raw = text('flclashx-special');
+    final raw = text('flclashz-special');
     if (raw == null) {
       return null;
     }
@@ -92,54 +103,54 @@ class ProviderHeaders {
 
   bool get widgetEditingDenied => specials?.contains('denywidgets') ?? false;
 
-  /// `flclashx-special: noglobal` takes the Global outbound mode away.
+  /// `flclashz-special: noglobal` takes the Global outbound mode away.
   bool get globalModeAllowed => !(specials?.contains('noglobal') ?? false);
 
-  /// `flclashx-special: onlytun` leaves TUN as the only takeover: the system
+  /// `flclashz-special: onlytun` leaves TUN as the only takeover: the system
   /// proxy is off and locked.
   bool get onlyTun => specials?.contains('onlytun') ?? false;
 
   bool get hideIp => specials?.contains('hideip') ?? false;
 
-  /// `flclashx-special: simple` hides the fine settings while the profile is
+  /// `flclashz-special: simple` hides the fine settings while the profile is
   /// selected.
   bool get simpleMode => specials?.contains('simple') ?? false;
 
   bool get noVibration => specials?.contains('novibrate') ?? false;
 
-  /// `flclashx-special: onegroup` shows the proxies page as the server group's
+  /// `flclashz-special: onegroup` shows the proxies page as the server group's
   /// proxies alone, without group headers or delay tests.
   bool get oneGroup => specials?.contains('onegroup') ?? false;
 
-  /// `flclashx-special: providermode` dresses the dashboard as the provider's:
+  /// `flclashz-special: providermode` dresses the dashboard as the provider's:
   /// its logo and name on top, the server's location in place of the status
   /// card and the start button at the bottom.
   bool get providerMode => specials?.contains('providermode') ?? false;
 
-  /// `flclashx-special: nologo` leaves the logo out of [providerMode]'s top line.
+  /// `flclashz-special: nologo` leaves the logo out of [providerMode]'s top line.
   bool get noLogo => specials?.contains('nologo') ?? false;
 
-  /// `flclashx-special: noservice` leaves that whole line out.
+  /// `flclashz-special: noservice` leaves that whole line out.
   bool get noService => specials?.contains('noservice') ?? false;
 
   /// A provider's own update manifest, replacing GitHub as the update source.
-  String? get updateManifestUrl => _httpsUrl(text('flclashx-update'));
+  String? get updateManifestUrl => _httpsUrl(text('flclashz-update'));
 
-  String? get preUpdateManifestUrl => _httpsUrl(text('flclashx-update-pre'));
+  String? get preUpdateManifestUrl => _httpsUrl(text('flclashz-update-pre'));
 
   String? _httpsUrl(String? value) =>
       value != null && Uri.tryParse(value)?.isScheme('https') == true
       ? value
       : null;
 
-  String? get serviceName => _plainOrBase64(text('flclashx-servicename'));
+  String? get serviceName => _plainOrBase64(text('flclashz-servicename'));
 
   String? get serviceLogo {
-    final url = _plainOrBase64(text('flclashx-servicelogo'));
+    final url = _plainOrBase64(text('flclashz-servicelogo'));
     return url != null && url.isUrl ? url : null;
   }
 
-  String? get serverGroup => _plainOrBase64(text('flclashx-serverinfo'));
+  String? get serverGroup => _plainOrBase64(text('flclashz-serverinfo'));
 
   /// Plain or base64 (optionally `base64:`-prefixed), whole.
   String? get fullAnnouncement {
@@ -165,13 +176,13 @@ class ProviderHeaders {
     return '${cut.trimRight()}…';
   }
 
-  LinkOffer? get buyPlan => LinkOffer.parse(text('flclashx-buyplan'));
+  LinkOffer? get buyPlan => LinkOffer.parse(text('flclashz-buyplan'));
 
-  LinkOffer? get buyTraffic => LinkOffer.parse(text('flclashx-buytraffic'));
+  LinkOffer? get buyTraffic => LinkOffer.parse(text('flclashz-buytraffic'));
 
   /// The panel's other hosts in the order to try them, each a host,
   /// `host:port` or a full origin.
-  List<String> get fallbackHosts => (text('flclashx-newdomain') ?? '')
+  List<String> get fallbackHosts => (text('flclashz-newdomain') ?? '')
       .split(',')
       .map((host) => host.trim())
       .where((host) => host.isNotEmpty)
@@ -194,6 +205,48 @@ class ProviderHeaders {
     }
     return urls;
   }
+}
+
+/// Profile-local Zapret policy. Values are normalized without importing the
+/// controller or permitting any commands, files or executable arguments.
+typedef ZapretHeaderSettings = ({
+  bool autostart,
+  bool autofallback,
+  bool autotune,
+  bool tuneonfail,
+  String? mode,
+  String? tunemode,
+});
+
+ZapretHeaderSettings? parseZapretHeader(String? raw) {
+  if (raw == null) return null;
+  final flags = <String>{};
+  String? mode;
+  String? tunemode;
+  for (final part in raw.split(',')) {
+    final value = part.trim().toLowerCase();
+    final colon = value.indexOf(':');
+    if (colon < 0) {
+      flags.add(value);
+      continue;
+    }
+    final key = value.substring(0, colon).trim();
+    final argument = value.substring(colon + 1).trim();
+    if (key == 'mode' && const {'strictsplit', 'fullbypass'}.contains(argument)) {
+      mode = argument;
+    } else if (key == 'tunemode' &&
+        const {'veryfast', 'fast', 'full'}.contains(argument)) {
+      tunemode = argument;
+    }
+  }
+  return (
+    autostart: flags.contains('autostart'),
+    autofallback: flags.contains('autofallback'),
+    autotune: flags.contains('autotune'),
+    tuneonfail: flags.contains('tuneonfail'),
+    mode: mode,
+    tunemode: tunemode,
+  );
 }
 
 const maxFallbackHosts = 5;

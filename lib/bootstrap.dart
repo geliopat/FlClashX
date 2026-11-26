@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:fl_clash/common/boot_guard.dart';
+import 'package:fl_clash/common/disclaimer_consent.dart';
+import 'package:fl_clash/common/component_integrity.dart';
 import 'package:fl_clash/common/boot_record.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/system_notification.dart';
@@ -200,7 +202,39 @@ class Bootstrap {
     }
     await _showCrashRecoveryTip();
     await _showPreChannelTip();
+    // Complete machine-wide Helper migration before starting either engine.
+    // The launcher independently rechecks readiness before spawning Mihomo.
+    if (system.isWindows && !_container.read(safeModeProvider)) {
+      _container.read(coreStatusProvider.notifier).value = CoreStatus.connecting;
+      try {
+        final integrity = await checkWindowsComponents();
+        if (integrity.isNotEmpty) {
+          throw StateError('Component integrity: ${integrity.join(', ')}');
+        }
+        await windows!.ensureHelperReady();
+        // The dashboard might have queried the previous (or missing) Helper
+        // while the window was opening. Reload the catalog from the new one.
+        await _container.read(zapretControllerProvider.notifier).loadStrategies();
+      } catch (error) {
+        _container.read(coreStatusProvider.notifier).value = CoreStatus.disconnected;
+        final message = 'Не удалось подготовить Helper до запуска Mihomo и Zapret: $error';
+        commonPrint.log(message, logLevel: LogLevel.error);
+        dialogs.showNotifier(message, level: MessageLevel.error);
+        // Leave recovery controls available, but do not restore the VPN or
+        // start either engine using an unverified service.
+        _container.read(initProvider.notifier).value = true;
+        await bootGuard.markRunning();
+        return;
+      }
+    }
     await _container.read(coreActionProvider.notifier).startCore();
+    if (system.isWindows &&
+        !_container.read(safeModeProvider) &&
+        _container.read(coreStatusProvider) != CoreStatus.connected) {
+      _container.read(initProvider.notifier).value = true;
+      await bootGuard.markRunning();
+      return;
+    }
     if (!_bootDecision.isDegraded) {
       await _container.read(setupActionProvider.notifier).initStatus();
     }
@@ -284,21 +318,38 @@ class Bootstrap {
     final acceptedVersion = _container.read(
       appSettingProvider.select((state) => state.acceptedDisclaimerVersion),
     );
-    if (acceptedVersion >= disclaimerVersion) {
-      return true;
-    }
-    final isDisclaimerAccepted =
-        _isDisclaimerAcceptedByEnvironment || await requestDisclaimerConsent();
+    final legacyAccepted = acceptedVersion >= disclaimerVersion;
+    if (!system.isWindows && legacyAccepted) return true;
+    final isDisclaimerAccepted = system.isWindows
+        ? await windowsDisclaimerConsent.ensure(
+            legacyAccepted: legacyAccepted,
+            environmentAccepted: _isDisclaimerAcceptedByEnvironment,
+            request: () async {
+              await window?.show();
+              return requestDisclaimerConsent();
+            },
+          )
+        : _isDisclaimerAcceptedByEnvironment || await requestDisclaimerConsent();
     if (!isDisclaimerAccepted) {
       await _container.read(systemActionProvider.notifier).handleExit();
       return false;
     }
-    _container
-        .read(appSettingProvider.notifier)
-        .update(
-          (state) =>
-              state.copyWith(acceptedDisclaimerVersion: disclaimerVersion),
-        );
+    if (!legacyAccepted) {
+      _container
+          .read(appSettingProvider.notifier)
+          .update(
+            (state) =>
+                state.copyWith(acceptedDisclaimerVersion: disclaimerVersion),
+          );
+      // Persist before starting the engines; do not rely on a debounced save.
+      try {
+        if (!await preferences.saveConfig(_container.read(configProvider))) {
+          commonPrint.log('Disclaimer settings write failed', logLevel: LogLevel.warning);
+        }
+      } catch (error) {
+        commonPrint.log('Disclaimer settings write failed: $error', logLevel: LogLevel.warning);
+      }
+    }
     return true;
   }
 }

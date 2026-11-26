@@ -32,7 +32,14 @@ class StoreAction extends _$StoreAction {
 
   void savePreferencesDebounce() {
     debouncer.call(FunctionTag.savePreferences, () async {
-      await preferences.saveConfig(ref.read(configProvider));
+      try {
+        if (!await preferences.saveConfig(ref.read(configProvider))) {
+          throw StateError('Preferences write failed');
+        }
+      } catch (error) {
+        commonPrint.log('Settings save failed: ${error.runtimeType}', logLevel: LogLevel.error);
+        dialogs.showNotifier(currentAppLocalizations.forkSaveSettingsFailed, level: MessageLevel.error);
+      }
     });
   }
 

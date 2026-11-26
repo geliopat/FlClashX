@@ -1,12 +1,15 @@
+import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:ffi/ffi.dart';
 import 'package:fl_clash/common/boot_record.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/system_dns.dart';
 import 'package:fl_clash/core/desktop/helper_client.dart';
+import 'package:fl_clash/core/desktop/core_manifest.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/plugins/app.dart';
 import 'package:flutter/foundation.dart' show visibleForTesting;
@@ -256,6 +259,16 @@ class System {
     return "'${value.replaceAll("'", "'\\''")}'";
   }
 
+  /// Reinstalls the Windows Helper from the currently running app bundle.
+  /// Unlike the normal authorization check, this deliberately replaces an
+  /// already-running service so newly added Helper endpoints become available.
+  Future<AuthorizeCode> updateHelperService() async {
+    if (!isWindows || windows == null) {
+      return AuthorizeCode.error;
+    }
+    return windows!.registerService(forceReinstall: true);
+  }
+
   Future<AuthorizeCode> authorizeCore() async {
     if (system.isAndroid) {
       return AuthorizeCode.error;
@@ -412,11 +425,128 @@ class Windows {
   static String installArguments(int ownerPid) =>
       'install --owner-pid $ownerPid';
 
-  Future<AuthorizeCode> registerService() {
-    return registerHelperService(
-      () async =>
-          runas(appPath.helperPath, installArguments(pid), showWindow: false),
+  // Keep this exact-name list synchronized with retired_windows_helper_names
+  // in the Rust installer. Never remove generic WinDivert or Zapret services.
+  static const retiredHelperServices = ['FlClashZPreHelperService'];
+
+  Future<AuthorizeCode>? _registration;
+  String? _registrationError;
+
+  /// Read-only preflight: never replace a live service here, because it
+  /// may own the current Mihomo process. Repair belongs to the restart worker.
+  Future<bool> helperNeedsRepair() async {
+    final readiness = await helperClient.readiness(
+      timeout: const Duration(seconds: 3),
+      logFailure: false,
+      verifyHelperBinary: true,
     );
+    return readiness != HelperReadiness.ready || await _hasRetiredHelper();
+  }
+
+  Future<HelperReadiness> ensureHelperReady({bool forceReinstall = false}) async {
+    final result = await registerService(forceReinstall: forceReinstall);
+    if (result == AuthorizeCode.error) {
+      throw HelperException(
+        code: 'helperUpdateFailed',
+        message: _registrationError ?? 'Не удалось проверить или обновить Helper',
+      );
+    }
+    return HelperReadiness.ready;
+  }
+
+  void _recordRegistrationError(String message) {
+    _registrationError = message;
+    commonPrint.log(message, logLevel: LogLevel.error);
+  }
+
+  Future<AuthorizeCode> registerService({bool forceReinstall = false}) {
+    final active = _registration;
+    if (active != null) {
+      return forceReinstall
+          ? active.then((_) => registerService(forceReinstall: true))
+          : active;
+    }
+    return _registration ??= _registerService(forceReinstall).whenComplete(() {
+      _registration = null;
+    });
+  }
+
+  Future<bool> _hasRetiredHelper() async {
+    final root = Platform.environment['SystemRoot'] ?? r'C:\Windows';
+    for (final service in retiredHelperServices) {
+      final result = await system.runProcess(
+        '$root\\System32\\sc.exe',
+        ['query', service],
+      );
+      if (result.exitCode == 0 || result.exitCode == 1072) return true;
+      if (result.exitCode != 1060) {
+        throw StateError('Cannot inspect Helper service $service: ${result.exitCode}');
+      }
+    }
+    return false;
+  }
+
+  Future<bool> _verifyBundledCore() async {
+    final expected = await CoreManifest.readCoreSha256();
+    if (expected == null) return false;
+    try {
+      final actual = await sha256.bind(File(appPath.corePath).openRead()).first;
+      return actual.toString() == expected;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // Wait for the elevated installer itself, not merely for the old service
+  // to answer a ping. This also detects UAC cancellation and installer errors.
+  Future<bool> _installAndWait() async {
+    final helper = File(appPath.helperPath);
+    if (!await helper.exists()) {
+      _recordRegistrationError('Helper executable not found: ${helper.path}');
+      return false;
+    }
+    final root = Platform.environment['SystemRoot'] ?? r'C:\Windows';
+    final escaped = helper.path.replaceAll("'", "''");
+    final command = 'try { '
+        "\$p = Start-Process -FilePath '$escaped' "
+        "-ArgumentList '${installArguments(pid)}' "
+        '-Verb RunAs -Wait -PassThru -ErrorAction Stop; '
+        'exit \$p.ExitCode } catch { [Console]::Error.WriteLine(\$_.Exception.Message); exit 1 }';
+    final bytes = <int>[
+      for (final unit in command.codeUnits) ...[unit & 0xff, unit >> 8],
+    ];
+    final result = await system.runProcess(
+      '$root\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden',
+       '-EncodedCommand', base64Encode(bytes)],
+    );
+    if (result.exitCode != 0) {
+      _recordRegistrationError('Helper installer failed (exit ${result.exitCode}): ${result.stderr.toString().trim()} ${result.stdout.toString().trim()}');
+    }
+    return result.exitCode == 0;
+  }
+
+  Future<AuthorizeCode> _registerService(bool forceReinstall) async {
+    _registrationError = null;
+    try {
+      final retired = await _hasRetiredHelper();
+      final result = await registerHelperService(
+        _installAndWait,
+        forceReinstall: forceReinstall || retired,
+        verifyBundledCore: _verifyBundledCore,
+        verifyHelperBinary: true,
+        onFailure: (message) { _registrationError ??= message; },
+        startupTimeout: const Duration(seconds: 30),
+      );
+      if (result == AuthorizeCode.success && await _hasRetiredHelper()) {
+        _recordRegistrationError('Legacy Helper services remain after installation');
+        return AuthorizeCode.error;
+      }
+      return result;
+    } catch (error) {
+      _recordRegistrationError('Helper startup verification failed: $error');
+      return AuthorizeCode.error;
+    }
   }
 }
 
@@ -424,14 +554,27 @@ typedef ElevatedHelperInstaller = Future<bool> Function();
 
 @visibleForTesting
 Future<AuthorizeCode> registerHelperService(
-  ElevatedHelperInstaller install,
-) async {
-  final readiness = await helperClient.readiness();
+  ElevatedHelperInstaller install, {
+  bool forceReinstall = false,
+  Future<bool> Function()? verifyBundledCore,
+  bool verifyHelperBinary = false,
+  void Function(String)? onFailure,
+  Duration startupTimeout = const Duration(seconds: 6),
+}) async {
+  final readiness = await helperClient.readiness(verifyHelperBinary: verifyHelperBinary);
   switch (readiness) {
     case HelperReadiness.ready:
-      commonPrint.log('helper service is ready');
-      return AuthorizeCode.none;
+      if (!forceReinstall) {
+        commonPrint.log('helper service is ready');
+        return AuthorizeCode.none;
+      }
+      commonPrint.log(
+        'forced Helper service reinstall requested',
+        logLevel: LogLevel.warning,
+      );
+      break;
     case HelperReadiness.manifestMissing:
+      onFailure?.call('Core manifest is missing or invalid');
       commonPrint.log(
         'Core manifest is missing or invalid; Helper service unavailable, '
         'falling back to direct Core',
@@ -443,6 +586,12 @@ Future<AuthorizeCode> registerHelperService(
       );
       return AuthorizeCode.error;
     case HelperReadiness.coreMismatch:
+      if (verifyBundledCore != null) {
+        commonPrint.log('Installed Helper reports a Core mismatch; verifying bundled Core before repair',
+            logLevel: LogLevel.warning);
+        break;
+      }
+      onFailure?.call('Core SHA256 does not match the bundled manifest');
       commonPrint.log(
         'the Core on disk does not match the bundled manifest, so the Helper '
         'refuses it; a package build may have stripped the binary',
@@ -457,11 +606,20 @@ Future<AuthorizeCode> registerHelperService(
       break;
   }
 
+  if (verifyBundledCore != null && !await verifyBundledCore()) {
+    onFailure?.call('Bundled Core SHA256 verification failed');
+    commonPrint.log('Bundled Core verification failed; installed services were not changed',
+        logLevel: LogLevel.error);
+    dialogs.showNotifier(currentAppLocalizations.helperCorruptTip,
+        level: MessageLevel.error);
+    return AuthorizeCode.error;
+  }
   commonPrint.log(
     'helper service is unavailable, requesting elevated installation',
     logLevel: LogLevel.warning,
   );
   if (!await install()) {
+    onFailure?.call('Elevated Helper installation failed or was cancelled');
     commonPrint.log(
       'failed to launch elevated helper installation',
       logLevel: LogLevel.error,
@@ -469,7 +627,13 @@ Future<AuthorizeCode> registerHelperService(
     return AuthorizeCode.error;
   }
 
-  final isRunning = await _waitForHelperService();
+  final isRunning = await _waitForHelperService(
+    verifyHelperBinary: verifyHelperBinary,
+    timeout: startupTimeout,
+  );
+  if (!isRunning) {
+    onFailure?.call('Helper did not become ready after installation: protocol, path or binary mismatch');
+  }
   commonPrint.log(
     isRunning
         ? 'helper service installation completed'
@@ -481,6 +645,7 @@ Future<AuthorizeCode> registerHelperService(
 
 Future<bool> _waitForHelperService({
   Duration timeout = const Duration(seconds: 6),
+  bool verifyHelperBinary = false,
 }) async {
   const interval = Duration(seconds: 1);
   final stopwatch = Stopwatch()..start();
@@ -488,7 +653,10 @@ Future<bool> _waitForHelperService({
     final remaining = timeout - stopwatch.elapsed;
     if (remaining <= Duration.zero) return false;
     final isRunning =
-        await helperClient.readiness(timeout: remaining, logFailure: false) ==
+        await helperClient.readiness(
+          timeout: remaining, logFailure: false,
+          verifyHelperBinary: verifyHelperBinary,
+        ) ==
         HelperReadiness.ready;
     if (isRunning) return true;
     final delay = timeout - stopwatch.elapsed;

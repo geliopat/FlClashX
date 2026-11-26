@@ -42,7 +42,7 @@ class Window implements WindowPort {
   }) async {
     if (!safeModeBuild) {
       if (system.isWindows) {
-        for (final scheme in protocolSchemes) {
+        for (final scheme in windowsProtocolSchemes) {
           protocol.register(scheme);
         }
       }

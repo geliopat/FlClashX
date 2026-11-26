@@ -2,6 +2,9 @@ name: build
 
 on:
   push:
+    # Keep the Zapret2 integration branch on the same compile/test path as PR-ready code.
+    branches:
+      - feature/zapret2-integration
     tags:
       - 'v*'
   workflow_dispatch:
@@ -26,7 +29,7 @@ jobs:
     name: Dart
     # A private copy pays for its Actions minutes, so it runs the checks only when
     # started by hand.
-    if: &checks github.event_name == 'workflow_dispatch' || !github.event.repository.private
+    if: &checks (github.event_name == 'workflow_dispatch' || !github.event.repository.private) && github.ref != 'refs/heads/feature/zapret2-integration'
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -120,7 +123,7 @@ jobs:
 
   desktop:
     name: Desktop ${{ matrix.platform }}
-    if: (github.event_name == 'workflow_dispatch' || !github.event.repository.private) && !(github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
+    if: (github.event_name == 'workflow_dispatch' || !github.event.repository.private) && !(github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) && github.ref != 'refs/heads/feature/zapret2-integration'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -135,6 +138,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Setup Go
         uses: actions/setup-go@v6
@@ -181,6 +187,11 @@ jobs:
 
       # Compiles the desktop runners and the native plugin code that only the
       # tagged release matrix built before; the bundle itself is discarded.
+      - name: Stage pinned Zapret2 and Flowseal assets
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: ./scripts/setup_zapret.ps1
+
       - name: Build debug bundle
         run: flutter build ${{ matrix.platform }} --debug
 
@@ -297,6 +308,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
         with:
@@ -322,6 +336,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Setup Rust cache
         uses: Swatinem/rust-cache@v2
@@ -482,6 +499,11 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" "$keychain"
           security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
           security find-identity -v -p codesigning "$keychain"
+
+      - name: Stage pinned Zapret2 and Flowseal assets
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: ./scripts/setup_zapret.ps1
 
       - name: Setup
         env:

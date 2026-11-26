@@ -132,6 +132,18 @@ void main() {
     expect(signatureWith(null), isNot(signatureWith('88 ms')));
   });
 
+  test('action icon is optional and part of the menu signature', () {
+    final plain = TrayCodec.encode(_spec(menu: const [
+      TrayMenuAction(label: 'Start'),
+    ]));
+    final icon = TrayCodec.encode(_spec(menu: const [
+      TrayMenuAction(label: 'Start', icon: 'start'),
+    ]));
+    expect((plain.menu.single as Map).containsKey('icon'), isFalse);
+    expect((icon.menu.single as Map)['icon'], 'start');
+    expect(plain.signature, isNot(icon.signature));
+  });
+
   test('separators serialize without label or state', () {
     final encoded = TrayCodec.encode(_spec(menu: const [TrayMenuSeparator()]));
 

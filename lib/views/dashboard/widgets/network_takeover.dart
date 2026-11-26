@@ -1,15 +1,18 @@
+import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/core/desktop/helper_client.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/ui/ui.dart';
 import 'package:fl_clash/views/dashboard/layout.dart';
 import 'package:fl_clash/views/dashboard/style.dart';
 import 'package:fl_clash/widgets/managed_setting.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_new_shapes/material_new_shapes.dart';
-import 'package:material_ui/material_ui.dart';
 
 import 'card.dart';
+import 'zapret_strategy_sheet.dart';
 
 typedef _RowMetrics = ({
   EdgeInsets padding,
@@ -247,6 +250,137 @@ class VpnTile extends ConsumerWidget {
         color: Colors.transparent,
         onTap: () => _setVpn(ref, !enabled),
         onChanged: (value) => _setVpn(ref, value),
+      ),
+    );
+  }
+}
+
+/// The Zapret switch beside VPN in the dashboard control row.
+class ZapretTile extends ConsumerWidget {
+  const ZapretTile({super.key});
+
+  Future<void> _change(WidgetRef ref, bool value) async {
+    try {
+      await ref.read(zapretControllerProvider.notifier).setEnabled(value);
+    } catch (error) {
+      dialogs.showNotifier(
+        error is HelperException ? error.message : error.toString(),
+        level: MessageLevel.error,
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final metrics = _tileMetricsOf(DashboardDensityScope.of(context));
+    final state = ref.watch(zapretControllerProvider);
+    final subtitle = !state.available
+        ? 'Служба Helper недоступна'
+        : state.busy
+        ? 'Выполняется операция...'
+        : state.running
+        ? 'Включён'
+        : 'Выключен';
+    final enabled = state.running;
+    final row = DashboardSwitchRow(
+      glyph: AppGlyphs.filter,
+      title: 'Zapret',
+      subtitle: metrics.subtitle ? subtitle : null,
+      value: enabled,
+      iconSize: metrics.icon,
+      padding: metrics.padding,
+      radius: metrics.radius,
+      color: Colors.transparent,
+      onTap: !state.available || state.busy
+          ? null
+          : () => _change(ref, !enabled),
+      onChanged: !state.available || state.busy
+          ? null
+          : (value) => _change(ref, value),
+    );
+    HelperZapretStrategy? selectedStrategy;
+    for (final item in state.strategies) {
+      if (item.id == state.selectedStrategyId) {
+        selectedStrategy = item;
+        break;
+      }
+    }
+    return DashboardCard(
+      padding: EdgeInsets.zero,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          row,
+          if (selectedStrategy != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 10, 10),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(DashboardCorner.tab),
+                      onTap: () => showZapretStrategiesSheet(context),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 8,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Стратегия',
+                              style: AppTextStyle.caption1.of(context).copyWith(
+                                    color: context.colorScheme.onSurfaceVariant,
+                                  ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              selectedStrategy.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTextStyle.footnote.of(
+                                context,
+                                emphasized: true,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  DashboardIconButton(
+                    glyph: AppGlyphs.chevronDown,
+                    tooltip: 'Выбрать стратегию Zapret',
+                    onPressed: () => showZapretStrategiesSheet(context),
+                  ),
+                ],
+              ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 10, 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      state.error ?? 'Загрузка каталога стратегий...',
+                      style: AppTextStyle.footnote.of(context).copyWith(
+                            color: context.colorScheme.onSurfaceVariant,
+                          ),
+                    ),
+                  ),
+                  DashboardIconButton(
+                    glyph: AppGlyphs.refresh,
+                    tooltip: 'Повторить загрузку стратегий',
+                    onPressed: () => ref
+                        .read(zapretControllerProvider.notifier)
+                        .loadStrategies(),
+                  ),
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }

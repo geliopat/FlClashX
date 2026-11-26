@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
 import 'package:fl_clash/common/constant.dart';
@@ -33,6 +34,141 @@ final class HelperStopResponse {
   final bool stopped;
 
   const HelperStopResponse({required this.stopped});
+}
+
+final class HelperZapretStrategy {
+  final String id;
+  final String name;
+  final String filename;
+  final String description;
+  final String engine;
+  final String category;
+  final bool supportsSplitMode;
+
+  const HelperZapretStrategy({
+    required this.id,
+    required this.name,
+    required this.filename,
+    required this.description,
+    required this.engine,
+    required this.category,
+    required this.supportsSplitMode,
+  });
+
+  factory HelperZapretStrategy.fromJson(Object? value) {
+    if (value is! Map) {
+      throw const FormatException('Zapret strategy must be an object');
+    }
+    final map = Map<String, Object?>.from(value);
+    String field(String key) {
+      final item = map[key];
+      if (item is! String || item.isEmpty) {
+        throw FormatException('Zapret strategy field $key is invalid');
+      }
+      return item;
+    }
+    final engine = field('engine');
+    final supportsSplitMode = map['supportsSplitMode'];
+    if (engine != 'winws' && engine != 'winws2') {
+      throw const FormatException('Unsupported Zapret engine');
+    }
+    if (supportsSplitMode is! bool) {
+      throw const FormatException('Zapret strategy split-mode capability is invalid');
+    }
+    return HelperZapretStrategy(
+      id: field('id'),
+      name: field('name'),
+      filename: field('filename'),
+      description: field('description'),
+      engine: engine,
+      category: field('category'),
+      supportsSplitMode: supportsSplitMode,
+    );
+  }
+}
+
+final class HelperZapretListInfo {
+  final String filename;
+  final int bytes;
+  final int entries;
+  final bool userManaged;
+
+  const HelperZapretListInfo({
+    required this.filename,
+    required this.bytes,
+    required this.entries,
+    required this.userManaged,
+  });
+
+  factory HelperZapretListInfo.fromJson(Object? value) {
+    if (value is! Map) throw const FormatException('Zapret list info must be an object');
+    final map = Map<String, Object?>.from(value);
+    final filename = map['filename'];
+    final bytes = map['bytes'];
+    final entries = map['entries'];
+    final userManaged = map['userManaged'];
+    if (filename is! String || bytes is! int || entries is! int || userManaged is! bool ||
+        bytes < 0 || entries < 0) {
+      throw const FormatException('Zapret list info fields are invalid');
+    }
+    return HelperZapretListInfo(
+      filename: filename,
+      bytes: bytes,
+      entries: entries,
+      userManaged: userManaged,
+    );
+  }
+}
+
+final class HelperZapretListContent {
+  final String filename;
+  final String content;
+
+  const HelperZapretListContent({required this.filename, required this.content});
+}
+
+final class HelperZapretLog {
+  final DateTime time;
+  final String level;
+  final String message;
+
+  const HelperZapretLog(this.time, this.level, this.message);
+
+  factory HelperZapretLog.fromJson(Object? value) {
+    if (value is! Map || value['timestampMs'] is! int ||
+        value['level'] is! String || value['message'] is! String) {
+      throw const FormatException('Invalid Zapret log entry');
+    }
+    return HelperZapretLog(
+      DateTime.fromMillisecondsSinceEpoch(value['timestampMs'] as int),
+      value['level'] as String,
+      value['message'] as String,
+    );
+  }
+}
+
+final class HelperZapretStatus {
+  final bool running;
+  final int uptimeMs;
+  final int? pid;
+  final String? strategyId;
+  final String? engine;
+  final String? mode;
+  final List<String> winDivertFilters;
+  final List<String> processingLists;
+  final int cleanedProcesses;
+
+  const HelperZapretStatus({
+    required this.running,
+    this.uptimeMs = 0,
+    required this.pid,
+    this.strategyId,
+    this.engine,
+    this.mode,
+    this.winDivertFilters = const [],
+    this.processingLists = const [],
+    this.cleanedProcesses = 0,
+  });
 }
 
 final class HelperException implements Exception {
@@ -170,6 +306,7 @@ final class HelperClient {
   Future<HelperReadiness> readiness({
     Duration? timeout,
     bool logFailure = true,
+    bool verifyHelperBinary = false,
   }) async {
     if (timeout != null && timeout <= Duration.zero) {
       return HelperReadiness.notReady;
@@ -193,9 +330,22 @@ final class HelperClient {
         cancelToken: cancelToken,
         options: _options(ResponseType.plain, acceptAnyStatus: true),
       );
-      return response.statusCode == HttpStatus.ok
+      final readiness = response.statusCode == HttpStatus.ok
           ? _readyFromOk(response, logFailure)
           : _notReadyFromPing(response, logFailure);
+      if (readiness == HelperReadiness.ready && verifyHelperBinary) {
+        final runningHash = response.headers.value('x-flclashz-helper-sha256');
+        if (runningHash == null || !RegExp(r'^[0-9a-f]{64}$').hasMatch(runningHash)) {
+          _logPingFailure('Missing running Helper SHA256', logFailure);
+          return HelperReadiness.notReady;
+        }
+        final bundledHash = await sha256.bind(File(_expectedHelperPath()).openRead()).first;
+        if (bundledHash.toString() != runningHash) {
+          _logPingFailure('Running Helper binary differs from bundled Helper', logFailure);
+          return HelperReadiness.notReady;
+        }
+      }
+      return readiness;
     } catch (error) {
       _logPingFailure('helper ping failed: $error', logFailure);
       return HelperReadiness.notReady;
@@ -344,6 +494,321 @@ final class HelperClient {
         details: error.toString(),
       );
     }
+  }
+
+  /// Reads the built-in Zapret2/Flowseal strategy catalog from the Helper.
+  Future<List<HelperZapretStrategy>> zapretStrategies() async {
+    try {
+      final response = await _dio.get<Object?>(
+        '$baseUrl/zapret/strategies',
+        options: _options(ResponseType.json, receiveTimeout: const Duration(seconds: 3)),
+      );
+      final value = response.data;
+      if (value is! List || value.isEmpty) {
+        throw HelperException(
+          code: 'invalidResponse',
+          message: 'Helper вернул пустой или некорректный список стратегий Zapret',
+          details: value,
+        );
+      }
+      try {
+        final strategies = value
+            .map(HelperZapretStrategy.fromJson)
+            .toList(growable: false);
+        final ids = strategies.map((item) => item.id).toSet();
+        if (ids.length != strategies.length) {
+          throw const FormatException('Duplicate Zapret strategy IDs');
+        }
+        return strategies;
+      } on FormatException catch (error) {
+        throw HelperException(
+          code: 'invalidResponse',
+          message: 'Helper вернул некорректный каталог стратегий Zapret',
+          details: error.message,
+        );
+      }
+    } on HelperException {
+      rethrow;
+    } on DioException catch (error) {
+      throw _mapZapretDioException(error, operation: 'strategies');
+    } catch (error) {
+      throw HelperException(
+        code: 'transportError',
+        message: 'Не удалось получить каталог стратегий Zapret через Helper',
+        details: error.toString(),
+      );
+    }
+  }
+
+  /// Lists the editable, allow-listed Zapret text files.
+  Future<List<HelperZapretListInfo>> zapretLists() async {
+    try {
+      final response = await _dio.get<Object?>(
+        '$baseUrl/zapret/lists',
+        options: _options(ResponseType.json, receiveTimeout: const Duration(seconds: 4)),
+      );
+      final value = response.data;
+      if (value is! List) {
+        throw HelperException(code: 'invalidResponse', message: 'Helper вернул некорректный список файлов Zapret', details: value);
+      }
+      try {
+        return value.map(HelperZapretListInfo.fromJson).toList(growable: false);
+      } on FormatException catch (error) {
+        throw HelperException(
+          code: 'invalidResponse',
+          message: 'Helper вернул некорректные данные списка файлов Zapret',
+          details: error.message,
+        );
+      }
+    } on HelperException {
+      rethrow;
+    } on DioException catch (error) {
+      throw _mapZapretDioException(error, operation: 'lists');
+    } catch (error) {
+      throw HelperException(code: 'transportError', message: 'Не удалось получить списки Zapret', details: error.toString());
+    }
+  }
+
+  Future<HelperZapretListContent> readZapretList(String filename) async {
+    try {
+      final response = await _dio.get<Object?>(
+        '$baseUrl/zapret/lists/${Uri.encodeComponent(filename)}',
+        options: _options(ResponseType.json, receiveTimeout: const Duration(seconds: 4)),
+      );
+      final data = _responseMap(response, operation: 'Zapret list');
+      final returnedName = data['filename'];
+      final content = data['content'];
+      if (returnedName != filename || content is! String) {
+        throw HelperException(code: 'invalidResponse', message: 'Helper вернул некорректное содержимое списка Zapret', details: data);
+      }
+      return HelperZapretListContent(filename: filename, content: content);
+    } on HelperException {
+      rethrow;
+    } on DioException catch (error) {
+      throw _mapZapretDioException(error, operation: 'read list');
+    } catch (error) {
+      throw HelperException(code: 'transportError', message: 'Не удалось прочитать список Zapret', details: error.toString());
+    }
+  }
+
+  Future<HelperZapretListInfo> restoreZapretList(String filename) async {
+    try {
+      final response = await _dio.post<Object?>(
+        '$baseUrl/zapret/lists/${Uri.encodeComponent(filename)}/restore',
+        options: _options(ResponseType.json, receiveTimeout: const Duration(seconds: 8)),
+      );
+      final data = _responseMap(response, operation: 'Restore Zapret list');
+      try {
+        return HelperZapretListInfo.fromJson(data);
+      } on FormatException catch (error) {
+        throw HelperException(
+          code: 'invalidResponse',
+          message: 'Helper вернул некорректные данные восстановления списка Zapret',
+          details: error.message,
+        );
+      }
+    } on HelperException {
+      rethrow;
+    } on DioException catch (error) {
+      throw _mapZapretDioException(error, operation: 'restore list');
+    } catch (error) {
+      throw HelperException(code: 'transportError', message: 'Не удалось восстановить список Zapret', details: error.toString());
+    }
+  }
+
+  Future<HelperZapretListInfo> writeZapretList(String filename, String content) async {
+    try {
+      final response = await _dio.put<Object?>(
+        '$baseUrl/zapret/lists/${Uri.encodeComponent(filename)}',
+        data: {'content': content},
+        options: _options(ResponseType.json, receiveTimeout: const Duration(seconds: 8)),
+      );
+      final data = _responseMap(response, operation: 'Save Zapret list');
+      try {
+        return HelperZapretListInfo.fromJson(data);
+      } on FormatException catch (error) {
+        throw HelperException(
+          code: 'invalidResponse',
+          message: 'Helper вернул некорректные данные сохранения списка Zapret',
+          details: error.message,
+        );
+      }
+    } on HelperException {
+      rethrow;
+    } on DioException catch (error) {
+      throw _mapZapretDioException(error, operation: 'save list');
+    } catch (error) {
+      throw HelperException(code: 'transportError', message: 'Не удалось сохранить список Zapret', details: error.toString());
+    }
+  }
+
+  Future<List<HelperZapretLog>> zapretLogs() async {
+    final response = await _dio.get<Object?>(
+      '$baseUrl/zapret/logs',
+      options: _options(ResponseType.json, receiveTimeout: const Duration(seconds: 3)),
+    );
+    final data = response.data;
+    if (data is! List) throw const FormatException('Invalid Zapret log list');
+    return data.map(HelperZapretLog.fromJson).toList(growable: false);
+  }
+
+  Future<String> zapretLogArchive() async {
+    final response = await _dio.get<Object?>(
+      '$baseUrl/zapret/logs/archive',
+      options: _options(ResponseType.json, receiveTimeout: const Duration(seconds: 15)),
+    );
+    final data = response.data;
+    if (data is! Map || data['content'] is! String) {
+      throw const FormatException('Invalid persistent journal');
+    }
+    return data['content'] as String;
+  }
+
+  Future<void> clearZapretLogs() async {
+    await _dio.delete<Object?>(
+      '$baseUrl/zapret/logs',
+      options: _options(ResponseType.json, receiveTimeout: const Duration(seconds: 3)),
+    );
+  }
+
+  /// Reads the Helper-owned Zapret process, regardless of which engine the
+  /// selected profile uses. The Helper keeps it in a kill-on-close Job Object.
+  Future<HelperZapretStatus> zapretStatus() async {
+    try {
+      final response = await _dio.get<Object?>(
+        '$baseUrl/zapret',
+        options: _options(ResponseType.json, receiveTimeout: const Duration(seconds: 3)),
+      );
+      return _parseZapretResponse(response, operation: 'Zapret status');
+    } on HelperException {
+      rethrow;
+    } on DioException catch (error) {
+      throw _mapZapretDioException(error, operation: 'status');
+    } catch (error) {
+      throw HelperException(
+        code: 'transportError',
+        message: 'Не удалось получить состояние Zapret через Helper',
+        details: error.toString(),
+      );
+    }
+  }
+
+  // Shared across HelperClient instances within this desktop process.
+  static int _zapretCommand = 0;
+
+  Map<String, String> _zapretHeaders() => {
+    'x-zapret-owner-pid': pid.toString(),
+    'x-zapret-command': (++_zapretCommand).toString(),
+  };
+
+  Future<void> setZapretWatchdog(bool enabled) async {
+    await _dio.put<Object?>('$baseUrl/zapret/watchdog',
+      data: {'enabled': enabled}, options: _options(ResponseType.json,
+        receiveTimeout: const Duration(seconds: 5)).copyWith(headers: _zapretHeaders()));
+  }
+
+  Future<HelperZapretStatus> startZapret({required String strategyId, required String mode, bool debug = false, bool? watchdog, Map<String, List<String>>? infrastructure, String? reason}) =>
+      _zapretAction('start', operation: 'start', strategyId: strategyId, mode: mode, debug: debug, watchdog: watchdog, infrastructure: infrastructure, reason: reason);
+
+  Future<HelperZapretStatus> stopZapret() =>
+      _zapretAction('stop', operation: 'stop');
+
+  Future<HelperZapretStatus> restartZapret({required String strategyId, required String mode, bool debug = false, bool? watchdog, Map<String, List<String>>? infrastructure, String? reason}) =>
+      _zapretAction('restart', operation: 'restart', strategyId: strategyId, mode: mode, debug: debug, watchdog: watchdog, infrastructure: infrastructure, reason: reason);
+
+  Future<HelperZapretStatus> _zapretAction(
+    String route, {
+    required String operation,
+    String? strategyId,
+    String? mode,
+    bool debug = false,
+    bool? watchdog,
+    Map<String, List<String>>? infrastructure,
+    String? reason,
+  }) async {
+    try {
+      final response = await _dio.post<Object?>(
+        '$baseUrl/zapret/$route',
+        data: strategyId == null
+            ? null
+            : {'strategyId': strategyId, 'mode': mode ?? 'fullBypass', if (debug) 'debug': true, 'watchdog': ?watchdog, 'infrastructure': ?infrastructure, 'reason': ?reason},
+        options: _options(
+          ResponseType.json,
+          receiveTimeout: operation == 'stop'
+              ? stopTimeout
+              : const Duration(seconds: 20),
+        ).copyWith(headers: _zapretHeaders()),
+      );
+      return _parseZapretResponse(response, operation: 'Zapret $operation');
+    } on HelperException {
+      rethrow;
+    } on DioException catch (error) {
+      throw _mapZapretDioException(error, operation: operation);
+    } catch (error) {
+      throw HelperException(
+        code: 'transportError',
+        message: 'Не удалось выполнить операцию Zapret через Helper',
+        details: error.toString(),
+      );
+    }
+  }
+
+  HelperZapretStatus _parseZapretResponse(
+    Response<Object?> response, {
+    required String operation,
+  }) {
+    final data = _responseMap(response, operation: operation);
+    final running = data['running'];
+    final pid = data['pid'];
+    final uptime = data['uptimeMs'] ?? 0;
+    final cleaned = data['cleanedProcesses'] ?? 0;
+    final strategyId = data['strategyId'];
+    final engine = data['engine'];
+    final mode = data['mode'];
+    final filters = data['winDivertFilters'] ?? const [];
+    final lists = data['processingLists'] ?? const [];
+    if (running is! bool ||
+        (pid != null && (pid is! int || pid <= 0)) ||
+        uptime is! int || uptime < 0 ||
+        cleaned is! int ||
+        cleaned < 0 ||
+        (strategyId != null && (strategyId is! String || strategyId.isEmpty)) ||
+        (engine != null && engine != 'winws' && engine != 'winws2') ||
+        (mode != null && mode != 'strictSplit' && mode != 'fullBypass') ||
+        filters is! List || filters.any((item) => item is! String) ||
+        lists is! List || lists.any((item) => item is! String) ||
+        (running && (pid == null || strategyId == null || engine == null)) ||
+        (!running && (pid != null || strategyId != null || engine != null))) {
+      throw HelperException(
+        code: 'invalidResponse',
+        message: 'Helper вернул некорректное состояние Zapret',
+        details: data,
+      );
+    }
+    return HelperZapretStatus(
+      running: running,
+      uptimeMs: uptime,
+      pid: pid as int?,
+      strategyId: strategyId as String?,
+      engine: engine as String?,
+      mode: mode as String?,
+      winDivertFilters: filters.cast<String>().toList(growable: false),
+      processingLists: lists.cast<String>().toList(growable: false),
+      cleanedProcesses: cleaned,
+    );
+  }
+
+  HelperException _mapZapretDioException(
+    DioException error, {
+    required String operation,
+  }) {
+    if (error.response?.statusCode == HttpStatus.notFound) {
+      return const HelperException(
+        code: 'zapretUnsupported',
+        message: 'Служба Helper не поддерживает Zapret2. Перезапусти или обнови FlClashZ, чтобы обновить службу.',
+      );
+    }
+    return _mapDioException(error, operation: 'Zapret $operation');
   }
 
   HelperStopResponse _parseStopResponse(
@@ -522,18 +987,38 @@ final class HelperLauncherResolver implements DesktopCoreLauncherResolver {
   final CoreProcessLauncher directLauncher;
   final CoreProcessLauncher helperLauncher;
   final HelperReadinessProbe helperReady;
+  final bool requireHelper;
 
   const HelperLauncherResolver({
     required this.hasHelper,
     required this.directLauncher,
     required this.helperLauncher,
     required this.helperReady,
+    this.requireHelper = false,
   });
 
   @override
   Future<CoreProcessLauncher> resolve() async {
-    if (!hasHelper) return directLauncher;
+    if (!hasHelper) {
+      if (requireHelper) {
+        throw const HelperException(
+          code: 'helperUnavailable',
+          message: 'Windows Helper is required',
+        );
+      }
+      return directLauncher;
+    }
     final readiness = await helperReady();
+    if (requireHelper) {
+      if (readiness != HelperReadiness.ready) {
+        throw HelperException(
+          code: 'helperUnavailable',
+          message: 'Windows Helper verification failed: ${readiness.name}',
+        );
+      }
+      // Do not bypass Helper if it fails to spawn the Core.
+      return helperLauncher;
+    }
     if (readiness == HelperReadiness.ready) {
       return FallbackCoreLauncher(
         primary: helperLauncher,

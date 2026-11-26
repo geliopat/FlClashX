@@ -3,21 +3,18 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 File _resolveSource(String relativePath) {
-  final direct = File(relativePath);
-  if (direct.existsSync()) {
-    return direct;
-  }
   final inPlugin = File('plugins/tray/$relativePath');
   if (inPlugin.existsSync()) {
     return inPlugin;
   }
-  return direct;
+  return File(relativePath);
 }
 
 String _body(String source, String signature) {
   final start = source.indexOf(signature);
   expect(start, isNonNegative, reason: signature);
   final end = source.indexOf('\n}\n', start);
+  expect(end, greaterThan(start), reason: signature);
   return source.substring(start, end);
 }
 
@@ -25,12 +22,42 @@ void main() {
   late String pluginSource;
 
   setUpAll(() {
-    pluginSource = _resolveSource('windows/tray_plugin.cpp').readAsStringSync();
+    pluginSource = _resolveSource('windows/tray_plugin.cpp')
+        .readAsStringSync()
+        .replaceAll('\r\n', '\n');
   });
 
-  test('windows menu clicks come from TrackPopupMenu, not WM_COMMAND', () {
+  test('native fallback still uses TrackPopupMenu, not WM_COMMAND', () {
     expect(pluginSource, contains('TPM_RETURNCMD'));
     expect(pluginSource, isNot(contains('WM_COMMAND')));
+  });
+
+  test('acrylic menu uses measured labels, tint and no outline', () {
+    final source = _resolveSource('windows/acrylic_menu.cpp').readAsStringSync();
+    expect(source, contains('0x65000000'));
+    expect(source, contains('0xfffffffe'));
+    expect(source, contains('CreateTextLayout'));
+    expect(source, contains('widthIncludingTrailingWhitespace'));
+    expect(source, contains('label_width_ + (detail_width ?'));
+    expect(source, contains('GetDpiForMonitor'));
+    expect(source, contains('VK_ESCAPE'));
+    expect(source, contains('WM_CAPTURECHANGED'));
+    expect(pluginSource, contains('acrylic_menu_.Open('));
+    expect(pluginSource, contains('TPM_RETURNCMD'));
+  });
+
+  test('acrylic text uses medium DirectWrite and premultiplied grayscale', () {
+    final source = _resolveSource('windows/acrylic_menu.cpp').readAsStringSync();
+    final cmake = _resolveSource('windows/CMakeLists.txt').readAsStringSync();
+    expect(source, contains('DWRITE_FONT_WEIGHT_MEDIUM'));
+    expect(source, contains('Segoe UI Variable Text'));
+    expect(source, contains('D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE'));
+    expect(source, contains('D2D1_ALPHA_MODE_PREMULTIPLIED'));
+    expect(source, contains('GUID_WICPixelFormat32bppPBGRA'));
+    expect(source, contains('DrawTextLayout'));
+    expect(source, contains('text_bitmap->CopyPixels'));
+    expect(source, isNot(contains('graphics.DrawString')));
+    expect(cmake, contains('d2d1 dwrite windowscodecs ole32'));
   });
 
   test('windows puts the detail in the accelerator column', () {

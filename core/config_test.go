@@ -15,6 +15,8 @@ import (
 	"time"
 
 	"github.com/metacubex/mihomo/adapter/inbound"
+	"github.com/metacubex/mihomo/component/resolver"
+	"github.com/metacubex/mihomo/component/trie"
 	"github.com/metacubex/mihomo/component/updater"
 	"github.com/metacubex/mihomo/config"
 	"github.com/metacubex/mihomo/constant"
@@ -1093,5 +1095,27 @@ rules:
 		if view.Fixed != "b" || view.Now != "b" {
 			t.Errorf("%s: fixed %q now %q, want the pin b", name, view.Fixed, view.Now)
 		}
+	}
+}
+
+func TestAppliedHostsSnapshot(t *testing.T) {
+	hosts := trie.New[resolver.HostValue]()
+	for domain, values := range map[string][]string{
+		"example.test": {"192.0.2.1", "2001:db8::1"},
+		"*.alias.test": {"example.test"},
+	} {
+		value, err := resolver.NewHostValue(values)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := hosts.Insert(domain, value); err != nil {
+			t.Fatal(err)
+		}
+	}
+	withCurrentConfig(t, &config.Config{Hosts: hosts})
+	got := handleGetAppliedHosts()
+	if len(got) != 2 || strings.Join(got["example.test"], ",") != "192.0.2.1,2001:db8::1" ||
+		strings.Join(got["*.alias.test"], ",") != "example.test" {
+		t.Fatalf("unexpected applied hosts: %v", got)
 	}
 }

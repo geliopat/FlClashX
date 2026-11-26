@@ -24,6 +24,7 @@ class _RunRequest {
   final bool resume;
   final DateTime? previousStartTime;
   final bool undoesFailedStart;
+  final void Function(Object)? onZapretStopError;
 
   const _RunRequest({
     required this.running,
@@ -31,6 +32,7 @@ class _RunRequest {
     required this.resume,
     required this.previousStartTime,
     this.undoesFailedStart = false,
+    this.onZapretStopError,
   });
 }
 
@@ -44,6 +46,9 @@ class SetupAction extends _$SetupAction {
   _RunRequest? _latestRunRequest;
   DateTime? _startTime;
   _SetupInputs? _appliedInputs;
+  final _builtHostCandidates = <String, HostCandidates>{};
+  HostCandidates _appliedHostCandidates = const {};
+  HostCandidates get appliedHostCandidates => _appliedHostCandidates;
   var _lastPushDuration = Duration.zero;
   var _pendingForceApply = false;
   var _pushes = 0;
@@ -213,11 +218,28 @@ class SetupAction extends _$SetupAction {
     return _run(running, initialize: running && initialize);
   }
 
+  /// Explicit tray start forces Zapret even when its automatic-start
+  /// preference is disabled. Stop still disconnects the VPN if Zapret
+  /// cannot confirm shutdown, and reports that failure afterwards.
+  Future<bool> setTrayRunning(bool running) async {
+    Object? stopError;
+    final success = await _run(
+      running,
+      initialize: running && !ref.read(initProvider),
+      forceZapret: running,
+      onZapretStopError: (error) => stopError = error,
+    );
+    if (stopError != null) throw stopError!;
+    return success;
+  }
+
   Future<bool> _run(
     bool running, {
     required bool initialize,
     bool resume = false,
     bool undoesFailedStart = false,
+    bool forceZapret = false,
+    void Function(Object)? onZapretStopError,
   }) {
     final request = _RunRequest(
       running: running,
@@ -225,13 +247,33 @@ class SetupAction extends _$SetupAction {
       resume: resume,
       previousStartTime: _startTime,
       undoesFailedStart: undoesFailedStart,
+      onZapretStopError: onZapretStopError,
     );
     _latestRunRequest = request;
     _setLocalRunning(running);
     if (request.initialize) {
       globalState.needInitStatus = false;
     }
-    return running ? _start(request) : _stop(request);
+    if (!running) return _stop(request);
+    return _start(request).then((success) async {
+      if (success && system.isWindows && _isCurrent(request) &&
+          (request.previousStartTime == null || forceZapret) && !request.resume &&
+          !ref.read(safeModeProvider)) {
+        try {
+          await ref.read(zapretControllerProvider.notifier)
+              .startAlongsideMihomo(force: forceZapret);
+          if (forceZapret && _isCurrent(request) &&
+              !ref.read(zapretControllerProvider).running) {
+            throw StateError(ref.read(zapretControllerProvider).error ??
+                currentAppLocalizations.forkLaunchUnavailable);
+          }
+        } catch (error) {
+          commonPrint.log('Linked Zapret start failed: $error', logLevel: LogLevel.warning);
+          if (forceZapret && _isCurrent(request)) rethrow;
+        }
+      }
+      return success;
+    });
   }
 
   Future<bool> _start(_RunRequest request) async {
@@ -309,6 +351,15 @@ class SetupAction extends _$SetupAction {
       if (ref.read(safeModeProvider)) {
         return true;
       }
+      if (!request.running && system.isWindows) {
+        try {
+          await ref.read(zapretControllerProvider.notifier).stopAlongsideMihomo();
+        } catch (error) {
+          commonPrint.log('Linked Zapret stop failed: $error', logLevel: LogLevel.warning);
+          request.onZapretStopError?.call(error);
+        }
+        if (!_isCurrent(request)) return true;
+      }
       return _setListening(request.running);
     });
   }
@@ -361,9 +412,24 @@ class SetupAction extends _$SetupAction {
           return null;
         }
         final vpnOptions = await ref.read(vpnOptionsProvider.future);
+        var restartZapret = false;
+        if (system.isWindows) {
+          try {
+            restartZapret = await ref.read(zapretControllerProvider.notifier).stopAlongsideMihomo();
+          } catch (error) {
+            commonPrint.log('VPN restart postponed: Zapret stop not confirmed: $error', logLevel: LogLevel.warning);
+            return false;
+          }
+        }
+        if (!_isCurrent(request)) return null;
         final answered = await restartCoreRunning();
         if (answered) {
           ref.read(runningVpnOptionsProvider.notifier).value = vpnOptions;
+          if (system.isWindows && _isCurrent(request)) {
+            await ref.read(zapretControllerProvider.notifier).startAlongsideMihomo(force: restartZapret).catchError((Object error) {
+              commonPrint.log('Linked Zapret restart failed: $error', logLevel: LogLevel.warning);
+            });
+          }
         }
         return answered;
       });
@@ -696,6 +762,12 @@ class SetupAction extends _$SetupAction {
     if (hasScript) {
       rawConfig = await handleEvaluate(scriptContent!, rawConfig);
     }
+    HostCandidates? hostCandidates;
+    if (system.isWindows && !ref.read(safeModeProvider)) {
+      final smart = ref.read(smartHostsProvider);
+      hostCandidates = collectHostCandidates(rawConfig['hosts'], patchConfig.hosts, smart.candidates);
+      rawConfig = mergeSmartHosts(rawConfig, patchConfig.hosts, smart.entries);
+    }
     final directory = await appPath.profilesPath;
     final injected = await _resolveInjectedProviders(
       setupState,
@@ -730,6 +802,15 @@ class SetupAction extends _$SetupAction {
         proxyChains: setupState.proxyChains,
       ),
     );
+    if (hostCandidates != null) {
+      final digest = profileBase == null
+          ? res.md5
+          : '${res.md5}${profileBase.base.digest}${matchOverride ?? ''}'.toMd5();
+      _builtHostCandidates[digest] = hostCandidates;
+      while (_builtHostCandidates.length > 4) {
+        _builtHostCandidates.remove(_builtHostCandidates.keys.first);
+      }
+    }
     if (profileBase == null) {
       return (yaml: res.yaml, md5: res.md5, counts: res.counts, base: null);
     }
@@ -934,6 +1015,28 @@ class SetupAction extends _$SetupAction {
     return fallback;
   }
 
+  /// The optimized profile path stores an overlay rather than the complete
+  /// configuration. Expand the same base/overlay pair used by Mihomo so
+  /// protection also includes server addresses omitted from that overlay.
+  Future<String> _zapretEffectiveYaml(BuiltProfile? profile) async {
+    final base = profile?.base;
+    return base == null ? profile?.yaml ?? '' : await _core.buildProfile(base);
+  }
+
+  Future<void> _syncZapretInfrastructure(BuiltProfile profile, int? profileId) async {
+    if (!system.isWindows || ref.read(safeModeProvider)) return;
+    try {
+      final yaml = await _zapretEffectiveYaml(profile);
+      if (!ref.mounted || profileId != ref.read(currentProfileIdProvider)) return;
+      final controller = ref.read(zapretControllerProvider.notifier);
+      final transition = await controller.beginProfileApply(yaml, profileId);
+      await controller.finishProfileApply(transition,
+        yaml: yaml, profileId: profileId, accepted: true);
+    } catch (error) {
+      commonPrint.log('Zapret infrastructure refresh failed: $error', logLevel: LogLevel.warning);
+    }
+  }
+
   Future<_SetupTaskResult> _setupConfig({
     bool force = false,
     bool silence = false,
@@ -979,16 +1082,23 @@ class SetupAction extends _$SetupAction {
     };
     final yamlString = realProfile?.yaml ?? '';
     final yamlMd5 = realProfile?.md5 ?? '';
+    final hostCandidates = _builtHostCandidates.remove(yamlMd5) ?? const <String, Map<String, String>>{};
     if (!profileFailed && yamlMd5 == globalState.lastConfigMd5 && !force) {
       _appliedInputs = inputs;
+      _appliedHostCandidates = hostCandidates;
       globalState.lastConfigCounts = realProfile.counts;
       await preloadInvoke?.call();
+      await _syncZapretInfrastructure(realProfile, profile?.id);
       return _SetupTaskResult.completed;
     }
     // Go answers a config it rejects by running its built-in default, which
     // has no proxies, so until this push succeeds no applied config is known.
     _appliedInputs = null;
+    _appliedHostCandidates = const {};
     _pushes++;
+    if (system.isWindows) {
+      ref.read(proxiesActionProvider.notifier).cancelDelayTests();
+    }
     globalState.lastConfigMd5 = null;
     globalState.lastConfigCounts = null;
     if (system.isAndroid) {
@@ -1001,7 +1111,17 @@ class SetupAction extends _$SetupAction {
     var setupFailed = false;
     await globalState.loadingRun(
       () async {
+        ZapretController? zapret;
+        ({int revision, bool restore, bool wasStopping, bool changed})? transition;
+        var protectionYaml = '';
+        var accepted = false;
         try {
+          if (system.isWindows && !ref.read(safeModeProvider)) {
+            protectionYaml = await _zapretEffectiveYaml(realProfile);
+            final controller = ref.read(zapretControllerProvider.notifier);
+            zapret = controller;
+            transition = await controller.beginProfileApply(protectionYaml, profile?.id);
+          }
           if (setupParams.base == null) {
             final configFilePath = await appPath.configFilePath;
             await File(configFilePath).writeAsStringAtomically(yamlString);
@@ -1024,12 +1144,26 @@ class SetupAction extends _$SetupAction {
             await globalState.safeRun(() => onUpdated?.call());
             throw MessageException(message);
           }
+          accepted = !profileFailed;
+          if (accepted) _appliedHostCandidates = hostCandidates;
         } catch (e, s) {
           setupFailed = true;
           if (preloadInvoke != null) {
             handoffFailure = (e, s);
           }
           rethrow;
+        } finally {
+          if (zapret != null && transition != null) {
+            try {
+              await zapret.finishProfileApply(transition,
+                yaml: protectionYaml, profileId: profile?.id, accepted: accepted);
+            } catch (error) {
+              // Core apply has already completed. Surface the Zapret error
+              // without rolling back or misreporting the Mihomo config.
+              commonPrint.log('Zapret infrastructure reconciliation failed: $error',
+                logLevel: LogLevel.warning);
+            }
+          }
         }
         globalState.lastConfigMd5 = yamlMd5;
         globalState.lastConfigCounts =

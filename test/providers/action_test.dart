@@ -1854,7 +1854,7 @@ class _RestartRecordingCoreAction extends CoreAction {
   bool restartResult = true;
 
   @override
-  Future<bool> restartCore({bool? running}) async {
+  Future<bool> restartCore({bool? running, bool repairHelper = false}) async {
     restartCount++;
     return restartResult;
   }
@@ -1862,7 +1862,7 @@ class _RestartRecordingCoreAction extends CoreAction {
 
 class _FailingRestartCoreAction extends CoreAction {
   @override
-  Future<bool> restartCore({bool? running}) async {
+  Future<bool> restartCore({bool? running, bool repairHelper = false}) async {
     throw _restartFailure;
   }
 }

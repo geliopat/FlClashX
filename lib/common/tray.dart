@@ -135,8 +135,12 @@ class AppTray implements TrayPort {
     final setupAction = read(setupActionProvider.notifier);
     final appLocalizations = currentAppLocalizations;
     String? shortcut(HotAction action) => _shortcut(trayState, action);
+    final zapret = isWindows ? read(zapretControllerProvider) : null;
+    final running = trayState.isStart || (zapret?.running ?? false) ||
+        (zapret?.busy ?? false);
     final showItem = TrayMenuAction(
       label: appLocalizations.show,
+      icon: 'show',
       detail: shortcut(HotAction.view),
       onSelected: () {
         window?.show();
@@ -144,12 +148,21 @@ class AppTray implements TrayPort {
     );
     final restartItem = TrayMenuAction(
       label: appLocalizations.restart,
+      icon: 'restart',
+      enabled: !isWindows ||
+          (read(initProvider) && read(coreStatusProvider) != CoreStatus.connecting &&
+              !(zapret?.busy ?? false) && !(zapret?.dashboardRestarting ?? false)),
       onSelected: () {
-        systemAction.handleRestart();
+        if (isWindows) {
+          unawaited(commonAction.restartFromTray());
+        } else {
+          systemAction.handleRestart();
+        }
       },
     );
     final exitItem = TrayMenuAction(
       label: appLocalizations.exit,
+      icon: 'exit',
       detail: shortcut(HotAction.exit),
       onSelected: () {
         systemAction.handleExit();
@@ -158,14 +171,23 @@ class AppTray implements TrayPort {
 
     return [
       showItem,
-      TrayMenuCheckbox(
-        label: trayState.isStart
-            ? appLocalizations.stop
-            : appLocalizations.start,
-        checked: false,
-        detail: shortcut(HotAction.start),
-        onSelected: commonAction.toggleRunning,
-      ),
+      if (isWindows)
+        TrayMenuAction(
+          label: running ? appLocalizations.stop : appLocalizations.start,
+          icon: running ? 'stop' : 'start',
+          enabled: read(initProvider) && !(zapret?.dashboardRestarting ?? false),
+          detail: shortcut(HotAction.start),
+          onSelected: () => unawaited(commonAction.toggleTrayRunning()),
+        )
+      else
+        TrayMenuCheckbox(
+          label: trayState.isStart
+              ? appLocalizations.stop
+              : appLocalizations.start,
+          checked: false,
+          detail: shortcut(HotAction.start),
+          onSelected: commonAction.toggleRunning,
+        ),
       if (isMacOS)
         TrayMenuCheckbox(
           label: appLocalizations.menuBarMode,

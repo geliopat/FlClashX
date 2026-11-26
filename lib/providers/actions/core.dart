@@ -4,11 +4,12 @@ part of '../action.dart';
 class CoreAction extends _$CoreAction {
   CoreController get _core => ref.read(coreHandlerProvider);
 
-  static const crashRestartLimit = 2;
+  static const crashRestartLimit = 3;
   static const crashRestartWindow = Duration(seconds: 5);
 
   int _requestedRestartRevision = 0;
   Future<bool>? _restartOperation;
+  bool get isRestarting => _restartOperation != null;
   int _restartsBegun = 0;
   bool _relaunchRequested = false;
   int _failedRestarts = 0;
@@ -98,6 +99,11 @@ class CoreAction extends _$CoreAction {
 
   /// Restarting a Core that keeps falling would only hide why it falls.
   Future<void> restartAfterCrash(String reason) async {
+    crashFileLogger.enable();
+    crashFileLogger.write(Log.app('[Mihomo] $reason').copyWith(logLevel: LogLevel.error));
+    if (system.isWindows && !ref.read(mihomoWatchdogProvider)) {
+      return;
+    }
     final restartedAt = _crashRestartedAt;
     final restartFailed =
         _restartingAfterCrash ||
@@ -153,15 +159,18 @@ class CoreAction extends _$CoreAction {
   }
 
   /// [running] stands in for a run that a crash rolled back.
-  Future<bool> restartCore({bool? running}) {
+  Future<bool> restartCore({bool? running, bool repairHelper = false}) {
     _requestedRestartRevision++;
     final activeOperation = _restartOperation;
     if (activeOperation != null) {
-      return activeOperation;
+      // An explicit repair requested during a relaunch must not be ignored.
+      return repairHelper
+          ? activeOperation.catchError((_) => false).then((_) => restartCore(running: running, repairHelper: true))
+          : activeOperation;
     }
 
     _restartsBegun++;
-    final operation = _runRestartWorker(running: running);
+    final operation = _runRestartWorker(running: running, repairHelper: repairHelper);
     _restartOperation = operation;
     return operation;
   }
@@ -179,10 +188,21 @@ class CoreAction extends _$CoreAction {
   @protected
   bool get coreIsEmbedded => coreLib != null;
 
-  Future<bool> _runRestartWorker({bool? running}) async {
+  Future<bool> _runRestartWorker({bool? running, required bool repairHelper}) async {
     final setupAction = ref.read(setupActionProvider.notifier);
     final bool wasRunning = running ?? ref.read(isStartProvider);
+    var restartZapret = false;
+    final zapret = system.isWindows && !ref.read(safeModeProvider)
+        ? ref.read(zapretControllerProvider.notifier) : null;
     try {
+      if (zapret != null) {
+        try {
+          restartZapret = await zapret.beginCoreRestart(repairHelper: repairHelper);
+        } catch (error) {
+          commonPrint.log('Mihomo restart postponed: Helper/Zapret preparation failed: $error', logLevel: LogLevel.warning);
+          rethrow;
+        }
+      }
       ref.read(coreStatusProvider.notifier).value = CoreStatus.connecting;
       final stopping = coreIsEmbedded && wasRunning
           ? setupAction.setRunning(false)
@@ -213,11 +233,18 @@ class CoreAction extends _$CoreAction {
           appliedRevision = revision;
         }
       } while (_relaunchRequested);
+      zapret?.endCoreRestart();
+      if (applied && zapret != null && ref.read(isStartProvider) && !ref.read(safeModeProvider)) {
+        await zapret.startAlongsideMihomo(force: restartZapret).catchError((Object error) {
+          commonPrint.log('Linked Zapret restart failed: $error', logLevel: LogLevel.warning);
+        });
+      }
       return applied;
     } catch (_) {
       ref.read(coreStatusProvider.notifier).value = CoreStatus.disconnected;
       rethrow;
     } finally {
+      zapret?.endCoreRestart();
       _relaunchRequested = false;
       _restartOperation = null;
     }

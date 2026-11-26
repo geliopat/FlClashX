@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:fl_clash/common/desktop_channel.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
@@ -7,6 +8,33 @@ import '../setup.dart' as setup;
 
 void main() {
   group('setup.dart', () {
+    test('Windows Helper build, runtime and installer names agree', () {
+      const name = 'FlClashZHelperService';
+      expect(setup.windowsHelperName, name);
+      expect(File('build_config.yaml').readAsStringSync(),
+          contains('windows_helper_name: $name'));
+      expect(File('windows/CMakeLists.txt').readAsStringSync(),
+          contains('$name.exe'));
+      expect(File('windows/CMakeLists.txt').readAsStringSync(),
+          isNot(contains('FlClashXHelperService.exe')));
+      final rust = File('services/helper/src/service/identity.rs').readAsStringSync();
+      expect(rust, contains('const WINDOWS_HELPER: &str = "$name";'));
+    });
+
+    test('Windows stable and pre apps resolve to the same Helper service', () {
+      expect(
+        helperServiceFor(pre: false, isWindows: true),
+        'FlClashZHelperService',
+      );
+      expect(
+        helperServiceFor(pre: true, isWindows: true),
+        'FlClashZHelperService',
+      );
+      expect(
+        helperServiceFor(pre: true, isWindows: false),
+        'FlClashXPreHelperService',
+      );
+    });
     test('a pre build of macOS takes its own bundle id and name', () {
       final config = setup.macosChannelConfig('pre')!;
 
@@ -72,6 +100,20 @@ void main() {
       expect(results.rest, ['android']);
     });
 
+    test('Windows packaging defaults to the stable release', () {
+      expect(setup.defaultPackageEnvironment(platform: 'windows'), 'stable');
+      expect(
+        setup.defaultPackageEnvironment(platform: 'windows', explicit: 'pre'),
+        'pre',
+      );
+      expect(setup.defaultPackageEnvironment(platform: 'linux'), 'pre');
+      final state = File('lib/state.dart').readAsStringSync();
+      expect(state, contains('defaultTargetPlatform == TargetPlatform.windows'));
+      final manager = File('lib/manager/app_manager.dart').readAsStringSync();
+      expect(manager, contains('system.isWindows || !globalState.isPre'));
+      expect(manager, contains("return 'SAFE MODE';"));
+    });
+
     test('accepts dev application environment', () {
       final results = setup.createSetupArgParser().parse([
         'android',
@@ -131,7 +173,7 @@ hooks:
     test('names artifacts by platform and architecture', () {
       expect(
         setup.artifactName('windows', 'amd64', '-setup.exe'),
-        'FlClashX-windows-amd64-setup.exe',
+        'FlClashZ-windows-amd64-setup.exe',
       );
       expect(
         setup.artifactName('android', 'arm64-v8a', '.apk'),
@@ -198,6 +240,10 @@ hooks:
       expect(setup.createBuildDefines(appVersion: '0.9.1', coreVersion: ''), [
         '--dart-define=APP_VERSION=0.9.1',
       ]);
+    });
+
+    test('release public key is passed into the compiled app', () {
+      expect(setup.createBuildDefines(appVersion: '1.0.1', coreVersion: '', updatePublicKey: 'public-key'), contains('--dart-define=FLCLASHZ_UPDATE_PUBLIC_KEY=public-key'));
     });
 
     test('renders the Inno Setup script from the packaging config', () {
@@ -280,62 +326,31 @@ hooks:
       expect(namesOf('chineseSimplified'), english);
     });
 
-    test('the installer clears a stale proxy once it has killed the app', () {
-      final script = File(
-        'windows/packaging/exe/inno_setup.iss',
-      ).readAsStringSync();
-
-      expect(
-        script,
-        contains("ExecAsOriginalUser(AppPath, '--clear-stale-proxy'"),
-      );
-      expect(
-        script,
-        matches(RegExp(r'ssPostInstall then\s+begin[^;]+;\s+ClearStaleProxy;')),
-      );
-      expect(
-        script,
-        matches(
-          RegExp(r'usUninstall:\s+begin\s+ShutDownApp;\s+ClearStaleProxy;'),
-        ),
-      );
-      expect(
-        script,
-        matches(
-          RegExp(r'ShutDownApp;\s+ClearStaleProxyBeforeInstall;\s+Result'),
-        ),
-        reason: 'an aborted install must not leave the proxy on a dead port',
-      );
-      expect(
-        script,
-        contains('Source: "{{CLEAR_PROXY_SCRIPT}}"; Flags: dontcopy'),
-      );
-      expect(
-        script,
-        contains("ExtractTemporaryFile('clear_stale_proxy.ps1');"),
-      );
-      expect(
-        File('windows/packaging/exe/clear_stale_proxy.ps1').readAsStringSync(),
-        contains(r"'^127\.0\.0\.1:(\d{1,5})$'"),
-      );
+    test('installer never adopts or retires an upstream client', () {
+      final script = File('windows/packaging/exe/inno_setup.iss').readAsStringSync();
+      expect(script, isNot(contains('RetireLegacyInstall')));
+      expect(script, isNot(contains('RetireLegacyHelpers')));
+      expect(script, isNot(contains('LegacyUninstallKey')));
+      expect(script, isNot(contains('[InstallDelete]')));
+      expect(script, isNot(contains('uninsneveruninstall')));
+      expect(script, isNot(contains('ClearStaleProxy')));
+      expect(script, contains("FileExists(ExpandConstant('{app}\\FlClashX.exe'))"));
+      expect(script, contains('RemoveOwnedAutostart'));
+      expect(script, contains("RemoveOwnedProtocol(HKEY_CURRENT_USER, 'flclashz')"));
+      expect(script, contains("RemoveOwnedProtocol(HKEY_LOCAL_MACHINE, 'clashz')"));
+      expect(script, contains('Software\\Classes\\flclashz'));
+      expect(script, isNot(contains('Software\\Classes\\flclashx')));
+      final dart = File('lib/common/system.dart').readAsStringSync();
+      expect(dart, contains("retiredHelperServices = ['FlClashZPreHelperService']"));
+      final rust = File('services/helper/src/service/identity.rs').readAsStringSync();
+      expect(rust, contains('&["FlClashZPreHelperService"]'));
     });
 
-    test('the installer takes over a 0.4 FlClashX registration in place', () {
-      final script = File(
-        'windows/packaging/exe/inno_setup.iss',
-      ).readAsStringSync();
-
-      expect(
-        script,
-        contains(r'Uninstall\728B3532-C74B-4870-9068-BE70FE12A3E6_is1'),
-      );
-      expect(script, contains("(Pos('FlClashX', Name) = 1)"));
-      expect(script, contains('WizardForm.DirEdit.Text := LegacyDir;'));
-      expect(
-        script,
-        matches(RegExp(r'ClearStaleProxy;\s+RetireLegacyInstall;')),
-      );
-      expect(script, isNot(contains('Exec(Uninstaller')));
+    test('Windows installer has its own stable and pre GUIDs', () {
+      final config = File('windows/packaging/exe/make_config.yaml').readAsStringSync();
+      expect(config, contains('app_id: A1E719DB-1597-4C0E-AC89-05BBED14D43D'));
+      final setupSource = File('setup.dart').readAsStringSync();
+      expect(setupSource, contains("_preWindowsAppId = '87F299A5-9634-45C1-915B-24E3A90B56A2'"));
     });
 
     group('a Windows or Linux pre-release', () {
@@ -343,9 +358,9 @@ hooks:
         'windows/packaging/exe/inno_setup.iss',
       ).readAsStringSync();
       final config = {
-        'app_id': 'D915C0D1-2F5B-4676-97D5-6D55F3EF45A4',
-        'display_name': 'FlClashX',
-        'executable_name': 'FlClashX.exe',
+        'app_id': 'A1E719DB-1597-4C0E-AC89-05BBED14D43D',
+        'display_name': 'FlClashZ',
+        'executable_name': 'FlClashZ.exe',
       };
 
       String render(setup.DesktopIdentity identity) => setup.renderInnoSetup(
@@ -362,26 +377,27 @@ hooks:
 
       test('installs under its own id, name, Helper and data', () {
         final pre = render(setup.preDesktop);
-        expect(pre, isNot(contains('D915C0D1-2F5B-4676-97D5-6D55F3EF45A4')));
-        expect(pre, contains(r'DefaultDirName={autopf}\FlClashX Pre'));
-        expect(pre, contains("HelperService = 'FlClashXPreHelperService';"));
-        expect(pre, contains('AdoptLegacy = False;'));
-        expect(pre, contains("KillProcess('FlClashXPre.exe');"));
-        expect(pre, contains(r'{userappdata}\com.follow\clashx.pre'));
+        expect(pre, contains('AppId=87F299A5-9634-45C1-915B-24E3A90B56A2'));
+        expect(pre, contains(r'DefaultDirName={autopf}\FlClashZ Pre'));
+        expect(pre, contains("HelperService = 'FlClashZHelperService';"));
+        expect(pre, isNot(contains("HelperService = 'FlClashXPreHelperService';")));
+        expect(pre, isNot(contains('AdoptLegacy')));
+        expect(pre, contains("KillProcess('FlClashZPre.exe');"));
+        expect(pre, contains(r'{userappdata}\sweetyyoba.com\clashz.pre'));
         expect(
           RegExp(r'\{\{([A-Z_]+)\}\}').allMatches(pre).map((m) => m[1]),
           everyElement('NAME'),
         );
       });
 
-      test('leaves the stable installer as it was', () {
+      test('uses the fork data path in the stable installer', () {
         final stable = render(setup.stableDesktop);
-        expect(stable, contains('AppId=D915C0D1-2F5B-4676-97D5-6D55F3EF45A4'));
-        expect(stable, contains(r'DefaultDirName={autopf}\FlClashX'));
-        expect(stable, contains("HelperService = 'FlClashXHelperService';"));
-        expect(stable, contains('AdoptLegacy = True;'));
-        expect(stable, contains("KillProcess('FlClashX.exe');"));
-        expect(stable, contains(r"{userappdata}\com.follow\clashx')"));
+        expect(stable, contains('AppId=A1E719DB-1597-4C0E-AC89-05BBED14D43D'));
+        expect(stable, contains(r'DefaultDirName={autopf}\FlClashZ'));
+        expect(stable, contains("HelperService = 'FlClashZHelperService';"));
+        expect(stable, isNot(contains('AdoptLegacy')));
+        expect(stable, contains("KillProcess('FlClashZ.exe');"));
+        expect(stable, contains(r"{userappdata}\sweetyyoba.com\clashz')"));
       });
 
       test('stops only the Core started from its own install', () {
@@ -448,6 +464,27 @@ hooks:
         );
       });
 
+      test('Windows pre bundle renames only the app and keeps shared Helper', () {
+        final dir = Directory.systemTemp.createTempSync('channel_windows_helper');
+        addTearDown(() => dir.deleteSync(recursive: true));
+        File('${dir.path}/FlClashX.exe').writeAsStringSync('app');
+        File('${dir.path}/FlClashXHelperService.exe').writeAsStringSync('helper');
+
+        setup.renameForChannel(
+          dir.path,
+          setup.preDesktop,
+          ext: '.exe',
+          renameHelper: false,
+        );
+
+        expect(File('${dir.path}/FlClashXPre.exe').readAsStringSync(), 'app');
+        expect(
+          File('${dir.path}/FlClashXHelperService.exe').readAsStringSync(),
+          'helper',
+        );
+        expect(File('${dir.path}/FlClashXPreHelperService.exe').existsSync(), isFalse);
+      });
+
       test('renames the app and Helper in the staged bundle only for pre', () {
         final dir = Directory.systemTemp.createTempSync('channel_bundle');
         addTearDown(() => dir.deleteSync(recursive: true));
@@ -469,13 +506,13 @@ hooks:
         final dir = Directory.systemTemp.createTempSync('channel_marker');
         addTearDown(() => dir.deleteSync(recursive: true));
         final binary = File('${dir.path}/FlClashX.exe')
-          ..writeAsBytesSync([0, ...setup.utf16le('clashx.pre'), 0]);
-        setup.requireChannelMarker(binary.path, setup.utf16le('clashx.pre'));
-        binary.writeAsBytesSync(setup.utf16le('clashx'));
+          ..writeAsBytesSync([0, ...setup.utf16le('clashz.pre'), 0]);
+        setup.requireChannelMarker(binary.path, setup.utf16le('clashz.pre'));
+        binary.writeAsBytesSync(setup.utf16le('clashz'));
         expect(
           () => setup.requireChannelMarker(
             binary.path,
-            setup.utf16le('clashx.pre'),
+            setup.utf16le('clashz.pre'),
           ),
           throwsA(isA<ProcessException>()),
         );

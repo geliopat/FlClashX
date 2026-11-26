@@ -1,10 +1,10 @@
 # Project-level configuration.
 cmake_minimum_required(VERSION 3.14)
-project(FlClashX LANGUAGES CXX)
+project(FlClashZ LANGUAGES CXX)
 
 # The name of the executable created for the application. Change this to change
 # the on-disk name of your application.
-set(BINARY_NAME "FlClashX")
+set(BINARY_NAME "FlClashZ")
 
 # Explicitly opt in to modern CMake behaviors to avoid warnings with recent
 # versions of CMake.
@@ -106,8 +106,8 @@ set(CORE_ARTIFACTS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../libclash/windows")
 # opaque MSB3073; only a Debug install with a changed Helper stops it, matched
 # by path so a Helper registered from an installed release is left alone.
 install(CODE "
-  set(helper_src \"${CORE_ARTIFACTS_DIR}/FlClashXHelperService.exe\")
-  set(helper_dst \"${INSTALL_BUNDLE_LIB_DIR}/FlClashXHelperService.exe\")
+  set(helper_src \"${CORE_ARTIFACTS_DIR}/FlClashZHelperService.exe\")
+  set(helper_dst \"${INSTALL_BUNDLE_LIB_DIR}/FlClashZHelperService.exe\")
   if(\"\${CMAKE_INSTALL_CONFIG_NAME}\" STREQUAL \"Debug\" AND EXISTS \"\${helper_dst}\")
     file(SHA256 \"\${helper_src}\" helper_src_hash)
     file(SHA256 \"\${helper_dst}\" helper_dst_hash)
@@ -115,17 +115,27 @@ install(CODE "
       message(STATUS \"Stopping the Helper running from \${helper_dst} before installing the Debug build\")
       file(TO_NATIVE_PATH \"\${helper_dst}\" helper_dst_native)
       execute_process(COMMAND powershell -NoProfile -NonInteractive -Command
-        \"Get-Process -Name FlClashXHelperService -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq '\${helper_dst_native}' } | Stop-Process -Force\"
+        \"Get-Process -Name FlClashZHelperService -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq '\${helper_dst_native}' } | Stop-Process -Force\"
         OUTPUT_QUIET ERROR_QUIET)
     endif()
   endif()
 " COMPONENT Runtime)
 install(FILES
   "${CORE_ARTIFACTS_DIR}/FlClashCore.exe"
-  "${CORE_ARTIFACTS_DIR}/FlClashXHelperService.exe"
+  "${CORE_ARTIFACTS_DIR}/FlClashZHelperService.exe"
   "${CORE_ARTIFACTS_DIR}/manifest.json"
   DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
   COMPONENT Runtime)
+
+# Zapret2 engines, Lua strategies, blobs and lists are staged by
+# scripts/setup_zapret.ps1 before Windows builds. Keep them beside the Helper:
+# the elevated service selects winws.exe or winws2.exe from this directory.
+set(ZAPRET_ASSETS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/zapret")
+if(EXISTS "${ZAPRET_ASSETS_DIR}/winws2.exe")
+  install(DIRECTORY "${ZAPRET_ASSETS_DIR}/"
+    DESTINATION "${INSTALL_BUNDLE_LIB_DIR}/zapret"
+    COMPONENT Runtime)
+endif()
 
 # Copy the native assets provided by the build.dart from all packages.
 set(NATIVE_ASSETS_DIR "${PROJECT_BUILD_DIR}native_assets/windows/")

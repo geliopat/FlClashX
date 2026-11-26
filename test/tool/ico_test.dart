@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:test/test.dart';
@@ -43,6 +44,46 @@ void main() {
       () => buildIco([IcoEntry(size: 512, png: _png(0, 1))]),
       throwsArgumentError,
     );
+  });
+
+  test('bundled FlClashZ ICOs contain complete PNG frames', () {
+    List<int> checkIco(String path, List<int> sizes) {
+      final data = File(path).readAsBytesSync();
+      expect(_u16(data, 0), 0, reason: path);
+      expect(_u16(data, 2), 1, reason: path);
+      expect(_u16(data, 4), sizes.length, reason: path);
+      for (var index = 0; index < sizes.length; index++) {
+        final dir = 6 + 16 * index;
+        final size = sizes[index];
+        expect(data[dir], size == 256 ? 0 : size, reason: path);
+        expect(data[dir + 1], data[dir], reason: path);
+        final length = _u32(data, dir + 8);
+        final offset = _u32(data, dir + 12);
+        expect(offset, greaterThanOrEqualTo(6 + 16 * sizes.length));
+        expect(offset + length, lessThanOrEqualTo(data.length));
+        expect(data.sublist(offset, offset + 8),
+            [137, 80, 78, 71, 13, 10, 26, 10]);
+        final header = ByteData.sublistView(data, offset + 16, offset + 24);
+        expect(header.getUint32(0), size, reason: path);
+        expect(header.getUint32(4), size, reason: path);
+      }
+      return data;
+    }
+
+    final app = checkIco('windows/runner/resources/app_icon.ico', icoSizes);
+    expect(checkIco('assets/images/icon.ico', icoSizes), app);
+    final png = File('assets/images/icon.png').readAsBytesSync();
+    expect(ByteData.sublistView(png).getUint32(16), 512);
+    expect(ByteData.sublistView(png).getUint32(20), 512);
+    final tray = [
+      for (var state = 1; state <= 4; state++)
+        checkIco('assets/images/tray/windows/status_${state}.ico', trayIcoSizes),
+    ];
+    for (var i = 0; i < tray.length; i++) {
+      for (var j = i + 1; j < tray.length; j++) {
+        expect(tray[i], isNot(equals(tray[j])));
+      }
+    }
   });
 
   test('tray sizes stop at the 2x small-icon ceiling', () {

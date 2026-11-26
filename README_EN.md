@@ -1,158 +1,105 @@
-<div>
+<div align="center">
 
-[**Russian**](README.md) · [**中文**](README_ZH.md)
+<img src="assets/images/icon.png" alt="FlClashZ" width="100">
+
+# FlClashZ
+
+**Mihomo + Zapret for Windows**
+
+[![Windows x64](https://img.shields.io/badge/Windows-x64-0078D4?style=flat-square&logo=windows)](https://github.com/geliopat/FlClashZ/releases/latest)
+[![Release](https://img.shields.io/github/v/release/geliopat/FlClashZ?style=flat-square)](https://github.com/geliopat/FlClashZ/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/geliopat/FlClashZ/total?style=flat-square)](https://github.com/geliopat/FlClashZ/releases)
+[![License](https://img.shields.io/github/license/geliopat/FlClashZ?style=flat-square)](LICENSE)
+
+[![Windows validation](https://github.com/geliopat/FlClashZ/actions/workflows/zapret-windows-validation.yml/badge.svg?branch=fix%2Fzapret2-stability)](https://github.com/geliopat/FlClashZ/actions/workflows/zapret-windows-validation.yml)
+
+[Русский](README.md) · **English** · [中文](README_ZH.md)
 
 </div>
 
-## FlClashX
+FlClashZ is an independent fork of [FlClashX](https://github.com/pluralplay/FlClashX), combining a Mihomo-based proxy client with integrated Zapret2/Flowseal management. Its release target is Windows x64, with support for Remnawave subscriptions. It is not an official client of the upstream projects.
 
-[![Downloads](https://img.shields.io/github/downloads/pluralplay/FlClashX/total?style=flat-square&logo=github)](https://github.com/pluralplay/FlClashX/releases/)
-[![Last Version](https://img.shields.io/github/release/pluralplay/FlClashX/all.svg?style=flat-square)](https://github.com/pluralplay/FlClashX/releases/)
-[![License](https://img.shields.io/github/license/pluralplay/FlClashX?style=flat-square)](LICENSE)
-
-[![Channel](https://img.shields.io/badge/Telegram-Chat-blue?style=flat-square&logo=telegram)](https://t.me/FlClashX)
-
-A fork of the multi-platform proxy client [FlClash](https://github.com/chen08209/FlClash) based on Mihomo, simple and easy to use, open source and ad-free. Built for VPN services: the subscription drives the app's look and settings through the headers of the panel's response.
-
-on Desktop:
-
-<p style="text-align: center;">
-    <img alt="desktop" src="snapshots/desktop.gif">
-</p>
-
-on Mobile:
-
-<p style="text-align: center;">
-    <img alt="mobile" src="snapshots/mobile.gif">
-</p>
-
-## Features
-
-Built on FlClash v0.9.2 and the mihomo v1.19.34 core, so everything the original does works here too: profiles from a link or a file, a built-in editor, override scripts, custom rules, proxies and groups, live views of connections, requests, DNS queries and logs, backup through WebDAV or a file, a Quick Settings tile and Android TV support, a tray menu and global hotkeys on the desktop. On top of that the fork adds:
-
-### For providers
-
-🧾 **`flclashx-*` subscription headers:** the look of the app and the proxies tab, the cards of the dashboard and their order, a background, app switches, fallback panel addresses, the service name and logo, renew and buy-traffic buttons. See [flclashx.app](https://flclashx.app/#headers).
-
-🔒 **Subscription settings belong to the provider:** config keys (ports, mode, TUN, stack, MTU, routes, geo and more) and headers are applied on every subscription update and when switching to the profile. Most of them the user can take over and hand back to the provider; the Android app lists and the dashboard card list always follow the subscription.
-
-🪪 **HWID:** the app sends `x-hwid`, `x-device-os`, `x-ver-os` and `x-device-model` (Remnawave and compatible panels) and shows dialogs when the device limit is reached or a HWID is not supported.
-
-🧭 **Extended dashboard:** the service logo and name on one row, the plan, the selected server with its flag and IP, the announcement, renew and buy-traffic buttons.
-
-⏰ **Expiry notifications** 3, 2 and 1 days before, on the day and after the subscription ends, on every platform. Tapping one opens the renewal page.
-
-🌐 **From the subscription YAML:** `flclashx-override` on the GLOBAL group, server and group captions (`serverDescription`, `groupDescription`), the external controller and Zashboard.
-
-### Android
-
-📱 **120 Hz:** while the app is on screen the display runs at its highest rate (90/120/144 Hz); in the background the rate goes back to the system.
-
-🔔 **The VPN notification** shows only the service name from the subscription (the profile name without one) and, when turned on in Settings → General, a stop button.
-
-🎯 **Access control:** "Smart selection" sends installed Russian apps around the VPN and every other app through it. A profile's `tun.include-package` and `tun.exclude-package` always apply and take precedence over the apps picked by hand.
-
-🔗 **`flclashx://install-config` links** add the profile right away, without a confirmation, and the app says so.
-
-📺 **Android TV:** an "Add profile from clipboard" button, a profile picker, sending a profile from the phone with a QR code.
-
-### Desktop
-
-💻 **macOS:** "Pin to menu bar" mode: the window opens from the menu bar icon, with no Dock icon.
-
-🇷🇺🇨🇳 **Windows:** Russian and Chinese in the installer.
-
-### Interface
-
-🪟 **Glass** on dashboard cards, sheets, cards and settings groups; the strength is set in the theme settings or with the `app.glass` key of the `flclashx-view` header.
-
-📊 **Dashboard:** the status card and the announcement can be moved; the service checks include Gosuslugi, Sberbank, VK, Yandex and Kinopoisk; IP quality of the current exit.
-
-🧭 **Proxies tab:** search, mode, latency test and fold-all sit in one button group, the rest under "More".
-
-🛠️ **Defaults:** process lookup on, TUN on, system proxy off, proxies shown as a list, no China presets.
-
-🗑️ **"Reset app"** in the general settings deletes every profile, the settings and the working folder and closes the app. Logs can be written to a file.
-
-🌍 **Localization:** a reworked Russian translation, seven languages in all.
-
-## Subscription headers and parameters
-
-The HTTP headers of the panel's response and the YAML parameters the app understands, with examples and a panel template, are described on [flclashx.app](https://flclashx.app/#headers).
-
-A setting the subscription sets is shown dimmed. The user can take it over, and then subscription updates and profile switches leave it alone. Right-clicking or long-pressing the row hands it back to the provider, and "Hand settings back to provider" in General → Logs and diagnostics hands back all of them at once.
-
-## Usage
-
-**Import a profile from a link.** Opening a link in this form adds the subscription to FlClashX right away, without a confirmation. The `clash://`, `clashmeta://`, `flclash://` and `clashx://` schemes work the same way.
-
-```text
-flclashx://install-config?url=<URL-encoded subscription link>
-```
-
-**Automate on Android.** Tasker, MacroDroid and similar apps can start, stop or toggle the VPN by starting an activity with one of these actions:
-
-```text
-com.follow.clashx.action.START
-com.follow.clashx.action.STOP
-com.follow.clashx.action.TOGGLE
-```
-
-From a computer, the same works over adb:
-
-```bash
-adb shell am start -a com.follow.clashx.action.TOGGLE
-```
-
-**Linux tray icon.** The `.deb` package installs its own dependencies. With the AppImage or the `.rpm`, install the AyatanaAppIndicator library:
-
-```bash
-sudo apt-get install libayatana-appindicator3-1   # Debian and Ubuntu
-sudo dnf install libayatana-appindicator-gtk3     # Fedora
-```
-
-**Unattended desktop.** The core starts only after the disclaimer is accepted. Where nobody can click it, such as a container, set `FLCLASH_ACCEPT_DISCLAIMER=1` in the app's environment to accept it on first launch.
+[Download](#download) · [Features](#features) · [Provider integration](#provider-integration) · [Updates](#updates) · [Build](#build-from-source)
 
 ## Download
 
-Builds are on [GitHub Releases](https://github.com/pluralplay/FlClashX/releases).
+Official packages are published on [GitHub Releases](https://github.com/geliopat/FlClashZ/releases). The asset links become available once the corresponding stable release is published.
 
-| Platform | Packages |
+| Edition | Format | Download |
+| --- | --- | --- |
+| Windows x64 installer | EXE | [FlClashZ-windows-amd64-setup.exe](https://github.com/geliopat/FlClashZ/releases/latest/download/FlClashZ-windows-amd64-setup.exe) |
+| Windows x64 portable | ZIP | [FlClashZ-windows-amd64.zip](https://github.com/geliopat/FlClashZ/releases/latest/download/FlClashZ-windows-amd64.zip) |
+
+Use the installer for normal use and built-in update installation. For portable use, extract the ZIP to its own directory and launch `FlClashZ.exe`; update it manually. Windows 10/11 x64 is the current target. Other inherited platforms are not current FlClashZ release targets.
+
+## Features
+
+| Mihomo | Zapret |
 | --- | --- |
-| Android | APK for `arm64-v8a`, `armeabi-v7a` and `x86_64`; most phones use `arm64-v8a` |
-| Windows 10 and later | Installer (`.exe`) or portable `.zip`, for x64 and ARM64 |
-| macOS 12 and later | DMG for Apple Silicon and Intel |
-| Linux | `.deb`, `.rpm` and AppImage, for x64 and ARM64; `flclashx-bin` and `flclashx-git` on the AUR |
+| Subscription and local profiles; YAML editor | Integrated Zapret2 and Flowseal management |
+| TUN, system proxy and routing rules | Start, stop and restart controls |
+| Proxy groups, DNS, connections and logs | Bundled Lua/BAT strategies and import |
+| Automatic latency checks for nodes and groups | Automatic strategy selection, history and fallback |
+| Overrides, scripts and backups | Availability diagnostics and list updates |
 
-<a href="https://github.com/pluralplay/FlClashX/releases"><img alt="Get it on GitHub" src="snapshots/get-it-on-github.svg" width="200px"/></a>
+Mihomo handles proxy routing and DNS. Zapret follows the selected mode and the strategy's capabilities. STRICT SPLIT, FULL BYPASS, linked startup, automatic selection and recovery are configurable.
+
+Windows interface: customizable dashboard, themes, glass cards and acrylic tray menu; separate Mihomo and Zapret controls, dedicated application data, Helper service and import protocols. The disclaimer acceptance is stored with application settings.
+
+## Provider integration
+
+Remnawave subscription headers, HWID and YAML fields `serverDescription`, `server-description` and `groupDescription` are supported when provided by the panel. The primary custom header prefix is `flclashz-`; inherited `flclashx-*` headers remain compatible, with the new names taking precedence.
+
+```http
+flclashz-view: app.theme:dark;app.glass:standard
+flclashz-widgets: profiles,networkSpeed,networkTakeover,zapret
+flclashz-zapret: autostart,mode:fullbypass,autofallback,autotune,tunemode:fast,tuneonfail
+```
+
+- [All subscription headers (Russian)](docs/headers.md)
+- [Zapret configuration headers (Russian)](docs/flclashz-zapret-headers.md)
+
+Installed-client import URI:
+
+```text
+flclashz://install-config?url=<URL-encoded subscription URL>
+```
+
+## Updates
+
+Stable releases use tags such as `v1.0.1`. The default stable update source is the signed [latest manifest](https://github.com/geliopat/FlClashZ/releases/latest/download/manifest.json). It includes the version, asset URLs, SHA-256 hashes and an Ed25519 signature. Version-specific manifests are available under `releases/download/v<version>/manifest.json`.
+
+The installer is designed to stop the running application before replacing files and preserve settings. Windows CI checks portable startup, installation, upgrade while running and FlClashX isolation before release publication.
 
 ## Build from source
 
-You need [Flutter](https://docs.flutter.dev/get-started/install) 3.47 (release builds use 3.47.6), [Go](https://go.dev/dl/) 1.27 and [Rust](https://rustup.rs/) installed through rustup. Each platform builds on its own host, except Android, which builds anywhere.
+Windows prerequisites: Flutter 3.47.6, Go 1.27.1, Rust (rustup), Visual Studio with Desktop development with C++, and Inno Setup 6.
 
-```bash
-git clone https://github.com/pluralplay/FlClashX.git
-cd FlClashX
+```powershell
+git clone --branch fix/zapret2-stability https://github.com/geliopat/FlClashZ.git
+cd FlClashZ
 flutter pub get
-dart setup.dart android   # or windows, macos, linux
+./scripts/setup_zapret.ps1
+dart setup.dart windows --env stable --arch amd64 --targets zip,exe -v
 ```
 
-Packages land in `dist/`. The Go core and the Rust libraries are compiled as part of the Flutter build.
+Packages are written to `dist/`. Signed-update verification in local builds requires a trusted public key via `FLCLASHZ_UPDATE_PUBLIC_KEY`. The private signing key belongs in GitHub Actions secrets, never in the source tree.
 
-| Platform | Also needed |
-| --- | --- |
-| Android | Android SDK with the NDK. Add `--arch arm64` to build a single ABI |
-| Windows | [Inno Setup](https://jrsoftware.org/isinfo.php) 6 for the installer |
-| macOS | Xcode and Node.js; the script installs `create-dmg` through npm |
-| Linux | Debian or Ubuntu; the script installs the build packages with apt and downloads `appimagetool` |
+[Windows validation](https://github.com/geliopat/FlClashZ/actions/workflows/zapret-windows-validation.yml) · [Release workflow](https://github.com/geliopat/FlClashZ/actions/workflows/flclashz-release.yml)
 
-Run `dart setup.dart --help` for the remaining options, such as `--targets` to build only some package formats.
+## Credits and license
 
-## Star
+Fork maintained by [geliopat](https://github.com/geliopat). Upstream authors and licenses remain credited:
 
-<p style="text-align: center;">
-The easiest way to support the developers is to click the star (⭐) at the top of the page.<br>
-If you want to support with a small donation, you can <a href="https://t.me/tribute/app?startapp=dtyh">do so here.</a>
-</p>
+- [FlClashX](https://github.com/pluralplay/FlClashX) — upstream client, pluralplay.
+- [FlClash](https://github.com/chen08209/FlClash) — original client, chen08209.
+- [Mihomo](https://github.com/MetaCubeX/mihomo)
+- [Zapret2](https://github.com/bol-van/zapret2)
+- [Flowseal](https://github.com/Flowseal/zapret-discord-youtube)
+- [zapret2-gui](https://github.com/mqclass/zapret2-gui) / [strategy fork](https://github.com/geliopat/zapret2-gui)
 
-**TON USDT:** `UQDSfrJ_k1BdsknhdR_zj4T3Is3OdMylD8PnDJ9mxO35i-TE`
+[GPL-3.0](LICENSE). Third-party components retain their own licensing terms.
+
+[Issues](https://github.com/geliopat/FlClashZ/issues) · [Release history](https://github.com/geliopat/FlClashZ/releases)
+
+Star the repository if you find it useful.

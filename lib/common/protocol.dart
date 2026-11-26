@@ -4,7 +4,10 @@ import 'package:win32_registry/win32_registry.dart';
 
 import 'print.dart';
 
-const protocolSchemes = ['clash', 'clashmeta', 'flclash', 'flclashx', 'clashx'];
+const legacyProtocolSchemes = ['clash', 'clashmeta', 'flclash', 'flclashx', 'clashx'];
+const windowsProtocolSchemes = ['flclashz', 'clashz'];
+// Import/QR compatibility is independent of OS handler registration.
+const protocolSchemes = [...legacyProtocolSchemes, ...windowsProtocolSchemes];
 
 class ProtocolRegistrationPlan {
   final String scheme;
@@ -82,6 +85,7 @@ class Protocol {
   }
 
   void register(String scheme) {
+    if (Platform.isWindows && !windowsProtocolSchemes.contains(scheme)) return;
     final plan = ProtocolRegistrationPlan(
       scheme: scheme,
       executable: Platform.resolvedExecutable,
@@ -111,7 +115,7 @@ class Protocol {
     }
     final dataHome = env['XDG_DATA_HOME'];
     final plan = LinuxProtocolRegistrationPlan(
-      schemes: schemes,
+      schemes: schemes.where(legacyProtocolSchemes.contains).toList(),
       executable: env['APPIMAGE'] ?? Platform.resolvedExecutable,
       applicationsDir:
           '${dataHome?.isNotEmpty == true ? dataHome : '$home/.local/share'}/applications',

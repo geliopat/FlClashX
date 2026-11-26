@@ -40,6 +40,16 @@ void main() {
     expect(received, ['https://example.com/a.yaml']);
   });
 
+  test('fork URL schemes import subscriptions', () async {
+    await listen();
+    await emit('flclashz://install-config?url=https://example.com/a.yaml');
+    await emit('clashz://install-config?url=https://example.com/b.yaml');
+    expect(received, ['https://example.com/a.yaml', 'https://example.com/b.yaml']);
+    expect(profileUrlFromQrCodes([
+      'flclashz://install-config?url=https://example.com/c.yaml',
+    ]), 'https://example.com/c.yaml');
+  });
+
   test('the log names the link without the subscription secrets', () async {
     final printed = <String>[];
     final original = debugPrint;

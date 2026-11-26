@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/ui/ui.dart';
@@ -38,6 +39,7 @@ extension DashboardWidgetWide on DashboardWidget {
     DashboardWidget.profiles ||
     DashboardWidget.serviceStatus ||
     DashboardWidget.memoryInfo => WideRowKind.middle,
+    DashboardWidget.zapret => WideRowKind.control,
     DashboardWidget.connectionStats ||
     DashboardWidget.proxyGroups => WideRowKind.bottom,
   };
@@ -81,6 +83,7 @@ List<DashboardWidget> wideDashboardWidgetsOf(SupportPlatform platform) => [
     DashboardWidget.intranetIp,
     DashboardWidget.profiles,
     DashboardWidget.serviceStatus,
+    DashboardWidget.zapret,
     DashboardWidget.memoryInfo,
     DashboardWidget.connectionStats,
     DashboardWidget.proxyGroups,
@@ -265,7 +268,9 @@ class _WideCard extends StatelessWidget {
         const NetworkTakeoverTile(TakeoverSwitch.systemProxy),
         const NetworkTakeoverTile(TakeoverSwitch.tun),
       ),
-      DashboardWidget.vpnButton => const VpnTile(),
+      DashboardWidget.vpnButton => system.isWindows
+          ? pair(const VpnTile(), const ZapretTile())
+          : const VpnTile(),
       DashboardWidget.serviceStatus => LayoutBuilder(
         builder: (context, constraints) =>
             ServiceStatusCard(columns: serviceColumns(constraints.maxWidth)),

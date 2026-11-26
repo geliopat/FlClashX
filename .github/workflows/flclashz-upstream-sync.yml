@@ -1,0 +1,138 @@
+name: FlClashZ upstream integration
+
+# Scheduled workflows are read from the default branch. Keep main as an exact
+# upstream mirror; set the FlClashZ development branch as the default branch.
+on:
+  schedule:
+    - cron: '23 4 * * *'
+  workflow_dispatch:
+    inputs:
+      force_validation:
+        description: Validate even if upstream is already integrated
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: flclashz-upstream-integration
+  cancel-in-progress: false
+
+jobs:
+  candidate:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    outputs:
+      sha: ${{ steps.merge.outputs.sha }}
+      branch: ${{ steps.merge.outputs.branch }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: fix/zapret2-stability
+          fetch-depth: 0
+      - name: Synchronize the clean mirror and prepare an isolated candidate
+        id: merge
+        shell: bash
+        env:
+          FORCE_VALIDATION: ${{ inputs.force_validation }}
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch --no-tags https://github.com/pluralplay/FlClashX.git refs/heads/main:refs/remotes/upstream/main
+          git fetch --no-tags origin refs/heads/main:refs/remotes/origin/main
+          upstream=$(git rev-parse refs/remotes/upstream/main)
+          mirror=$(git rev-parse refs/remotes/origin/main)
+          development=$(git rev-parse HEAD)
+          mkdir -p integration-report
+          printf 'upstream=%s\nmirror=%s\ndevelopment=%s\n' "$upstream" "$mirror" "$development" | tee integration-report/refs.txt
+          if ! git merge-base --is-ancestor "$mirror" "$upstream"; then
+            echo "::error::The clean main mirror has diverged. Refusing to overwrite its history."
+            exit 1
+          fi
+          if [[ "$mirror" != "$upstream" ]]; then
+            git push origin "$upstream:refs/heads/main"
+          fi
+          git diff --name-status "$upstream...$development" > integration-report/our-changes.txt
+          git log --oneline "$upstream..$development" > integration-report/our-commits.txt
+          if git merge-base --is-ancestor "$upstream" "$development" && [[ "$FORCE_VALIDATION" != true ]]; then
+            echo "Upstream already integrated."
+            exit 0
+          fi
+          short_upstream=$(git rev-parse --short=12 "$upstream")
+          short_development=$(git rev-parse --short=12 "$development")
+          candidate="sync/flclashz-$short_upstream-$short_development"
+          if git ls-remote --exit-code --heads origin "refs/heads/$candidate" > /dev/null; then
+            if [[ "$FORCE_VALIDATION" != true ]]; then
+              echo "Candidate already exists: $candidate"
+              exit 0
+            fi
+            git fetch --no-tags origin "refs/heads/$candidate"
+            git checkout --detach FETCH_HEAD
+          else
+            git checkout -b "$candidate"
+            # Merge without committing so the fork's version can never be
+            # replaced by upstream's pubspec version.
+            if ! git merge --no-ff --no-commit "$upstream"; then
+              if git diff --name-only --diff-filter=U | grep -Fxq pubspec.yaml; then
+                python3 tool/flclashz_sync_versions.py --resolve-pubspec || true
+              fi
+              if [[ -n "$(git diff --name-only --diff-filter=U)" ]] || ! git rev-parse -q --verify MERGE_HEAD >/dev/null; then
+                git diff --name-only --diff-filter=U > integration-report/conflicts.txt
+                git merge --abort || true
+                echo "::error::Merge conflicts. Development and previous releases were not changed."
+                exit 1
+              fi
+            fi
+            python3 tool/flclashz_sync_versions.py --development "$development" --upstream "$upstream"
+            if git rev-parse -q --verify MERGE_HEAD >/dev/null || ! git diff --cached --quiet; then
+              git commit -m "Merge FlClashX upstream and record integrated versions"
+            fi
+            git push origin "HEAD:refs/heads/$candidate"
+          fi
+          sha=$(git rev-parse HEAD)
+          git diff --name-status "$upstream" "$sha" > integration-report/candidate-changes.txt
+          git diff --binary "$upstream" "$sha" > integration-report/flclashz.patch
+          printf 'candidate=%s\ncommit=%s\n' "$candidate" "$sha" >> integration-report/refs.txt
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "branch=$candidate" >> "$GITHUB_OUTPUT"
+      - name: Preserve the integration report
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: FlClashZ-integration-report
+          path: integration-report/
+          if-no-files-found: error
+
+  windows-validation:
+    needs: candidate
+    if: needs.candidate.outputs.sha != ''
+    uses: ./.github/workflows/zapret-windows-validation.yml
+    with:
+      candidate_ref: ${{ needs.candidate.outputs.sha }}
+
+  record:
+    needs: [candidate, windows-validation]
+    if: needs.windows-validation.result == 'success'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Record validated commit
+        env:
+          CANDIDATE: ${{ needs.candidate.outputs.branch }}
+          SHA: ${{ needs.candidate.outputs.sha }}
+        run: |
+          printf 'Validated Windows candidate: `%s` (commit `%s`)\n' "$CANDIDATE" "$SHA" >> "$GITHUB_STEP_SUMMARY"
+          echo 'Candidate retained. Release publication requires repository opt-in and a compatible signed update manifest.' >> "$GITHUB_STEP_SUMMARY"
+
+  release:
+    needs: [candidate, windows-validation]
+    if: needs.windows-validation.result == 'success' && vars.FLCLASHZ_RELEASE_ENABLED == 'true'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/flclashz-release.yml
+    with:
+      candidate_ref: ${{ needs.candidate.outputs.sha }}
+    secrets:
+      UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}

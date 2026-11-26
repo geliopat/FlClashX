@@ -1,3 +1,4 @@
+import 'package:fl_clash/l10n/l10n.dart';
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -22,6 +23,7 @@ class _CoreStatusButtonState extends ConsumerState<CoreStatusButton> {
 
   Timer? _holdTimer;
   CoreStatus _status = CoreStatus.disconnected;
+  bool _requesting = false;
 
   @override
   void initState() {
@@ -62,49 +64,69 @@ class _CoreStatusButtonState extends ConsumerState<CoreStatusButton> {
   }
 
   Future<void> _handleConnection() async {
-    if (_holdTimer != null) {
+    if (_requesting || _holdTimer != null ||
+        (system.isWindows && !ref.read(initProvider))) {
       return;
     }
     final coreStatus = ref.read(coreStatusProvider);
-    if (coreStatus == CoreStatus.connecting) {
-      return;
+    if (coreStatus == CoreStatus.connecting) return;
+    final restartAll = system.isWindows && !ref.read(safeModeProvider);
+    if (restartAll) {
+      final zapret = ref.read(zapretControllerProvider);
+      if (zapret.busy || zapret.dashboardRestarting) return;
     }
-    final tip = coreStatus == CoreStatus.connected
-        ? context.appLocalizations.forceRestartCoreTip
-        : context.appLocalizations.restartCoreTip;
-    final res = await dialogs.showMessage(message: TextSpan(text: tip));
-    if (res != true || !mounted) {
-      return;
-    }
+    setState(() => _requesting = true);
     try {
-      await ref.read(coreActionProvider.notifier).restartCore();
+      final tip = restartAll
+          ? AppLocalizations.of(context).forkRestartAllTip
+          : coreStatus == CoreStatus.connected
+              ? context.appLocalizations.forceRestartCoreTip
+              : context.appLocalizations.restartCoreTip;
+      final res = await dialogs.showMessage(
+        title: restartAll ? AppLocalizations.of(context).forkRestartAll : null,
+        message: TextSpan(text: tip),
+      );
+      if (res != true || !mounted ||
+          (system.isWindows && !ref.read(initProvider))) return;
+      if (restartAll) {
+        if (ref.read(safeModeProvider)) return;
+        await ref.read(zapretControllerProvider.notifier)
+            .restartFromDashboard(restartAll: true);
+      } else {
+        await ref.read(coreActionProvider.notifier).restartCore();
+      }
     } catch (error) {
-      dialogs.showNotifier(error.toString(), level: MessageLevel.error);
+      if (mounted) dialogs.showNotifier(error.toString(), level: MessageLevel.error);
+    } finally {
+      if (mounted) setState(() => _requesting = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final coreStatus = _holdTimer != null ? CoreStatus.connecting : _status;
+    final restartAll = system.isWindows && !ref.watch(safeModeProvider);
+    final zapretBusy = restartAll && ref.watch(zapretControllerProvider.select((state) => state.busy || state.dashboardRestarting));
+    final coreStatus = _holdTimer != null || _requesting ? CoreStatus.connecting : _status;
     final appLocalizations = context.appLocalizations;
+    final canRestart = (!_requesting && !zapretBusy) && (!system.isWindows || ref.watch(initProvider));
     const style = ElasticPress.buttonStyle;
     final iconOnly =
         coreStatus == CoreStatus.connected || ViewScope.isMobileOf(context);
     final icon = CorePulse(status: coreStatus);
     return Tooltip(
-      message: appLocalizations.coreStatus,
+      message: restartAll ? AppLocalizations.of(context).forkRestartAll : appLocalizations.coreStatus,
       child: FadeScaleBox(
         alignment: Alignment.centerRight,
         child: iconOnly
             ? IconButton.filled(
                 key: ValueKey(iconOnly),
                 style: style,
-                onPressed: _handleConnection,
+                onPressed: canRestart ? _handleConnection : null,
                 icon: icon,
               )
             : FilledButton.icon(
                 key: ValueKey(iconOnly),
-                onPressed: _handleConnection,
+                onPressed: canRestart ? _handleConnection : null,
                 style: style,
                 icon: SizedBox.square(
                   dimension: globalState.measure.textHeight(

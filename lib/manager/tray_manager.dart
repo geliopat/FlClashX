@@ -8,6 +8,10 @@ import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/providers/action.dart';
 import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/providers/state.dart';
+import 'package:fl_clash/providers/zapret.dart';
+import 'package:fl_clash/providers/auto_delay.dart';
+import 'package:fl_clash/providers/smart_hosts.dart';
+import 'package:fl_clash/providers/zapret_diagnostics.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:tray/tray.dart';
@@ -40,6 +44,25 @@ class _TrayManagerState extends ConsumerState<TrayManager> {
         _requestUpdate();
       }
     });
+    if (system.isWindows) {
+      ref.read(proxiesActionProvider.notifier);
+      ref.read(autoDelayProvider);
+      ref.listenManual(zapretControllerProvider.select((state) => (
+        state.running, state.busy, state.dashboardRestarting,
+      )), (_, _) => _requestUpdate());
+      ref.listenManual(coreStatusProvider, (_, _) => _requestUpdate());
+      ref.listenManual(initProvider, (_, _) => _requestUpdate());
+      ref.listenManual(zapretDiagnosticsProvider, (_, _) {});
+      ref.listenManual(smartHostsProvider.select((state) => state.revision), (_, _) {
+        if (ref.read(initProvider)) {
+          unawaited(ref.read(setupActionProvider.notifier).applyProfile(force: true, silence: true).then((ok) async {
+            if (ok && mounted) await ref.read(coreActionProvider.notifier).clearDnsCacheOnNetworkChange();
+          }).catchError((Object error) {
+            commonPrint.log('Smart Hosts apply failed: $error', logLevel: LogLevel.warning);
+          }));
+        }
+      });
+    }
     if (system.isMacOS) {
       ref.listenManual(trayDelaysProvider, (prev, next) {
         if (!const DeepCollectionEquality().equals(prev, next)) {

@@ -141,14 +141,22 @@ SelectedProxyState getRealSelectedProxyState(
   final group = groups.getGroup(state.proxyName);
   final newState = state.copyWith(group: true);
   if (group == null) return newState;
+  // A balancer has no single selected node. The Core implements a dedicated
+  // balancer probe, and the UI must read the result under the same key.
+  if (group.type == GroupType.LoadBalance) {
+    return newState.copyWith(testUrl: group.testUrl ?? newState.testUrl);
+  }
   final currentSelectedName = group.getCurrentSelectedName(
     selectedMap[newState.proxyName] ?? '',
   );
   if (currentSelectedName.isEmpty) {
-    return newState;
+    return newState.copyWith(testUrl: group.testUrl ?? newState.testUrl);
   }
   return getRealSelectedProxyState(
-    newState.copyWith(proxyName: currentSelectedName, testUrl: group.testUrl),
+    newState.copyWith(
+      proxyName: currentSelectedName,
+      testUrl: group.testUrl ?? newState.testUrl,
+    ),
     groups: groups,
     selectedMap: selectedMap,
   );

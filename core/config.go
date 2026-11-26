@@ -74,6 +74,32 @@ func handleGetConfig(path string) (*config.RawConfig, error) {
 	return unmarshalRawConfig(buf)
 }
 
+// Read the parsed configuration held by the running core, not a possibly
+// newer config.yaml written before a failed profile apply.
+func handleGetAppliedHosts() map[string][]string {
+	configMu.Lock()
+	defer configMu.Unlock()
+	if currentConfig == nil {
+		return nil
+	}
+	entries := map[string][]string{}
+	if currentConfig.Hosts != nil {
+		currentConfig.Hosts.Foreach(func(domain string, value resolver.HostValue) bool {
+			if value.IsDomain {
+				entries[domain] = []string{value.Domain}
+			} else {
+				addresses := make([]string, 0, len(value.IPs))
+				for _, ip := range value.IPs {
+					addresses = append(addresses, ip.String())
+				}
+				entries[domain] = addresses
+			}
+			return true
+		})
+	}
+	return entries
+}
+
 func handleGetProxyDefinition(name string) (map[string]any, error) {
 	raw, err := handleGetConfig(runningConfigPath())
 	if err != nil {

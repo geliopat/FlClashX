@@ -459,7 +459,8 @@ enum DashboardWidget {
   proxyGroups,
   connectionStats,
   intranetIp,
-  memoryInfo;
+  memoryInfo,
+  zapret(platforms: [SupportPlatform.Windows]);
 
   final List<SupportPlatform> platforms;
 
@@ -528,6 +529,8 @@ enum PageLabel {
   resources,
   connections,
   dns,
+  zapret,
+  zapretLogs,
 }
 
 enum RuleAction {

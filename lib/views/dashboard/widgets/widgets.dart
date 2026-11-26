@@ -11,3 +11,4 @@ export 'proxy_groups.dart';
 export 'server_location.dart';
 export 'service_status.dart';
 export 'traffic.dart';
+export 'zapret_diagnostics.dart';

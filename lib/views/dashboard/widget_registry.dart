@@ -20,6 +20,7 @@ extension DashboardWidgetView on DashboardWidget {
     DashboardWidget.connectionStats => const ConnectionStatsCard(),
     DashboardWidget.intranetIp => const IntranetIpCard(),
     DashboardWidget.memoryInfo => const MemoryInfo(),
+    DashboardWidget.zapret => const ZapretWidgetCard(),
   };
 
   Glyph get glyph => switch (this) {
@@ -35,6 +36,7 @@ extension DashboardWidgetView on DashboardWidget {
     DashboardWidget.connectionStats => AppGlyphs.connections,
     DashboardWidget.intranetIp => AppGlyphs.devices,
     DashboardWidget.memoryInfo => AppGlyphs.memory,
+    DashboardWidget.zapret => AppGlyphs.filter,
   };
 
   String label(BuildContext context) {
@@ -52,6 +54,7 @@ extension DashboardWidgetView on DashboardWidget {
       DashboardWidget.connectionStats => appLocalizations.connectionStats,
       DashboardWidget.intranetIp => appLocalizations.intranetIP,
       DashboardWidget.memoryInfo => appLocalizations.memoryInfo,
+      DashboardWidget.zapret => 'Zapret',
     };
   }
 
@@ -68,9 +71,14 @@ extension DashboardWidgetView on DashboardWidget {
   /// The status card holds the start button, which has nowhere else to go
   /// unless [providerMode] puts it at the foot of the page, and the
   /// announcement comes and goes with the subscription.
-  bool removable({required bool providerMode}) =>
+  bool removable({
+    required bool providerMode,
+    SupportPlatform? platform,
+  }) =>
       (providerMode || this != DashboardWidget.currentOutbound) &&
-      this != DashboardWidget.announcement;
+      this != DashboardWidget.announcement &&
+      !(platform == SupportPlatform.Windows &&
+          this == DashboardWidget.zapret);
 }
 
 /// The status card, or under `providermode` the server's location.
@@ -91,8 +99,9 @@ List<DashboardWidget> withFixedCards(
   List<DashboardWidget> saved, {
   required bool announcement,
   bool providerMode = false,
+  SupportPlatform? platform,
 }) {
-  return [
+  final result = <DashboardWidget>[
     if (announcement && !saved.contains(DashboardWidget.announcement))
       DashboardWidget.announcement,
     if (!providerMode && !saved.contains(DashboardWidget.currentOutbound))
@@ -100,4 +109,12 @@ List<DashboardWidget> withFixedCards(
     for (final card in saved)
       if (announcement || card != DashboardWidget.announcement) card,
   ];
+  // The regular Windows dashboard always keeps Zapret as a standalone card.
+  // ProviderMode gets it only through the flclashx-widgets header.
+  if (!providerMode &&
+      platform == SupportPlatform.Windows &&
+      !result.contains(DashboardWidget.zapret)) {
+    result.add(DashboardWidget.zapret);
+  }
+  return result;
 }

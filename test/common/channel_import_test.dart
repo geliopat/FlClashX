@@ -354,14 +354,18 @@ void main() {
   group('a Windows or Linux pre-release', () {
     test('reads the store beside its own', () {
       expect(
-        stableHomeOf(join('data', 'com.follow', 'clashx.pre')),
-        join('data', 'com.follow', 'clashx'),
+        stableHomeOf(join('data', 'sweetyyoba.com', 'clashz.pre')),
+        join('data', 'sweetyyoba.com', 'clashz'),
       );
       expect(
         stableHomeOf(join('share', 'com.follow.clashx.pre')),
         join('share', 'com.follow.clashx'),
       );
       expect(stableHomeOf(join('share', 'com.follow.clashx')), isNull);
+      expect(
+        stableHomeOf(join('data', 'sweetyyoba.com', 'clashz')),
+        isNull,
+      );
     });
 
     test(

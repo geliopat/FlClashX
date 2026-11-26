@@ -143,7 +143,6 @@ class Request {
 
   /// A pre-release installs as its own app, which a stable release would not
   /// upgrade, so it only hears of newer pre-releases.
-  @visibleForTesting
   Future<Map<String, dynamic>?> latestPrerelease() async {
     try {
       final releases = <dynamic>[];

@@ -7,3 +7,4 @@ core_name: FlClashCore
 output_dir: libclash
 helper_dir: services/helper
 helper_name: FlClashXHelperService
+windows_helper_name: FlClashZHelperService

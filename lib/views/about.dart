@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/common/flclashz_upstream_versions.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/providers/providers.dart';
+import 'package:fl_clash/providers/zapret_components.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/ui/ui.dart';
@@ -11,9 +13,9 @@ import 'package:material_ui/material_ui.dart';
 
 @immutable
 class Person {
-  const Person({required this.avatar, required this.name, this.link});
+  const Person({this.avatar, required this.name, this.link});
 
-  final String avatar;
+  final String? avatar;
   final String name;
   final String? link;
 }
@@ -24,11 +26,21 @@ const _forkAuthors = [
     name: 'pluralplay',
     link: 'https://github.com/pluralplay',
   ),
+  Person(
+    avatar: 'https://avatars.githubusercontent.com/u/267946799?v=4&s=128',
+    name: 'geliopat',
+    link: 'https://github.com/geliopat',
+  ),
 ];
 
 const _upstreamRepository = 'chen08209/FlClash';
 const _coreRepository = 'MetaCubeX/mihomo';
-const _telegram = 'https://t.me/flclashx';
+const _flClashXRepository = 'pluralplay/FlClashX';
+const _zapretComponentLinks = <String, String>{
+  'Zapret2': 'https://github.com/bol-van/zapret2',
+  'Flowseal': 'https://github.com/Flowseal/zapret-discord-youtube',
+  'Стратегии Lua/BAT': 'https://github.com/geliopat/zapret2-gui',
+};
 
 /// The running core's version when it answers, else the one this build was
 /// made with, else nothing.
@@ -39,7 +51,11 @@ final coreVersionProvider = FutureProvider.autoDispose<String?>((ref) async {
       live = await ref.read(coreHandlerProvider).getCoreVersion();
     } catch (_) {}
   }
-  final version = live.isNotEmpty ? live : coreVersionDefine;
+  final version = live.isNotEmpty
+      ? live
+      : coreVersionDefine.isNotEmpty
+      ? coreVersionDefine
+      : bundledMihomoVersion;
   return version.isEmpty ? null : version;
 });
 
@@ -128,6 +144,12 @@ class AboutView extends ConsumerWidget {
               ),
               _buildLinkItem(
                 glyph: AppGlyphs.link,
+                title: 'FlClashX',
+                url: 'https://github.com/$_flClashXRepository',
+                label: 'github.com/$_flClashXRepository',
+              ),
+              _buildLinkItem(
+                glyph: AppGlyphs.link,
                 title: appLocalizations.originalRepository,
                 url: 'https://github.com/$_upstreamRepository',
                 label: 'github.com/$_upstreamRepository',
@@ -137,12 +159,6 @@ class AboutView extends ConsumerWidget {
                 title: appLocalizations.core,
                 url: 'https://github.com/$_coreRepository',
                 label: 'github.com/$_coreRepository',
-              ),
-              _buildLinkItem(
-                glyph: AppGlyphs.send,
-                title: 'Telegram',
-                url: _telegram,
-                label: 't.me/flclashx',
               ),
             ],
           ),
@@ -188,7 +204,6 @@ class _AboutHero extends ConsumerWidget {
   });
 
   static const _logoSize = 96.0;
-  static const _logoInset = 14.0;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -204,19 +219,10 @@ class _AboutHero extends ConsumerWidget {
             onEnterDeveloperMode: onEnterDeveloperMode,
             onEasterEgg: onEasterEgg,
             onLongPress: onUnlockFullSettings,
-            child: DecoratedBox(
-              decoration: ShapeDecoration(
-                color: raised,
-                shape: AppShape.all(AppCorner.fit(_logoSize)),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(_logoInset),
-                child: Image.asset(
-                  'assets/images/icon.png',
-                  width: _logoSize - _logoInset * 2,
-                  height: _logoSize - _logoInset * 2,
-                ),
-              ),
+            child: Image.asset(
+              'assets/images/icon.png',
+              width: _logoSize,
+              height: _logoSize,
             ),
           ),
           const SizedBox(height: 20),
@@ -231,21 +237,45 @@ class _AboutHero extends ConsumerWidget {
             alignment: WrapAlignment.center,
             children: [
               _Pill(
-                label: 'v${globalState.packageInfo.displayVersion}',
+                label: 'FlClashZ v${globalState.packageInfo.displayVersion}',
+                url: 'https://github.com/$repository',
                 color: colorScheme.primary,
                 foregroundColor: colorScheme.onPrimary,
               ),
+              _Pill(
+                label: 'FlClashX v$flClashXVersion',
+                url: 'https://github.com/$_flClashXRepository',
+                color: raised,
+                foregroundColor: colorScheme.onSurfaceVariant,
+              ),
               if (coreVersion != null)
                 _Pill(
-                  label: 'core: $coreVersion',
+                  label: 'Mihomo: $coreVersion',
+                  url: 'https://github.com/$_coreRepository',
                   color: colorScheme.secondaryContainer,
                   foregroundColor: colorScheme.onSecondaryContainer,
                 ),
               _Pill(
                 label: 'GPL-3.0',
+                url: 'https://www.gnu.org/licenses/gpl-3.0.html',
                 color: raised,
                 foregroundColor: colorScheme.onSurfaceVariant,
               ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            alignment: WrapAlignment.center,
+            children: [
+              for (final entry in installedZapretComponents.entries)
+                _Pill(
+                  label: '${entry.key}: ${entry.value}',
+                  url: _zapretComponentLinks[entry.key],
+                  color: raised,
+                  foregroundColor: colorScheme.onSurfaceVariant,
+                ),
             ],
           ),
           const SizedBox(height: 16),
@@ -274,26 +304,52 @@ class _AboutHero extends ConsumerWidget {
 
 class _Pill extends StatelessWidget {
   final String label;
+  final String? url;
   final Color color;
   final Color foregroundColor;
 
   const _Pill({
     required this.label,
+    this.url,
     required this.color,
     required this.foregroundColor,
   });
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: ShapeDecoration(color: color, shape: AppShape.full),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        child: Text(
-          label,
-          style: AppTextStyle.caption1
-              .of(context, emphasized: true)
-              .copyWith(color: foregroundColor),
+    final content = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: Text(
+        label,
+        style: AppTextStyle.caption1
+            .of(context, emphasized: true)
+            .copyWith(color: foregroundColor),
+      ),
+    );
+    final link = url;
+    if (link == null) {
+      return DecoratedBox(
+        decoration: ShapeDecoration(color: color, shape: AppShape.full),
+        child: content,
+      );
+    }
+    return Tooltip(
+      message: link,
+      child: FocusRing(
+        shape: AppShape.full,
+        standsOff: true,
+        child: Material(
+          color: color,
+          shape: AppShape.full,
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            mouseCursor: clickableCursor,
+            customBorder: AppShape.full,
+            hoverColor: foregroundColor.withValues(alpha: 0.08),
+            focusColor: foregroundColor.withValues(alpha: 0.12),
+            onTap: () => dialogs.openUrl(link),
+            child: content,
+          ),
         ),
       ),
     );
@@ -360,12 +416,28 @@ class _Avatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final link = person.link;
+    final avatar = person.avatar;
+    final initial = Text(person.name.substring(0, 1).toUpperCase());
+    final remote = avatar?.startsWith('https://') == true;
     final column = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         CircleAvatar(
           radius: size / 2,
-          foregroundImage: AssetImage(person.avatar),
+          foregroundImage: avatar == null || remote ? null : AssetImage(avatar),
+          child: remote
+              ? ClipOval(
+                  child: Image.network(
+                    avatar!,
+                    width: size,
+                    height: size,
+                    fit: BoxFit.cover,
+                    frameBuilder: (context, child, frame, wasSynchronouslyLoaded) =>
+                        frame == null && !wasSynchronouslyLoaded ? initial : child,
+                    errorBuilder: (context, error, stackTrace) => initial,
+                  ),
+                )
+              : avatar == null ? initial : null,
         ),
         const SizedBox(height: 4),
         Text(

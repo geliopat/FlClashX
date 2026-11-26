@@ -50,6 +50,14 @@ void main() {
       wideDashboardWidgetsOf(SupportPlatform.Windows),
       isNot(contains(DashboardWidget.vpnButton)),
     );
+    expect(
+      wideDashboardWidgetsOf(SupportPlatform.Windows),
+      contains(DashboardWidget.zapret),
+    );
+    expect(
+      _rows(wideDashboardWidgetsOf(SupportPlatform.Windows), 4),
+      contains([DashboardWidget.zapret]),
+    );
   });
 
   test('a card starts a new row when its kind changes or the row is full', () {

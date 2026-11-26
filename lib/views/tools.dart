@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
@@ -19,8 +20,10 @@ import 'package:url_launcher/url_launcher.dart';
 import 'config/advanced.dart';
 import 'config/custom_resources.dart';
 import 'developer.dart';
+import 'diagnostics.dart';
 import 'disclaimer.dart';
 import 'theme.dart';
+import 'zapret_settings.dart';
 
 class ToolsView extends ConsumerStatefulWidget {
   const ToolsView({super.key});
@@ -55,7 +58,13 @@ class _ToolViewState extends ConsumerState<ToolsView> {
     if (simple) {
       return generateSection(
         title: appLocalizations.settings,
-        items: const [_LocaleItem(), _ThemeItem(), _GeneralItem()],
+        items: [
+          const _LocaleItem(),
+          const _ThemeItem(),
+          if (Platform.isWindows) const _ZapretItem(),
+          if (Platform.isWindows) const _DiagnosticsItem(),
+          const _GeneralItem(),
+        ],
       );
     }
     return generateSection(
@@ -68,6 +77,8 @@ class _ToolViewState extends ConsumerState<ToolsView> {
         if (system.isAndroid) const _AccessItem(),
         const _AdvancedConfigItem(),
         const _CustomResourcesItem(),
+        if (Platform.isWindows) const _ZapretItem(),
+          if (Platform.isWindows) const _DiagnosticsItem(),
         const _GeneralItem(),
       ],
       footer: [
@@ -229,6 +240,31 @@ class _AccessItem extends StatelessWidget {
       widget: const AccessView(),
     );
   }
+}
+
+class _ZapretItem extends StatelessWidget {
+  const _ZapretItem();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListItem.open(
+      leading: const GlyphIcon(AppGlyphs.wrench),
+      title: const Text('Zapret'),
+      subtitle: const Text('Диагностика, списки и обновления'),
+      widget: const ZapretSettingsView(),
+    );
+  }
+}
+
+class _DiagnosticsItem extends StatelessWidget {
+  const _DiagnosticsItem();
+
+  @override
+  Widget build(BuildContext context) => ListItem.open(
+    leading: const Icon(Icons.health_and_safety_outlined),
+    title: Text(AppLocalizations.of(context).forkDiagnostics),
+    widget: const DiagnosticsView(),
+  );
 }
 
 class _GeneralItem extends StatelessWidget {

@@ -265,10 +265,22 @@ List<RecordColumn<DnsQuery>> _dnsQueryColumns(
       cell: (_, query) => _DnsResult(query),
       sortKey: (query) => query.summary.toLowerCase(),
     ),
+    RecordColumn(
+      const TableColumn('resolver', 'Резолвер', flex: 1.0),
+      cell: (_, query) => RecordCellText(
+        query.resolverName.isEmpty ? 'Не определён' : query.resolverName,
+        muted: true,
+      ),
+      sortKey: (query) => query.resolverName.toLowerCase(),
+    ),
     if (wide)
       RecordColumn(
-        TableColumn('upstream', appLocalizations.source, flex: 0.8),
-        cell: (_, query) => RecordCellText(query.upstream, muted: true),
+        const TableColumn('upstream', 'DNS-сервер', flex: 0.8),
+        cell: (_, query) => RecordCellText(
+          query.cached ? appLocalizations.cache :
+              query.upstream.isEmpty ? 'Не сообщён' : query.upstream,
+          muted: true,
+        ),
         sortKey: (query) => query.upstream.toLowerCase(),
       ),
     RecordColumn(
@@ -454,6 +466,8 @@ class DnsQueryItem extends StatelessWidget {
                       : RecordTone.neutral,
                   onPressed: () => onClickKeyword?.call(tag),
                 ),
+              if (dnsQuery.resolverName.isNotEmpty)
+                Text(dnsQuery.resolverName, style: styles.secondary),
               if (dnsQuery.upstream.isNotEmpty)
                 Text(dnsQuery.upstream, style: styles.secondary),
             ],
@@ -477,7 +491,9 @@ class DnsQueryDetailView extends StatelessWidget {
       (appLocalizations.domain, dnsQuery.domain),
       (appLocalizations.recordType, dnsQuery.type),
       (appLocalizations.initiator, dnsQuery.initiator?.label ?? ''),
-      (appLocalizations.source, dnsQuery.upstream),
+      ('Резолвер', dnsQuery.resolverName.isEmpty ? 'Не определён' : dnsQuery.resolverName),
+      ('DNS-сервер', dnsQuery.cached ? appLocalizations.cache :
+          dnsQuery.upstream.isEmpty ? 'Ядро не сообщает адрес' : dnsQuery.upstream),
       (
         appLocalizations.cache,
         dnsQuery.cached ? appLocalizations.yes : appLocalizations.no,

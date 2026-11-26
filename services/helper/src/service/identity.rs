@@ -4,10 +4,10 @@ use once_cell::sync::Lazy;
 
 const STABLE_HELPER: &str = "FlClashXHelperService";
 const PRE_HELPER: &str = "FlClashXPreHelperService";
+const WINDOWS_HELPER: &str = "FlClashZHelperService";
 
-/// A pre-release ships this binary as `FlClashXPreHelperService`, and every
-/// name the Helper registers follows from that, so a stable and a pre-release
-/// install keep their own service, port key, unit and socket.
+/// Linux still derives its per-channel service, port key, unit and socket
+/// from the Helper filename. Windows deliberately uses one shared service.
 static PRE: Lazy<bool> = Lazy::new(|| {
     std::env::current_exe()
         .map(|path| is_pre_helper(&path))
@@ -22,7 +22,24 @@ pub fn is_pre_helper(executable: &Path) -> bool {
 }
 
 pub fn helper_name() -> &'static str {
-    helper_name_for(*PRE)
+    // Windows stable and pre builds deliberately share one SCM service name.
+    // The installed service image is replaced by whichever channel installs
+    // most recently; Linux keeps its existing per-channel units.
+    if cfg!(windows) {
+        windows_helper_name()
+    } else {
+        helper_name_for(*PRE)
+    }
+}
+
+pub fn windows_helper_name() -> &'static str {
+    WINDOWS_HELPER
+}
+
+#[cfg(any(windows, test))]
+pub fn retired_windows_helper_names() -> &'static [&'static str] {
+    // Never remove services belonging to upstream FlClash or FlClashX.
+    &["FlClashZPreHelperService"]
 }
 
 pub fn helper_name_for(pre: bool) -> &'static str {
@@ -71,6 +88,11 @@ mod tests {
         )));
         assert_eq!(helper_name_for(true), "FlClashXPreHelperService");
         assert_eq!(helper_name_for(false), "FlClashXHelperService");
+        assert_eq!(windows_helper_name(), "FlClashZHelperService");
+        assert_eq!(
+            retired_windows_helper_names(),
+            &["FlClashZPreHelperService"]
+        );
         assert_eq!(linux_service_for(true), "flclashx-pre-helper");
         assert_eq!(linux_runtime_dir_for(false), "flclashx");
     }

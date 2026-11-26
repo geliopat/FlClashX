@@ -2,6 +2,13 @@ import 'package:fl_clash/common/protocol.dart';
 import 'package:test/test.dart';
 
 void main() {
+  test('Windows claims only fork-specific URL schemes', () {
+    expect(windowsProtocolSchemes, ['flclashz', 'clashz']);
+    expect(protocolSchemes, containsAll(legacyProtocolSchemes));
+    expect(protocolSchemes, containsAll(windowsProtocolSchemes));
+    expect(windowsProtocolSchemes.toSet().intersection(legacyProtocolSchemes.toSet()), isEmpty);
+  });
+
   group('ProtocolRegistrationPlan', () {
     test('builds registry writes for URL protocol registration', () {
       const plan = ProtocolRegistrationPlan(
@@ -19,7 +26,7 @@ void main() {
 
   group('LinuxProtocolRegistrationPlan', () {
     const plan = LinuxProtocolRegistrationPlan(
-      schemes: protocolSchemes,
+      schemes: legacyProtocolSchemes,
       executable: '/home/me/Apps/FlClash.AppImage',
       applicationsDir: '/home/me/.local/share/applications',
     );

@@ -20,17 +20,19 @@ Future<void> clearAppData() async {
   await Directory(await appPath.profilesPath).safeDelete(recursive: true);
 }
 
-/// [clearAppData] plus the rest of the app home, bar the lock this process holds.
+/// [clearAppData] plus the rest of the app home, bar the instance lock and
+/// the Windows disclaimer consent marker.
 Future<void> resetAppData() async {
   await clearAppData();
   await fileLogger.dispose();
   final home = Directory(await appPath.homeDirPath);
   final lockPath = await appPath.lockFilePath;
+  final consentPath = system.isWindows ? await appPath.disclaimerConsentPath : null;
   if (!await home.exists()) {
     return;
   }
   await for (final entity in home.list(followLinks: false)) {
-    if (entity.path == lockPath) {
+    if (entity.path == lockPath || entity.path == consentPath) {
       continue;
     }
     try {

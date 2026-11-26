@@ -54,11 +54,12 @@ abstract final class TrayCodec {
       sink[id] = item;
       return switch (item) {
         TrayMenuSeparator() => <String, Object?>{'id': id, 'type': 'separator'},
-        TrayMenuAction(:final label, :final detail, :final enabled) =>
+        TrayMenuAction(:final label, :final detail, :final icon, :final enabled) =>
           <String, Object?>{
             'id': id,
             'type': 'action',
             'label': label,
+            if (icon != null && icon.isNotEmpty) 'icon': icon,
             if (detail != null && detail.isNotEmpty) 'detail': detail,
             'enabled': enabled,
           },

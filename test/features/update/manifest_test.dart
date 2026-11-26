@@ -325,11 +325,47 @@ void main() {
     });
   });
 
-  test('the pinned keys are raw 32-byte keys', () {
-    expect(updateManifestKeys, isNotEmpty);
-    for (final key in updateManifestKeys) {
+  test('the configured public key is pinned as a raw 32-byte key', () async {
+    final configured = Platform.environment['FLCLASHZ_UPDATE_PUBLIC_KEY'] ?? '';
+    if (configured.isNotEmpty) {
+      expect(updateManifestKeys, contains(configured));
+    }
+    final pinned = updateManifestKeys.where((key) => key.isNotEmpty).toList();
+    for (final key in pinned) {
       expect(base64.decode(key), hasLength(32));
     }
+    if (pinned.isEmpty) {
+      // Unconfigured development builds must reject even a valid signature
+      // made by an untrusted key. Release CI passes the actual public key.
+      await expectLater(
+        verifyUpdateManifest(await _signed(_manifest('v1.0.1')), pre: false),
+        _rejected('signature'),
+      );
+    }
+  });
+
+  test('Windows 1.0.0 discovers 1.0.1 through latest, not itself', () async {
+    const latest =
+        'https://github.com/geliopat/FlClashZ/releases/latest/download/manifest.json';
+    const versioned =
+        'https://github.com/geliopat/FlClashZ/releases/download/v1.0.1/manifest.json';
+    final manifest = await _signed(_manifest('v1.0.1', names: const [
+      'FlClashZ-windows-amd64-setup.exe',
+      'FlClashZ-windows-amd64.zip',
+    ]));
+    Future<Map<String, dynamic>?> check(String current) => fetchManifestUpdate(
+      Dio()..httpClientAdapter = _FakeAdapter({
+        latest: () => _redirect(versioned),
+        versioned: () => _json(manifest),
+      }),
+      Uri.parse(latest),
+      currentVersion: current,
+      pre: false,
+      keys: keys,
+    );
+    expect((await check('1.0.0'))?['tag_name'], 'v1.0.1');
+    expect(await check('1.0.1'), isNull);
+    expect(await check('1.0.2'), isNull);
   });
 
   group('an unsigned body is bounded before it is read', () {

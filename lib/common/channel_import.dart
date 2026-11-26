@@ -123,10 +123,10 @@ Future<StableSource?> _macosSource() async {
   }
   final home = await appPath.homeDirPath;
   final domain = basename(home);
-  if (domain != '$packageName.pre') {
+  if (domain != 'com.follow.clashx.pre') {
     return null;
   }
-  final stableHome = join(dirname(home), packageName);
+  final stableHome = join(dirname(home), 'com.follow.clashx');
   return (
     stableHome: stableHome,
     home: home,

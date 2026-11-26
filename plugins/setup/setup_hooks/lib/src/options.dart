@@ -16,6 +16,7 @@ class BuildConfig {
     required this.outputDir,
     required this.helperDir,
     required this.helperName,
+    this.windowsHelperName = 'FlClashZHelperService',
   });
 
   final String tags;
@@ -26,6 +27,7 @@ class BuildConfig {
   final String outputDir;
   final String helperDir;
   final String helperName;
+  final String windowsHelperName;
 
   static const _defaults = BuildConfig(
     tags: 'with_gvisor',
@@ -55,6 +57,7 @@ class BuildConfig {
       outputDir: yaml['output_dir'] as String? ?? _defaults.outputDir,
       helperDir: yaml['helper_dir'] as String? ?? _defaults.helperDir,
       helperName: yaml['helper_name'] as String? ?? _defaults.helperName,
+      windowsHelperName: yaml['windows_helper_name'] as String? ?? _defaults.windowsHelperName,
     );
   }
 
@@ -67,5 +70,6 @@ class BuildConfig {
     'output_dir': outputDir,
     'helper_dir': helperDir,
     'helper_name': helperName,
+    'windows_helper_name': windowsHelperName,
   };
 }

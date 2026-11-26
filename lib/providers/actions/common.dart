@@ -4,6 +4,7 @@ part of '../action.dart';
 class CommonAction extends _$CommonAction {
   CoreController get _core => ref.read(coreHandlerProvider);
   bool _isUpdatingTraffic = false;
+  bool _trayOperationInProgress = false;
 
   @override
   void build() {}
@@ -20,6 +21,47 @@ class CommonAction extends _$CommonAction {
             ),
       ),
     );
+  }
+
+  /// The Windows tray is an explicit request for both components.
+  /// It does not change the persistent linked-start preference.
+  Future<void> toggleTrayRunning() async {
+    if (_trayOperationInProgress || !ref.read(initProvider)) return;
+    if (ref.read(zapretControllerProvider).dashboardRestarting) return;
+    _trayOperationInProgress = true;
+    try {
+      final zapret = ref.read(zapretControllerProvider);
+      final running = ref.read(isStartProvider) || zapret.running || zapret.busy;
+      await globalState.safeRun(
+        () => ref.read(setupActionProvider.notifier).setTrayRunning(!running),
+      );
+    } finally {
+      _trayOperationInProgress = false;
+    }
+  }
+
+  /// Use exactly the dashboard's coordinated restart, not app relaunch.
+  Future<void> restartFromTray() async {
+    if (_trayOperationInProgress || !ref.read(initProvider) ||
+        ref.read(coreStatusProvider) == CoreStatus.connecting) return;
+    final restartAll = !ref.read(safeModeProvider);
+    if (restartAll) {
+      final zapret = ref.read(zapretControllerProvider);
+      if (zapret.busy || zapret.dashboardRestarting) return;
+    }
+    _trayOperationInProgress = true;
+    try {
+      await globalState.safeRun(() async {
+        if (restartAll) {
+          await ref.read(zapretControllerProvider.notifier)
+              .restartFromDashboard(restartAll: true);
+        } else {
+          await ref.read(coreActionProvider.notifier).restartCore();
+        }
+      });
+    } finally {
+      _trayOperationInProgress = false;
+    }
   }
 
   void updateSpeedStatistics() {
@@ -95,13 +137,24 @@ class CommonAction extends _$CommonAction {
     final manifestUrl = globalState.isPre
         ? headers?.preUpdateManifestUrl
         : headers?.updateManifestUrl;
-    if (manifestUrl == null) {
+    // Windows fork releases require our signed manifest. Do not fall back
+    // to an unsigned GitHub release when the signing key is not configured.
+    if (manifestUrl == null && !Platform.isWindows) {
       return request.checkForUpdate();
     }
     try {
+      String? source = manifestUrl;
+      if (source == null && globalState.isPre) {
+        final release = await request.latestPrerelease();
+        final tag = release?['tag_name'];
+        if (tag is! String || !RegExp(r'^v\d+\.\d+\.\d+-pre\.\d+$').hasMatch(tag)) {
+          return null;
+        }
+        source = 'https://github.com/$repository/releases/download/$tag/manifest.json';
+      }
       return await fetchManifestUpdate(
         request.dio,
-        Uri.parse(manifestUrl),
+        Uri.parse(source ?? 'https://github.com/$repository/releases/latest/download/manifest.json'),
         currentVersion: globalState.packageInfo.displayVersion,
         pre: globalState.isPre,
       );

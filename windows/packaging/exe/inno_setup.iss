@@ -18,27 +18,25 @@ WizardStyle=modern
 PrivilegesRequired={{PRIVILEGES_REQUIRED}}
 ArchitecturesAllowed={{ARCH}}
 ArchitecturesInstallIn64BitMode={{ARCH}}
-UninstallDisplayIcon={uninstallexe}
+UninstallDisplayIcon={app}\{{EXECUTABLE_NAME}}
 ChangesAssociations=yes
 UsePreviousAppDir=yes
 UsePreviousGroup=yes
 UsePreviousTasks=yes
+CloseApplications=yes
+RestartApplications=no
 
 [Code]
 const
   SHCNE_ASSOCCHANGED = $08000000;
   SHCNF_IDLIST = $0000;
   HelperService = '{{HELPER_SERVICE}}';
-  AdoptLegacy = {{ADOPT_LEGACY}};
-  LegacyUninstallKey = 'Software\Microsoft\Windows\CurrentVersion\Uninstall\728B3532-C74B-4870-9068-BE70FE12A3E6_is1';
-  LegacyHelperService = 'FlClashHelperService';
 
 var
   IsUpgrade: Boolean;
   PreviousVersion: String;
   HelperHeld: Boolean;
-  LegacyRoot: Integer;
-  LegacyDir: String;
+  UpdatePrepared: Boolean;
 
 procedure SHChangeNotify(wEventId: Integer; uFlags: Integer; dwItem1: Integer; dwItem2: Integer); external 'SHChangeNotify@shell32.dll stdcall';
 
@@ -67,8 +65,6 @@ begin
   RunHidden('powershell.exe', '-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "Get-Process -Name FlClashCore -ErrorAction SilentlyContinue | Where-Object { $_.Path -and $_.Path.StartsWith(''' + Dir + ''', [StringComparison]::OrdinalIgnoreCase) } | Stop-Process -Force"');
 end;
 
-// The client goes first so it cannot bring the Helper back, and the Helper is
-// disabled before it stops because the SCM restarts a killed Helper in 5 s.
 procedure ShutDownApp;
 begin
   KillProcess('{{EXECUTABLE_NAME}}');
@@ -79,34 +75,6 @@ begin
   Sleep(1000);
 end;
 
-// Killing the app skips its exit path, which is what turns the system proxy
-// off; the executable clears a proxy left on a port nothing listens on. The
-// proxy is a per-user setting, so Setup runs it as the user who started it,
-// which the uninstaller cannot.
-procedure ClearStaleProxy;
-var
-  AppPath: String;
-  ResultCode: Integer;
-begin
-  AppPath := ExpandConstant('{app}\{{EXECUTABLE_NAME}}');
-  if not FileExists(AppPath) then
-    Exit;
-  if IsUninstaller then
-    Exec(AppPath, '--clear-stale-proxy', '', SW_HIDE, ewWaitUntilTerminated, ResultCode)
-  else
-    ExecAsOriginalUser(AppPath, '--clear-stale-proxy', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-end;
-
-// The install may abort before any 0.5 executable is in place, and 0.4.x
-// has no --clear-stale-proxy, so Setup clears the proxy without the app.
-procedure ClearStaleProxyBeforeInstall;
-var
-  ResultCode: Integer;
-begin
-  ExtractTemporaryFile('clear_stale_proxy.ps1');
-  ExecAsOriginalUser('powershell.exe', '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + ExpandConstant('{tmp}\clear_stale_proxy.ps1') + '"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-end;
-
 procedure ReleaseHelper;
 begin
   if not HelperHeld then
@@ -114,6 +82,28 @@ begin
   HelperHeld := False;
   RunHidden('sc.exe', 'config "' + HelperService + '" start= auto');
   RunHidden('sc.exe', 'start "' + HelperService + '"');
+end;
+
+function RunUpdateScript(const Phase: String): Integer;
+var
+  Params: String;
+begin
+  Params := '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' +
+    ExpandConstant('{tmp}\prepare_update.ps1') + '" -Phase ' + Phase +
+    ' -InstallDir "' + ExpandConstant('{app}') + '" -AppExe "{{EXECUTABLE_NAME}}"' +
+    ' -ServiceName "' + HelperService + '" -Endpoint "' +
+    ExpandConstant('{userappdata}\{{USER_DATA_DIR}}\core-cli.json') + '" -StateFile "' +
+    ExpandConstant('{tmp}\flclashz-update-state.json') + '"';
+  Result := RunHidden(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'), Params);
+end;
+
+procedure ReleaseUpdate;
+begin
+  if not UpdatePrepared then Exit;
+  if RunUpdateScript('Release') = 0 then
+    UpdatePrepared := False
+  else
+    Log('Failed to restore FlClashZ Helper service configuration');
 end;
 
 function IsAppInstalled(): Boolean;
@@ -143,88 +133,46 @@ begin
     Result := Version;
 end;
 
-// 0.4.x registered under upstream FlClash's AppId, so only an entry that
-// names FlClashX is ours.
-function FindLegacyInstall(Root: Integer): Boolean;
-var
-  Name: String;
-begin
-  Result := RegQueryStringValue(Root, LegacyUninstallKey, 'DisplayName', Name) and
-            (Pos('FlClashX', Name) = 1) and
-            RegQueryStringValue(Root, LegacyUninstallKey, 'InstallLocation', LegacyDir);
-  if Result then
-  begin
-    LegacyRoot := Root;
-    LegacyDir := RemoveBackslashUnlessRoot(LegacyDir);
-  end;
-end;
-
-function HasLegacyInstall(): Boolean;
-begin
-  Result := LegacyDir <> '';
-end;
-
-// The old uninstaller would remove the new files and offer to delete the
-// user data both versions share, so its entry goes without running it.
-procedure RetireLegacyInstall;
-var
-  Uninstaller: String;
-  ImagePath: String;
-begin
-  if not HasLegacyInstall or (CompareText(LegacyDir, ExpandConstant('{app}')) <> 0) then
-    Exit;
-  if RegQueryStringValue(LegacyRoot, LegacyUninstallKey, 'UninstallString', Uninstaller) then
-  begin
-    Uninstaller := RemoveQuotes(Uninstaller);
-    if CompareText(Uninstaller, ExpandConstant('{uninstallexe}')) <> 0 then
-    begin
-      DeleteFile(Uninstaller);
-      DeleteFile(ChangeFileExt(Uninstaller, '.dat'));
-      DeleteFile(ChangeFileExt(Uninstaller, '.msg'));
-    end;
-  end;
-  RegDeleteKeyIncludingSubkeys(LegacyRoot, LegacyUninstallKey);
-  if RegQueryStringValue(HKEY_LOCAL_MACHINE, 'SYSTEM\CurrentControlSet\Services\' + LegacyHelperService, 'ImagePath', ImagePath) and
-     (Pos(Lowercase(AddBackslash(LegacyDir)), Lowercase(ImagePath)) > 0) then
-  begin
-    RunHidden('net.exe', 'stop "' + LegacyHelperService + '"');
-    RunHidden('sc.exe', 'delete "' + LegacyHelperService + '"');
-    KillProcess(LegacyHelperService + '.exe');
-    DeleteFile(AddBackslash(LegacyDir) + LegacyHelperService + '.exe');
-  end;
-end;
-
 function InitializeSetup(): Boolean;
 begin
-  if AdoptLegacy and not FindLegacyInstall(HKEY_LOCAL_MACHINE) and not FindLegacyInstall(HKEY_LOCAL_MACHINE_32) then
-    FindLegacyInstall(HKEY_CURRENT_USER);
   IsUpgrade := IsAppInstalled();
   if IsUpgrade then
-    PreviousVersion := GetInstalledVersion()
-  else if HasLegacyInstall then
-  begin
-    IsUpgrade := True;
-    RegQueryStringValue(LegacyRoot, LegacyUninstallKey, 'DisplayVersion', PreviousVersion);
-  end;
+    PreviousVersion := GetInstalledVersion();
   Result := True;
 end;
 
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
-  ShutDownApp;
-  ClearStaleProxyBeforeInstall;
   Result := '';
+  { Refuse a directory containing another client before changing any services. }
+  if FileExists(ExpandConstant('{app}\FlClashX.exe')) or
+     FileExists(ExpandConstant('{app}\FlClashXPre.exe')) or
+     FileExists(ExpandConstant('{app}\FlClash.exe')) or
+     FileExists(ExpandConstant('{app}\FlClashXHelperService.exe')) or
+     FileExists(ExpandConstant('{app}\FlClashXPreHelperService.exe')) or
+     FileExists(ExpandConstant('{app}\FlClashHelperService.exe')) or
+     FileExists(ExpandConstant('{app}\FlClashPreHelperService.exe')) then
+  begin
+    Result := CustomMessage('ForeignInstallDir');
+    Exit;
+  end;
+  ExtractTemporaryFile('prepare_update.ps1');
+  UpdatePrepared := True;
+  if RunUpdateScript('Stop') <> 0 then
+  begin
+    ReleaseUpdate;
+    Result := CustomMessage('UpdateShutdownFailed');
+  end;
 end;
 
 procedure DeinitializeSetup();
 begin
+  ReleaseUpdate;
   ReleaseHelper;
 end;
 
 procedure InitializeWizard();
 begin
-  if HasLegacyInstall and not IsAppInstalled() then
-    WizardForm.DirEdit.Text := LegacyDir;
   if IsUpgrade then
   begin
     WizardForm.Caption := '{{DISPLAY_NAME}} - ' + CustomMessage('Upgrade');
@@ -266,10 +214,33 @@ begin
   if CurStep = ssPostInstall then
   begin
     SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, 0, 0);
-    ClearStaleProxy;
-    RetireLegacyInstall;
+    ReleaseUpdate;
     ReleaseHelper;
   end;
+end;
+
+// Only remove per-user entries if they still point at this installation.
+procedure RemoveOwnedProtocol(Root: Integer; const Scheme: String);
+var
+  Key, Command: String;
+begin
+  Key := 'Software\Classes\' + Scheme;
+  if RegQueryStringValue(Root, Key + '\shell\open\command', '', Command) and
+     (CompareText(Command, '"' + ExpandConstant('{app}\{{EXECUTABLE_NAME}}') + '" "%1"') = 0) then
+    RegDeleteKeyIncludingSubkeys(Root, Key);
+end;
+
+procedure RemoveOwnedAutostart;
+var
+  Key, Command, Exe: String;
+begin
+  Key := 'Software\Microsoft\Windows\CurrentVersion\Run';
+  Exe := ExpandConstant('{app}\{{EXECUTABLE_NAME}}');
+  if RegQueryStringValue(HKEY_CURRENT_USER, Key, '{{DISPLAY_NAME}}', Command) and
+     ((CompareText(Command, Exe) = 0) or
+      (CompareText(Command, '"' + Exe + '"') = 0) or
+      (Pos(Lowercase('"' + Exe + '" '), Lowercase(Command)) = 1)) then
+    RegDeleteValue(HKEY_CURRENT_USER, Key, '{{DISPLAY_NAME}}');
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
@@ -278,14 +249,19 @@ begin
     usUninstall:
     begin
       ShutDownApp;
-      ClearStaleProxy;
       RunHidden('sc.exe', 'delete "' + HelperService + '"');
+      RemoveOwnedAutostart;
+      RemoveOwnedProtocol(HKEY_CURRENT_USER, 'flclashz');
+      RemoveOwnedProtocol(HKEY_CURRENT_USER, 'clashz');
+      RemoveOwnedProtocol(HKEY_LOCAL_MACHINE, 'flclashz');
+      RemoveOwnedProtocol(HKEY_LOCAL_MACHINE, 'clashz');
     end;
     usPostUninstall:
     begin
       if DirExists(ExpandConstant('{userappdata}\{{USER_DATA_DIR}}')) then
       begin
-        if MsgBox(CustomMessage('RemoveUserData'), mbConfirmation, MB_YESNO) = IDYES then
+        if (not UninstallSilent) and
+           (MsgBox(CustomMessage('RemoveUserData'), mbConfirmation, MB_YESNO) = IDYES) then
           DelTree(ExpandConstant('{userappdata}\{{USER_DATA_DIR}}'), True, True, True);
       end;
     end;
@@ -305,6 +281,8 @@ english.ContinueHint=Click Next to continue the upgrade, or Cancel to exit.
 english.CurrentVersion=Current version: %1
 english.NewVersion=New version: %1
 english.RemoveUserData=Remove the application's user data?
+english.UpdateShutdownFailed=Could not safely stop FlClashZ. Close it and retry the update.
+english.ForeignInstallDir=Choose a separate folder. This folder belongs to another FlClash application.
 russian.Upgrade=Обновление
 russian.FreshInstall=Новая установка
 russian.InstalledVersion=Обнаружена установленная версия %1.
@@ -314,6 +292,8 @@ russian.ContinueHint=Нажмите «Далее», чтобы продолжи�
 russian.CurrentVersion=Текущая версия: %1
 russian.NewVersion=Новая версия: %1
 russian.RemoveUserData=Удалить пользовательские данные программы?
+russian.UpdateShutdownFailed=Не удалось безопасно завершить FlClashZ. Закройте программу и повторите обновление.
+russian.ForeignInstallDir=Выберите отдельную папку. Эта папка принадлежит другому приложению FlClash.
 chineseSimplified.Upgrade=升级
 chineseSimplified.FreshInstall=全新安装
 chineseSimplified.InstalledVersion=已安装版本 %1。
@@ -323,13 +303,25 @@ chineseSimplified.ContinueHint=点击“下一步”继续升级，或点击“�
 chineseSimplified.CurrentVersion=当前版本：%1
 chineseSimplified.NewVersion=新版本：%1
 chineseSimplified.RemoveUserData=是否删除应用程序的用户数据？
+chineseSimplified.UpdateShutdownFailed=无法安全关闭 FlClashZ。请退出程序后重试更新。
+chineseSimplified.ForeignInstallDir=请选择单独的目录。此目录属于其他 FlClash 应用。
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: checkedonce; Check: not IsUpgradeInstallation
 
 [Files]
+Source: "{{UPDATE_SCRIPT}}"; Flags: dontcopy
 Source: "{{SOURCE_DIR}}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "{{CLEAR_PROXY_SCRIPT}}"; Flags: dontcopy
+
+[Registry]
+Root: HKLM; Subkey: "Software\Classes\flclashz"; ValueType: string; ValueName: ""; ValueData: "URL:FlClashZ"
+Root: HKLM; Subkey: "Software\Classes\flclashz"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""
+Root: HKLM; Subkey: "Software\Classes\flclashz\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{{EXECUTABLE_NAME}},0"
+Root: HKLM; Subkey: "Software\Classes\flclashz\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{{EXECUTABLE_NAME}}"" ""%1"""
+Root: HKLM; Subkey: "Software\Classes\clashz"; ValueType: string; ValueName: ""; ValueData: "URL:FlClashZ"
+Root: HKLM; Subkey: "Software\Classes\clashz"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""
+Root: HKLM; Subkey: "Software\Classes\clashz\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{{EXECUTABLE_NAME}},0"
+Root: HKLM; Subkey: "Software\Classes\clashz\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{{EXECUTABLE_NAME}}"" ""%1"""
 
 [Icons]
 Name: "{autoprograms}\{{DISPLAY_NAME}}"; Filename: "{app}\{{EXECUTABLE_NAME}}"

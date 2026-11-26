@@ -338,6 +338,7 @@ func runProbe(parent context.Context, req probeRequest) *ProbeResult {
 	}
 
 	start := time.Now()
+	defer func() { result.sampleMicros = time.Since(start).Microseconds() }()
 	response, err := client.Do(request)
 	if err != nil {
 		return fail(err)

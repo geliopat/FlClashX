@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:fl_clash/common/boot_record.dart';
 import 'package:fl_clash/common/constant.dart';
 import 'package:fl_clash/common/preferences.dart';
+import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -69,6 +70,87 @@ void main() {
 
       expect(restored.currentProfileId, 42);
       expect(restored.excludeSSIDs, ['home']);
+    });
+
+    test('saveConfig preserves the Zapret dashboard widget', () async {
+      const config = Config(
+        themeProps: defaultThemeProps,
+        currentProfileId: 42,
+        appSettingProps: AppSettingProps(
+          dashboardWidgets: [
+            DashboardWidget.currentOutbound,
+            DashboardWidget.zapret,
+          ],
+          dashboardWidgetsChosen: true,
+          openLogs: true,
+          acceptedDisclaimerVersion: disclaimerVersion,
+        ),
+      );
+
+      expect(await preferences.saveConfig(config), isTrue);
+      final saved = (await preferences.getConfigMap())!;
+      final app = saved['appSettingProps'] as Map<String, Object?>;
+      expect(app['dashboardWidgets'], ['currentOutbound', 'zapret']);
+      expect(Config.strictFromJson(saved), config);
+    });
+
+    test('every saved dashboard widget and setting enum survives persistence', () async {
+      final app = const AppSettingProps().copyWith(
+        dashboardWidgets: DashboardWidget.values,
+        dashboardWidgetsChosen: true,
+      );
+      final base = Config(themeProps: defaultThemeProps, appSettingProps: app);
+      final cases = <Config>[
+        base,
+        for (final value in RequestFeed.values)
+          base.copyWith.appSettingProps(requestFeed: value),
+        for (final value in TabAnimation.values)
+          base.copyWith.appSettingProps(tabAnimation: value),
+        for (final value in RestoreStrategy.values)
+          base.copyWith.appSettingProps(restoreStrategy: value),
+        for (final value in EditorFontSize.values)
+          base.copyWith.appSettingProps(editorFontSize: value),
+        for (final value in AccessControlMode.values)
+          base.copyWith.vpnProps.accessControlProps(mode: value),
+        for (final value in AccessSortType.values)
+          base.copyWith.vpnProps.accessControlProps(sort: value),
+        for (final value in ProxiesType.values)
+          base.copyWith.proxiesStyleProps(type: value),
+        for (final value in ProxiesSortType.values)
+          base.copyWith.proxiesStyleProps(sortType: value),
+        for (final value in ProxiesLayout.values)
+          base.copyWith.proxiesStyleProps(layout: value),
+        for (final value in ProxiesIconStyle.values)
+          base.copyWith.proxiesStyleProps(iconStyle: value),
+        for (final value in ProxyCardType.values)
+          base.copyWith.proxiesStyleProps(cardType: value),
+        for (final value in Mode.values)
+          base.copyWith.patchClashConfig(mode: value),
+        for (final value in LogLevel.values)
+          base.copyWith.patchClashConfig(logLevel: value),
+        for (final value in FindProcessMode.values)
+          base.copyWith.patchClashConfig(findProcessMode: value),
+        for (final value in InterfaceNameMode.values)
+          base.copyWith.patchClashConfig(interfaceNameMode: value),
+        for (final value in GeodataLoader.values)
+          base.copyWith.patchClashConfig(geodataLoader: value),
+        for (final value in TunStack.values)
+          base.copyWith.patchClashConfig.tun(stack: value),
+        base.copyWith.patchClashConfig(
+          tunOverrideKeys: TunOverrideKey.values.toSet(),
+        ),
+      ];
+      for (final config in cases) {
+        expect(await preferences.saveConfig(config), isTrue);
+        expect(Config.strictFromJson((await preferences.getConfigMap())!), config);
+      }
+    });
+
+    test('corrupted settings JSON restores last successful configuration', () async {
+      const config = Config(themeProps: defaultThemeProps, currentProfileId: 42);
+      expect(await preferences.saveConfig(config), isTrue);
+      await store.setString(configKey, 'broken');
+      expect(Config.strictFromJson((await preferences.getConfigMap())!), config);
     });
 
     test('getConfigMap returns null for malformed JSON', () async {

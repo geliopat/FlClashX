@@ -37,6 +37,9 @@ void main() {
       final locale = entry.key;
       final lookup = entry.value;
       final messages = lookup.messages;
+      final source = arbByLocale[locale]!;
+      expect(source.keys.where((key) => !key.startsWith('@')).toSet(),
+          expectedKeys, reason: '$locale ARB keys must match English');
       expect(
         messages.keys.toSet(),
         expectedKeys,
@@ -67,6 +70,10 @@ void main() {
           isNotEmpty,
           reason: '$locale.$key must not be empty',
         );
+        if (key.startsWith('fork') && argumentCount == 0) {
+          expect(translated, source[key],
+              reason: '$locale.$key generated text must equal its ARB source');
+        }
       }
     }
   });

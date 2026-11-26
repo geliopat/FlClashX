@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:fl_clash/common/constant.dart';
 import 'package:fl_clash/common/desktop_channel.dart';
@@ -17,17 +18,297 @@ const _coreSha256 =
     '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 
 void main() {
+  test('Zapret catalog preserves the original engine families and categories', () async {
+    final client = _client(
+      _ResponseAdapter(
+        (_) => _jsonListResponse([
+          {
+            'id': 'flowseal-alt',
+            'name': 'Flowseal ALT',
+            'filename': 'general (ALT).bat',
+            'description': 'Flowseal strategy',
+            'engine': 'winws',
+            'category': 'flowseal',
+            'supportsSplitMode': true,
+          },
+          {
+            'id': 'zapret2-ru-ultimate',
+            'name': 'Zapret2 Ultimate',
+            'filename': 'zapret2-ru-ultimate.lua',
+            'description': 'Lua strategy',
+            'engine': 'winws2',
+            'category': 'zapret2',
+            'supportsSplitMode': false,
+          },
+          {
+            'id': 'kinlay0-alt14',
+            'name': 'kinlay0 ALT14',
+            'filename': 'general (ALT14).bat',
+            'description': 'Imported BAT translated to winws2',
+            'engine': 'winws2',
+            'category': 'zapret2',
+            'supportsSplitMode': false,
+          },
+        ]),
+      ),
+    );
+
+    final result = await client.zapretStrategies();
+
+    expect(result.map((item) => item.id), [
+      'flowseal-alt',
+      'zapret2-ru-ultimate',
+      'kinlay0-alt14',
+    ]);
+    expect(result.first.engine, 'winws');
+    expect(result.first.supportsSplitMode, isTrue);
+    expect(result[1].supportsSplitMode, isFalse);
+    expect(result.last.engine, 'winws2');
+  });
+
+  test('Zapret start sends launch mode and parses active diagnostics', () async {
+    final adapter = _ResponseAdapter((options) {
+      expect(options.method, 'POST');
+      expect(options.path, endsWith('/zapret/start'));
+      expect(options.data, {'strategyId': 'flowseal-alt', 'mode': 'fullBypass'});
+      expect(int.tryParse(options.headers['x-zapret-owner-pid'].toString()), greaterThan(0));
+      expect(int.tryParse(options.headers['x-zapret-command'].toString()), greaterThan(0));
+      return _jsonResponse({
+        'running': true,
+        'pid': 3210,
+        'strategyId': 'flowseal-alt',
+        'engine': 'winws',
+        'mode': 'fullBypass',
+        'winDivertFilters': ['--wf-tcp=80,443'],
+        'processingLists': ['--hostlist=lists/list-general.txt'],
+        'cleanedProcesses': 2,
+      });
+    });
+    final client = _client(adapter);
+
+    final result = await client.startZapret(strategyId: 'flowseal-alt', mode: 'fullBypass');
+
+    expect(result.running, isTrue);
+    expect(result.pid, 3210);
+    expect(result.strategyId, 'flowseal-alt');
+    expect(result.engine, 'winws');
+    expect(result.mode, 'fullBypass');
+    expect(result.winDivertFilters, ['--wf-tcp=80,443']);
+    expect(result.processingLists, ['--hostlist=lists/list-general.txt']);
+    expect(result.cleanedProcesses, 2);
+  });
+
+  test('Zapret restart matches the shared Rust wire contract', () async {
+    final fixture = jsonDecode(
+      await File('test/fixtures/zapret_restart_contract.json').readAsString(),
+    ) as Map<String, dynamic>;
+    final client = _client(_ResponseAdapter((options) {
+      expect(options.method, 'POST');
+      expect(options.path, endsWith('/zapret/restart'));
+      expect(options.data, fixture['request']);
+      return _jsonResponse(Map<String, Object?>.from(fixture['response'] as Map));
+    }));
+    final result = await client.restartZapret(
+      strategyId: 'flowseal-alt',
+      mode: 'fullBypass',
+      debug: true,
+      watchdog: false,
+      reason: 'dashboard',
+    );
+    expect(result.running, isTrue);
+    expect(result.pid, 3210);
+    expect(result.engine, 'winws');
+  });
+
+  test('reads persistent service journal through its fixed endpoint', () async {
+    const content = '{"timestampMs":1,"level":"info","component":"Zapret","message":"started"}\n';
+    final client = _client(_ResponseAdapter((options) {
+      expect(options.method, 'GET');
+      expect(options.path, endsWith('/zapret/logs/archive'));
+      return _jsonResponse({'content': content});
+    }));
+    expect(await client.zapretLogArchive(), content);
+  });
+
+  test('Zapret operations carry increasing sequence numbers from one owner', () async {
+    final commands = <int>[];
+    final owners = <String>{};
+    final adapter = _ResponseAdapter((options) {
+      commands.add(int.parse(options.headers['x-zapret-command'].toString()));
+      owners.add(options.headers['x-zapret-owner-pid'].toString());
+      if (options.path.endsWith('/watchdog')) return _jsonResponse(<String, Object?>{});
+      return _jsonResponse({
+        'running': false,
+        'winDivertFilters': <String>[],
+        'processingLists': <String>[],
+        'cleanedProcesses': 0,
+      });
+    });
+    final client = _client(adapter);
+    await client.stopZapret();
+    await client.setZapretWatchdog(false);
+    await client.stopZapret();
+    expect(owners, hasLength(1));
+    expect(commands, hasLength(3));
+    expect(commands[1], greaterThan(commands[0]));
+    expect(commands[2], greaterThan(commands[1]));
+  });
+
+  test('Zapret refuses a running status without a known strategy engine', () async {
+    final client = _client(
+      _ResponseAdapter(
+        (_) => _jsonResponse({
+          'running': true,
+          'pid': 3210,
+          'cleanedProcesses': 0,
+        }),
+      ),
+    );
+
+    await expectLater(
+      client.zapretStatus(),
+      throwsA(
+        isA<HelperException>().having(
+          (error) => error.code,
+          'code',
+          'invalidResponse',
+        ),
+      ),
+    );
+  });
+
+  test('rejects an empty built-in Zapret strategy catalog', () async {
+    final client = _client(
+      _ResponseAdapter((_) => _jsonListResponse([])),
+    );
+
+    await expectLater(
+      client.zapretStrategies(),
+      throwsA(
+        isA<HelperException>().having(
+          (error) => error.code,
+          'code',
+          'invalidResponse',
+        ),
+      ),
+    );
+  });
+
+  test('rejects duplicate IDs in the Zapret strategy catalog', () async {
+    Map<String, Object?> strategy() => {
+      'id': 'flowseal-alt',
+      'name': 'Flowseal ALT',
+      'filename': 'general (ALT).bat',
+      'description': 'Flowseal strategy',
+      'engine': 'winws',
+      'category': 'flowseal',
+            'supportsSplitMode': true,
+    };
+    final client = _client(
+      _ResponseAdapter(
+        (_) => _jsonListResponse([strategy(), strategy()]),
+      ),
+    );
+
+    await expectLater(
+      client.zapretStrategies(),
+      throwsA(
+        isA<HelperException>().having(
+          (error) => error.code,
+          'code',
+          'invalidResponse',
+        ),
+      ),
+    );
+  });
+
+  test('reads Zapret list metadata through Helper', () async {
+    final client = _client(
+      _ResponseAdapter((options) {
+        expect(options.path, endsWith('/zapret/lists'));
+        return _jsonListResponse([
+          {
+            'filename': 'list-general.txt',
+            'bytes': 120,
+            'entries': 3,
+            'userManaged': false,
+          },
+        ]);
+      }),
+    );
+
+    final lists = await client.zapretLists();
+
+    expect(lists.single.filename, 'list-general.txt');
+    expect(lists.single.entries, 3);
+    expect(lists.single.userManaged, isFalse);
+  });
+
+  test('reads and writes an allow-listed Zapret list', () async {
+    var read = false;
+    final client = _client(
+      _ResponseAdapter((options) {
+        if (options.method == 'GET') {
+          read = true;
+          expect(options.path, endsWith('/zapret/lists/list-general.txt'));
+          return _jsonResponse({
+            'filename': 'list-general.txt',
+            'content': 'example.org\n',
+          });
+        }
+        expect(read, isTrue);
+        expect(options.method, 'PUT');
+        expect(options.data, {'content': 'example.org\ncustom.org\n'});
+        return _jsonResponse({
+          'filename': 'list-general.txt',
+          'bytes': 23,
+          'entries': 2,
+          'userManaged': false,
+        });
+      }),
+    );
+
+    final loaded = await client.readZapretList('list-general.txt');
+    final saved = await client.writeZapretList(
+      'list-general.txt',
+      'example.org\ncustom.org\n',
+    );
+
+    expect(loaded.content, 'example.org\n');
+    expect(saved.entries, 2);
+  });
+
+  test('restores a Zapret list backup through Helper', () async {
+    final client = _client(
+      _ResponseAdapter((options) {
+        expect(options.method, 'POST');
+        expect(options.path, endsWith('/zapret/lists/list-general.txt/restore'));
+        return _jsonResponse({
+          'filename': 'list-general.txt',
+          'bytes': 12,
+          'entries': 1,
+          'userManaged': false,
+        });
+      }),
+    );
+
+    final result = await client.restoreZapretList('list-general.txt');
+
+    expect(result.filename, 'list-general.txt');
+    expect(result.entries, 1);
+  });
+
   test('reads the port from the key the Windows service publishes it in', () {
     final peer = File('services/helper/src/service/peer.rs').readAsStringSync();
 
     expect(peer, contains('r"${helperPortKeyFor('{}')}"'));
     expect(peer, contains('const PORT_VALUE: &str = "$helperPortValue";'));
-    expect(helperPortKey, helperPortKeyFor('FlClashXHelperService'));
+    expect(helperPortKey, helperPortKeyFor(Platform.isWindows ? 'FlClashZHelperService' : 'FlClashXHelperService'));
   });
 
   test('only the stable app falls back to the fixed Helper port', () {
     expect(HelperClient.helperPortFor(published: 50123, pre: true), 50123);
-    expect(HelperClient.helperPortFor(published: null, pre: false), helperPort);
+    expect(HelperClient.helperPortFor(published: null, pre: false), 47891);
     expect(
       () => HelperClient.helperPortFor(published: null, pre: true),
       throwsA(
@@ -455,7 +736,7 @@ void main() {
     },
   );
 
-  test('ping requires protocol 6 and the expected Helper path', () async {
+  test('ping requires the current Helper protocol and the expected path', () async {
     final adapter = _ResponseAdapter((options) {
       expect(options.queryParameters, {'coreSha256': _coreSha256});
       return ResponseBody.fromString(
@@ -473,6 +754,33 @@ void main() {
           r'C:\Program Files\FlClash\FlClashXHelperService.exe',
     );
 
+    expect(await client.readiness(), HelperReadiness.ready);
+  });
+
+  test('startup verifies the running Helper hash even with a matching protocol', () async {
+    final dir = Directory.systemTemp.createTempSync('helper-binary-check');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final bundled = File([dir.path, 'FlClashZHelperService.exe'].join(Platform.pathSeparator));
+    await bundled.writeAsString('current helper');
+    final digest = sha256.convert(utf8.encode('current helper')).toString();
+    String? runningHash = digest;
+    final client = _client(
+      _ResponseAdapter((_) => ResponseBody.fromString(
+        bundled.path,
+        HttpStatus.ok,
+        headers: {
+          helperProtocolVersionHeader: [helperProtocolVersion],
+          Headers.contentTypeHeader: ['text/plain'],
+          if (runningHash != null) 'x-flclashz-helper-sha256': [runningHash],
+        },
+      )),
+      expectedHelperPath: () => bundled.path,
+    );
+    expect(await client.readiness(verifyHelperBinary: true), HelperReadiness.ready);
+    runningHash = _coreSha256;
+    expect(await client.readiness(verifyHelperBinary: true), HelperReadiness.notReady);
+    runningHash = null;
+    expect(await client.readiness(verifyHelperBinary: true), HelperReadiness.notReady);
     expect(await client.readiness(), HelperReadiness.ready);
   });
 
@@ -697,6 +1005,39 @@ void main() {
     expect(await resolver.resolve(), same(direct));
   });
 
+  test('required Helper never falls back to direct Core', () async {
+    final direct = FakeLauncher(owner: CoreProcessOwner.direct, pid: 1);
+    final helper = FakeLauncher(owner: CoreProcessOwner.helper, pid: 2);
+    var readiness = HelperReadiness.notReady;
+    final resolver = HelperLauncherResolver(
+      hasHelper: true,
+      requireHelper: true,
+      directLauncher: direct,
+      helperLauncher: helper,
+      helperReady: () async => readiness,
+    );
+    for (final unavailable in [
+      HelperReadiness.notReady,
+      HelperReadiness.manifestMissing,
+      HelperReadiness.coreMismatch,
+    ]) {
+      readiness = unavailable;
+      await expectLater(resolver.resolve(), throwsA(isA<HelperException>()));
+    }
+    readiness = HelperReadiness.ready;
+    final resolved = await resolver.resolve();
+    expect(resolved, same(helper));
+    helper.startError = const HelperException(
+      code: 'processLaunchFailed',
+      message: 'cannot spawn Core',
+    );
+    await expectLater(
+      resolved.start(sessionId: _sessionId, address: 'test-address'),
+      throwsA(isA<HelperException>()),
+    );
+    expect(direct.startCount, 0);
+  });
+
   test('launcher resolver never probes Helper without one installed', () async {
     final direct = FakeLauncher(owner: CoreProcessOwner.direct, pid: 1);
     final helper = FakeLauncher(owner: CoreProcessOwner.helper, pid: 2);
@@ -816,6 +1157,16 @@ HelperClient _client(
 }
 
 ResponseBody _jsonResponse(Map<String, Object?> body, {int statusCode = 200}) {
+  return ResponseBody.fromString(
+    jsonEncode(body),
+    statusCode,
+    headers: {
+      Headers.contentTypeHeader: ['application/json'],
+    },
+  );
+}
+
+ResponseBody _jsonListResponse(List<Object?> body, {int statusCode = 200}) {
   return ResponseBody.fromString(
     jsonEncode(body),
     statusCode,

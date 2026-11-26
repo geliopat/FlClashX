@@ -21,6 +21,7 @@ class FileLogger {
     DateTime Function()? now,
     this.maxFileBytes = 10 * 1024 * 1024,
     this.keepDays = 10,
+    this.prefix = appName,
     @visibleForTesting Future<void> Function(ArchiveRequest)? writeArchive,
   }) : _directory = directory ?? _defaultDirectory,
        _now = now ?? DateTime.now,
@@ -32,6 +33,7 @@ class FileLogger {
   final Future<void> Function(ArchiveRequest) _writeArchiveWith;
   final int maxFileBytes;
   final int keepDays;
+  final String prefix;
 
   static const _pendingLimit = 2000;
 
@@ -43,8 +45,9 @@ class FileLogger {
   File? _file;
   int _size = 0;
 
-  static final _dayPattern = RegExp(
-    r'^FlClashX_(\d{4}-\d{2}-\d{2})(?:_\d+)?\.log$',
+  late final _dayPattern = RegExp(
+    (prefix == appName ? r'^FlClash[ZX]' : '^'+RegExp.escape(prefix)) +
+    r'_(\d{4}-\d{2}-\d{2})(?:_\d+)?\.log$',
   );
 
   static Future<String> _defaultDirectory() async =>
@@ -114,7 +117,7 @@ class FileLogger {
     return archivePath;
   }
 
-  static const _archivePrefix = '${appName}_logs_';
+  String get _archivePrefix => '${prefix}_logs_';
 
   Future<String> _freshArchivePath(String directory, DateTime now) async {
     final time = [
@@ -182,8 +185,8 @@ class FileLogger {
     _day = day;
     for (var index = 0; ; index++) {
       final name = index == 0
-          ? '${appName}_$day.log'
-          : '${appName}_${day}_$index.log';
+          ? '${prefix}_$day.log'
+          : '${prefix}_${day}_$index.log';
       final file = File(join(directory, name));
       final size = await file.exists() ? await file.length() : 0;
       if (size + incoming <= maxFileBytes || size == 0) {
@@ -231,3 +234,12 @@ Future<void> _writeArchive(ArchiveRequest request) async {
 }
 
 final fileLogger = FileLogger();
+
+final zapretFileLogger = FileLogger(
+  prefix: 'Zapret',
+  directory: () async => join(await appPath.homeDirPath, logsDirectoryName, 'zapret'),
+);
+final crashFileLogger = FileLogger(
+  prefix: 'Crashes',
+  directory: () async => join(await appPath.homeDirPath, logsDirectoryName, 'crashes'),
+);

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:fl_clash/enum/enum.dart';
@@ -23,6 +24,11 @@ void main(List<String> args) {
       if (args.contains(restartCoreArgument)) {
         exit((await runRestartCoreCli()).code);
       }
+      // CI-only startup acknowledgement. Normal launches never write it.
+      final smokeMarker = Platform.isWindows && args.contains('--ci-smoke-test')
+          ? Platform.environment['FLCLASHZ_SMOKE_MARKER']
+          : null;
+      var startupFailed = false;
       fileLogger.enable();
       if (Platform.isWindows || Platform.isLinux) {
         SharedPreferencesStorePlatform.instance = AtomicFilePreferencesStore(
@@ -33,6 +39,7 @@ void main(List<String> args) {
         linkManager.seedInitialLink(args);
       }
       FlutterError.onError = (details) {
+        startupFailed = true;
         Future.microtask(() {
           commonPrint.log(
             'exception: ${details.exception} stack: ${details.stack}',
@@ -53,10 +60,38 @@ void main(List<String> args) {
             child: const Application(),
           ),
         );
+        if (smokeMarker != null && smokeMarker.isNotEmpty) {
+          final paths = jsonEncode({
+            'status': 'first-frame-ok',
+            'home': await appPath.homeDirPath,
+            'cache': (await appPath.cacheDir.future).path,
+            'preferences': await appPath.sharedPreferencesPath,
+            'database': await appPath.databasePath,
+            'config': await appPath.configFilePath,
+            'profiles': await appPath.profilesPath,
+            'providers': await appPath.providerCacheRootPath,
+            'scripts': await appPath.scriptsDirPath,
+            'lock': await appPath.lockFilePath,
+            'coreCli': await appPath.coreCliPath,
+          });
+          if (!startupFailed) {
+            // Awaiting the path futures can pass the first frame. Schedule a
+            // new frame explicitly so acknowledgement is not lost.
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!startupFailed) {
+                File(smokeMarker).writeAsStringSync(paths, flush: true);
+              }
+            });
+            WidgetsBinding.instance.ensureVisualUpdate();
+          }
+        }
         if (system.isDesktop) {
           unawaited(
             coreCliServer.start(
               restartCore: () => _restartCoreByCommand(container),
+              shutdownForUpdate: Platform.isWindows
+                  ? () => container.read(systemActionProvider.notifier).handleExit()
+                  : null,
             ),
           );
         }

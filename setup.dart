@@ -62,7 +62,10 @@ Future<void> main(List<String> args) async {
     exit(1);
   }
 
-  final env = results['env'] as String;
+  final env = defaultPackageEnvironment(
+    platform: platform,
+    explicit: results.wasParsed('env') ? results['env'] as String : null,
+  );
   final rootDir = Directory.current.path;
   final skipped = packagesNotBuildingAssets(
     File(p.join(rootDir, 'pubspec.yaml')).readAsStringSync(),
@@ -93,13 +96,16 @@ Future<void> main(List<String> args) async {
   exit(exitCode);
 }
 
+String defaultPackageEnvironment({required String platform, String? explicit}) =>
+    explicit ?? (platform == 'windows' ? 'stable' : 'pre');
+
 ArgParser createSetupArgParser() {
   return ArgParser()
     ..addOption(
       'env',
       defaultsTo: 'pre',
       allowed: ['dev', 'pre', 'stable'],
-      help: 'Application environment',
+      help: 'Application environment (Windows defaults to stable)',
     )
     ..addOption(
       'targets',
@@ -146,9 +152,12 @@ Map<String, String> createBuildEnvironment(String env) {
 List<String> createBuildDefines({
   required String appVersion,
   required String coreVersion,
+  String updatePublicKey = '',
 }) => [
   '--dart-define=APP_VERSION=$appVersion',
   if (coreVersion.isNotEmpty) '--dart-define=CORE_VERSION=$coreVersion',
+  if (updatePublicKey.isNotEmpty)
+    '--dart-define=FLCLASHZ_UPDATE_PUBLIC_KEY=$updatePublicKey',
 ];
 
 /// The tag CI builds from when it is a release tag, else the pubspec version.
@@ -226,7 +235,7 @@ const stableDesktop = DesktopIdentity(
   packageName: 'flclashx',
   installDir: _appName,
   helperUnit: 'flclashx-helper',
-  windowsDataDir: r'com.follow\clashx',
+  windowsDataDir: r'sweetyyoba.com\clashz',
 );
 
 const preDesktop = DesktopIdentity(
@@ -238,10 +247,12 @@ const preDesktop = DesktopIdentity(
   packageName: 'flclashx-pre',
   installDir: 'FlClashXPre',
   helperUnit: 'flclashx-pre-helper',
-  windowsDataDir: r'com.follow\clashx.pre',
+  windowsDataDir: r'sweetyyoba.com\clashz.pre',
 );
 
-const _preWindowsAppId = '3B6E2F0A-9C41-4D57-8A2E-7F1D5C0B9E63';
+const windowsHelperName = 'FlClashZHelperService';
+
+const _preWindowsAppId = '87F299A5-9634-45C1-915B-24E3A90B56A2';
 
 DesktopIdentity desktopIdentityOf(String env) =>
     env == 'pre' ? preDesktop : stableDesktop;
@@ -255,12 +266,18 @@ List<String> channelScripts(List<String> scripts, DesktopIdentity identity) => [
     line.replaceAll(stableDesktop.helperUnit, identity.helperUnit),
 ];
 
-void renameForChannel(String dir, DesktopIdentity identity, {String ext = ''}) {
+void renameForChannel(
+  String dir,
+  DesktopIdentity identity, {
+  String ext = '',
+  bool renameHelper = true,
+}) {
   if (!identity.pre) return;
   for (final (from, to) in [
     (stableDesktop.executable, identity.executable),
     (stableDesktop.helper, identity.helper),
   ]) {
+    if (!renameHelper && from == stableDesktop.helper) continue;
     final file = File(p.join(dir, '$from$ext'));
     if (file.existsSync()) file.renameSync(p.join(dir, '$to$ext'));
   }
@@ -289,7 +306,7 @@ List<int> utf16le(String value) => [
 /// `FlClashX-<platform>-<arch>` plus the format's extension; the release
 /// templates and the AUR package link these names.
 String artifactName(String platform, String arch, String extension) =>
-    '$_appName-$platform-$arch$extension';
+    '${platform == 'windows' ? 'FlClashZ' : _appName}-$platform-$arch$extension';
 
 void _showHelp(ArgParser parser) {
   stderr.writeln('Usage: dart setup.dart [platform] [options]');
@@ -352,7 +369,11 @@ class _Build {
       '--$arg',
     if (androidArch != null)
       '--target-platform=${_androidFlutterTarget[androidArch]!}',
-    ...createBuildDefines(appVersion: appVersion, coreVersion: coreVersion),
+    ...createBuildDefines(
+      appVersion: appVersion,
+      coreVersion: coreVersion,
+      updatePublicKey: Platform.environment['FLCLASHZ_UPDATE_PUBLIC_KEY'] ?? '',
+    ),
   ];
 
   Future<int> run(
@@ -632,7 +653,18 @@ Future<void> _packageWindows(
   Set<String> targets, {
   required String env,
 }) async {
-  final identity = desktopIdentityOf(env);
+  final legacy = desktopIdentityOf(env);
+  final identity = DesktopIdentity(
+    pre: legacy.pre,
+    executable: legacy.pre ? 'FlClashZPre' : 'FlClashZ',
+    helper: windowsHelperName,
+    displayName: legacy.pre ? 'FlClashZ Pre' : 'FlClashZ',
+    bundleId: legacy.pre ? 'com.sweetyyoba.clashz.pre' : 'com.sweetyyoba.clashz',
+    packageName: legacy.pre ? 'clashz.pre' : 'clashz',
+    installDir: legacy.pre ? 'FlClashZPre' : 'FlClashZ',
+    helperUnit: legacy.helperUnit,
+    windowsDataDir: legacy.windowsDataDir,
+  );
   await build.mustRun('flutter', [
     'build',
     'windows',
@@ -650,13 +682,28 @@ Future<void> _packageWindows(
   );
   var bundle = built;
   if (identity.pre) {
-    requireChannelMarker(p.join(built, '$_appName.exe'), utf16le('clashx.pre'));
+    requireChannelMarker(p.join(built, 'FlClashZ.exe'), utf16le('clashz.pre'));
     bundle = p.join(build.rootDir, 'build', 'windows', winArch, 'pre_bundle');
     if (Directory(bundle).existsSync()) {
       Directory(bundle).deleteSync(recursive: true);
     }
     await build.copyTree(built, bundle);
-    renameForChannel(bundle, identity, ext: '.exe');
+    File(p.join(bundle, 'FlClashZ.exe')).renameSync(p.join(bundle, '${identity.executable}.exe'));
+  }
+  // An incremental Windows build may still contain the old Helper binary.
+  // Do not ship two versions in ZIP or EXE packages.
+  for (final name in [
+    'FlClashXHelperService.exe',
+    'FlClashXPreHelperService.exe',
+    'FlClashHelperService.exe',
+    'FlClashPreHelperService.exe',
+    'FlClashZPreHelperService.exe',
+  ]) {
+    final stale = File(p.join(bundle, name));
+    if (stale.existsSync()) stale.deleteSync();
+  }
+  if (!File(p.join(bundle, '$windowsHelperName.exe')).existsSync()) {
+    throw StateError('Missing Windows Helper in the package: $windowsHelperName.exe');
   }
   if (targets.contains('zip')) {
     final zip = build.dist(artifactName('windows', build.arch, '.zip'));
@@ -723,8 +770,8 @@ String renderInnoSetup(
   DesktopIdentity identity = stableDesktop,
 }) {
   final displayName = identity.pre
-      ? identity.displayName
-      : (config['display_name'] ?? _appName) as String;
+      ? 'FlClashZ Pre'
+      : (config['display_name'] ?? 'FlClashZ') as String;
   final privileges = (config['privileges_required'] ?? 'admin') as String;
   final locales = (config['locales'] as List?) ?? const [];
   final chineseIsl = p.join(
@@ -759,21 +806,14 @@ String renderInnoSetup(
     'PRIVILEGES_REQUIRED': privileges,
     'ARCH': arch == 'arm64' ? 'arm64' : 'x64compatible',
     'SOURCE_DIR': sourceDir,
+    'UPDATE_SCRIPT': p.join(rootDir, 'windows', 'packaging', 'exe', 'prepare_update.ps1'),
     'EXECUTABLE_NAME': identity.pre
-        ? '${identity.executable}.exe'
-        : (config['executable_name'] ?? '$_appName.exe') as String,
-    'HELPER_SERVICE': identity.helper,
+        ? 'FlClashZPre.exe'
+        : (config['executable_name'] ?? 'FlClashZ.exe') as String,
+    'HELPER_SERVICE': windowsHelperName,
     'USER_DATA_DIR': identity.windowsDataDir,
-    'ADOPT_LEGACY': identity.pre ? 'False' : 'True',
     'LANGUAGES': languages.join('\n'),
     'RUN_FLAGS': privileges == 'admin' ? 'runascurrentuser' : '',
-    'CLEAR_PROXY_SCRIPT': p.join(
-      rootDir,
-      'windows',
-      'packaging',
-      'exe',
-      'clear_stale_proxy.ps1',
-    ),
   };
   var rendered = template;
   values.forEach((key, value) {

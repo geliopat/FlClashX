@@ -24,6 +24,13 @@ void main() {
     }
   });
 
+  test('disclaimer consent is stored alongside settings', () async {
+    expect(
+      await appPath.disclaimerConsentPath,
+      join(dirname(await appPath.sharedPreferencesPath), 'disclaimer.accepted'),
+    );
+  });
+
   test('provider directories match the paths handed to the core', () async {
     const proxiesUrl = 'https://example.com/a.yaml';
     const rulesUrl = 'https://example.com/b.yaml';

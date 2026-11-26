@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/common/file_logger.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/features/form/form.dart';
 import 'package:fl_clash/l10n/l10n.dart';
@@ -10,6 +11,7 @@ import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/views/config/on_demand.dart';
+import 'package:fl_clash/views/config/smart_hosts.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -483,6 +485,7 @@ class GeneralView extends ConsumerWidget {
     return [
       const TestUrlItem(),
       const DelayTestTimeoutItem(),
+      if (system.isWindows) ...const [AutoDelayIntervalItem(active: true), AutoDelayIntervalItem(active: false), ZapretProbeIntervalItem()],
       _clashToggle(
         title: (l) => l.unifiedDelay,
         managedKey: 'clash.unified-delay',
@@ -532,7 +535,7 @@ class GeneralView extends ConsumerWidget {
     ];
   }
 
-  List<Widget> _coreItems() {
+  List<Widget> _coreItems(BuildContext context) {
     return [
       _clashToggle(
         title: (l) => 'IPv6',
@@ -541,6 +544,12 @@ class GeneralView extends ConsumerWidget {
         update: (state, value) => state.copyWith(ipv6: value),
       ),
       const HostsItem(),
+      if (system.isWindows) const MihomoWatchdogItem(),
+      if (system.isWindows)
+        ListItem.open(
+          title: Text(AppLocalizations.of(context).forkSmartHosts),
+          widget: const SmartHostsView(),
+        ),
       ConfigToggleItem(
         title: (l) => l.appendSystemDns,
         selector: networkSettingProvider.select(
@@ -574,8 +583,6 @@ class GeneralView extends ConsumerWidget {
       ),
       if (system.isDesktop) const OpenLogsFolderItem(),
       if (system.isAndroid) const ShareLogsItem(),
-      const ReturnToProviderItem(),
-      const ResetAppItem(),
     ];
   }
 
@@ -638,17 +645,97 @@ class GeneralView extends ConsumerWidget {
             ),
             generateSection(
               title: appLocalizations.core,
-              items: _coreItems(),
+              items: _coreItems(context),
               footer: appLocalizations.ipv6Desc,
             ),
           ],
           generateSection(
-            title: appLocalizations.logsAndDiagnostics,
+            title: '${appLocalizations.logs} Mihomo',
             items: _logItems(simple: simple),
             footer: appLocalizations.logcatDesc,
           ),
+          if (system.isWindows)
+            generateSection(
+              title: '${appLocalizations.logs} Zapret',
+              items: [
+                ListItem(
+                  title: Text(AppLocalizations.of(context).forkVerboseEngine),
+                  subtitle: Text(AppLocalizations.of(context).forkNextZapretStart),
+                  trailing: Switch(
+                    value: ref.watch(
+                      zapretControllerProvider.select((state) => state.debugLogs),
+                    ),
+                    onChanged: ref.read(zapretControllerProvider.notifier).setDebugLogs,
+                  ),
+                ),
+                ListItem(
+                  title: Text(AppLocalizations.of(context).forkOpenZapretLogs),
+                  onTap: () async => system.openDirectory(await zapretFileLogger.directoryPath),
+                ),
+                ListItem(
+                  title: Text(AppLocalizations.of(context).forkCrashHistory),
+                  onTap: () async => system.openDirectory(await crashFileLogger.directoryPath),
+                ),
+              ],
+              footer: AppLocalizations.of(context).forkEngineDebugTip,
+            ),
+          generateSection(
+            title: AppLocalizations.of(context).forkResetSettings,
+            items: const [
+              ReturnToProviderItem(),
+              ResetAppItem(),
+            ],
+          ),
         ],
       ),
+    );
+  }
+}
+
+class ZapretProbeIntervalItem extends ConsumerWidget {
+  const ZapretProbeIntervalItem({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return ListItem<int>.options(
+      title: Text(AppLocalizations.of(context).forkHttpsInterval),
+      options: ZapretProbeInterval.values,
+      value: ref.watch(zapretProbeIntervalProvider),
+      textBuilder: (value) => value == 0 ? AppLocalizations.of(context).forkDisabled : '$value сек.',
+      onChanged: (value) => ref.read(zapretProbeIntervalProvider.notifier).update(value),
+    );
+  }
+}
+
+class MihomoWatchdogItem extends ConsumerWidget {
+  const MihomoWatchdogItem({super.key});
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return ListItem(
+      title: const Text('Watchdog Mihomo'),
+      subtitle: Text(AppLocalizations.of(context).forkCoreRecovery),
+      trailing: Switch(
+        value: ref.watch(mihomoWatchdogProvider),
+        onChanged: ref.read(mihomoWatchdogProvider.notifier).setEnabled,
+      ),
+    );
+  }
+}
+
+class AutoDelayIntervalItem extends ConsumerWidget {
+  const AutoDelayIntervalItem({super.key, required this.active});
+  final bool active;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final intervals = ref.watch(autoDelayProvider);
+    return ListItem<int>.options(
+      title: Text(active ? AppLocalizations.of(context).forkSelectedPingInterval : AppLocalizations.of(context).forkOtherPingInterval),
+      options: AutoDelayController.values,
+      value: active ? intervals.active : intervals.others,
+      textBuilder: (value) => value == 0 ? AppLocalizations.of(context).forkDisabled : '$value сек.',
+      onChanged: (value) => ref.read(autoDelayProvider.notifier).set(
+        active: active ? value : null, others: active ? null : value),
     );
   }
 }

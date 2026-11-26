@@ -8,6 +8,7 @@ import 'package:dio/dio.dart';
 import 'package:fl_clash/common/app_localizations.dart';
 import 'package:fl_clash/common/constant.dart';
 import 'package:fl_clash/common/exception.dart';
+import 'package:fl_clash/common/package.dart';
 import 'package:fl_clash/common/request.dart';
 import 'package:fl_clash/l10n/l10n.dart';
 import 'package:fl_clash/state.dart';
@@ -446,6 +447,28 @@ void main() {
       }, _RealHttpOverrides());
       return pending;
     }
+
+    test('sends the FlClashZ user agent on subscription downloads', () async {
+      final previousCoreVersion = globalState.coreVersion;
+      globalState.coreVersion = '1.19.34';
+      String? userAgent;
+      server.listen((incoming) {
+        userAgent = incoming.headers.value(HttpHeaders.userAgentHeader);
+        incoming.response
+          ..statusCode = HttpStatus.ok
+          ..write('proxies: []');
+        unawaited(incoming.response.close());
+      });
+      try {
+        await fetch();
+        expect(
+          userAgent,
+          'FlClashZ/v${globalState.packageInfo.displayVersion} core/v1.19.34 Platform/${Platform.operatingSystem}',
+        );
+      } finally {
+        globalState.coreVersion = previousCoreVersion;
+      }
+    });
 
     test('that answers with part of the file is refused', () async {
       server.listen((request) {
