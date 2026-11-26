@@ -32,27 +32,71 @@ type ZapretCdnSample struct {
 	HTTP    int     `json:"httpStatus,omitempty"`
 }
 
-func cdnURLs(html string) []string {
+// Keep several original playback URLs per node; the first format can
+// be rejected even when a different format is available.
+const (
+	zapretCdnMaxHosts = 6
+	zapretCdnMaxURLs  = 3
+)
+
+type cdnCandidates struct {
+	host string
+	urls []string
+}
+
+func appendCDNURL(groups []cdnCandidates, raw string) []cdnCandidates {
+	if len(raw) > 4096 {
+		return groups
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme != "https" || u.User != nil || u.Port() != "" ||
+		u.Path != "/videoplayback" || !zapretCdnHost.MatchString(u.Hostname()) {
+		return groups
+	}
+	for i := range groups {
+		if groups[i].host != u.Hostname() {
+			continue
+		}
+		for _, existing := range groups[i].urls {
+			if existing == raw {
+				return groups
+			}
+		}
+		if len(groups[i].urls) < zapretCdnMaxURLs {
+			groups[i].urls = append(groups[i].urls, raw)
+		}
+		return groups
+	}
+	if len(groups) < zapretCdnMaxHosts {
+		groups = append(groups, cdnCandidates{host: u.Hostname(), urls: []string{raw}})
+	}
+	return groups
+}
+
+func cdnURLs(html string) []cdnCandidates {
 	html = strings.ReplaceAll(strings.ReplaceAll(html, "\\/", "/"), "\\u0026", "&")
-	seen := map[string]bool{}
-	var urls []string
+	var groups []cdnCandidates
 	for _, raw := range zapretStreamURL.FindAllString(html, -1) {
-		if len(raw) > 4096 {
-			continue
-		}
-		u, err := url.Parse(raw)
-		if err != nil || u.Scheme != "https" || u.User != nil || u.Port() != "" ||
-			u.Path != "/videoplayback" || !zapretCdnHost.MatchString(u.Hostname()) ||
-			seen[u.Hostname()] {
-			continue
-		}
-		seen[u.Hostname()] = true
-		urls = append(urls, raw)
-		if len(urls) == 6 {
+		// An escaped closing quote can leave a trailing JSON backslash.
+		groups = appendCDNURL(groups, strings.TrimSuffix(raw, "\\"))
+	}
+	return groups
+}
+
+// Rejection is not a speed sample. Retry only with another original URL,
+// never by modifying the signed query or the DNS destination.
+func measureCDNCandidates(ctx context.Context, urls []string, measure func(context.Context, string) ZapretCdnSample) ZapretCdnSample {
+	sample := ZapretCdnSample{Verdict: "unknown", Reason: "budget_exhausted"}
+	for _, raw := range urls {
+		if ctx.Err() != nil {
 			break
 		}
+		sample = measure(ctx, raw)
+		if sample.Reason != "stream_http" || (sample.HTTP != 403 && sample.HTTP != 401 && sample.HTTP != 410) {
+			return sample
+		}
 	}
-	return urls
+	return sample
 }
 
 func zapretDirect(result *ProbeResult) bool {
@@ -113,11 +157,10 @@ func handleZapretCdnCheck() []ZapretCdnSample {
 	defer zapretCdnMutex.Unlock()
 	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
 	defer cancel()
-	var urls []string
-	seen := map[string]bool{}
+	var groups []cdnCandidates
 	samples := []ZapretCdnSample{}
 	for _, id := range []string{"aqz-KE-bpKQ", "dQw4w9WgXcQ", "LXb3EKWsInQ"} {
-		if ctx.Err() != nil || len(urls) >= 6 {
+		if ctx.Err() != nil {
 			break
 		}
 		page := runProbe(ctx, probeRequest{
@@ -143,23 +186,21 @@ func handleZapretCdnCheck() []ZapretCdnSample {
 				} else {
 					diagnostic.Reason = "stream_urls_found"
 				}
-				for _, raw := range found {
-					u, _ := url.Parse(raw)
-					if !seen[u.Hostname()] && len(urls) < 6 {
-						seen[u.Hostname()] = true
-						urls = append(urls, raw)
+				for _, group := range found {
+					for _, raw := range group.urls {
+						groups = appendCDNURL(groups, raw)
 					}
 				}
 			}
 		}
 		samples = append(samples, diagnostic)
 	}
-	for _, raw := range urls {
+	for _, group := range groups {
 		if ctx.Err() != nil {
 			samples = append(samples, ZapretCdnSample{Verdict: "diagnostic", Reason: "budget_exhausted"})
 			break
 		}
-		samples = append(samples, measureZapretCDN(ctx, raw))
+		samples = append(samples, measureCDNCandidates(ctx, group.urls, measureZapretCDN))
 	}
 	return samples
 }
