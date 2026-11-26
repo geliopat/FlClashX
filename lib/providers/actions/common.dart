@@ -101,8 +101,11 @@ class CommonAction extends _$CommonAction {
   }
 
   Future<void> _updateTraffic() async {
-    final generation = trafficHistory.generation;
-    if (system.isWindows && trafficHistory.resetting) return;
+    final history = system.isWindows && !ref.read(safeModeProvider)
+        ? ref.read(trafficHistoryProvider)
+        : null;
+    final generation = history?.generation;
+    if (history?.resetting == true) return;
     try {
       final onlyStatisticsProxy = ref.read(
         appSettingProvider.select((state) => state.onlyStatisticsProxy),
@@ -115,14 +118,14 @@ class CommonAction extends _$CommonAction {
         else
           Future<Traffic?>.value(null),
       ]);
-      if (!ref.mounted || (system.isWindows && generation != trafficHistory.generation)) return;
-      if (system.isWindows) {
-        await trafficHistory.record(
-          generation: generation,
+      if (!ref.mounted || generation != history?.generation) return;
+      if (history != null) {
+        await history.record(
+          generation: generation!,
           all: onlyStatisticsProxy ? alternateTotal : totalTraffic,
           proxy: onlyStatisticsProxy ? totalTraffic : alternateTotal,
         );
-        if (!ref.mounted || generation != trafficHistory.generation) return;
+        if (!ref.mounted || generation != history.generation) return;
       }
       if (traffic != null) {
         ref.read(trafficsProvider.notifier).addTraffic(traffic);

@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/common/traffic_history.dart';
+import 'package:fl_clash/providers/zapret.dart';
 import 'package:fl_clash/core/controller.dart';
 import 'package:fl_clash/core/interface.dart';
 import 'package:fl_clash/core/method.dart';
@@ -81,6 +83,19 @@ class _UnflooredDebounceSetupAction extends SetupAction {
 class _CappedDebounceSetupAction extends _UnflooredDebounceSetupAction {
   @override
   Duration get maxApplyDebounce => const Duration(milliseconds: 300);
+}
+
+// These unit/widget tests exercise SetupAction, not the real Helper IPC.
+// Linked lifecycle ordering is covered separately with a recording fake.
+class _IdleZapret extends ZapretController {
+  @override
+  ZapretState build() => const ZapretState();
+
+  @override
+  Future<void> startAlongsideMihomo({bool force = false}) async {}
+
+  @override
+  Future<bool> stopAlongsideMihomo() async => false;
 }
 
 class TestCommonAction extends CommonAction {
@@ -225,6 +240,8 @@ void main() {
     action = TestSetupAction();
     container = ProviderContainer(
       overrides: [
+        trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+        zapretControllerProvider.overrideWith(_IdleZapret.new),
         profilesProvider.overrideWith(TestProfiles.new),
         setupActionProvider.overrideWith(() => action),
         commonActionProvider.overrideWith(TestCommonAction.new),
@@ -268,6 +285,8 @@ void main() {
       final scopedAction = TestSetupAction();
       final scoped = ProviderContainer(
         overrides: [
+          trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_IdleZapret.new),
           profilesProvider.overrideWith(TestProfiles.new),
           setupActionProvider.overrideWith(() => scopedAction),
           commonActionProvider.overrideWith(TestCommonAction.new),
@@ -414,6 +433,8 @@ void main() {
     SetupAction buildScoped() {
       scoped = ProviderContainer(
         overrides: [
+          trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_IdleZapret.new),
           profilesProvider.overrideWith(TestProfiles.new),
           setupActionProvider.overrideWith(TestSetupAction.new),
           commonActionProvider.overrideWith(TestCommonAction.new),
@@ -440,7 +461,7 @@ void main() {
     void setVisible(bool visible) =>
         scoped.read(appVisibleProvider.notifier).value = visible;
 
-    testWidgets('reads traffic only while the app is visible', (tester) async {
+    testWidgets('Windows keeps reading traffic in the tray; other platforms pause', (tester) async {
       final setup = buildScoped();
       await setup.setRunning(true);
       expect(trafficUpdates(), 1);
@@ -450,19 +471,19 @@ void main() {
 
       setVisible(false);
       await tester.pump(const Duration(seconds: 5));
-      expect(trafficUpdates(), 3);
+      expect(trafficUpdates(), system.isWindows ? 8 : 3);
       expect(scoped.read(isStartProvider), isTrue);
 
       setVisible(true);
       await tester.pump();
-      expect(trafficUpdates(), 4);
+      expect(trafficUpdates(), system.isWindows ? 8 : 4);
       await tester.pump(const Duration(seconds: 1));
-      expect(trafficUpdates(), 5);
+      expect(trafficUpdates(), system.isWindows ? 9 : 5);
 
       await setup.setRunning(false);
     });
 
-    testWidgets('a start while hidden waits for the app to be shown', (
+    testWidgets('hidden Windows starts accounting immediately', (
       tester,
     ) async {
       final setup = buildScoped();
@@ -471,11 +492,11 @@ void main() {
       await tester.pump(const Duration(seconds: 3));
 
       expect(scoped.read(runTimeProvider), isNotNull);
-      expect(trafficUpdates(), 0);
+      expect(trafficUpdates(), system.isWindows ? 4 : 0);
 
       setVisible(true);
       await tester.pump();
-      expect(trafficUpdates(), 1);
+      expect(trafficUpdates(), system.isWindows ? 4 : 1);
 
       await setup.setRunning(false);
     });
@@ -487,14 +508,14 @@ void main() {
       setVisible(false);
       await setup.setRunning(true);
       await tester.pump(const Duration(seconds: 2));
-      expect(trafficUpdates(), 0);
+      expect(trafficUpdates(), system.isWindows ? 3 : 0);
 
       scoped
           .read(appSettingProvider.notifier)
           .update((state) => state.copyWith(showTrayTitle: true));
       await tester.pump(const Duration(seconds: 2));
 
-      expect(trafficUpdates(), system.isMacOS ? 3 : 0);
+      expect(trafficUpdates(), system.isWindows ? 5 : (system.isMacOS ? 3 : 0));
 
       await setup.setRunning(false);
     });
@@ -506,6 +527,8 @@ void main() {
       action = TestSetupAction();
       container = ProviderContainer(
         overrides: [
+          trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_IdleZapret.new),
           profilesProvider.overrideWith(TestProfiles.new),
           setupActionProvider.overrideWith(() => action),
           commonActionProvider.overrideWith(TestCommonAction.new),
@@ -527,6 +550,8 @@ void main() {
       action = TestSetupAction();
       container = ProviderContainer(
         overrides: [
+          trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_IdleZapret.new),
           profilesProvider.overrideWith(TestProfiles.new),
           setupActionProvider.overrideWith(() => action),
           commonActionProvider.overrideWith(TestCommonAction.new),
@@ -571,6 +596,8 @@ void main() {
       action = TestSetupAction();
       container = ProviderContainer(
         overrides: [
+          trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_IdleZapret.new),
           profilesProvider.overrideWith(TestProfiles.new),
           setupActionProvider.overrideWith(() => action),
           commonActionProvider.overrideWith(TestCommonAction.new),
@@ -891,6 +918,8 @@ void main() {
       final scopedAction = TestSetupAction();
       final scoped = ProviderContainer(
         overrides: [
+          trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_IdleZapret.new),
           profilesProvider.overrideWith(TestProfiles.new),
           setupActionProvider.overrideWith(() => scopedAction),
           safeModeProvider.overrideWithValue(true),
@@ -1110,6 +1139,8 @@ void main() {
       final scopedAction = TestSetupAction()..tunStillFailed = true;
       final scoped = ProviderContainer(
         overrides: [
+          trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_IdleZapret.new),
           profilesProvider.overrideWith(TestProfiles.new),
           setupActionProvider.overrideWith(() => scopedAction),
           coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
@@ -1138,6 +1169,8 @@ void main() {
       final scopedAction = TestSetupAction()..needsAuthorization = false;
       final scoped = ProviderContainer(
         overrides: [
+          trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_IdleZapret.new),
           profilesProvider.overrideWith(TestProfiles.new),
           setupActionProvider.overrideWith(() => scopedAction),
           coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
@@ -1172,6 +1205,8 @@ void main() {
       final scopedAction = TestSetupAction();
       final scoped = ProviderContainer(
         overrides: [
+          trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_IdleZapret.new),
           profilesProvider.overrideWith(TestProfiles.new),
           setupActionProvider.overrideWith(() => scopedAction),
           coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
@@ -1204,6 +1239,8 @@ void main() {
       final scopedAction = TestSetupAction();
       final scoped = ProviderContainer(
         overrides: [
+          trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_IdleZapret.new),
           profilesProvider.overrideWith(TestProfiles.new),
           setupActionProvider.overrideWith(() => scopedAction),
           coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
@@ -1238,6 +1275,8 @@ void main() {
       final scopedAction = TestSetupAction();
       final scoped = ProviderContainer(
         overrides: [
+          trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_IdleZapret.new),
           profilesProvider.overrideWith(TestProfiles.new),
           setupActionProvider.overrideWith(() => scopedAction),
           coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
@@ -1272,6 +1311,8 @@ void main() {
       final scopedAction = TestSetupAction();
       final scoped = ProviderContainer(
         overrides: [
+          trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_IdleZapret.new),
           profilesProvider.overrideWith(TestProfiles.new),
           setupActionProvider.overrideWith(() => scopedAction),
           coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
@@ -1309,6 +1350,8 @@ void main() {
     ProviderContainer buildScoped(List<Profile> profiles, int? profileId) {
       final scoped = ProviderContainer(
         overrides: [
+          trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_IdleZapret.new),
           profilesProvider.overrideWith(() => TestProfiles(profiles)),
           currentProfileIdProvider.overrideWithBuild((_, _) => profileId),
           setupActionProvider.overrideWith(TestSetupAction.new),
@@ -1365,6 +1408,8 @@ void main() {
       ).copyWith(id: 1, currentGroupName: 'Manual');
       final scoped = ProviderContainer(
         overrides: [
+          trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_IdleZapret.new),
           profilesProvider.overrideWith(() => TestProfiles([profile])),
           currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
           setupActionProvider.overrideWith(TestSetupAction.new),
@@ -1383,6 +1428,8 @@ void main() {
       ).copyWith(id: 1, currentGroupName: 'Manual');
       final scoped = ProviderContainer(
         overrides: [
+          trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_IdleZapret.new),
           profilesProvider.overrideWith(() => TestProfiles([profile])),
           currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
           setupActionProvider.overrideWith(TestSetupAction.new),
@@ -1455,6 +1502,8 @@ void main() {
         final setupAction = TestSetupAction();
         final scoped = ProviderContainer(
           overrides: [
+            trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+            zapretControllerProvider.overrideWith(_IdleZapret.new),
             profilesProvider.overrideWith(() => TestProfiles([profile])),
             currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
             setupActionProvider.overrideWith(() => setupAction),
@@ -1520,6 +1569,8 @@ void main() {
         var preloadRan = false;
         final scoped = ProviderContainer(
           overrides: [
+            trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+            zapretControllerProvider.overrideWith(_IdleZapret.new),
             profilesProvider.overrideWith(() => TestProfiles([profile])),
             currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
             setupStateProvider.overrideWith((_, _) => nullProfileSetupState),
@@ -1552,6 +1603,8 @@ void main() {
         when(() => core.setupConfig(any())).thenAnswer((_) async => '');
         final scoped = ProviderContainer(
           overrides: [
+            trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+            zapretControllerProvider.overrideWith(_IdleZapret.new),
             profilesProvider.overrideWith(() => TestProfiles([profile])),
             currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
             setupStateProvider.overrideWith((_, _) => nullProfileSetupState),
@@ -1588,6 +1641,8 @@ void main() {
         addTearDown(() => useAppPaths(tempDir));
         final scoped = ProviderContainer(
           overrides: [
+            trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+            zapretControllerProvider.overrideWith(_IdleZapret.new),
             profilesProvider.overrideWith(() => TestProfiles([profile])),
             currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
             setupStateProvider.overrideWith((_, _) => nullProfileSetupState),
@@ -1641,6 +1696,8 @@ void main() {
         });
         final scoped = ProviderContainer(
           overrides: [
+            trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+            zapretControllerProvider.overrideWith(_IdleZapret.new),
             profilesProvider.overrideWith(() => TestProfiles([profile])),
             currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
             setupStateProvider.overrideWith((_, _) => nullProfileSetupState),
@@ -1688,6 +1745,8 @@ void main() {
         );
         final scoped = ProviderContainer(
           overrides: [
+            trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+            zapretControllerProvider.overrideWith(_IdleZapret.new),
             profilesProvider.overrideWith(() => TestProfiles([profile])),
             currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
             setupStateProvider.overrideWith((_, _) => nullProfileSetupState),
@@ -1763,6 +1822,8 @@ void main() {
         ).thenAnswer((_) async => const ChangeProxyResult());
         final scoped = ProviderContainer(
           overrides: [
+            trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+            zapretControllerProvider.overrideWith(_IdleZapret.new),
             profilesProvider.overrideWith(() => TestProfiles([first, second])),
             coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
           ],
@@ -1819,6 +1880,8 @@ void main() {
         });
         final scoped = ProviderContainer(
           overrides: [
+            trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+            zapretControllerProvider.overrideWith(_IdleZapret.new),
             profilesProvider.overrideWith(() => TestProfiles([profile])),
             currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
             setupStateProvider.overrideWith(
@@ -1857,6 +1920,8 @@ void main() {
         when(() => core.setupConfig(any())).thenAnswer((_) async => '');
         final scoped = ProviderContainer(
           overrides: [
+            trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+            zapretControllerProvider.overrideWith(_IdleZapret.new),
             currentProfileProvider.overrideWithValue(null),
             setupStateProvider.overrideWith((_, _) => nullProfileSetupState),
             coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
@@ -1895,6 +1960,8 @@ void main() {
         });
         final scoped = ProviderContainer(
           overrides: [
+            trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+            zapretControllerProvider.overrideWith(_IdleZapret.new),
             profilesProvider.overrideWith(() => TestProfiles([profile])),
             currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
             setupStateProvider.overrideWith(
@@ -1936,6 +2003,8 @@ void main() {
       var setupState = nullProfileSetupState.copyWith(profileId: profile.id);
       final scoped = ProviderContainer(
         overrides: [
+          trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_IdleZapret.new),
           profilesProvider.overrideWith(() => TestProfiles([profile])),
           currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
           setupStateProvider.overrideWith((_, _) => setupState),
@@ -1982,6 +2051,8 @@ void main() {
       });
       final scoped = ProviderContainer(
         overrides: [
+          trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_IdleZapret.new),
           profilesProvider.overrideWith(() => TestProfiles([profile])),
           currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
           setupStateProvider.overrideWith(
@@ -2022,6 +2093,8 @@ void main() {
         when(() => core.updateConfig(any())).thenAnswer((_) async => '');
         final scoped = ProviderContainer(
           overrides: [
+            trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+            zapretControllerProvider.overrideWith(_IdleZapret.new),
             profilesProvider.overrideWith(() => TestProfiles([profile])),
             currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
             setupStateProvider.overrideWith(
@@ -2060,6 +2133,8 @@ void main() {
       });
       final scoped = ProviderContainer(
         overrides: [
+          trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_IdleZapret.new),
           profilesProvider.overrideWith(() => TestProfiles([profile])),
           currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
           setupStateProvider.overrideWith(
@@ -2092,6 +2167,8 @@ void main() {
       when(() => core.setupConfig(any())).thenAnswer((_) async => '');
       final scoped = ProviderContainer(
         overrides: [
+          trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_IdleZapret.new),
           profilesProvider.overrideWith(() => TestProfiles([profile])),
           currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
           setupStateProvider.overrideWith(
@@ -2169,6 +2246,8 @@ void main() {
       });
       final scoped = ProviderContainer(
         overrides: [
+          trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_IdleZapret.new),
           profilesProvider.overrideWith(() => TestProfiles([profile])),
           currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
           setupStateProvider.overrideWith(
@@ -2232,6 +2311,8 @@ void main() {
       await configFile.writeAsString('previous');
       final scoped = ProviderContainer(
         overrides: [
+          trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_IdleZapret.new),
           profilesProvider.overrideWith(() => TestProfiles([profile])),
           currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
           setupStateProvider.overrideWith(
@@ -2288,6 +2369,8 @@ void main() {
         );
         final scoped = ProviderContainer(
           overrides: [
+            trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+            zapretControllerProvider.overrideWith(_IdleZapret.new),
             coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
             setupActionProvider.overrideWith(SetupAction.new),
           ],
@@ -2327,6 +2410,8 @@ void main() {
       });
       final scoped = ProviderContainer(
         overrides: [
+          trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_IdleZapret.new),
           profilesProvider.overrideWith(() => TestProfiles([profile])),
           setupStateProvider.overrideWith(
             (_, profileId) =>
@@ -2365,6 +2450,8 @@ void main() {
         );
         final scoped = ProviderContainer(
           overrides: [
+            trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+            zapretControllerProvider.overrideWith(_IdleZapret.new),
             profilesProvider.overrideWith(() => TestProfiles([profile])),
             coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
             patchClashConfigProvider.overrideWithBuild((_, _) => _tunOff),
@@ -2400,6 +2487,8 @@ void main() {
         when(() => core.stopListener()).thenAnswer((_) async => true);
         final scoped = ProviderContainer(
           overrides: [
+            trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+            zapretControllerProvider.overrideWith(_IdleZapret.new),
             profilesProvider.overrideWith(() => TestProfiles([profile])),
             currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
             setupStateProvider.overrideWith(
@@ -2498,6 +2587,8 @@ void main() {
       );
       final scoped = ProviderContainer(
         overrides: [
+          trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_IdleZapret.new),
           coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
           patchClashConfigProvider.overrideWithBuild((_, _) => _tunOff),
           setupActionProvider.overrideWith(SetupAction.new),
@@ -2569,6 +2660,8 @@ void main() {
       );
       final scoped = ProviderContainer(
         overrides: [
+          trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_IdleZapret.new),
           coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
           patchClashConfigProvider.overrideWithBuild((_, _) => _tunOff),
           setupActionProvider.overrideWith(SetupAction.new),
@@ -2627,6 +2720,8 @@ void main() {
       );
       final scoped = ProviderContainer(
         overrides: [
+          trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_IdleZapret.new),
           coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
           patchClashConfigProvider.overrideWithBuild((_, _) => _tunOff),
           setupActionProvider.overrideWith(SetupAction.new),
@@ -2667,6 +2762,8 @@ void main() {
       when(() => core.getConfig(any())).thenAnswer((_) async => {});
       final scoped = ProviderContainer(
         overrides: [
+          trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_IdleZapret.new),
           coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
           patchClashConfigProvider.overrideWithBuild((_, _) => _tunOff),
           setupActionProvider.overrideWith(SetupAction.new),
@@ -2701,6 +2798,8 @@ void main() {
         when(() => core.setupConfig(any())).thenThrow(StateError('rejected'));
         final scoped = ProviderContainer(
           overrides: [
+            trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+            zapretControllerProvider.overrideWith(_IdleZapret.new),
             currentProfileProvider.overrideWithValue(null),
             setupStateProvider.overrideWith((_, _) => nullProfileSetupState),
             coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
@@ -2726,6 +2825,8 @@ void main() {
         when(() => core.setupConfig(any())).thenAnswer((_) async => '');
         final scoped = ProviderContainer(
           overrides: [
+            trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+            zapretControllerProvider.overrideWith(_IdleZapret.new),
             currentProfileProvider.overrideWithValue(null),
             setupStateProvider.overrideWith((_, _) => nullProfileSetupState),
             coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
@@ -2757,6 +2858,8 @@ void main() {
         ).thenAnswer((_) async => 'config rejected');
         final scoped = ProviderContainer(
           overrides: [
+            trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+            zapretControllerProvider.overrideWith(_IdleZapret.new),
             currentProfileProvider.overrideWithValue(null),
             setupStateProvider.overrideWith((_, _) => nullProfileSetupState),
             coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),

@@ -81,7 +81,7 @@ class _SidebarStatisticsState extends ConsumerState<SidebarStatistics> {
   @override
   void initState() {
     super.initState();
-    unawaited(trafficHistory.load());
+    unawaited(ref.read(trafficHistoryProvider).load());
     scheduleMicrotask(_refresh);
     _timer = Timer.periodic(const Duration(seconds: 2), (_) => _refresh());
   }
@@ -212,6 +212,7 @@ class _SidebarStatisticsState extends ConsumerState<SidebarStatistics> {
   @override
   Widget build(BuildContext context) {
     final l = context.appLocalizations;
+    final history = ref.watch(trafficHistoryProvider);
     final theme = Theme.of(context);
     final style = theme.textTheme.bodySmall;
     final heading = theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600);
@@ -239,11 +240,11 @@ class _SidebarStatisticsState extends ConsumerState<SidebarStatistics> {
           _trafficRow(l.forkSidebarSpeed, speed, style, rate: true),
           _trafficRow(l.forkSidebarSession, session, style),
           ValueListenableBuilder<int>(
-            valueListenable: trafficHistory.revision,
+            valueListenable: history.revision,
             builder: (context, _, _) => _trafficRow(
               l.forkSidebar24Hours,
-              trafficHistory.loaded
-                  ? trafficHistory.window.total(DateTime.now(), onlyProxy: onlyProxy)
+              history.loaded
+                  ? history.window.total(DateTime.now(), onlyProxy: onlyProxy)
                   : null,
               style,
             ),

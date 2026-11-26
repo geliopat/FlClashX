@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:fl_clash/common/traffic_history.dart';
+
 import 'package:fl_clash/core/desktop/model.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
@@ -95,6 +97,7 @@ void main() {
     final events = <String>[];
     final zapret = _Zapret(events);
     final container = ProviderContainer(overrides: [
+      trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
       profilesProvider.overrideWith(TestProfiles.new),
       setupActionProvider.overrideWith(() => _Setup(events)),
       commonActionProvider.overrideWith(TestCommonAction.new),
@@ -142,6 +145,7 @@ void main() {
     await mockPreferences();
     final events = <String>[];
     final container = ProviderContainer(overrides: [
+      trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
       profilesProvider.overrideWith(TestProfiles.new),
       setupActionProvider.overrideWith(() => _Setup(events)),
       coreActionProvider.overrideWith(() => _Core(events)),

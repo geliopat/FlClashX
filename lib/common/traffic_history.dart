@@ -6,6 +6,7 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 
 /// Rolling, UTC minute buckets. Keep independent counters for all traffic and
@@ -78,6 +79,9 @@ class RollingTrafficWindow {
 /// The history is independent of the sidebar lifecycle. It keeps recording
 /// while the Windows window is in the tray and survives normal restarts.
 class TrafficHistory {
+  TrafficHistory({this.persist = true});
+
+  final bool persist;
   final window = RollingTrafficWindow();
   final revision = ValueNotifier<int>(0);
   Future<void>? _loading;
@@ -94,6 +98,7 @@ class TrafficHistory {
 
   Future<void> _load() async {
     try {
+      if (!persist) return;
       final file = await _file();
       if (await file.exists()) {
         window.restore(jsonDecode(await file.readAsString()), DateTime.now());
@@ -135,6 +140,7 @@ class TrafficHistory {
   }
 
   Future<void> flush() {
+    if (!persist) return Future<void>.value();
     return _writes = _writes.then((_) async {
       try {
         await load();
@@ -149,4 +155,4 @@ class TrafficHistory {
   }
 }
 
-final trafficHistory = TrafficHistory();
+final trafficHistoryProvider = Provider<TrafficHistory>((ref) => TrafficHistory());

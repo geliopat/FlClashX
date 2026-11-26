@@ -341,7 +341,11 @@ class SetupAction extends _$SetupAction {
       await ref.read(commonActionProvider.notifier).updateTraffic();
       if (!ref.mounted || !_isCurrent(request)) return;
     }
-    final reset = system.isWindows ? trafficHistory.beginReset() : null;
+    if (!ref.mounted || !_isCurrent(request)) return;
+    final history = system.isWindows && !ref.read(safeModeProvider)
+        ? ref.read(trafficHistoryProvider)
+        : null;
+    final reset = history?.beginReset();
     var confirmed = false;
     try {
       await resetCoreTraffic();
@@ -351,7 +355,7 @@ class SetupAction extends _$SetupAction {
           logLevel: LogLevel.warning);
     } finally {
       if (reset != null) {
-        trafficHistory.finishReset(reset, confirmed: confirmed);
+        history!.finishReset(reset, confirmed: confirmed);
       }
     }
     if (!ref.mounted || !_isCurrent(request)) return;
