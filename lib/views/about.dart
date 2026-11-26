@@ -199,7 +199,6 @@ class _AboutHero extends ConsumerWidget {
   });
 
   static const _logoSize = 96.0;
-  static const _logoInset = 14.0;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -215,19 +214,10 @@ class _AboutHero extends ConsumerWidget {
             onEnterDeveloperMode: onEnterDeveloperMode,
             onEasterEgg: onEasterEgg,
             onLongPress: onUnlockFullSettings,
-            child: DecoratedBox(
-              decoration: ShapeDecoration(
-                color: raised,
-                shape: AppShape.all(AppCorner.fit(_logoSize)),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(_logoInset),
-                child: Image.asset(
-                  'assets/images/icon.png',
-                  width: _logoSize - _logoInset * 2,
-                  height: _logoSize - _logoInset * 2,
-                ),
-              ),
+            child: Image.asset(
+              'assets/images/icon.png',
+              width: _logoSize,
+              height: _logoSize,
             ),
           ),
           const SizedBox(height: 20),
