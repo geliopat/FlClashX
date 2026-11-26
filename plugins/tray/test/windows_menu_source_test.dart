@@ -18,6 +18,7 @@ String _body(String source, String signature) {
   final start = source.indexOf(signature);
   expect(start, isNonNegative, reason: signature);
   final end = source.indexOf('\n}\n', start);
+  expect(end, greaterThan(start), reason: signature);
   return source.substring(start, end);
 }
 
@@ -25,7 +26,9 @@ void main() {
   late String pluginSource;
 
   setUpAll(() {
-    pluginSource = _resolveSource('windows/tray_plugin.cpp').readAsStringSync();
+    pluginSource = _resolveSource('windows/tray_plugin.cpp')
+        .readAsStringSync()
+        .replaceAll('\r\n', '\n');
   });
 
   test('native fallback still uses TrackPopupMenu, not WM_COMMAND', () {

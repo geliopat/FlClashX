@@ -22,6 +22,7 @@ import 'package:riverpod/riverpod.dart';
 import 'package:tray/tray.dart';
 
 import '../helpers/app_paths.dart';
+import '../helpers/preferences.dart';
 
 class _TrayZapret extends ZapretController {
   _TrayZapret({this.running = false});
@@ -124,7 +125,8 @@ void main() {
     }
   });
 
-  setUp(() {
+  setUp(() async {
+    await mockPreferences();
     debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
     calls = [];
     tray = AppTray.forPlatform(isMacOS: true, isWindows: false);
