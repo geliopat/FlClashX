@@ -17,9 +17,9 @@ class RollingTrafficWindow {
 
   static int minute(DateTime at) => at.millisecondsSinceEpoch ~/ 60000;
 
-  void resetBaseline() {
+  void resetBaseline({bool confirmed = true}) {
     for (var i = 0; i < _previous.length; i++) {
-      _previous[i] = 0;
+      _previous[i] = confirmed ? 0 : null;
     }
   }
 
@@ -121,13 +121,14 @@ class TrafficHistory {
     }
   }
 
-  void beginReset() {
-    generation++;
+  int beginReset() {
     resetting = true;
+    return ++generation;
   }
 
-  void finishReset() {
-    window.resetBaseline();
+  void finishReset(int token, {required bool confirmed}) {
+    if (token != generation) return;
+    window.resetBaseline(confirmed: confirmed);
     resetting = false;
     revision.value++;
     unawaited(flush());

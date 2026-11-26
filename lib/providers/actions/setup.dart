@@ -341,11 +341,18 @@ class SetupAction extends _$SetupAction {
       await ref.read(commonActionProvider.notifier).updateTraffic();
       if (!ref.mounted || !_isCurrent(request)) return;
     }
-    if (system.isWindows) trafficHistory.beginReset();
+    final reset = system.isWindows ? trafficHistory.beginReset() : null;
+    var confirmed = false;
     try {
       await resetCoreTraffic();
+      confirmed = true;
+    } catch (error) {
+      commonPrint.log('Traffic reset: ${compactError(error)}',
+          logLevel: LogLevel.warning);
     } finally {
-      if (system.isWindows) trafficHistory.finishReset();
+      if (reset != null) {
+        trafficHistory.finishReset(reset, confirmed: confirmed);
+      }
     }
     if (!ref.mounted || !_isCurrent(request)) return;
     ref.read(trafficsProvider.notifier).clear();

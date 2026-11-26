@@ -30,6 +30,16 @@ void main() {
     expect(history.total(start.add(const Duration(hours: 24)), onlyProxy: false), const Traffic());
   });
 
+  test('unconfirmed reset must not count the previous session twice', () {
+    final history = RollingTrafficWindow()..resetBaseline();
+    history.record(start, all: const Traffic(up: 500, down: 900));
+    history.resetBaseline(confirmed: false);
+    history.record(start, all: const Traffic(up: 500, down: 900));
+    history.record(start, all: const Traffic(up: 510, down: 920));
+    expect(history.total(start, onlyProxy: false),
+        const Traffic(up: 510, down: 920));
+  });
+
   test('first sample after reconnect establishes a baseline', () {
     final history = RollingTrafficWindow();
     history.record(start, all: const Traffic(up: 500, down: 900));

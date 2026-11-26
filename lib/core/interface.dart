@@ -587,7 +587,11 @@ abstract class CoreHandlerInterface with CoreInterface {
   }
 
   @override
-  FutureOr<void> resetTraffic() => _invokeUnobserved(CoreMethod.resetTraffic);
+  Future<void> resetTraffic() async {
+    if (await _invokeMethod<bool>(method: CoreMethod.resetTraffic) != true) {
+      throw StateError('Core did not acknowledge traffic reset');
+    }
+  }
 
   @override
   FutureOr<void> startLog() => _invokeUnobserved(CoreMethod.startLog);
