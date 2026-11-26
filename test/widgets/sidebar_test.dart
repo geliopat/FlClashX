@@ -36,6 +36,8 @@ Widget _sidebar({
   ValueChanged<int>? onSelected,
   VoidCallback? onToggle,
   Size windowControls = Size.zero,
+  bool pinLastDestination = false,
+  Widget? footer,
   EdgeInsets safePadding = EdgeInsets.zero,
 }) {
   return TestApp(
@@ -54,6 +56,8 @@ Widget _sidebar({
                   onSelected: onSelected ?? (_) {},
                   onToggle: onToggle,
                   windowControls: windowControls,
+                  pinLastDestination: pinLastDestination,
+                  footer: footer,
                 ),
               ),
             ),
@@ -103,6 +107,22 @@ Finder _rowTooltip(String message) => find.byWidgetPredicate(
 );
 
 void main() {
+  testWidgets('pinned settings stay below the sidebar footer', (tester) async {
+    int? selected;
+    await tester.pumpWidget(_sidebar(
+      destinations: const [..._destinations,
+        SidebarDestination(glyph: AppGlyphs.settings, label: 'Settings')],
+      pinLastDestination: true,
+      footer: const Text('Traffic'),
+      onSelected: (index) => selected = index,
+    ));
+    expect(tester.getBottomLeft(find.text('Traffic')).dy,
+        lessThan(tester.getTopLeft(find.text('Settings')).dy));
+    await tester.tap(find.text('Settings'));
+    expect(selected, 3);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('the selected row carries a centered indicator', (tester) async {
     await tester.pumpWidget(_sidebar(selectedIndex: 1));
 

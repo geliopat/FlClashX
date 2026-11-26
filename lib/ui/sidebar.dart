@@ -48,6 +48,8 @@ class NavigationSidebar extends StatefulWidget {
     required this.onSelected,
     this.onToggle,
     this.windowControls = Size.zero,
+    this.pinLastDestination = false,
+    this.footer,
   });
 
   final List<SidebarDestination> destinations;
@@ -56,6 +58,8 @@ class NavigationSidebar extends StatefulWidget {
   final ValueChanged<int> onSelected;
   final VoidCallback? onToggle;
   final Size windowControls;
+  final bool pinLastDestination;
+  final Widget? footer;
 
   @override
   State<NavigationSidebar> createState() => _NavigationSidebarState();
@@ -133,6 +137,8 @@ class _NavigationSidebarState extends State<NavigationSidebar>
               expanded: true,
               destinations: widget.destinations,
               selectedIndex: widget.selectedIndex,
+              pinLastDestination: widget.pinLastDestination,
+              footer: widget.footer,
               onSelected: (index) {
                 widget.onSelected(index);
                 _closeOverlay();
@@ -153,6 +159,8 @@ class _NavigationSidebarState extends State<NavigationSidebar>
             expanded: widget.expanded,
             destinations: widget.destinations,
             selectedIndex: widget.selectedIndex,
+            pinLastDestination: widget.pinLastDestination,
+            footer: widget.footer,
             onSelected: widget.onSelected,
             onToggle: _handleToggle,
           ),
@@ -259,6 +267,8 @@ class _SidebarPane extends StatelessWidget {
     required this.selectedIndex,
     required this.onSelected,
     required this.onToggle,
+    required this.pinLastDestination,
+    required this.footer,
   });
 
   final double progress;
@@ -268,6 +278,8 @@ class _SidebarPane extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onSelected;
   final VoidCallback onToggle;
+  final bool pinLastDestination;
+  final Widget? footer;
 
   @override
   Widget build(BuildContext context) {
@@ -291,9 +303,32 @@ class _SidebarPane extends StatelessWidget {
             _fitsOneLine(context, label, labelStyle, labelWidth)
         ? ''
         : label;
+    final pinned = pinLastDestination && destinations.isNotEmpty;
+    final menuCount = destinations.length - (pinned ? 1 : 0);
+    Widget destinationRow(int index) {
+      final destination = destinations[index];
+      return _SidebarButton(
+        key: ValueKey(destination.label),
+        colors: colors,
+        height: itemHeight,
+        sideInset: sideInset,
+        selected: index == selectedIndex,
+        tooltip: rowTooltip(destination.label),
+        onTap: () => onSelected(index),
+        child: _DestinationRow(
+          destination: destination,
+          selected: index == selectedIndex,
+          width: rowWidth,
+          iconInset: iconInset,
+          style: labelStyle,
+          labelOpacity: labelOpacity,
+        ),
+      );
+    }
     return SizedBox(
       width: lerpDouble(compactWidth, _expandedWidth, progress),
-      child: Column(
+      child: LayoutBuilder(
+        builder: (context, constraints) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SizedBox(height: windowControls.height + _verticalInset),
@@ -324,27 +359,11 @@ class _SidebarPane extends StatelessWidget {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        for (final (index, destination) in destinations.indexed)
-                          _SidebarButton(
-                            key: ValueKey(destination.label),
-                            colors: colors,
-                            height: itemHeight,
-                            sideInset: sideInset,
-                            selected: index == selectedIndex,
-                            tooltip: rowTooltip(destination.label),
-                            onTap: () => onSelected(index),
-                            child: _DestinationRow(
-                              destination: destination,
-                              selected: index == selectedIndex,
-                              width: rowWidth,
-                              iconInset: iconInset,
-                              style: labelStyle,
-                              labelOpacity: labelOpacity,
-                            ),
-                          ),
+                        for (var index = 0; index < menuCount; index++)
+                          destinationRow(index),
                       ],
                     ),
-                    if (selectedIndex < destinations.length)
+                    if (selectedIndex >= 0 && selectedIndex < menuCount)
                       _SelectionIndicator(
                         color: colors.indicator,
                         index: selectedIndex,
@@ -356,8 +375,32 @@ class _SidebarPane extends StatelessWidget {
               ),
             ),
           ),
+          if (footer != null && expanded && progress >= 0.999)
+            ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: math.max(0.0,
+                  constraints.maxHeight * 0.5 - itemHeight)),
+              child: SingleChildScrollView(
+                primary: false,
+                padding: EdgeInsets.symmetric(horizontal: sideInset + 4),
+                child: footer!,
+              ),
+            ),
+          if (pinned)
+            Stack(
+              children: [
+                destinationRow(menuCount),
+                if (selectedIndex == menuCount)
+                  _SelectionIndicator(
+                    color: colors.indicator,
+                    index: 0,
+                    start: sideInset,
+                    stride: itemHeight + _itemGap,
+                  ),
+              ],
+            ),
           const SizedBox(height: _verticalInset),
         ],
+      ),
       ),
     );
   }

@@ -171,6 +171,8 @@ class _Sidebar extends ConsumerWidget {
         for (final item in items)
           SidebarDestination(glyph: item.glyph, label: item.label.label),
       ],
+      pinLastDestination: system.isWindows && items.isNotEmpty &&
+          items.last.label == PageLabel.tools,
       selectedIndex: currentIndex,
       expanded: canExpand && sidebarExpanded,
       onSelected: onSelected,
