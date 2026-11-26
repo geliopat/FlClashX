@@ -99,14 +99,28 @@ class CommonAction extends _$CommonAction {
       return;
     }
     _isUpdatingTraffic = true;
+    final generation = trafficHistory.generation;
     try {
       final onlyStatisticsProxy = ref.read(
         appSettingProvider.select((state) => state.onlyStatisticsProxy),
       );
-      final [traffic, totalTraffic] = await Future.wait([
+      final [traffic, totalTraffic, alternateTotal] = await Future.wait([
         _readTraffic(() => _core.getTraffic(onlyStatisticsProxy)),
         _readTraffic(() => _core.getTotalTraffic(onlyStatisticsProxy)),
+        if (system.isWindows)
+          _readTraffic(() => _core.getTotalTraffic(!onlyStatisticsProxy))
+        else
+          Future<Traffic?>.value(null),
       ]);
+      if (!ref.mounted || (system.isWindows && generation != trafficHistory.generation)) return;
+      if (system.isWindows) {
+        await trafficHistory.record(
+          generation: generation,
+          all: onlyStatisticsProxy ? alternateTotal : totalTraffic,
+          proxy: onlyStatisticsProxy ? totalTraffic : alternateTotal,
+        );
+        if (!ref.mounted || generation != trafficHistory.generation) return;
+      }
       if (traffic != null) {
         ref.read(trafficsProvider.notifier).addTraffic(traffic);
       }

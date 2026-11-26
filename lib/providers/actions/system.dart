@@ -75,6 +75,7 @@ class SystemAction extends _$SystemAction {
     await Future.wait([
       ?saveOperation,
       drainDatabaseWrites(),
+      if (system.isWindows) trafficHistory.flush(),
       fileLogger.dispose(),
       bootGuard.markClosed(),
       if (systemDnsCoordinator != null) systemDnsCoordinator!.shutdown(),

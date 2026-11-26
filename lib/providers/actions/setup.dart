@@ -87,6 +87,7 @@ class SetupAction extends _$SetupAction {
 
   bool get _isTrafficShown =>
       ref.read(appVisibleProvider) ||
+      (system.isWindows && !ref.read(safeModeProvider)) ||
       (system.isMacOS &&
           !ref.read(safeModeProvider) &&
           ref.read(appSettingProvider).showTrayTitle);
@@ -335,6 +336,7 @@ class SetupAction extends _$SetupAction {
   }
 
   void _clearTraffic() {
+    if (system.isWindows) trafficHistory.resetSession();
     resetCoreTraffic();
     ref.read(trafficsProvider.notifier).clear();
     ref.read(totalTrafficProvider.notifier).value = const Traffic();
