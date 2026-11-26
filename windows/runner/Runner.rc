@@ -89,21 +89,21 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.follow" "\0"
+            VALUE "CompanyName", "sweetyyoba.com" "\0"
 #ifdef FLCLASHX_PRE
             VALUE "FileDescription", "FlClashZ Pre" "\0"
 #else
             VALUE "FileDescription", "FlClashZ" "\0"
 #endif
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "clashx" "\0"
+            VALUE "InternalName", "clashz" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2025 com.follow. All rights reserved." "\0"
 #ifdef FLCLASHX_PRE
             VALUE "OriginalFilename", "FlClashZPre.exe" "\0"
-            VALUE "ProductName", "clashx.pre" "\0"
+            VALUE "ProductName", "clashz.pre" "\0"
 #else
             VALUE "OriginalFilename", "FlClashZ.exe" "\0"
-            VALUE "ProductName", "clashx" "\0"
+            VALUE "ProductName", "clashz" "\0"
 #endif
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END

@@ -417,21 +417,21 @@ hooks:
         expect(pre, isNot(contains("HelperService = 'FlClashXPreHelperService';")));
         expect(pre, contains('AdoptLegacy = False;'));
         expect(pre, contains("KillProcess('FlClashXPre.exe');"));
-        expect(pre, contains(r'{userappdata}\com.follow\clashx.pre'));
+        expect(pre, contains(r'{userappdata}\sweetyyoba.com\clashz.pre'));
         expect(
           RegExp(r'\{\{([A-Z_]+)\}\}').allMatches(pre).map((m) => m[1]),
           everyElement('NAME'),
         );
       });
 
-      test('leaves the stable installer as it was', () {
+      test('uses the fork data path in the stable installer', () {
         final stable = render(setup.stableDesktop);
         expect(stable, contains('AppId=D915C0D1-2F5B-4676-97D5-6D55F3EF45A4'));
         expect(stable, contains(r'DefaultDirName={autopf}\FlClashX'));
         expect(stable, contains("HelperService = 'FlClashZHelperService';"));
         expect(stable, contains('AdoptLegacy = True;'));
         expect(stable, contains("KillProcess('FlClashX.exe');"));
-        expect(stable, contains(r"{userappdata}\com.follow\clashx')"));
+        expect(stable, contains(r"{userappdata}\sweetyyoba.com\clashz')"));
       });
 
       test('stops only the Core started from its own install', () {
@@ -540,13 +540,13 @@ hooks:
         final dir = Directory.systemTemp.createTempSync('channel_marker');
         addTearDown(() => dir.deleteSync(recursive: true));
         final binary = File('${dir.path}/FlClashX.exe')
-          ..writeAsBytesSync([0, ...setup.utf16le('clashx.pre'), 0]);
-        setup.requireChannelMarker(binary.path, setup.utf16le('clashx.pre'));
-        binary.writeAsBytesSync(setup.utf16le('clashx'));
+          ..writeAsBytesSync([0, ...setup.utf16le('clashz.pre'), 0]);
+        setup.requireChannelMarker(binary.path, setup.utf16le('clashz.pre'));
+        binary.writeAsBytesSync(setup.utf16le('clashz'));
         expect(
           () => setup.requireChannelMarker(
             binary.path,
-            setup.utf16le('clashx.pre'),
+            setup.utf16le('clashz.pre'),
           ),
           throwsA(isA<ProcessException>()),
         );

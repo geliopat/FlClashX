@@ -9,6 +9,12 @@ $Bundle = (Resolve-Path $Bundle).Path
 foreach ($name in @('FlClashZ.exe', 'FlClashCore.exe', 'FlClashZHelperService.exe', 'flutter_windows.dll', 'manifest.json', 'data/app.so', 'data/icudtl.dat', 'zapret/winws.exe', 'zapret/winws2.exe')) {
   if (!(Test-Path (Join-Path $Bundle $name))) { throw "Missing bundle component: $name" }
 }
+# The Windows path provider derives the app data subdirectory from these
+# version resource values. Reject an accidental upstream identity.
+$versionInfo = (Get-Item -LiteralPath (Join-Path $Bundle 'FlClashZ.exe')).VersionInfo
+if ($versionInfo.CompanyName -ne 'sweetyyoba.com' -or $versionInfo.ProductName -ne 'clashz') {
+  throw "Unexpected application data identity: $($versionInfo.CompanyName)/$($versionInfo.ProductName)"
+}
 $marker = Join-Path $env:RUNNER_TEMP ("flclashz-smoke-" + [guid]::NewGuid() + ".txt")
 $previous = $env:FLCLASHZ_SMOKE_MARKER
 $env:FLCLASHZ_SMOKE_MARKER = $marker

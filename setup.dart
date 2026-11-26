@@ -226,7 +226,7 @@ const stableDesktop = DesktopIdentity(
   packageName: 'flclashx',
   installDir: _appName,
   helperUnit: 'flclashx-helper',
-  windowsDataDir: r'com.follow\clashx',
+  windowsDataDir: r'sweetyyoba.com\clashz',
 );
 
 const preDesktop = DesktopIdentity(
@@ -238,7 +238,7 @@ const preDesktop = DesktopIdentity(
   packageName: 'flclashx-pre',
   installDir: 'FlClashXPre',
   helperUnit: 'flclashx-pre-helper',
-  windowsDataDir: r'com.follow\clashx.pre',
+  windowsDataDir: r'sweetyyoba.com\clashz.pre',
 );
 
 const windowsHelperName = 'FlClashZHelperService';
@@ -669,7 +669,7 @@ Future<void> _packageWindows(
   );
   var bundle = built;
   if (identity.pre) {
-    requireChannelMarker(p.join(built, 'FlClashZ.exe'), utf16le('clashx.pre'));
+    requireChannelMarker(p.join(built, 'FlClashZ.exe'), utf16le('clashz.pre'));
     bundle = p.join(build.rootDir, 'build', 'windows', winArch, 'pre_bundle');
     if (Directory(bundle).existsSync()) {
       Directory(bundle).deleteSync(recursive: true);
