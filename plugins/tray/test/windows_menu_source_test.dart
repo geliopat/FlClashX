@@ -40,13 +40,28 @@ void main() {
     final source = _resolveSource('windows/acrylic_menu.cpp').readAsStringSync();
     expect(source, contains('0x65000000'));
     expect(source, contains('0xfffffffe'));
-    expect(source, contains('MeasureString'));
+    expect(source, contains('CreateTextLayout'));
+    expect(source, contains('widthIncludingTrailingWhitespace'));
     expect(source, contains('label_width_ + (detail_width ?'));
     expect(source, contains('GetDpiForMonitor'));
     expect(source, contains('VK_ESCAPE'));
     expect(source, contains('WM_CAPTURECHANGED'));
     expect(pluginSource, contains('acrylic_menu_.Open('));
     expect(pluginSource, contains('TPM_RETURNCMD'));
+  });
+
+  test('acrylic text uses medium DirectWrite and premultiplied grayscale', () {
+    final source = _resolveSource('windows/acrylic_menu.cpp').readAsStringSync();
+    final cmake = _resolveSource('windows/CMakeLists.txt').readAsStringSync();
+    expect(source, contains('DWRITE_FONT_WEIGHT_MEDIUM'));
+    expect(source, contains('Segoe UI Variable Text'));
+    expect(source, contains('D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE'));
+    expect(source, contains('D2D1_ALPHA_MODE_PREMULTIPLIED'));
+    expect(source, contains('GUID_WICPixelFormat32bppPBGRA'));
+    expect(source, contains('DrawTextLayout'));
+    expect(source, contains('text_bitmap->CopyPixels'));
+    expect(source, isNot(contains('graphics.DrawString')));
+    expect(cmake, contains('d2d1 dwrite windowscodecs ole32'));
   });
 
   test('windows puts the detail in the accelerator column', () {

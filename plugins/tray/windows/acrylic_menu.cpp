@@ -3,6 +3,11 @@
 #include <algorithm>
 #include <cmath>
 #include <utility>
+#include <d2d1.h>
+#include <dwrite.h>
+#include <wincodec.h>
+#include <wrl/client.h>
+#include <limits>
 #include <dwmapi.h>
 #include <objidl.h>
 #include <gdiplus.h>
@@ -12,6 +17,7 @@
 namespace tray {
 namespace {
 using namespace Gdiplus;
+using Microsoft::WRL::ComPtr;
 
 constexpr wchar_t kClassName[] = L"FlClashZ.AcrylicTrayMenu";
 constexpr DWORD kAcrylicTint = 0x65000000;  // AABBGGRR; black, alpha 101.
@@ -133,13 +139,12 @@ void DrawIcon(Graphics& graphics, const AcrylicRow& row, REAL x, REAL y,
 
 struct AcrylicMenu::Render {
   ULONG_PTR token = 0;
-  std::unique_ptr<Font> font;
+  std::vector<BYTE> text_pixels;
   Render() {
     GdiplusStartupInput input;
     if (GdiplusStartup(&token, &input, nullptr) != Ok) token = 0;
   }
   ~Render() {
-    font.reset();
     if (token) GdiplusShutdown(token);
   }
 };
@@ -167,37 +172,48 @@ bool AcrylicMenu::Open(HWND owner, POINT anchor,
   if (FAILED(GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &dpi_x, &dpi_y)))
     dpi_x = 96;
   dpi_ = dpi_x;
-  render_->font = std::make_unique<Font>(L"Segoe UI Variable Text",
-      static_cast<REAL>(Scale(14)), FontStyleRegular, UnitPixel);
-  if (render_->font->GetLastStatus() != Ok) {
-    render_->font = std::make_unique<Font>(L"Segoe UI",
-        static_cast<REAL>(Scale(14)), FontStyleRegular, UnitPixel);
-  }
-  if (render_->font->GetLastStatus() != Ok) return false;
-  HDC screen = GetDC(nullptr);
-  if (!screen) return false;
+  ComPtr<IDWriteFactory> write;
+  if (FAILED(DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED,
+      __uuidof(IDWriteFactory),
+      reinterpret_cast<IUnknown**>(write.GetAddressOf())))) return false;
+  ComPtr<IDWriteFontCollection> fonts;
+  if (FAILED(write->GetSystemFontCollection(fonts.GetAddressOf()))) return false;
+  UINT32 family_index = 0;
+  BOOL family_exists = FALSE;
+  if (FAILED(fonts->FindFamilyName(L"Segoe UI Variable Text", &family_index,
+                                 &family_exists))) return false;
+  const wchar_t* family = family_exists ? L"Segoe UI Variable Text" : L"Segoe UI";
+  ComPtr<IDWriteTextFormat> format;
+  // Layout and rendering both use physical pixels at a 96-DPI render target.
+  if (FAILED(write->CreateTextFormat(family, fonts.Get(),
+      DWRITE_FONT_WEIGHT_MEDIUM, DWRITE_FONT_STYLE_NORMAL,
+      DWRITE_FONT_STRETCH_NORMAL, 14.0f * static_cast<float>(dpi_) / 96.0f,
+      L"", format.GetAddressOf()))) return false;
+  if (FAILED(format->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP)) ||
+      FAILED(format->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER)))
+    return false;
+  const auto measure = [&](const std::wstring& text, int& width) {
+    if (text.empty()) return true;
+    ComPtr<IDWriteTextLayout> layout;
+    if (FAILED(write->CreateTextLayout(text.c_str(),
+        static_cast<UINT32>(text.size()), format.Get(), 32768.0f,
+        static_cast<float>(Scale(kRowHeight)), layout.GetAddressOf())))
+      return false;
+    DWRITE_TEXT_METRICS metrics{};
+    if (FAILED(layout->GetMetrics(&metrics))) return false;
+    width = (std::max)(width,
+        static_cast<int>(std::ceil(metrics.widthIncludingTrailingWhitespace)));
+    return true;
+  };
   int detail_width = 0;
   label_width_ = 0;
   height_ = 2 * Scale(kPadding);
-  {
-    Graphics graphics(screen);
-    StringFormat format(StringFormat::GenericTypographic());
-    const auto measure = [&](const std::wstring& text) {
-      RectF bounds{};
-      graphics.MeasureString(text.c_str(), -1, render_->font.get(),
-          PointF(0, 0), &format, &bounds);
-      return static_cast<int>(std::ceil(bounds.Width));
-    };
-    for (const auto& row : rows) {
-      height_ += Scale(row.separator ? kSeparatorHeight : kRowHeight);
-      if (!row.separator) {
-        label_width_ = (std::max)(label_width_, measure(row.label));
-        if (!row.detail.empty())
-          detail_width = (std::max)(detail_width, measure(row.detail));
-      }
-    }
+  for (const auto& row : rows) {
+    height_ += Scale(row.separator ? kSeparatorHeight : kRowHeight);
+    if (!row.separator &&
+        (!measure(row.label, label_width_) || !measure(row.detail, detail_width)))
+      return false;
   }
-  ReleaseDC(nullptr, screen);
   // Fit the longest translated label and optional shortcut column, no
   // fixed minimum width. Allow two extra DIP for glyph overhang.
   width_ = 2 * Scale(kPadding + kInset) + Scale(kIcon + kGap + 2) +
@@ -214,6 +230,87 @@ bool AcrylicMenu::Open(HWND owner, POINT anchor,
     bounds_.push_back(RECT{Scale(kPadding), top, width_ - Scale(kPadding), bottom});
     top = bottom;
   }
+  // Text does not change on hover. Rasterize once, before opening the window.
+  // Keep the existing GDI+ icons, highlights and acrylic composition untouched.
+  // WIC requires COM on this thread; balance successful initialization only.
+  struct ComScope {
+    HRESULT result = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    ~ComScope() { if (SUCCEEDED(result)) CoUninitialize(); }
+  } com;
+  if (FAILED(com.result) && com.result != RPC_E_CHANGED_MODE) return false;
+  ComPtr<IWICImagingFactory> wic;
+  if (FAILED(CoCreateInstance(CLSID_WICImagingFactory, nullptr,
+      CLSCTX_INPROC_SERVER, IID_PPV_ARGS(wic.GetAddressOf())))) return false;
+  ComPtr<IWICBitmap> text_bitmap;
+  if (FAILED(wic->CreateBitmap(static_cast<UINT>(width_),
+      static_cast<UINT>(height_), GUID_WICPixelFormat32bppPBGRA,
+      WICBitmapCacheOnLoad, text_bitmap.GetAddressOf()))) return false;
+  ComPtr<ID2D1Factory> d2d;
+  if (FAILED(D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED,
+                              d2d.GetAddressOf()))) return false;
+  ComPtr<ID2D1RenderTarget> target;
+  const auto properties = D2D1::RenderTargetProperties(
+      D2D1_RENDER_TARGET_TYPE_SOFTWARE,
+      D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM,
+                       D2D1_ALPHA_MODE_PREMULTIPLIED), 96.0f, 96.0f);
+  if (FAILED(d2d->CreateWicBitmapRenderTarget(text_bitmap.Get(),
+      properties, target.GetAddressOf()))) return false;
+  target->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE);
+  ComPtr<ID2D1SolidColorBrush> text_brush;
+  if (FAILED(target->CreateSolidColorBrush(
+      D2D1::ColorF(D2D1::ColorF::White), text_brush.GetAddressOf()))) return false;
+  const auto draw = [&](const std::wstring& text, float x, float y,
+                        float width, float height, bool trailing, float alpha) {
+    if (text.empty()) return true;
+    if (width <= 0.0f || height <= 0.0f) return false;
+    ComPtr<IDWriteTextLayout> layout;
+    if (FAILED(write->CreateTextLayout(text.c_str(),
+        static_cast<UINT32>(text.size()), format.Get(), width, height,
+        layout.GetAddressOf())) ||
+        FAILED(layout->SetTextAlignment(trailing ? DWRITE_TEXT_ALIGNMENT_TRAILING
+                                                 : DWRITE_TEXT_ALIGNMENT_LEADING)))
+      return false;
+    text_brush->SetOpacity(alpha);
+    target->DrawTextLayout(D2D1::Point2F(x, y), layout.Get(), text_brush.Get());
+    return true;
+  };
+  target->BeginDraw();
+  target->Clear(D2D1::ColorF(0.0f, 0.0f, 0.0f, 0.0f));
+  bool text_ok = true;
+  for (size_t i = 0; i < rows_.size() && text_ok; ++i) {
+    const auto& row = rows_[i];
+    if (row.separator) continue;
+    const auto& rect = bounds_[i];
+    const float x = static_cast<float>(rect.left + Scale(kInset) +
+                                       Scale(kIcon + kGap));
+    const float y = static_cast<float>(rect.top);
+    const float h = static_cast<float>(rect.bottom - rect.top);
+    const float label_width = static_cast<float>(label_width_ + Scale(2));
+    text_ok = draw(row.label, x, y, label_width, h, false,
+                   row.enabled ? 1.0f : 115.0f / 255.0f);
+    if (text_ok && !row.detail.empty()) {
+      const float detail_x = x + static_cast<float>(label_width_ + Scale(kDetailGap));
+      const float detail_end = static_cast<float>(rect.right - Scale(kInset));
+      text_ok = draw(row.detail, detail_x, y, detail_end - detail_x, h, true,
+                     row.enabled ? 190.0f / 255.0f : 100.0f / 255.0f);
+    }
+  }
+  const HRESULT draw_result = target->EndDraw();
+  if (!text_ok || FAILED(draw_result)) return false;
+  // Release the render target before reading the premultiplied text bitmap.
+  text_brush.Reset();
+  target.Reset();
+  const size_t stride = static_cast<size_t>(width_) * 4;
+  const size_t bytes = stride * static_cast<size_t>(height_);
+  if (stride > (std::numeric_limits<UINT>::max)() ||
+      bytes > (std::numeric_limits<UINT>::max)()) return false;
+  render_->text_pixels.resize(bytes);
+  if (FAILED(text_bitmap->CopyPixels(nullptr, static_cast<UINT>(stride),
+      static_cast<UINT>(bytes), render_->text_pixels.data()))) {
+    render_->text_pixels.clear();
+    return false;
+  }
+
   const HINSTANCE instance = GetModuleHandleW(nullptr);
   WNDCLASSW wc{};
   wc.lpfnWndProc = WindowProc;
@@ -322,10 +419,6 @@ void AcrylicMenu::Paint(HWND window) {
       Graphics graphics(&surface);
       graphics.Clear(Color(0, 0, 0, 0));
       graphics.SetSmoothingMode(SmoothingModeAntiAlias);
-      graphics.SetTextRenderingHint(TextRenderingHintAntiAliasGridFit);
-      StringFormat format(StringFormat::GenericTypographic());
-      format.SetLineAlignment(StringAlignmentCenter);
-      format.SetFormatFlags(format.GetFormatFlags() | StringFormatFlagsNoWrap);
       for (size_t i = 0; i < rows_.size(); ++i) {
         const auto& row = rows_[i];
         const auto& rect = bounds_[i];
@@ -343,21 +436,27 @@ void AcrylicMenu::Paint(HWND window) {
           RoundFill(graphics, RectF(x, y, w, h), static_cast<REAL>(Scale(5)),
                     Color(static_cast<BYTE>(pressed_ == hover_ ? 38 : 24), 255, 255, 255));
         const Color foreground(static_cast<BYTE>(row.enabled ? 255 : 115), 255, 255, 255);
-        SolidBrush brush(foreground);
         const REAL icon = static_cast<REAL>(Scale(kIcon));
         const REAL inset = static_cast<REAL>(Scale(kInset));
         DrawIcon(graphics, row, x + inset, y + (h - icon) / 2, icon, foreground);
-        const REAL text_x = x + inset + static_cast<REAL>(Scale(kIcon + kGap));
-        format.SetAlignment(StringAlignmentNear);
-        graphics.DrawString(row.label.c_str(), -1, render_->font.get(),
-            RectF(text_x, y, static_cast<REAL>(label_width_ + Scale(2)), h),
-            &format, &brush);
-        if (!row.detail.empty()) {
-          SolidBrush secondary(Color(static_cast<BYTE>(row.enabled ? 190 : 100), 255, 255, 255));
-          const REAL detail_x = text_x + static_cast<REAL>(label_width_ + Scale(kDetailGap));
-          format.SetAlignment(StringAlignmentFar);
-          graphics.DrawString(row.detail.c_str(), -1, render_->font.get(),
-              RectF(detail_x, y, x + w - inset - detail_x, h), &format, &secondary);
+
+      }
+    }
+    // Source-over composition of two premultiplied BGRA layers. Preserve
+    // the text's grayscale coverage (including alpha) on the acrylic surface.
+    auto* destination = static_cast<BYTE*>(pixels);
+    const auto& text = render_->text_pixels;
+    const size_t expected = static_cast<size_t>(width_) *
+                            static_cast<size_t>(height_) * 4;
+    if (text.size() == expected) {
+      for (size_t i = 0; i < text.size(); i += 4) {
+        const unsigned alpha = text[i + 3];
+        if (!alpha) continue;
+        const unsigned inverse = 255 - alpha;
+        for (size_t channel = 0; channel < 4; ++channel) {
+          const unsigned value = text[i + channel] +
+              (destination[i + channel] * inverse + 127) / 255;
+          destination[i + channel] = static_cast<BYTE>((std::min)(value, 255u));
         }
       }
     }
