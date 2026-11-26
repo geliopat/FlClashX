@@ -88,10 +88,9 @@ void main() {
     await mockPreferences();
     final events = <String>[];
     final zapret = _Zapret(events);
-    final setup = _Setup(events);
     final container = ProviderContainer(overrides: [
       profilesProvider.overrideWith(TestProfiles.new),
-      setupActionProvider.overrideWith(() => setup),
+      setupActionProvider.overrideWith(() => _Setup(events)),
       commonActionProvider.overrideWith(TestCommonAction.new),
       coreActionProvider.overrideWith(() => _Core(events)),
       zapretControllerProvider.overrideWith(() => zapret),
@@ -102,6 +101,7 @@ void main() {
     addTearDown(container.dispose);
     container.read(initProvider.notifier).value = true;
 
+    final setup = container.read(setupActionProvider.notifier);
     expect(await setup.setRunning(true, initialize: true), isTrue);
     expect(events, containsAllInOrder(['mihomo:listener:true', 'zapret:start:false']));
     events.clear();
