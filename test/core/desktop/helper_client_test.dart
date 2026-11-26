@@ -306,18 +306,43 @@ void main() {
     expect(helperPortKey, helperPortKeyFor(Platform.isWindows ? 'FlClashZHelperService' : 'FlClashXHelperService'));
   });
 
-  test('only the stable app falls back to the fixed Helper port', () {
-    expect(HelperClient.helperPortFor(published: 50123, pre: true), 50123);
-    expect(HelperClient.helperPortFor(published: null, pre: false), 47891);
-    expect(
-      () => HelperClient.helperPortFor(published: null, pre: true),
-      throwsA(
-        isA<HelperException>().having(
-          (error) => error.code,
-          'code',
-          'helperUnavailable',
+  test('Windows Helper never uses the upstream fixed port as a fallback', () {
+    for (final pre in [false, true]) {
+      expect(
+        HelperClient.helperPortFor(
+          published: 50123,
+          pre: pre,
+          isWindows: true,
         ),
+        50123,
+      );
+      for (final port in [null, 0, -1, 65536]) {
+        expect(
+          () => HelperClient.helperPortFor(
+            published: port,
+            pre: pre,
+            isWindows: true,
+          ),
+          throwsA(
+            isA<HelperException>().having(
+              (error) => error.code,
+              'code',
+              'helperUnavailable',
+            ),
+          ),
+        );
+      }
+    }
+  });
+
+  test('legacy non-Windows stable Helper keeps the fixed port', () {
+    expect(
+      HelperClient.helperPortFor(
+        published: null,
+        pre: false,
+        isWindows: false,
       ),
+      47891,
     );
   });
 

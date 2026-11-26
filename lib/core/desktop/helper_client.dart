@@ -254,19 +254,29 @@ final class HelperClient {
       return 'http://$appHelperService';
     }
     final published = Platform.isWindows ? _readPublishedPort() : null;
-    return 'http://$localhost:${helperPortFor(published: published, pre: isPreDesktopApp)}';
+    final port = helperPortFor(
+      published: published,
+      pre: isPreDesktopApp,
+      isWindows: Platform.isWindows,
+    );
+    return 'http://$localhost:$port';
   }
 
-  /// A 0.4.2 Helper on [helperPort] stops its Core for any session.
+  /// Both Windows channels use our service's published port. Never fall back
+  /// to the upstream fixed port: it can belong to a different client.
   @visibleForTesting
-  static int helperPortFor({required int? published, required bool pre}) {
-    if (published != null) {
+  static int helperPortFor({
+    required int? published,
+    required bool pre,
+    required bool isWindows,
+  }) {
+    if (published != null && published > 0 && published <= 65535) {
       return published;
     }
-    if (pre) {
+    if (isWindows || pre || published != null) {
       throw const HelperException(
         code: 'helperUnavailable',
-        message: 'The Helper has not published its port',
+        message: 'The Helper has not published a valid port',
       );
     }
     return helperPort;
