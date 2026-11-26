@@ -48,9 +48,10 @@ class _TrayManagerState extends ConsumerState<TrayManager> {
       ref.read(proxiesActionProvider.notifier);
       ref.read(autoDelayProvider);
       ref.listenManual(zapretControllerProvider.select((state) => (
-        state.running, state.busy, state.available, state.selectedStrategyId,
-        state.mode, state.startWithMihomo, state.strategies,
+        state.running, state.busy, state.dashboardRestarting,
       )), (_, _) => _requestUpdate());
+      ref.listenManual(coreStatusProvider, (_, _) => _requestUpdate());
+      ref.listenManual(initProvider, (_, _) => _requestUpdate());
       ref.listenManual(zapretDiagnosticsProvider, (_, _) {});
       ref.listenManual(smartHostsProvider.select((state) => state.revision), (_, _) {
         if (ref.read(initProvider)) {

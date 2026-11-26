@@ -24,6 +24,7 @@ class _RunRequest {
   final bool resume;
   final DateTime? previousStartTime;
   final bool undoesFailedStart;
+  final void Function(Object)? onZapretStopError;
 
   const _RunRequest({
     required this.running,
@@ -31,6 +32,7 @@ class _RunRequest {
     required this.resume,
     required this.previousStartTime,
     this.undoesFailedStart = false,
+    this.onZapretStopError,
   });
 }
 
@@ -216,11 +218,28 @@ class SetupAction extends _$SetupAction {
     return _run(running, initialize: running && initialize);
   }
 
+  /// Explicit tray start forces Zapret even when its automatic-start
+  /// preference is disabled. Stop still disconnects the VPN if Zapret
+  /// cannot confirm shutdown, and reports that failure afterwards.
+  Future<bool> setTrayRunning(bool running) async {
+    Object? stopError;
+    final success = await _run(
+      running,
+      initialize: running && !ref.read(initProvider),
+      forceZapret: running,
+      onZapretStopError: (error) => stopError = error,
+    );
+    if (stopError != null) throw stopError!;
+    return success;
+  }
+
   Future<bool> _run(
     bool running, {
     required bool initialize,
     bool resume = false,
     bool undoesFailedStart = false,
+    bool forceZapret = false,
+    void Function(Object)? onZapretStopError,
   }) {
     final request = _RunRequest(
       running: running,
@@ -228,6 +247,7 @@ class SetupAction extends _$SetupAction {
       resume: resume,
       previousStartTime: _startTime,
       undoesFailedStart: undoesFailedStart,
+      onZapretStopError: onZapretStopError,
     );
     _latestRunRequest = request;
     _setLocalRunning(running);
@@ -237,11 +257,20 @@ class SetupAction extends _$SetupAction {
     if (!running) return _stop(request);
     return _start(request).then((success) async {
       if (success && system.isWindows && _isCurrent(request) &&
-          request.previousStartTime == null && !request.resume &&
+          (request.previousStartTime == null || forceZapret) && !request.resume &&
           !ref.read(safeModeProvider)) {
-        await ref.read(zapretControllerProvider.notifier).startAlongsideMihomo().catchError((Object error) {
+        try {
+          await ref.read(zapretControllerProvider.notifier)
+              .startAlongsideMihomo(force: forceZapret);
+          if (forceZapret && _isCurrent(request) &&
+              !ref.read(zapretControllerProvider).running) {
+            throw StateError(ref.read(zapretControllerProvider).error ??
+                currentAppLocalizations.forkLaunchUnavailable);
+          }
+        } catch (error) {
           commonPrint.log('Linked Zapret start failed: $error', logLevel: LogLevel.warning);
-        });
+          if (forceZapret && _isCurrent(request)) rethrow;
+        }
       }
       return success;
     });
@@ -327,6 +356,7 @@ class SetupAction extends _$SetupAction {
           await ref.read(zapretControllerProvider.notifier).stopAlongsideMihomo();
         } catch (error) {
           commonPrint.log('Linked Zapret stop failed: $error', logLevel: LogLevel.warning);
+          request.onZapretStopError?.call(error);
         }
         if (!_isCurrent(request)) return true;
       }

@@ -117,6 +117,19 @@ void main() {
     expect(await container.read(coreActionProvider.notifier).restartCore(), isTrue);
     expect(events, isNot(contains('zapret:start:true')));
     expect(events, isNot(contains('mihomo:listener:true')));
+    events.clear();
+    expect(await setup.setTrayRunning(true), isTrue);
+    expect(events, containsAllInOrder(['mihomo:listener:true', 'zapret:start:true']));
+    events.clear();
+    zapret.failStop = true;
+    await expectLater(setup.setTrayRunning(false), throwsStateError);
+    expect(events, containsAllInOrder(['zapret:stop', 'mihomo:listener:false']));
+    expect(container.read(isStartProvider), isFalse);
+    expect(container.read(zapretControllerProvider).running, isTrue);
+    events.clear();
+    zapret.failStop = false;
+    expect(await setup.setTrayRunning(false), isTrue);
+    expect(container.read(zapretControllerProvider).running, isFalse);
   }, skip: !Platform.isWindows);
 
   test('Windows refuses a full restart when Zapret stop fails', () async {

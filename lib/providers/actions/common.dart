@@ -4,6 +4,7 @@ part of '../action.dart';
 class CommonAction extends _$CommonAction {
   CoreController get _core => ref.read(coreHandlerProvider);
   bool _isUpdatingTraffic = false;
+  bool _trayOperationInProgress = false;
 
   @override
   void build() {}
@@ -20,6 +21,46 @@ class CommonAction extends _$CommonAction {
             ),
       ),
     );
+  }
+
+  /// The Windows tray is an explicit request for both components.
+  /// It does not change the persistent linked-start preference.
+  Future<void> toggleTrayRunning() async {
+    if (_trayOperationInProgress) return;
+    _trayOperationInProgress = true;
+    try {
+      final zapret = ref.read(zapretControllerProvider);
+      final running = ref.read(isStartProvider) || zapret.running || zapret.busy;
+      await globalState.safeRun(
+        () => ref.read(setupActionProvider.notifier).setTrayRunning(!running),
+      );
+    } finally {
+      _trayOperationInProgress = false;
+    }
+  }
+
+  /// Use exactly the dashboard's coordinated restart, not app relaunch.
+  Future<void> restartFromTray() async {
+    if (_trayOperationInProgress || !ref.read(initProvider) ||
+        ref.read(coreStatusProvider) == CoreStatus.connecting) return;
+    final restartAll = !ref.read(safeModeProvider);
+    if (restartAll) {
+      final zapret = ref.read(zapretControllerProvider);
+      if (zapret.busy || zapret.dashboardRestarting) return;
+    }
+    _trayOperationInProgress = true;
+    try {
+      await globalState.safeRun(() async {
+        if (restartAll) {
+          await ref.read(zapretControllerProvider.notifier)
+              .restartFromDashboard(restartAll: true);
+        } else {
+          await ref.read(coreActionProvider.notifier).restartCore();
+        }
+      });
+    } finally {
+      _trayOperationInProgress = false;
+    }
   }
 
   void updateSpeedStatistics() {

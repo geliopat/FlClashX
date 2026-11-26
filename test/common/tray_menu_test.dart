@@ -11,6 +11,7 @@ import 'package:fl_clash/l10n/l10n.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/action.dart';
 import 'package:fl_clash/providers/state.dart';
+import 'package:fl_clash/providers/zapret.dart';
 import 'package:fl_clash/state.dart';
 import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
@@ -21,6 +22,14 @@ import 'package:riverpod/riverpod.dart';
 import 'package:tray/tray.dart';
 
 import '../helpers/app_paths.dart';
+
+class _TrayZapret extends ZapretController {
+  _TrayZapret({this.running = false});
+  final bool running;
+
+  @override
+  ZapretState build() => ZapretState(running: running);
+}
 
 const _channel = MethodChannel('tray');
 
@@ -119,7 +128,9 @@ void main() {
     debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
     calls = [];
     tray = AppTray.forPlatform(isMacOS: true, isWindows: false);
-    container = ProviderContainer();
+    container = ProviderContainer(overrides: [
+      zapretControllerProvider.overrideWith(_TrayZapret.new),
+    ]);
     Tray.instance.resetForTesting();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(_channel, (call) async {
@@ -482,6 +493,23 @@ void main() {
         isNot(contains(currentAppLocalizations.monochromeIcon)),
       );
       expect(_labels(showCall()), isNot(contains(HotAction.delayTest.label)));
+    });
+
+    test('Windows has one combined start/stop entry, even for Zapret alone', () async {
+      await update(_trayState(), on: windows);
+      final l10n = currentAppLocalizations;
+      expect(_labels(showCall()), contains(l10n.start));
+      expect(_labels(showCall()), isNot(contains('Zapret')));
+      expect(_item(showCall(), l10n.start)['type'], 'action');
+
+      container.dispose();
+      container = ProviderContainer(overrides: [
+        zapretControllerProvider.overrideWith(() => _TrayZapret(running: true)),
+      ]);
+      await update(_trayState(), on: windows);
+      expect(_labels(showCall()), contains(l10n.stop));
+      expect(_labels(showCall()), isNot(contains(l10n.start)));
+      expect(_labels(showCall()), isNot(contains('Zapret')));
     });
 
     test('joins modifiers with + in the hotkey hints', () async {

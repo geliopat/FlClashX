@@ -136,11 +136,8 @@ class AppTray implements TrayPort {
     final appLocalizations = currentAppLocalizations;
     String? shortcut(HotAction action) => _shortcut(trayState, action);
     final zapret = isWindows ? read(zapretControllerProvider) : null;
-    void zapretAction(Future<void> operation) {
-      unawaited(operation.catchError((Object error) {
-        // The controller also retains the error for the next UI visit.
-      }));
-    }
+    final running = trayState.isStart || (zapret?.running ?? false) ||
+        (zapret?.busy ?? false);
     final showItem = TrayMenuAction(
       label: appLocalizations.show,
       detail: shortcut(HotAction.view),
@@ -150,8 +147,15 @@ class AppTray implements TrayPort {
     );
     final restartItem = TrayMenuAction(
       label: appLocalizations.restart,
+      enabled: !isWindows ||
+          (read(initProvider) && read(coreStatusProvider) != CoreStatus.connecting &&
+              !(zapret?.busy ?? false) && !(zapret?.dashboardRestarting ?? false)),
       onSelected: () {
-        systemAction.handleRestart();
+        if (isWindows) {
+          unawaited(commonAction.restartFromTray());
+        } else {
+          systemAction.handleRestart();
+        }
       },
     );
     final exitItem = TrayMenuAction(
@@ -164,63 +168,20 @@ class AppTray implements TrayPort {
 
     return [
       showItem,
-      TrayMenuCheckbox(
-        label: trayState.isStart
-            ? appLocalizations.stop
-            : appLocalizations.start,
-        checked: false,
-        detail: shortcut(HotAction.start),
-        onSelected: commonAction.toggleRunning,
-      ),
-      if (zapret != null)
-        TrayMenuSubmenu(
-          label: 'Zapret',
-          detail: zapret.running ? 'Запущен' : 'Остановлен',
-          items: [
-            TrayMenuAction(
-              label: zapret.running ? 'Остановить Zapret' : 'Запустить Zapret',
-              onSelected: () => zapretAction(read(zapretControllerProvider.notifier).setEnabled(!read(zapretControllerProvider).running)),
-            ),
-            TrayMenuAction(
-              label: 'Перезапустить Zapret',
-              onSelected: () => zapretAction(read(zapretControllerProvider.notifier).restart()),
-            ),
-            TrayMenuCheckbox(
-              label: 'Запуск Zapret при старте Mihomo',
-              checked: zapret.startWithMihomo,
-              onSelected: () => zapretAction(read(zapretControllerProvider.notifier).setStartWithMihomo(!read(zapretControllerProvider).startWithMihomo)),
-            ),
-            if (zapret.strategies.isNotEmpty)
-              TrayMenuSubmenu(
-                label: 'Стратегии',
-                items: [
-                  for (final category in zapret.strategies.map((s) => s.category).toSet())
-                    TrayMenuSubmenu(
-                      label: category,
-                      items: [
-                        for (final strategy in zapret.strategies.where((s) => s.category == category))
-                          TrayMenuCheckbox(
-                            label: strategy.name,
-                            checked: strategy.id == zapret.selectedStrategyId,
-                            onSelected: () => zapretAction(read(zapretControllerProvider.notifier).selectStrategy(strategy.id)),
-                          ),
-                      ],
-                    ),
-                ],
-              ),
-            if (zapret.supportsSplitMode)
-              TrayMenuSubmenu(
-                label: 'Режим',
-                items: [
-                  for (final mode in ZapretMode.values)
-                    TrayMenuCheckbox(
-                      label: mode == ZapretMode.strictSplit ? 'STRICT SPLIT' : 'FULL BYPASS',
-                      checked: zapret.mode == mode,
-                      onSelected: () => zapretAction(read(zapretControllerProvider.notifier).setMode(mode)),
-                    ),
-                ],
-              ),
-          ],
+      if (isWindows)
+        TrayMenuAction(
+          label: running ? appLocalizations.stop : appLocalizations.start,
+          detail: shortcut(HotAction.start),
+          onSelected: () => unawaited(commonAction.toggleTrayRunning()),
+        )
+      else
+        TrayMenuCheckbox(
+          label: trayState.isStart
+              ? appLocalizations.stop
+              : appLocalizations.start,
+          checked: false,
+          detail: shortcut(HotAction.start),
+          onSelected: commonAction.toggleRunning,
         ),
       if (isMacOS)
         TrayMenuCheckbox(
