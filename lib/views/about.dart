@@ -36,6 +36,11 @@ const _forkAuthors = [
 const _upstreamRepository = 'chen08209/FlClash';
 const _coreRepository = 'MetaCubeX/mihomo';
 const _flClashXRepository = 'pluralplay/FlClashX';
+const _zapretComponentLinks = <String, String>{
+  'Zapret2': 'https://github.com/bol-van/zapret2',
+  'Flowseal': 'https://github.com/Flowseal/zapret-discord-youtube',
+  'Стратегии Lua/BAT': 'https://github.com/geliopat/zapret2-gui',
+};
 
 /// The running core's version when it answers, else the one this build was
 /// made with, else nothing.
@@ -233,22 +238,26 @@ class _AboutHero extends ConsumerWidget {
             children: [
               _Pill(
                 label: 'FlClashZ v${globalState.packageInfo.displayVersion}',
+                url: 'https://github.com/$repository',
                 color: colorScheme.primary,
                 foregroundColor: colorScheme.onPrimary,
               ),
               _Pill(
                 label: 'FlClashX v$flClashXVersion',
+                url: 'https://github.com/$_flClashXRepository',
                 color: raised,
                 foregroundColor: colorScheme.onSurfaceVariant,
               ),
               if (coreVersion != null)
                 _Pill(
                   label: 'Mihomo: $coreVersion',
+                  url: 'https://github.com/$_coreRepository',
                   color: colorScheme.secondaryContainer,
                   foregroundColor: colorScheme.onSecondaryContainer,
                 ),
               _Pill(
                 label: 'GPL-3.0',
+                url: 'https://www.gnu.org/licenses/gpl-3.0.html',
                 color: raised,
                 foregroundColor: colorScheme.onSurfaceVariant,
               ),
@@ -263,6 +272,7 @@ class _AboutHero extends ConsumerWidget {
               for (final entry in installedZapretComponents.entries)
                 _Pill(
                   label: '${entry.key}: ${entry.value}',
+                  url: _zapretComponentLinks[entry.key],
                   color: raised,
                   foregroundColor: colorScheme.onSurfaceVariant,
                 ),
@@ -294,26 +304,52 @@ class _AboutHero extends ConsumerWidget {
 
 class _Pill extends StatelessWidget {
   final String label;
+  final String? url;
   final Color color;
   final Color foregroundColor;
 
   const _Pill({
     required this.label,
+    this.url,
     required this.color,
     required this.foregroundColor,
   });
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: ShapeDecoration(color: color, shape: AppShape.full),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        child: Text(
-          label,
-          style: AppTextStyle.caption1
-              .of(context, emphasized: true)
-              .copyWith(color: foregroundColor),
+    final content = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: Text(
+        label,
+        style: AppTextStyle.caption1
+            .of(context, emphasized: true)
+            .copyWith(color: foregroundColor),
+      ),
+    );
+    final link = url;
+    if (link == null) {
+      return DecoratedBox(
+        decoration: ShapeDecoration(color: color, shape: AppShape.full),
+        child: content,
+      );
+    }
+    return Tooltip(
+      message: link,
+      child: FocusRing(
+        shape: AppShape.full,
+        standsOff: true,
+        child: Material(
+          color: color,
+          shape: AppShape.full,
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            mouseCursor: clickableCursor,
+            customBorder: AppShape.full,
+            hoverColor: foregroundColor.withValues(alpha: 0.08),
+            focusColor: foregroundColor.withValues(alpha: 0.12),
+            onTap: () => dialogs.openUrl(link),
+            child: content,
+          ),
         ),
       ),
     );

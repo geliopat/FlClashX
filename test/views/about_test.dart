@@ -1,4 +1,6 @@
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/common/flclashz_upstream_versions.dart';
+import 'package:fl_clash/providers/zapret_components.dart';
 import 'package:fl_clash/core/controller.dart';
 import 'package:fl_clash/core/interface.dart';
 import 'package:fl_clash/enum/enum.dart';
@@ -56,10 +58,37 @@ void main() {
   testWidgets('shows the app and core versions as badges', (tester) async {
     await pump(tester);
 
-    expect(find.text('v1.2.3'), findsOneWidget);
-    expect(find.text('core: v1.19.32'), findsOneWidget);
+    expect(find.text('FlClashZ v1.2.3'), findsOneWidget);
+    expect(find.text('Mihomo: v1.19.32'), findsOneWidget);
     expect(find.text('GPL-3.0'), findsOneWidget);
     expect(find.text('Check for updates'), findsOneWidget);
+  });
+
+  testWidgets('version badges have the expected repository links', (tester) async {
+    await pump(tester);
+
+    final links = <String, String>{
+      'FlClashZ v1.2.3': 'https://github.com/geliopat/FlClashZ',
+      'FlClashX v$flClashXVersion': 'https://github.com/pluralplay/FlClashX',
+      'Mihomo: v1.19.32': 'https://github.com/MetaCubeX/mihomo',
+      'GPL-3.0': 'https://www.gnu.org/licenses/gpl-3.0.html',
+      'Zapret2: ${installedZapretComponents['Zapret2']}':
+          'https://github.com/bol-van/zapret2',
+      'Flowseal: ${installedZapretComponents['Flowseal']}':
+          'https://github.com/Flowseal/zapret-discord-youtube',
+      'Стратегии Lua/BAT: ${installedZapretComponents['Стратегии Lua/BAT']}':
+          'https://github.com/geliopat/zapret2-gui',
+    };
+    for (final entry in links.entries) {
+      final badge = find.text(entry.key);
+      expect(badge, findsOneWidget);
+      final tooltip = find.ancestor(of: badge, matching: find.byType(Tooltip));
+      expect(tooltip, findsOneWidget);
+      expect(tester.widget<Tooltip>(tooltip).message, entry.value);
+      final ink = find.descendant(of: tooltip, matching: find.byType(InkWell));
+      expect(ink, findsOneWidget);
+      expect(tester.widget<InkWell>(ink).onTap, isNotNull);
+    }
   });
 
   testWidgets('lists the links and the people behind the fork', (tester) async {
@@ -68,21 +97,21 @@ void main() {
     expect(find.text('Original repository'), findsOneWidget);
     expect(find.text('github.com/chen08209/FlClash'), findsOneWidget);
     expect(find.text('github.com/MetaCubeX/mihomo'), findsOneWidget);
-    expect(find.text('t.me/flclashx'), findsOneWidget);
+    expect(find.text('github.com/pluralplay/FlClashX'), findsOneWidget);
     expect(find.text('Fork author'), findsOneWidget);
     expect(find.text('pluralplay'), findsOneWidget);
-    expect(find.byType(CircleAvatar), findsOneWidget);
+    expect(find.byType(CircleAvatar), findsNWidgets(2));
     expect(find.text('x_kit_'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('a core that does not answer leaves the core badge out', (
+  testWidgets('a core that does not answer uses the bundled version', (
     tester,
   ) async {
     when(() => core.getCoreVersion()).thenThrow(StateError('not running'));
     await pump(tester);
 
-    expect(find.text('v1.2.3'), findsOneWidget);
-    expect(find.textContaining('core:'), findsNothing);
+    expect(find.text('FlClashZ v1.2.3'), findsOneWidget);
+    expect(find.text('Mihomo: ${coreVersionDefine.isNotEmpty ? coreVersionDefine : bundledMihomoVersion}'), findsOneWidget);
   });
 }
