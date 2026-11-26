@@ -28,8 +28,8 @@ class ZapretLogsView extends StatefulWidget {
   State<ZapretLogsView> createState() => _ZapretLogsViewState();
 }
 
-class _ZapretLogsViewState extends State<ZapretLogsView> {
-  Timer? _timer;
+class _ZapretLogsViewState extends State<ZapretLogsView>
+    with WidgetsBindingObserver, ActivePollingMixin<ZapretLogsView> {
   late int _tab = widget.journalOnly ? 2 : 0;
   bool _loading = false;
   String _query = '';
@@ -39,35 +39,43 @@ class _ZapretLogsViewState extends State<ZapretLogsView> {
   Future<List<_JournalEntry>>? _archive;
 
   @override
-  void initState() {
-    super.initState();
-    if (widget.journalOnly) {
-      _archive = _loadArchive();
-      return;
-    }
-    scheduleMicrotask(_refresh);
-    _timer = Timer.periodic(const Duration(seconds: 2), (_) {
-      if (_tab == 0) unawaited(_refresh());
-    });
-  }
+  Duration get pollInterval => _tab == 0
+      ? const Duration(seconds: 2)
+      : const Duration(seconds: 30);
 
   @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  Future<void> _refresh() async {
-    if (_loading || !mounted) return;
+  Future<void> poll(PollGuard isCurrent) async {
+    if (_tab != 0) {
+      if (isCurrent()) _reloadArchive();
+      return;
+    }
+    if (_loading || !isCurrent()) return;
     _loading = true;
     try {
       final logs = await helperClient.zapretLogs();
-      if (mounted) setState(() { _logs = logs; _error = null; });
+      if (isCurrent() && _tab == 0) {
+        setState(() { _logs = logs; _error = null; });
+      }
     } catch (error) {
-      if (mounted) setState(() => _error = error.toString());
+      if (isCurrent() && _tab == 0) {
+        setState(() => _error = error.toString());
+      }
     } finally {
       _loading = false;
     }
+  }
+
+  bool _readingArchive = false;
+
+  void _reloadArchive() {
+    if (!mounted || _readingArchive) return;
+    _readingArchive = true;
+    final future = _loadArchive();
+    setState(() => _archive = future);
+    // Observe the original future even if the user leaves the page before
+    // FutureBuilder subscribes. Keep its error available for the UI.
+    unawaited(future.then<void>((_) {}, onError: (Object _, StackTrace __) {})
+        .whenComplete(() => _readingArchive = false));
   }
 
   Future<List<_JournalEntry>> _loadArchive() async {
@@ -93,9 +101,9 @@ class _ZapretLogsViewState extends State<ZapretLogsView> {
     if (_tab == value) return;
     setState(() {
       _tab = value;
-      if (value != 0) _archive = _loadArchive();
+      _filter = 'all';
     });
-    if (value == 0) unawaited(_refresh());
+    restartPolling();
   }
 
   bool _matches(_JournalEntry entry) {
@@ -149,7 +157,7 @@ class _ZapretLogsViewState extends State<ZapretLogsView> {
           ListItem(
             title: Text(l.update),
             trailing: const Icon(Icons.refresh),
-            onTap: () => setState(() => _archive = _loadArchive()),
+            onTap: _reloadArchive,
           ),
         if (error != null)
           ListItem(title: Text(l.forkLogReadError), subtitle: Text(error)),
@@ -179,7 +187,7 @@ class _ZapretLogsViewState extends State<ZapretLogsView> {
     return FutureBuilder<List<_JournalEntry>>(
       future: _archive,
       builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
+        if (snapshot.connectionState != ConnectionState.done && !snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
         if (snapshot.hasError) {
@@ -188,7 +196,7 @@ class _ZapretLogsViewState extends State<ZapretLogsView> {
             children: [
               Text(l.forkJournalUnavailable),
               TextButton(
-                onPressed: () => setState(() => _archive = _loadArchive()),
+                onPressed: _reloadArchive,
                 child: Text(l.retry),
               ),
             ],

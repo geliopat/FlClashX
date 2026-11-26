@@ -466,8 +466,7 @@ class ZapretController extends Notifier<ZapretState> {
 
   bool _canCommitListUpdate() => ref.mounted && ref.read(initProvider) &&
       !ref.read(safeModeProvider) && state.available && !state.busy &&
-      !state.dashboardRestarting && !_coreRestarting && !_profileApplying &&
-      !_lifecycleStopping;
+      !state.dashboardRestarting && !_coreRestarting && !_profileApplying;
 
   Future<void> _maybeUpdateLists() async {
     if (_checkingListUpdate || !_canCommitListUpdate() ||

@@ -77,7 +77,13 @@ pub(super) fn read() -> io::Result<String> {
     for index in (0..FILE_COUNT).rev() {
         match File::open(file_path(dir, index)) {
             Ok(file) => {
+                let start = bytes.len();
                 file.take(MAX_BYTES).read_to_end(&mut bytes)?;
+                // A torn final record in a rotated file must not consume the
+                // first valid record of the next file.
+                if bytes.len() > start && !bytes.ends_with(b"\n") {
+                    bytes.push(b'\n');
+                }
             }
             Err(error) if error.kind() == io::ErrorKind::NotFound => {}
             Err(error) => return Err(error),

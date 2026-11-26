@@ -378,7 +378,10 @@ class _SidebarPane extends StatelessWidget {
           if (footer != null && expanded && progress >= 0.999)
             ConstrainedBox(
               constraints: BoxConstraints(maxHeight: math.max(0.0,
-                  constraints.maxHeight * 0.5 - itemHeight)),
+                  math.min(constraints.maxHeight * 0.5 - itemHeight,
+                    constraints.maxHeight - windowControls.height -
+                    _toggleGap - _verticalInset * 2 -
+                    (itemHeight + _itemGap) * (pinned ? 3 : 2)))),
               child: SingleChildScrollView(
                 primary: false,
                 padding: EdgeInsets.symmetric(horizontal: sideInset + 4),
