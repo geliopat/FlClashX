@@ -12,6 +12,7 @@ foreach ($name in @('FlClashZ.exe', 'FlClashCore.exe', 'FlClashZHelperService.ex
 # The Windows path provider derives the app data subdirectory from these
 # version resource values. Reject an accidental upstream identity.
 $versionInfo = (Get-Item -LiteralPath (Join-Path $Bundle 'FlClashZ.exe')).VersionInfo
+if ($versionInfo.LegalCopyright -notmatch 'sweetyyoba\.com') { throw 'Unexpected copyright resource' }
 if ($versionInfo.CompanyName -ne 'sweetyyoba.com' -or $versionInfo.ProductName -ne 'clashz') {
   throw "Unexpected application data identity: $($versionInfo.CompanyName)/$($versionInfo.ProductName)"
 }

@@ -427,13 +427,7 @@ class Windows {
 
   // Keep this exact-name list synchronized with retired_windows_helper_names
   // in the Rust installer. Never remove generic WinDivert or Zapret services.
-  static const retiredHelperServices = [
-    'FlClashXPreHelperService',
-    'FlClashHelperService',
-    'FlClashPreHelperService',
-    'FlClashXHelperService',
-    'FlClashZPreHelperService',
-  ];
+  static const retiredHelperServices = ['FlClashZPreHelperService'];
 
   Future<AuthorizeCode>? _registration;
   String? _registrationError;

@@ -1,7 +1,7 @@
 script_template: inno_setup.iss
-app_id: D915C0D1-2F5B-4676-97D5-6D55F3EF45A4
+app_id: A1E719DB-1597-4C0E-AC89-05BBED14D43D
 app_name: FlClashZ
-publisher: geliopat
+publisher: sweetyyoba.com
 publisher_url: https://github.com/geliopat/FlClashZ
 display_name: FlClashZ
 executable_name: FlClashZ.exe

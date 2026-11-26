@@ -805,7 +805,7 @@ final class HelperClient {
     if (error.response?.statusCode == HttpStatus.notFound) {
       return const HelperException(
         code: 'zapretUnsupported',
-        message: 'Служба Helper не поддерживает Zapret2. Перезапусти или обнови FlClashX, чтобы обновить службу.',
+        message: 'Служба Helper не поддерживает Zapret2. Перезапусти или обнови FlClashZ, чтобы обновить службу.',
       );
     }
     return _mapDioException(error, operation: 'Zapret $operation');

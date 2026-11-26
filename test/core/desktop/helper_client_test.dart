@@ -308,7 +308,7 @@ void main() {
 
   test('only the stable app falls back to the fixed Helper port', () {
     expect(HelperClient.helperPortFor(published: 50123, pre: true), 50123);
-    expect(HelperClient.helperPortFor(published: null, pre: false), helperPort);
+    expect(HelperClient.helperPortFor(published: null, pre: false), 47891);
     expect(
       () => HelperClient.helperPortFor(published: null, pre: true),
       throwsA(

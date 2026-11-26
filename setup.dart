@@ -243,7 +243,7 @@ const preDesktop = DesktopIdentity(
 
 const windowsHelperName = 'FlClashZHelperService';
 
-const _preWindowsAppId = '3B6E2F0A-9C41-4D57-8A2E-7F1D5C0B9E63';
+const _preWindowsAppId = '87F299A5-9634-45C1-915B-24E3A90B56A2';
 
 DesktopIdentity desktopIdentityOf(String env) =>
     env == 'pre' ? preDesktop : stableDesktop;
@@ -646,9 +646,9 @@ Future<void> _packageWindows(
     executable: legacy.pre ? 'FlClashZPre' : 'FlClashZ',
     helper: windowsHelperName,
     displayName: legacy.pre ? 'FlClashZ Pre' : 'FlClashZ',
-    bundleId: legacy.bundleId,
-    packageName: legacy.packageName,
-    installDir: legacy.installDir,
+    bundleId: legacy.pre ? 'com.sweetyyoba.clashz.pre' : 'com.sweetyyoba.clashz',
+    packageName: legacy.pre ? 'clashz.pre' : 'clashz',
+    installDir: legacy.pre ? 'FlClashZPre' : 'FlClashZ',
     helperUnit: legacy.helperUnit,
     windowsDataDir: legacy.windowsDataDir,
   );
@@ -798,16 +798,8 @@ String renderInnoSetup(
         : (config['executable_name'] ?? '$_appName.exe') as String,
     'HELPER_SERVICE': windowsHelperName,
     'USER_DATA_DIR': identity.windowsDataDir,
-    'ADOPT_LEGACY': identity.pre ? 'False' : 'True',
     'LANGUAGES': languages.join('\n'),
     'RUN_FLAGS': privileges == 'admin' ? 'runascurrentuser' : '',
-    'CLEAR_PROXY_SCRIPT': p.join(
-      rootDir,
-      'windows',
-      'packaging',
-      'exe',
-      'clear_stale_proxy.ps1',
-    ),
   };
   var rendered = template;
   values.forEach((key, value) {
