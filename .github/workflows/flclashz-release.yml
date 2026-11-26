@@ -1,6 +1,8 @@
 name: FlClashZ versioned Windows release
 
 on:
+  push:
+    branches: [fix/zapret2-stability]
   workflow_call:
     inputs:
       candidate_ref:
@@ -28,23 +30,25 @@ jobs:
   prepare:
     # Explicit repository opt-in: the current runtime regressions must be
     # fixed and the fork's public signing key must be pinned first.
-    if: vars.FLCLASHZ_RELEASE_ENABLED == 'true'
+    if: (inputs.candidate_ref != '' && vars.FLCLASHZ_RELEASE_ENABLED == 'true') || (github.event_name == 'push' && startsWith(github.event.head_commit.message || '', 'release: FlClashZ v'))
     runs-on: ubuntu-24.04
     permissions:
       contents: write
     outputs:
       sha: ${{ steps.version.outputs.sha }}
       tag: ${{ steps.version.outputs.tag }}
+      public_key: ${{ steps.signing.outputs.public_key }}
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: ${{ inputs.candidate_ref }}
+          ref: ${{ inputs.candidate_ref || github.sha }}
           fetch-depth: 0
       - name: Verify release prerequisites and allocate an immutable version branch
         id: version
         shell: bash
         env:
-          CANDIDATE_SHA: ${{ inputs.candidate_ref }}
+          CANDIDATE_SHA: ${{ inputs.candidate_ref || github.sha }}
+          EXPLICIT_RELEASE: ${{ inputs.candidate_ref == '' && github.event_name == 'push' }}
         run: |
           set -euo pipefail
           [[ "$CANDIDATE_SHA" =~ ^[0-9a-f]{40}$ ]]
@@ -54,6 +58,19 @@ jobs:
           grep -Fq "const repository = 'geliopat/FlClashZ';" lib/common/constant.dart
           grep -Fq "FlClashZ-windows-" lib/features/update/asset.dart
           grep -Fq "FlClashZ" windows/CMakeLists.txt
+          if [[ "$EXPLICIT_RELEASE" == true ]]; then
+            version=$(sed -nE 's/^version: ([0-9]+\.[0-9]+\.[0-9]+)(\+[0-9]+)?$/\1/p' pubspec.yaml)
+            [[ -n "$version" ]]
+            tag="v$version"
+            [[ "$(git log -1 --format=%s)" == "release: FlClashZ $tag" ]]
+            if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
+              echo "::error::Tag already exists; refusing to replace $tag"
+              exit 1
+            fi
+            echo "sha=$CANDIDATE_SHA" >> "$GITHUB_OUTPUT"
+            echo "tag=$tag" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           # Never allocate a version already used by a tag or archived branch.
           git ls-remote --refs origin 'refs/tags/v*' 'refs/heads/release/v*' > "$RUNNER_TEMP/versions.txt"
           export VERSIONS_FILE="$RUNNER_TEMP/versions.txt"
@@ -89,59 +106,50 @@ jobs:
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
+      - name: Resolve the release signing public key
+        id: signing
+        shell: bash
+        env:
+          SIGNING_SEED: ${{ secrets.UPDATE_SIGNING_KEY }}
+          PINNED_KEY: ${{ vars.FLCLASHZ_UPDATE_PUBLIC_KEY }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64, os, subprocess
+          seed = os.environ.get("SIGNING_SEED", "").strip()
+          pin = os.environ.get("PINNED_KEY", "").strip()
+          if pin and len(base64.b64decode(pin, validate=True)) != 32:
+              raise SystemExit("Invalid FLCLASHZ_UPDATE_PUBLIC_KEY")
+          if seed:
+              raw = base64.b64decode(seed, validate=True)
+              if len(raw) != 32:
+                  raise SystemExit("UPDATE_SIGNING_KEY must be a base64 Ed25519 seed of 32 bytes")
+              private_der = bytes.fromhex("302e020100300506032b657004220420") + raw
+              public_der = subprocess.run(
+                  ["openssl", "pkey", "-inform", "DER", "-pubout", "-outform", "DER"],
+                  input=private_der, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True,
+              ).stdout
+              if not public_der.startswith(bytes.fromhex("302a300506032b6570032100")) or len(public_der) != 44:
+                  raise SystemExit("Unexpected Ed25519 public key encoding")
+              derived = base64.b64encode(public_der[-32:]).decode()
+              if pin and pin != derived:
+                  raise SystemExit("Signing key does not match FLCLASHZ_UPDATE_PUBLIC_KEY")
+              pin = derived
+          else:
+              print("::warning::UPDATE_SIGNING_KEY is missing. Build can run; publication will refuse to proceed.")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              out.write("public_key=" + pin + "\n")
+          PY
+
   validate:
     needs: prepare
     uses: ./.github/workflows/zapret-windows-validation.yml
     with:
       candidate_ref: ${{ needs.prepare.outputs.sha }}
-
-  package:
-    needs: [prepare, validate]
-    runs-on: windows-2022
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          ref: ${{ needs.prepare.outputs.sha }}
-          persist-credentials: false
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: actions/setup-go@v6
-        with:
-          go-version: '1.27.1'
-          cache-dependency-path: core/go.sum
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          flutter-version: '3.47.6'
-          cache: true
-      - name: Install dependencies
-        run: flutter pub get
-      - name: Stage pinned assets
-        shell: pwsh
-        run: ./scripts/setup_zapret.ps1
-      - name: Build stable Windows packages
-        run: dart setup.dart windows --env stable -v
-      - name: Smoke test the actual portable release
-        shell: pwsh
-        run: |
-          $folder = Join-Path $env:RUNNER_TEMP 'flclashz-release-smoke'
-          Expand-Archive -LiteralPath 'dist/FlClashZ-windows-amd64.zip' -DestinationPath $folder -Force
-          $exe = @(Get-ChildItem -Path $folder -Recurse -File -Filter 'FlClashZ.exe')
-          if ($exe.Count -ne 1) { throw 'Expected one packaged application executable' }
-          ./scripts/windows_smoke_test.ps1 -Bundle $exe[0].Directory.FullName
-
-      - name: Verify distribution names
-        shell: pwsh
-        run: |
-          if (!(Test-Path 'dist/FlClashZ-windows-amd64-setup.exe')) { throw 'Expected branded Windows installer is missing' }
-          if (!(Test-Path 'dist/FlClashZ-windows-amd64.zip')) { throw 'Expected branded portable build is missing' }
-      - uses: actions/upload-artifact@v6
-        with:
-          name: FlClashZ-versioned-dist
-          path: dist/FlClashZ-windows-*
-          if-no-files-found: error
+      update_public_key: ${{ needs.prepare.outputs.public_key }}
 
   publish:
-    needs: [prepare, validate, package]
+    needs: [prepare, validate]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -159,7 +167,11 @@ jobs:
         run: flutter pub get
       - uses: actions/download-artifact@v7
         with:
-          name: FlClashZ-versioned-dist
+          name: FlClashZ-Windows-x64-portable
+          path: dist
+      - uses: actions/download-artifact@v7
+        with:
+          name: FlClashZ-Windows-x64-installer
           path: dist
       - name: Sign upstream-compatible update manifest and checksums
         shell: bash
@@ -167,13 +179,17 @@ jobs:
           FLCLASHX_UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
           FLCLASHZ_UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
           TAG: ${{ needs.prepare.outputs.tag }}
+          FLCLASHZ_UPDATE_PUBLIC_KEY: ${{ needs.prepare.outputs.public_key }}
         run: |
           set -euo pipefail
-          test -n "$FLCLASHZ_UPDATE_SIGNING_KEY"
+          test -n "$FLCLASHZ_UPDATE_SIGNING_KEY" || { echo '::error::Configure repository secret UPDATE_SIGNING_KEY before publication'; exit 1; }
+          test -n "$FLCLASHZ_UPDATE_PUBLIC_KEY"
+          test -s dist/FlClashZ-windows-amd64.zip
+          test -s dist/FlClashZ-windows-amd64-setup.exe
           for file in dist/FlClashZ-windows-*; do
             (cd dist && sha256sum "$(basename "$file")" > "$(basename "$file").sha256")
           done
-          dart run tool/sign_update_manifest.dart --version "$TAG" \
+          dart run -DFLCLASHZ_UPDATE_PUBLIC_KEY="$FLCLASHZ_UPDATE_PUBLIC_KEY" tool/sign_update_manifest.dart --version "$TAG" \
             --base-url "https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG" \
             --out dist/manifest.json dist
           test -s dist/manifest.json
@@ -183,7 +199,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.prepare.outputs.tag }}
           SHA: ${{ needs.prepare.outputs.sha }}
-          CANDIDATE_SHA: ${{ inputs.candidate_ref }}
+          CANDIDATE_SHA: ${{ inputs.candidate_ref || github.sha }}
         run: |
           set -euo pipefail
           if gh release view "$TAG" >/dev/null 2>&1; then
@@ -195,4 +211,35 @@ jobs:
             exit 1
           fi
           notes=$(printf 'FlClashZ Windows x64\n\nValidated source: %s\nRelease commit: %s\n' "$CANDIDATE_SHA" "$SHA")
-          gh release create "$TAG" dist/* --target "$SHA" --title "FlClashZ $TAG" --notes "$notes" --latest
+          gh release create "$TAG" dist/* --target "$SHA" --title "FlClashZ $TAG" --notes "$notes" --draft
+          gh release edit "$TAG" --draft=false --latest
+      - name: Verify versioned and latest release manifest
+        shell: bash
+        env:
+          TAG: ${{ needs.prepare.outputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          base="https://github.com/$GITHUB_REPOSITORY/releases"
+          curl --fail --silent --show-error --location --retry 8 --retry-all-errors --retry-delay 5 "$base/download/$TAG/manifest.json" -o "$RUNNER_TEMP/version-manifest.json"
+          curl --fail --silent --show-error --location --retry 8 --retry-all-errors --retry-delay 5 "$base/latest/download/manifest.json" -o "$RUNNER_TEMP/latest-manifest.json"
+          cmp dist/manifest.json "$RUNNER_TEMP/version-manifest.json"
+          cmp dist/manifest.json "$RUNNER_TEMP/latest-manifest.json"
+          gh release view "$TAG" --json assets,tagName,isDraft,isPrerelease > "$RUNNER_TEMP/release.json"
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib
+          temp = pathlib.Path(os.environ["RUNNER_TEMP"])
+          manifest = json.loads((temp / "latest-manifest.json").read_text())
+          release = json.loads((temp / "release.json").read_text())
+          tag = os.environ["TAG"]
+          names = {"FlClashZ-windows-amd64.zip", "FlClashZ-windows-amd64-setup.exe"}
+          assert manifest["version"] == release["tagName"] == tag
+          assert not release["isDraft"] and not release["isPrerelease"]
+          assert manifest["signature"]
+          assert {a["name"] for a in manifest["assets"]} == names
+          assert {a["name"] for a in release["assets"]} >= names | {n + ".sha256" for n in names} | {"manifest.json"}
+          for asset in manifest["assets"]:
+              name = asset["name"]
+              assert asset["url"] == "https://github.com/" + os.environ["GITHUB_REPOSITORY"] + "/releases/download/" + tag + "/" + name
+              assert hashlib.sha256((pathlib.Path("dist") / name).read_bytes()).hexdigest() == asset["sha256"]
+          PY

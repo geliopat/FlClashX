@@ -152,9 +152,12 @@ Map<String, String> createBuildEnvironment(String env) {
 List<String> createBuildDefines({
   required String appVersion,
   required String coreVersion,
+  String updatePublicKey = '',
 }) => [
   '--dart-define=APP_VERSION=$appVersion',
   if (coreVersion.isNotEmpty) '--dart-define=CORE_VERSION=$coreVersion',
+  if (updatePublicKey.isNotEmpty)
+    '--dart-define=FLCLASHZ_UPDATE_PUBLIC_KEY=$updatePublicKey',
 ];
 
 /// The tag CI builds from when it is a release tag, else the pubspec version.
@@ -366,7 +369,11 @@ class _Build {
       '--$arg',
     if (androidArch != null)
       '--target-platform=${_androidFlutterTarget[androidArch]!}',
-    ...createBuildDefines(appVersion: appVersion, coreVersion: coreVersion),
+    ...createBuildDefines(
+      appVersion: appVersion,
+      coreVersion: coreVersion,
+      updatePublicKey: Platform.environment['FLCLASHZ_UPDATE_PUBLIC_KEY'] ?? '',
+    ),
   ];
 
   Future<int> run(

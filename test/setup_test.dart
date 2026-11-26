@@ -242,6 +242,10 @@ hooks:
       ]);
     });
 
+    test('release public key is passed into the compiled app', () {
+      expect(setup.createBuildDefines(appVersion: '1.0.1', coreVersion: '', updatePublicKey: 'public-key'), contains('--dart-define=FLCLASHZ_UPDATE_PUBLIC_KEY=public-key'));
+    });
+
     test('renders the Inno Setup script from the packaging config', () {
       const template =
           'AppId={{APP_ID}}\nAppVersion={{APP_VERSION}}\n{{LANGUAGES}}\n'
