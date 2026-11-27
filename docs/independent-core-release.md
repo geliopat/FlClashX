@@ -31,13 +31,14 @@ execution, including before probing --core-info. Refuse downgrade unless a
 previous trusted local version is explicitly restored.
 
 A core updater must coordinate exclusively with the existing lifecycle owner.
-Verify bytes before stopping the active core, stage safely, retain the last
-verified binary and manifest, replace both as a journaled transaction, and
-check initialization/config/listeners/IPC on restart. Restore both on failure.
-The privileged Helper must verify the signed identity and hash itself before
-launch, restrict paths and reject reparse points; a user-writable hash file
-alone must never authorize a privileged executable. Recover interrupted
-transactions at startup. Preserve existing bundled manifest fallback.
+Verify bytes before stopping the active core, stage safely and retain immutable verified releases, then switch the selection
+as a journaled transaction and check initialization/config/listeners/IPC on
+restart. Restore the previous selection on failure. The privileged Helper
+verifies the signed identity and hash before launch; the protected store
+rejects reparse points and non-SYSTEM/Admin ACLs. A user-writable selection
+file never authorizes an unsigned executable. Pending journals always name
+the previous committed core, so interrupted trials recover at startup.
+The bundled executable and its embedded Helper hash remain untouched.
 
 Default source: https://github.com/geliopat/Clash.Meta/releases/latest/download/core-manifest.json
 (actual availability begins only after the first independently approved release).
@@ -49,6 +50,9 @@ installation; manual check and confirmation. No arbitrary URL executable.
 - Core metadata command and contract test implemented; not compiled.
 - Independent workflow, signer and guarded patch replay are implemented in the core repository (`FlClashZ` branch). The default branch still needs explicit configuration before workflow_dispatch. No build was dispatched.
 - Client-side signed manifest parsing, compatibility checks, numeric version ordering and staged binary hashing are implemented with regression fixtures. Not yet wired to downloads or lifecycle. The signing key must be provisioned before publication.
-- Trusted-key provisioning, transaction, privileged Helper verification and update integration
-  remain open; do not mark independent updates ready until implemented and
-  accepted.
+- Helper independently verifies Ed25519 manifests and exact executable bytes. New `/core/stage` and `/core/start` endpoints store and start only authenticated, content-addressed releases in an ACL-protected directory adjacent to the Helper. One upload is admitted at a time, with bounded size. Existing bundled hash/launch remains separate.
+- Reuse the existing downloader for HTTPS default/custom manifests and signed local import. Stage through Helper before changing the active version.
+- Durable selection journal and rollback worker implemented; a failed candidate restores the last committed selection and reuses the original CoreAction restart worker. CoreAction checks IPC connection, initialized state, actual Mihomo version and configuration/listener restoration, with a short crash observation window. Watchdog does not compete with an active trial. No update UI until stage 3.
+- Core public key is injected into both Dart and Rust, and included in Helper cache identity.
+- Remaining gates: regenerate Cargo.lock for the new Ed25519 dependency, run formatting/static analysis and Windows security/IPC regression tests after authorization; configure the repository default branch and signing key/variables. Do not claim the feature accepted or publish a release before these gates.
+

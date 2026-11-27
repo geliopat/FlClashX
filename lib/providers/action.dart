@@ -10,6 +10,8 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/system_dns.dart';
 import 'package:fl_clash/common/traffic_history.dart';
 import 'package:fl_clash/core/core.dart';
+import 'package:fl_clash/core/desktop/core_release_selection.dart';
+import 'package:fl_clash/features/update/core_release_manifest.dart';
 import 'package:fl_clash/database/database.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/features/proxy_chains/store.dart';

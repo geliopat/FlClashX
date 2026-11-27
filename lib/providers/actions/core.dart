@@ -9,7 +9,9 @@ class CoreAction extends _$CoreAction {
 
   int _requestedRestartRevision = 0;
   Future<bool>? _restartOperation;
-  bool get isRestarting => _restartOperation != null;
+  Future<bool>? _coreReleaseOperation;
+  bool _coreReleaseCrashed = false;
+  bool get isRestarting => _restartOperation != null || _coreReleaseOperation != null;
   int _restartsBegun = 0;
   bool _relaunchRequested = false;
   int _failedRestarts = 0;
@@ -101,6 +103,12 @@ class CoreAction extends _$CoreAction {
   Future<void> restartAfterCrash(String reason) async {
     crashFileLogger.enable();
     crashFileLogger.write(Log.app('[Mihomo] $reason').copyWith(logLevel: LogLevel.error));
+    // The activation transaction owns recovery during a candidate trial.
+    // A competing watchdog relaunch could commit the wrong executable.
+    if (_coreReleaseOperation != null) {
+      _coreReleaseCrashed = true;
+      return;
+    }
     if (system.isWindows && !ref.read(mihomoWatchdogProvider)) {
       final id = recoveryJournal.begin('Mihomo', 'watchdog');
       recoveryJournal.record(id, 'Mihomo', 'watchdog', RecoveryOutcome.skipped);
@@ -170,6 +178,17 @@ class CoreAction extends _$CoreAction {
 
   /// [running] stands in for a run that a crash rolled back.
   Future<bool> restartCore({bool? running, bool repairHelper = false}) {
+    final update = _coreReleaseOperation;
+    if (update != null) {
+      // A Helper repair must follow the exclusive core trial, not interrupt it.
+      return repairHelper
+          ? update.catchError((_) => false).then((_) => restartCore(running: running, repairHelper: true))
+          : update;
+    }
+    return _restartCore(running: running, repairHelper: repairHelper);
+  }
+
+  Future<bool> _restartCore({bool? running, bool repairHelper = false}) {
     _requestedRestartRevision++;
     final activeOperation = _restartOperation;
     if (activeOperation != null) {
@@ -185,7 +204,84 @@ class CoreAction extends _$CoreAction {
     return operation;
   }
 
+  /// Called after Helper has authenticated and staged the signed package.
+  /// Keep download/staging outside this operation: a bad package cannot stop
+  /// the working core. All configuration/listener recovery uses the existing
+  /// restart worker, not an independent process launcher.
+  Future<bool> activateCoreRelease(CoreReleaseManifest manifest) =>
+      _changeCoreRelease(manifest: manifest);
+
+  Future<bool> restorePreviousCoreRelease() => _changeCoreRelease(restore: true);
+
+  Future<bool> _changeCoreRelease({
+    CoreReleaseManifest? manifest,
+    bool restore = false,
+  }) {
+    if (!system.isWindows || safeModeBuild || ref.read(safeModeProvider)) {
+      return Future.error(StateError('Independent core updates require normal Windows mode'));
+    }
+    if (_coreReleaseOperation != null) {
+      return Future.error(StateError('Core release update already running'));
+    }
+    final operation = _runCoreReleaseChange(manifest: manifest, restore: restore);
+    _coreReleaseOperation = operation;
+    return operation.whenComplete(() {
+      if (identical(_coreReleaseOperation, operation)) {
+        _coreReleaseOperation = null;
+        _coreReleaseCrashed = false;
+      }
+    });
+  }
+
+  Future<bool> _runCoreReleaseChange({
+    required CoreReleaseManifest? manifest,
+    required bool restore,
+  }) async {
+    // Wait out an earlier restart before the first trial selection is visible.
+    await _restartOperation?.catchError((_) => false);
+    final setup = ref.read(setupActionProvider.notifier);
+    final running = setup.requestedRunning ?? ref.read(isStartProvider);
+    final id = recoveryJournal.begin('Mihomo', restore ? 'core-rollback' : 'core-update');
+    var outcome = RecoveryOutcome.interrupted;
+
+    Future<bool> restart() async {
+      _coreReleaseCrashed = false;
+      // This is the sole bypass of the public restart join while the
+      // transaction owns the lifecycle. It still uses the same worker.
+      final restored = await _restartCore(running: running);
+      if (!restored || _coreReleaseCrashed || !await _core.isInit) return false;
+      final selected = await coreReleaseSelection.selectedForLaunch();
+      final expected = selected?.version.mihomoVersion ?? coreVersionDefine;
+      final actual = await _core.getCoreVersion();
+      String normalized(String version) => version.startsWith('v') ? version : 'v$version';
+      if (expected.isNotEmpty && normalized(actual) != normalized(expected)) return false;
+      // Detect immediate crashes after successful configuration/listener setup.
+      await Future<void>.delayed(const Duration(seconds: 2));
+      return !_coreReleaseCrashed &&
+          ref.read(coreStatusProvider) == CoreStatus.connected &&
+          await _core.isInit;
+    }
+
+    try {
+      final result = restore
+          ? await coreReleaseSelection.restorePrevious(restart: restart)
+          : await coreReleaseSelection.activate(
+              manifest!, bundledVersion: coreVersionDefine.isNotEmpty
+                  ? coreVersionDefine : await _core.getCoreVersion(),
+              restart: restart,
+            );
+      outcome = result ? RecoveryOutcome.succeeded : RecoveryOutcome.failed;
+      return result;
+    } catch (_) {
+      outcome = RecoveryOutcome.failed;
+      rethrow;
+    } finally {
+      recoveryJournal.record(id, 'Mihomo', restore ? 'core-rollback' : 'core-update', outcome);
+    }
+  }
+
   Future<bool>? requestRelaunch() {
+    if (_coreReleaseOperation != null) return _coreReleaseOperation;
     final operation = _restartOperation;
     if (operation != null) {
       _relaunchRequested = true;
