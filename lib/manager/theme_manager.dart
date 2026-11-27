@@ -51,7 +51,9 @@ ThemeData watchAppTheme(WidgetRef ref, Brightness brightness) {
   final material = system.isWindows && !safeModeBuild
       ? ref.watch(windowMaterialProvider).value ?? WindowEffect.none
       : WindowEffect.none;
-  final alpha = material == WindowEffect.mica ? 0.20 : 0.32;
+  final alpha = material == WindowEffect.mica || material == WindowEffect.micaAlt
+      ? 0.20
+      : 0.32;
   final colorScheme = material == WindowEffect.none
       ? baseScheme
       : baseScheme.copyWith(

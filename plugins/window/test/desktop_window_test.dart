@@ -150,6 +150,16 @@ void main() {
     });
   });
 
+  test('Mica Alt uses a distinct native wire name', () async {
+    responder = (call) => call.method == 'isEffectSupported' ? true : null;
+    expect(await desktopWindow.isEffectSupported(WindowEffect.micaAlt), isTrue);
+    await desktopWindow.setEffect(WindowEffect.micaAlt, brightness: Brightness.dark);
+    expect(calls[0].arguments, {'effect': 'micaAlt'});
+    expect(calls[1].arguments, {
+      'effect': 'micaAlt', 'tint': null, 'brightness': 'dark',
+    });
+  });
+
   test('bounds carry only the fields that were given', () async {
     await desktopWindow.setPosition(const Offset(10, 20));
     await desktopWindow.setSize(const Size(300, 400));

@@ -21,6 +21,7 @@ enum class Effect {
   kAcrylic,
   kMica,
   kGlass,
+  kMicaAlt,
 };
 
 std::optional<TitleBarStyle> ParseTitleBarStyle(const std::string& value);
@@ -42,11 +43,11 @@ struct WindowStyle {
   void SetTitleBarStyle(TitleBarStyle style, bool button_visibility,
                         HWND hwnd);
   void SetRoundedCorners(bool value, HWND hwnd);
-  void SetEffect(Effect value, uint32_t tint, std::optional<bool> dark,
+  bool SetEffect(Effect value, uint32_t tint, std::optional<bool> dark,
                  HWND hwnd);
 
   // Only place calling the Dwm*/SetWindowCompositionAttribute APIs.
-  void Apply(HWND hwnd) const;
+  bool Apply(HWND hwnd) const;
 
   // Rows the controller keeps clear above the view and paints transparent.
   // Windows 10 draws the top border only inside a frame extended over the

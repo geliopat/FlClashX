@@ -32,6 +32,7 @@ enum SystemBackdropType {
   kDwmsbtNone = 1,
   kDwmsbtMainWindow = 2,
   kDwmsbtTransientWindow = 3,
+  kDwmsbtTabbedWindow = 4,
 };
 
 enum AccentState {
@@ -117,6 +118,7 @@ std::optional<Effect> ParseEffect(const std::string& value) {
   if (value == "blur") return Effect::kBlur;
   if (value == "acrylic") return Effect::kAcrylic;
   if (value == "mica") return Effect::kMica;
+  if (value == "micaAlt") return Effect::kMicaAlt;
   if (value == "glass") return Effect::kGlass;
   return std::nullopt;
 }
@@ -145,6 +147,8 @@ bool IsEffectSupported(Effect effect) {
              (has_accent && WindowsBuildNumber() >= 17134);
     case Effect::kMica:
       return WindowsBuildNumber() >= 22000;
+    case Effect::kMicaAlt:
+      return WindowsBuildNumber() >= kSystemBackdropBuild;
     case Effect::kGlass:
       return false;
   }
@@ -163,18 +167,19 @@ void WindowStyle::SetRoundedCorners(bool value, HWND hwnd) {
   Apply(hwnd);
 }
 
-void WindowStyle::SetEffect(Effect value, uint32_t tint,
+bool WindowStyle::SetEffect(Effect value, uint32_t tint,
                             std::optional<bool> dark, HWND hwnd) {
   effect = value;
   effect_tint = tint;
   dark_mode = dark;
-  Apply(hwnd);
+  return Apply(hwnd);
 }
 
-void WindowStyle::Apply(HWND hwnd) const {
+bool WindowStyle::Apply(HWND hwnd) const {
   if (hwnd == nullptr) {
-    return;
+    return false;
   }
+  HRESULT backdrop_result = S_OK;
 
   int accent_state = kAccentDisabled;
   uint32_t accent_color = 0;
@@ -203,11 +208,14 @@ void WindowStyle::Apply(HWND hwnd) const {
     case Effect::kMica:
       backdrop_type = kDwmsbtMainWindow;
       break;
+    case Effect::kMicaAlt:
+      backdrop_type = kDwmsbtTabbedWindow;
+      break;
   }
 
   // Windows fills an extended frame opaque, which would cover an accent effect.
   MARGINS margins{};
-  if (effect == Effect::kMica ||
+  if (effect == Effect::kMica || effect == Effect::kMicaAlt ||
       (effect == Effect::kAcrylic && WindowsBuildNumber() >= kSystemBackdropBuild)) {
     margins = {-1, -1, -1, -1};
   } else if (ExtendsTopFrame(*this)) {
@@ -226,8 +234,8 @@ void WindowStyle::Apply(HWND hwnd) const {
   }
 
   if (WindowsBuildNumber() >= kSystemBackdropBuild) {
-    ::DwmSetWindowAttribute(hwnd, DWMWA_SYSTEMBACKDROP_TYPE, &backdrop_type,
-                            sizeof(backdrop_type));
+    backdrop_result = ::DwmSetWindowAttribute(
+        hwnd, DWMWA_SYSTEMBACKDROP_TYPE, &backdrop_type, sizeof(backdrop_type));
   } else if (IsWindows11OrGreater()) {
     const BOOL mica = effect == Effect::kMica ? TRUE : FALSE;
     ::DwmSetWindowAttribute(hwnd, DWMWA_MICA_EFFECT, &mica, sizeof(mica));
@@ -247,7 +255,8 @@ void WindowStyle::Apply(HWND hwnd) const {
   // what hides the caption buttons for a hidden title bar.
   const bool hide_buttons =
       title_bar_style == TitleBarStyle::kHidden &&
-      (!window_button_visibility || effect == Effect::kMica);
+      (!window_button_visibility || effect == Effect::kMica ||
+       effect == Effect::kMicaAlt);
   LONG_PTR style_bits = ::GetWindowLongPtrW(hwnd, GWL_STYLE);
   style_bits = hide_buttons ? (style_bits & ~WS_SYSMENU)
                             : (style_bits | WS_SYSMENU);
@@ -264,6 +273,7 @@ void WindowStyle::Apply(HWND hwnd) const {
   ::SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
                  SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_NOMOVE | SWP_NOSIZE |
                      SWP_NOACTIVATE | SWP_FRAMECHANGED);
+  return effect != Effect::kMicaAlt || SUCCEEDED(backdrop_result);
 }
 
 int WindowStyle::TopBorderHeight(HWND hwnd) const {

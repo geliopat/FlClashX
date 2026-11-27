@@ -381,7 +381,11 @@ void WindowPlugin::HandleSetEffect(const flutter::EncodableMap* args,
     }
     dark = *brightness == "dark";
   }
-  style_.SetEffect(*effect, tint, dark, controller_.GetWindow());
+  if (!style_.SetEffect(*effect, tint, dark, controller_.GetWindow())) {
+    style_.SetEffect(Effect::kNone, 0, dark, controller_.GetWindow());
+    result->Error("effect_failed", "setEffect: " + *effect_name);
+    return;
+  }
   result->Success();
 }
 

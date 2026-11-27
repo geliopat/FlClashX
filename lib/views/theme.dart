@@ -96,6 +96,7 @@ class _WindowMaterialItem extends ConsumerWidget {
     final selected = preference.value ?? WindowEffect.none;
     String label(WindowEffect effect) => switch (effect) {
       WindowEffect.mica => 'Mica',
+      WindowEffect.micaAlt => 'Mica Alt',
       WindowEffect.acrylic => 'Acrylic',
       _ => ru ? 'Без прозрачности' : 'Opaque',
     };
