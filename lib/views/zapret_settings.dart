@@ -257,11 +257,6 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
       generateSection(
         title: AppLocalizations.of(context).forkHelperService,
         items: [
-          ListItem(
-            title: const Text('Watchdog Zapret'),
-            subtitle: Text(AppLocalizations.of(context).forkWatchdogHint),
-            trailing: Switch(value: zapret.watchdog, onChanged: ref.read(zapretControllerProvider.notifier).setWatchdog),
-          ),
           ManagedSetting(
             settingKey: zapretStartSetting,
             onTakenOver: zapret.busy ? null : () => ref
