@@ -131,19 +131,30 @@ HRESULT CreateIconGeometry(ID2D1Factory* factory, const AcrylicRow& row,
     begin(2, 3); line(14, 3); line(14, 13); line(2, 13); end(true);
     begin(2, 6); line(14, 6); end();
   } else if (row.icon == "start") {
-    begin(3, 2); line(13, 8); line(3, 14); end(true);
-  } else if (row.icon == "stop") {
-    // Match the Flutter circle-stop glyph on the native 16-unit grid.
-    begin(2.13f, 8);
-    sink->AddArc(D2D1::ArcSegment(point(13.87f, 8),
-        D2D1::SizeF(5.87f * scale, 5.87f * scale), 0.0f,
-        D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
-    sink->AddArc(D2D1::ArcSegment(point(2.13f, 8),
-        D2D1::SizeF(5.87f * scale, 5.87f * scale), 0.0f,
-        D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
+    // Same hollow rounded triangle as the dashboard, on the 16-unit grid.
+    const auto curve = [&](float cx, float cy, float px, float py) {
+      sink->AddQuadraticBezier(D2D1::QuadraticBezierSegment(
+          point(cx, cy), point(px, py)));
+    };
+    begin(4.67f, 4.2f);
+    curve(4.67f, 3.0f, 5.69f, 3.64f);
+    line(11.65f, 7.36f);
+    curve(12.67f, 8.0f, 11.65f, 8.64f);
+    line(5.69f, 12.36f);
+    curve(4.67f, 13.0f, 4.67f, 11.8f);
     end(true);
-    begin(5.67f, 5.67f); line(10.33f, 5.67f);
-    line(10.33f, 10.33f); line(5.67f, 10.33f); end(true);
+  } else if (row.icon == "stop") {
+    // Match the dashboard's hollow rounded square, without an outer circle.
+    const auto curve = [&](float cx, float cy, float px, float py) {
+      sink->AddQuadraticBezier(D2D1::QuadraticBezierSegment(
+          point(cx, cy), point(px, py)));
+    };
+    begin(5, 3.33f); line(11, 3.33f);
+    curve(12.67f, 3.33f, 12.67f, 5);
+    line(12.67f, 11); curve(12.67f, 12.67f, 11, 12.67f);
+    line(5, 12.67f); curve(3.33f, 12.67f, 3.33f, 11);
+    line(3.33f, 5); curve(3.33f, 3.33f, 5, 3.33f);
+    end(true);
   } else if (row.icon == "restart") {
     // Match the Flutter clockwise rotate arrow.
     begin(13, 10.33f);

@@ -85,7 +85,7 @@ class _EngineControlButtonState extends State<EngineControlButton> {
         message: widget.error ?? widget.actionLabel,
         child: Semantics(
           button: true, enabled: enabled,
-          label: widget.actionLabel, value: uptime,
+          label: '${widget.name} · ${widget.actionLabel}', value: uptime,
           child: LocalMaterialPane(
             appearance: appearance,
             color: background,
