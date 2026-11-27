@@ -25,6 +25,7 @@ class GlyphIcon extends StatelessWidget {
             glyph: glyph,
             fill: fill ?? iconTheme.fill ?? 0,
             color: color.withValues(alpha: color.a * opacity),
+            shadows: iconTheme.shadows ?? const [],
           ),
         ),
       ),
