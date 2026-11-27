@@ -1,5 +1,6 @@
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/providers/providers.dart';
+import 'package:fl_clash/models/managed_settings.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/ui/ui.dart';
 import 'package:material_ui/material_ui.dart';
@@ -84,7 +85,9 @@ class ManagedSetting extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return ManagedSettingRegion(
       locked: ref.watch(settingLockedProvider(settingKey)),
-      releasable: ref.watch(settingReleasableProvider(settingKey)),
+      releasable: ref.watch(settingReleasableProvider(settingKey)) ||
+          (isClashOwnershipKey(settingKey) && ref.watch(appSettingProvider.select(
+            (state) => state.ownedSettings.contains(settingKey)))),
       dimsWhenLocked: dimsWhenLocked,
       showsLock: showsLock,
       onTakeOver: () => _takeOver(ref),

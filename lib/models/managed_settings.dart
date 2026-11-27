@@ -1,4 +1,5 @@
 import 'clash_config.dart';
+import 'config.dart';
 import 'provider_headers.dart';
 
 /// Flags of `flclashz-settings` and the app switch each one drives.
@@ -102,6 +103,56 @@ const managedClashKeys = {
 };
 
 String clashSettingKey(String yamlKey) => 'clash.$yamlKey';
+
+bool isClashOwnershipKey(String key) =>
+    key.startsWith('clash.') && managedClashKeys.contains(key.substring(6));
+
+// Store only provenance (not profile values or credentials) in the existing
+// persisted set. The prefix is disjoint from the header-owned setting names.
+const _yamlSourcePrefix = 'profile.yaml.source.';
+const _yamlSourceVersion = 'profile.yaml.version.1';
+
+bool hasYamlSourceVersion(Set<String> markers) => markers.contains(_yamlSourceVersion);
+
+Set<String> previousYamlSources(Set<String> markers) => {
+  for (final marker in markers)
+    if (marker.startsWith(_yamlSourcePrefix) &&
+        managedClashKeys.contains(marker.substring(_yamlSourcePrefix.length)))
+      marker.substring(_yamlSourcePrefix.length),
+};
+
+Set<String> withYamlSources(Set<String> markers, Set<String> named) => {
+  for (final marker in markers)
+    if (!marker.startsWith(_yamlSourcePrefix)) marker,
+  _yamlSourceVersion,
+  for (final key in named.intersection(managedClashKeys)) '$_yamlSourcePrefix$key',
+};
+
+/// On legacy stores, absent non-default values are the only safe candidates
+/// for inferring local ownership. Named values without an explicit ownership
+/// record remain inherited: a stale subscription value is indistinguishable
+/// from an old unrecorded edit. Never infer ownership for default values.
+Set<String> legacyLocalClashKeys(
+  PatchClashConfig current, AuthenticationProps authentication, Set<String> named,
+) => {
+  for (final key in managedClashKeys.difference(named))
+    if (key == 'authentication'
+        ? authentication != const AuthenticationProps()
+        : keepOwnedSettings(current, defaultClashConfig, {clashSettingKey(key)}) != defaultClashConfig)
+      clashSettingKey(key),
+};
+
+Set<String> keptClashKeys({
+  required Set<String> named,
+  required Set<String> previous,
+  required Set<String> owned,
+  Set<String> released = const {},
+}) => {
+  ...owned,
+  for (final key in managedClashKeys)
+    if (!named.contains(key) && !previous.contains(key) &&
+        !released.contains(clashSettingKey(key))) clashSettingKey(key),
+};
 
 /// The lockable keys of each settings page, for its hint.
 const generalPageKeys = {

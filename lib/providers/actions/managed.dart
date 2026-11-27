@@ -6,6 +6,7 @@ class ManagedSettingsAction extends _$ManagedSettingsAction {
   void build() {}
 
   void takeOver(String key) {
+    if (ref.read(appSettingProvider).ownedSettings.contains(key)) return;
     ref
         .read(appSettingProvider.notifier)
         .update(
@@ -20,6 +21,7 @@ class ManagedSettingsAction extends _$ManagedSettingsAction {
   /// it is theirs to change.
   Future<bool> confirmTakeOver(String key) async {
     if (!ref.read(settingLockedProvider(key))) {
+      if (isClashOwnershipKey(key)) takeOver(key);
       return true;
     }
     final agreed = await dialogs.showMessage(
@@ -40,7 +42,7 @@ class ManagedSettingsAction extends _$ManagedSettingsAction {
 
   /// For a change from the tray or a hotkey, which has nowhere to ask.
   void takeOverIfLocked(String key) {
-    if (ref.read(settingLockedProvider(key))) {
+    if (isClashOwnershipKey(key) || ref.read(settingLockedProvider(key))) {
       takeOver(key);
     }
   }
@@ -59,7 +61,7 @@ class ManagedSettingsAction extends _$ManagedSettingsAction {
 
   void release(String key) {
     disown(key);
-    if (!zapretPageKeys.contains(key)) _reapply();
+    if (!zapretPageKeys.contains(key)) _reapply(released: {key});
   }
 
   void releaseAll() {
@@ -76,10 +78,10 @@ class ManagedSettingsAction extends _$ManagedSettingsAction {
     ref
         .read(appSettingProvider.notifier)
         .update((state) => state.copyWith(ownedSettings: const {}));
-    _reapply();
+    _reapply(released: owned);
   }
 
-  void _reapply() {
+  void _reapply({Set<String> released = const {}}) {
     final profile = ref.read(currentProfileProvider);
     ref
         .read(profileHeadersActionProvider.notifier)
@@ -87,7 +89,7 @@ class ManagedSettingsAction extends _$ManagedSettingsAction {
     unawaited(
       ref
           .read(profileSettingsActionProvider.notifier)
-          .apply(profileSettingsSourceOf(profile)),
+          .apply(profileSettingsSourceOf(profile), released: released),
     );
   }
 }

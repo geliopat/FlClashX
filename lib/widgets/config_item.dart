@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/l10n/l10n.dart';
+import 'package:fl_clash/models/managed_settings.dart';
+import 'package:fl_clash/providers/action.dart';
 import 'package:fl_clash/ui/list.dart';
 import 'package:flutter/foundation.dart' show listEquals;
 import 'package:material_ui/material_ui.dart';
@@ -103,6 +105,14 @@ abstract class _ConfigItem<T> extends ConsumerWidget {
   /// The setting's key in the subscription, when a panel may speak for it.
   final String? managedKey;
 
+  void write(WidgetRef ref, T value) {
+    final key = managedKey;
+    if (key != null && isClashOwnershipKey(key)) {
+      ref.read(managedSettingsActionProvider.notifier).takeOver(key);
+    }
+    onChanged(ref, value);
+  }
+
   VoidCallback? takenOver(WidgetRef ref, T value) => null;
 
   Widget buildItem(
@@ -146,7 +156,7 @@ class ConfigToggleItem extends _ConfigItem<bool> {
 
   @override
   VoidCallback? takenOver(WidgetRef ref, bool value) =>
-      () => onChanged(ref, !value);
+      () => write(ref, !value);
 
   @override
   Widget buildItem(
@@ -159,7 +169,7 @@ class ConfigToggleItem extends _ConfigItem<bool> {
       leading: leading,
       title: Text(title(appLocalizations)),
       value: value,
-      onChanged: (value) => onChanged(ref, value),
+      onChanged: (value) => write(ref, value),
     );
   }
 }
@@ -194,7 +204,7 @@ class ConfigOptionsItem<T> extends _ConfigItem<T> {
       options: options,
       value: value,
       textBuilder: textBuilder,
-      onChanged: (value) => onChanged(ref, value),
+      onChanged: (value) => write(ref, value),
     );
   }
 }
@@ -256,7 +266,7 @@ class ConfigTextItem extends _ConfigItem<String> {
         if (normalized == null || normalized == value) {
           return;
         }
-        onChanged(ref, normalized);
+        write(ref, normalized);
       },
     );
   }
@@ -311,7 +321,7 @@ class ConfigListEditItem extends _ConfigItem<List<String>> {
         }
         final next = List<String>.from(items);
         if (!listEquals(next, value)) {
-          onChanged(ref, next);
+          write(ref, next);
         }
       },
     );

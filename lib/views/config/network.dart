@@ -5,6 +5,7 @@ import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/features/form/form.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/config.dart';
+import 'package:fl_clash/providers/action.dart';
 import 'package:fl_clash/providers/state.dart';
 import 'package:fl_clash/views/config/override.dart';
 import 'package:fl_clash/views/config/tun.dart';
@@ -282,9 +283,8 @@ class RouteAddressItem extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, ref) {
-    return ManagedSetting(
-      settingKey: 'clash.tun.route-address',
-      child: ConfigListEditItem(
+    return ConfigListEditItem(
+        managedKey: 'clash.tun.route-address',
         title: (l) => l.routeAddress,
         itemMaxLength: TextInputLimits.cidr,
         itemValidator: validateCidr,
@@ -294,7 +294,6 @@ class RouteAddressItem extends ConsumerWidget {
         onChanged: _tunWriter(
           (state, value) => state.copyWith.tun(routeAddress: value),
         ),
-      ),
     );
   }
 }
@@ -365,6 +364,9 @@ class _NumberItem extends ConsumerWidget {
       onChanged: (value) {
         if (value == null) {
           return;
+        }
+        if (managedKey != null) {
+          ref.read(managedSettingsActionProvider.notifier).takeOver(managedKey!);
         }
         ref
             .read(patchClashConfigProvider.notifier)

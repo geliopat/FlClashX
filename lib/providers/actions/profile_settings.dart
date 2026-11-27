@@ -23,10 +23,8 @@ class ProfileSettingsAction extends _$ProfileSettingsAction {
 
   int _generation = 0;
 
-  /// What the last synced file named: only those keys fall back to the app
-  /// default when the next file leaves them out, so a value the user set
-  /// for a key no file names stays.
-  Set<String> _named = const {};
+  // Release requests survive a superseding profile read or transient failure.
+  final _released = <String>{};
 
   /// Set when the Core could not be asked; its next connection asks again.
   bool _unread = false;
@@ -53,14 +51,14 @@ class ProfileSettingsAction extends _$ProfileSettingsAction {
     );
   }
 
-  Future<void> apply(ProfileSettingsSource source) async {
+  Future<void> apply(ProfileSettingsSource source, {Set<String> released = const {}}) async {
+    _released.addAll(released.where(isClashOwnershipKey));
     final id = source.id;
     final generation = ++_generation;
     _unread = false;
     if (id == null ||
         source.type == ProfileType.custom ||
         source.extendType == ExtendType.script) {
-      _named = const {};
       ref.read(managedClashKeysProvider.notifier).set(const {});
       ref.read(globalOverrideProvider.notifier).value = false;
       return;
@@ -78,17 +76,29 @@ class ProfileSettingsAction extends _$ProfileSettingsAction {
       }
       return;
     }
-    if (generation != _generation) {
+    if (!ref.mounted || generation != _generation) {
       return;
     }
     final modes = ref.read(availableModesProvider);
-    final named = base.present.toSet();
-    final kept = {
-      ...ref.read(appSettingProvider).ownedSettings,
-      for (final key in managedClashKeys)
-        if (!named.contains(key) && !_named.contains(key)) clashSettingKey(key),
+    final named = base.present.toSet().intersection(managedClashKeys);
+    final settings = ref.read(appSettingProvider);
+    final previous = previousYamlSources(settings.panelSetSettings);
+    final released = Set<String>.of(_released);
+    final owned = {
+      ...settings.ownedSettings,
+      if (!hasYamlSourceVersion(settings.panelSetSettings))
+        ...legacyLocalClashKeys(ref.read(patchClashConfigProvider),
+          ref.read(networkSettingProvider).authentication, named).difference(released),
     };
-    _named = named;
+    final kept = keptClashKeys(named: named, previous: previous, owned: owned, released: released);
+    final resetMissing = {
+      for (final key in released)
+        if (!owned.contains(key) && !named.contains(key.substring(6))) key,
+    };
+    ref.read(appSettingProvider.notifier).update((state) => state.copyWith(
+      ownedSettings: owned,
+      panelSetSettings: withYamlSources(state.panelSetSettings, named),
+    ));
     ref
         .read(managedClashKeysProvider.notifier)
         .set(managedClashKeysOf(base.present));
@@ -98,7 +108,9 @@ class ProfileSettingsAction extends _$ProfileSettingsAction {
         .update(
           (state) => keepOwnedSettings(
             state,
-            syncProfileSettings(state, base.config, base.present, modes: modes),
+            keepOwnedSettings(defaultClashConfig,
+              syncProfileSettings(state, base.config, base.present, modes: modes),
+              resetMissing),
             kept,
           ),
         );
@@ -111,5 +123,6 @@ class ProfileSettingsAction extends _$ProfileSettingsAction {
             ),
           );
     }
+    _released.removeAll(released);
   }
 }

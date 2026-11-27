@@ -143,6 +143,12 @@ class _PortFormState extends ConsumerState<_PortForm> {
       return;
     }
     final ports = [for (final field in _fields) int.parse(_textOf(field))];
+    final current = ref.read(patchClashConfigProvider);
+    for (final (index, field) in _fields.indexed) {
+      if (!ref.read(settingLockedProvider(field.settingKey)) && field.select(current) != ports[index]) {
+        ref.read(managedSettingsActionProvider.notifier).takeOver(field.settingKey);
+      }
+    }
     ref
         .read(patchClashConfigProvider.notifier)
         .update(

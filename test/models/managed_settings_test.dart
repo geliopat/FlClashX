@@ -3,6 +3,26 @@ import 'package:fl_clash/models/models.dart';
 import 'package:test/test.dart';
 
 void main() {
+  test('legacy migration preserves only absent non-default values and explicit ownership', () {
+    const current = PatchClashConfig(keepAliveIdle: 0, keepAliveInterval: 60,
+      tcpConcurrent: false, allowLan: true);
+    final owned = legacyLocalClashKeys(current, const AuthenticationProps(),
+      {'keep-alive-interval', 'allow-lan'});
+    expect(owned, {'clash.keep-alive-idle', 'clash.tcp-concurrent'});
+  });
+
+  test('source markers survive restart without storing profile values', () {
+    final markers = withYamlSources({'app.hideIp'}, {'ipv6', 'tun.stack', 'proxies'});
+    expect(hasYamlSourceVersion(markers), isTrue);
+    expect(previousYamlSources(markers), {'ipv6', 'tun.stack'});
+    expect(withYamlSources(markers, {'ipv6'}).contains('app.hideIp'), isTrue);
+    expect(previousYamlSources(withYamlSources(markers, {'ipv6'})), {'ipv6'});
+    final kept = keptClashKeys(named: {'keep-alive-idle'}, previous: previousYamlSources(markers),
+      owned: {'clash.keep-alive-idle'}, released: {'clash.mixed-port'});
+    expect(kept, contains('clash.keep-alive-idle'));
+    expect(kept, isNot(contains('clash.tun.stack')));
+    expect(kept, isNot(contains('clash.mixed-port')));
+  });
   test('Zapret ownership is independent for each header field', () {
     const personal = (autostart: false, autofallback: false, autotune: false,
       tuneonfail: true, mode: 'fullbypass', tunemode: 'veryfast');
