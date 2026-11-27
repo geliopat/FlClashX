@@ -17,6 +17,18 @@ void main() {
     expect(RecoveryJournal.parseLine('unstructured line'), isNull);
   });
 
+  test('native watchdog records preserve outcome and operation id', () {
+    final raw = [
+      '{"timestampMs":123,"component":"Zapret","recovery":{"id":"native-1","action":"watchdog","outcome":"started"}}',
+      '{"message":"legacy watchdog message"}',
+      '{broken',
+      '{"timestampMs":456,"component":"Zapret","recovery":{"id":"native-1","action":"watchdog","outcome":"failed"}}',
+    ].join('\n');
+    final events = RecoveryJournal.parseNativeArchive(raw);
+    expect(events.map((e) => e.id).toSet(), {'native-1'});
+    expect(events.map((e) => e.outcome), [RecoveryOutcome.started, RecoveryOutcome.failed]);
+  });
+
   test('journal persists starts and terminal results with shared operation id', () async {
     final folder = await Directory.systemTemp.createTemp('recovery_journal_test');
     final logger = FileLogger(prefix: 'Recovery', directory: () async => folder.path);
