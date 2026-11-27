@@ -19,6 +19,13 @@ const captionButtonWidth = 46.0;
 /// square slot the height of the bar, with a regular icon size.
 const pinIconSize = 16.0;
 
+/// At narrow widths keep the compact separate caption so page actions and
+/// search fields never compete for the same horizontal space.
+bool useIntegratedWindowHeader({required bool isWindows, required double width}) =>
+    isWindows && width >= 1000;
+
+double integratedCaptionWidth(double height) => height + captionButtonWidth * 3;
+
 Size getCaptionButtonSize(double headerHeight) =>
     Size(captionButtonWidth, headerHeight);
 

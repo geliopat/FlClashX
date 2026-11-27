@@ -226,9 +226,16 @@ class WindowHeaderContainer extends StatelessWidget {
         if (!showsHeader) {
           return child!;
         }
+        final integrated = useIntegratedWindowHeader(
+          isWindows: system.isWindows,
+          width: ref.watch(viewWidthProvider),
+        );
         return WindowHeaderLayout(
           height: kHeaderHeight,
-          header: const WindowHeader(),
+          integrated: integrated,
+          onDragStart: desktopWindow.startDragging,
+          onDoubleTap: _toggleWindowMaximized,
+          header: WindowHeader(integrated: integrated),
           child: child!,
         );
       },
@@ -243,11 +250,17 @@ class WindowHeaderLayout extends StatelessWidget {
     required this.height,
     required this.header,
     required this.child,
+    this.integrated = false,
+    this.onDragStart,
+    this.onDoubleTap,
   });
 
   final double height;
   final Widget header;
   final Widget child;
+  final bool integrated;
+  final VoidCallback? onDragStart;
+  final VoidCallback? onDoubleTap;
 
   @override
   Widget build(BuildContext context) {
@@ -256,11 +269,24 @@ class WindowHeaderLayout extends StatelessWidget {
         children: [
           Column(
             children: [
-              SizedBox(height: height),
-              Expanded(flex: 1, child: child),
+              SizedBox(height: integrated ? 0 : height),
+              Expanded(
+                child: IntegratedWindowHeaderScope(
+                  clearance: integrated ? integratedCaptionWidth(height) : 0,
+                  onDragStart: integrated ? onDragStart : null,
+                  onDoubleTap: integrated ? onDoubleTap : null,
+                  child: child,
+                ),
+              ),
             ],
           ),
-          Positioned(top: 0, left: 0, right: 0, child: header),
+          Positioned(
+            top: integrated ? (pageToolbarHeight - height) / 2 : 0,
+            left: integrated ? null : 0,
+            right: 0,
+            width: integrated ? integratedCaptionWidth(height) : null,
+            child: header,
+          ),
         ],
       ),
     );
@@ -359,15 +385,7 @@ class WindowCaptionController extends ValueNotifier<WindowCaptionState>
     _set(value.copyWith(isFullScreen: false));
   }
 
-  Future<void> toggleMaximized() async {
-    if (await desktopWindow.isFullScreen()) {
-      await desktopWindow.setFullScreen(false);
-    } else if (await desktopWindow.isMaximized()) {
-      await desktopWindow.unmaximize();
-    } else {
-      await desktopWindow.maximize();
-    }
-  }
+  Future<void> toggleMaximized() => _toggleWindowMaximized();
 
   Future<void> togglePin() async {
     final isPinned = await desktopWindow.isAlwaysOnTop();
@@ -383,8 +401,20 @@ class WindowCaptionController extends ValueNotifier<WindowCaptionState>
   }
 }
 
+Future<void> _toggleWindowMaximized() async {
+  if (await desktopWindow.isFullScreen()) {
+    await desktopWindow.setFullScreen(false);
+  } else if (await desktopWindow.isMaximized()) {
+    await desktopWindow.unmaximize();
+  } else {
+    await desktopWindow.maximize();
+  }
+}
+
 class WindowHeader extends ConsumerStatefulWidget {
-  const WindowHeader({super.key});
+  const WindowHeader({super.key, this.integrated = false});
+
+  final bool integrated;
 
   @override
   ConsumerState<WindowHeader> createState() => _WindowHeaderState();
@@ -403,6 +433,7 @@ class _WindowHeaderState extends ConsumerState<WindowHeader> {
   Widget build(BuildContext context) {
     return WindowHeaderBar(
       height: kHeaderHeight,
+      integrated: widget.integrated,
       onDragStart: desktopWindow.startDragging,
       onDoubleTap: caption.toggleMaximized,
       title: system.isMacOS ? const Text(appName) : null,
@@ -429,9 +460,11 @@ class WindowHeaderBar extends StatelessWidget {
     required this.onDoubleTap,
     this.title,
     this.actions,
+    this.integrated = false,
   });
 
   final double height;
+  final bool integrated;
   final VoidCallback onDragStart;
   final VoidCallback onDoubleTap;
   final Widget? title;
@@ -441,13 +474,15 @@ class WindowHeaderBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = context.colorScheme;
     return Material(
-      shape: Border(bottom: Divider.createBorderSide(context)),
+      type: integrated ? MaterialType.transparency : MaterialType.canvas,
+      shape: integrated ? null : Border(bottom: Divider.createBorderSide(context)),
       child: SizedBox(
         height: height,
         child: Stack(
           alignment: AlignmentDirectional.center,
           children: [
-            Positioned.fill(
+            if (!integrated)
+              Positioned.fill(
               child: GestureDetector(
                 onPanStart: (_) {
                   onDragStart();

@@ -121,5 +121,9 @@ double overlayTopOffset(Ref ref) {
     version: version,
     isMobileView: isMobileView,
   );
-  return pageToolbarHeight + (showsHeader ? kHeaderHeight : 0);
+  final integrated = useIntegratedWindowHeader(
+    isWindows: system.isWindows,
+    width: ref.watch(viewWidthProvider),
+  );
+  return pageToolbarHeight + (showsHeader && !integrated ? kHeaderHeight : 0);
 }

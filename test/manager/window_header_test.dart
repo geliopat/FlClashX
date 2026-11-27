@@ -692,6 +692,25 @@ void main() {
     });
   });
 
+  testWidgets('integrated caption leaves the entire window to the page', (
+    tester,
+  ) async {
+    await tester.pumpWidget(TestApp(
+      child: WindowHeaderLayout(
+        height: 32,
+        integrated: true,
+        header: const SizedBox(height: 32, key: Key('integrated-caption')),
+        child: const ColoredBox(key: _contentKey, color: Color(0xFF00FF00)),
+      ),
+    ));
+    expect(tester.getTopLeft(find.byKey(_contentKey)), Offset.zero);
+    final rect = tester.getRect(find.byKey(const Key('integrated-caption')));
+    expect(rect.width, 170);
+    expect(rect.center.dy, pageToolbarHeight / 2);
+    expect(rect.right, tester.getRect(find.byKey(_contentKey)).right);
+    expect(tester.takeException(), isNull);
+  });
+
   group('WindowHeaderContainer', () {
     late ProviderContainer container;
 
@@ -763,8 +782,12 @@ void main() {
       expect(find.byType(WindowHeader), shows ? findsOneWidget : findsNothing);
       expect(
         tester.getTopLeft(find.byKey(_contentKey)).dy,
-        shows ? kHeaderHeight : 0,
+        shows && !system.isWindows ? kHeaderHeight : 0,
       );
+      if (system.isWindows) {
+        expect(tester.getRect(find.byType(WindowHeader)).width,
+            integratedCaptionWidth(kHeaderHeight));
+      }
     });
 
     testWidgets('the overlay offset reserves exactly what the header takes', (
@@ -779,7 +802,9 @@ void main() {
         );
         expect(
           container.read(overlayTopOffsetProvider),
-          pageToolbarHeight + (shows ? kHeaderHeight : 0),
+          pageToolbarHeight + (shows && !useIntegratedWindowHeader(
+            isWindows: system.isWindows, width: viewSize.width,
+          ) ? kHeaderHeight : 0),
           reason: 'view size $viewSize',
         );
       }

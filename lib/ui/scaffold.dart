@@ -553,7 +553,7 @@ class CommonScaffoldState extends State<CommonScaffold>
   }
 
   Widget _buildTitle({required bool compact}) {
-    return widget.titleWidget ??
+    final title = widget.titleWidget ??
         (widget.titleMenuItems.isEmpty
             ? Text(widget.title!)
             : CommonPopupBox(
@@ -566,6 +566,25 @@ class CommonScaffoldState extends State<CommonScaffold>
                 popupBuilder: (_) =>
                     CommonPopupMenu(items: widget.titleMenuItems),
               ));
+    final caption = IntegratedWindowHeaderScope.maybeOf(context);
+    if (compact || caption == null || caption.clearance == 0) return title;
+    Widget drag(Widget child) => GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onPanStart: (_) => caption.onDragStart?.call(),
+      onDoubleTap: caption.onDoubleTap,
+      child: child,
+    );
+    // Interactive title widgets keep their own gestures. Only the adjacent
+    // empty space is draggable; ordinary text can be dragged as well.
+    if (widget.titleWidget != null || widget.titleMenuItems.isNotEmpty) {
+      return Row(
+        children: [
+          Flexible(child: title),
+          Expanded(child: drag(const SizedBox(height: 40))),
+        ],
+      );
+    }
+    return drag(Align(alignment: AlignmentDirectional.centerStart, child: title));
   }
 
   List<Widget> _buildActions(
@@ -867,9 +886,17 @@ class CommonScaffoldState extends State<CommonScaffold>
                 ],
               );
               final bar = _buildAppBarWrap(appBar, barSearch: barSearch);
+              final caption = IntegratedWindowHeaderScope.maybeOf(context);
               return isCompact
                   ? bar
-                  : _buildFloatingHeader(_WindowControlsClearance(child: bar));
+                  : _buildFloatingHeader(
+                      _WindowControlsClearance(
+                        child: Padding(
+                          padding: EdgeInsets.only(right: caption?.clearance ?? 0),
+                          child: bar,
+                        ),
+                      ),
+                    );
             },
           ),
           ValueListenableBuilder(

@@ -53,3 +53,29 @@ class ViewScope extends InheritedModel<ViewScopeAspect> {
     },
   );
 }
+
+ 
+/// The window owns its caption buttons; a full page reserves their slot and
+/// supplies a safe drag region inside its own toolbar.
+class IntegratedWindowHeaderScope extends InheritedWidget {
+  const IntegratedWindowHeaderScope({
+    super.key,
+    required this.clearance,
+    this.onDragStart,
+    this.onDoubleTap,
+    required super.child,
+  });
+
+  final double clearance;
+  final VoidCallback? onDragStart;
+  final VoidCallback? onDoubleTap;
+
+  static IntegratedWindowHeaderScope? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<IntegratedWindowHeaderScope>();
+
+  @override
+  bool updateShouldNotify(IntegratedWindowHeaderScope oldWidget) =>
+      clearance != oldWidget.clearance ||
+      onDragStart != oldWidget.onDragStart ||
+      onDoubleTap != oldWidget.onDoubleTap;
+}
