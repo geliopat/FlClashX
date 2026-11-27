@@ -79,19 +79,40 @@ class ZapretView extends ConsumerWidget {
         title: AppLocalizations.of(context).forkState,
         items: [
           ListItem(
-            leading: Icon(
-              zapret.running ? Icons.check_circle_rounded : Icons.pause_circle_outline,
-              color: zapret.running
-                  ? context.colorScheme.primary
-                  : context.colorScheme.onSurfaceVariant,
-            ),
+            leading: zapret.busy || zapret.dashboardRestarting
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Tooltip(
+                    message: zapret.running
+                        ? AppLocalizations.of(context).forkStopZapret
+                        : AppLocalizations.of(context).forkStartZapret,
+                    child: Icon(
+                      zapret.running
+                          ? Icons.stop_circle_outlined
+                          : Icons.play_circle_outline,
+                      color: zapret.running
+                          ? context.colorScheme.primary
+                          : context.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
             title: const Text('Zapret'),
-            subtitle: Text(zapret.running ? AppLocalizations.of(context).forkStarted : AppLocalizations.of(context).forkStopped),
-          ),
-          ListItem(
-            title: Text(zapret.running ? AppLocalizations.of(context).forkStopZapret : AppLocalizations.of(context).forkStartZapret),
-            leading: Icon(zapret.running ? Icons.stop_circle_outlined : Icons.play_circle_outline),
-            onTap: zapret.busy || !zapret.available ? null : () => ref.read(zapretControllerProvider.notifier).setEnabled(!zapret.running),
+            subtitle: Text(
+              zapret.running
+                  ? AppLocalizations.of(context).forkStarted
+                  : AppLocalizations.of(context).forkStopped,
+            ),
+            onTap: zapret.busy || zapret.dashboardRestarting || !zapret.available
+                ? null
+                : () async {
+                    try {
+                      await ref.read(zapretControllerProvider.notifier)
+                          .setEnabled(!zapret.running);
+                    } catch (_) {
+                      // The controller exposes the failure in the error row.
+                    }
+                  },
           ),
           if (zapret.running)
             ListItem(
