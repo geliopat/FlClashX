@@ -201,6 +201,8 @@ bool AcrylicMenu::Open(HWND owner, POINT anchor,
   if (FAILED(GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &dpi_x, &dpi_y)))
     dpi_x = 96;
   dpi_ = dpi_x;
+  auto render = std::make_unique<Render>();
+  if (!render->com.valid()) return false;
   ComPtr<IDWriteFactory> write;
   if (FAILED(DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED,
       __uuidof(IDWriteFactory),
@@ -261,8 +263,6 @@ bool AcrylicMenu::Open(HWND owner, POINT anchor,
   }
   // Cache layouts and vector geometries for the lifetime of this popup.
   // Every frame is composed by Direct2D/DirectWrite into one PBGRA bitmap.
-  auto render = std::make_unique<Render>();
-  if (!render->com.valid()) return false;
   if (FAILED(CoCreateInstance(CLSID_WICImagingFactory, nullptr,
       CLSCTX_INPROC_SERVER, IID_PPV_ARGS(render->wic.GetAddressOf())))) return false;
   if (FAILED(D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED,
@@ -312,6 +312,11 @@ bool AcrylicMenu::Open(HWND owner, POINT anchor,
         static_cast<float>(rect.left + Scale(kInset)), y + (h - icon) / 2.0f,
         icon, IconStroke(icon), visual.icon.GetAddressOf()))) return false;
   }
+  // Layouts retain their own references; release local COM objects before
+  // the popup can close synchronously during window creation or activation.
+  format.Reset();
+  fonts.Reset();
+  write.Reset();
   render_ = std::move(render);
   // Validate the first frame before showing the window; the caller can still
   // fall back to the system menu if Direct2D/WIC initialization fails.
@@ -455,8 +460,9 @@ bool AcrylicMenu::RenderFrame() {
     if (row.separator) {
       brush->SetOpacity(42.0f / 255.0f);
       const float mid = SnapStroke(y + h / 2.0f, 1.0f);
-      target->DrawLine(D2D1::Point2F(x + Scale(8), mid),
-          D2D1::Point2F(right - Scale(8), mid), brush.Get(), 1.0f);
+      const float inset = static_cast<float>(Scale(8));
+      target->DrawLine(D2D1::Point2F(x + inset, mid),
+          D2D1::Point2F(right - inset, mid), brush.Get(), 1.0f);
       continue;
     }
     if (static_cast<int>(i) == hover_) {
