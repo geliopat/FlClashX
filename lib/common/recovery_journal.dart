@@ -79,6 +79,30 @@ class RecoveryJournal {
     }
   }
 
+  /// Decode new structured Helper events only; old free-text messages are
+  /// still available in the separate legacy journal.
+  static List<RecoveryEvent> parseNativeArchive(String archive) {
+    final tail = Queue<RecoveryEvent>();
+    for (final line in const LineSplitter().convert(archive)) {
+      try {
+        final json = jsonDecode(line) as Map<String, dynamic>;
+        final recovery = json['recovery'] as Map<String, dynamic>;
+        final event = RecoveryEvent(
+          id: recovery['id'] as String,
+          time: DateTime.fromMillisecondsSinceEpoch(json['timestampMs'] as int, isUtc: true),
+          component: json['component'] as String,
+          action: recovery['action'] as String,
+          outcome: RecoveryOutcome.values.byName(recovery['outcome'] as String),
+        );
+        tail.addLast(event);
+        if (tail.length > maxEntries) tail.removeFirst();
+      } catch (_) {
+        // Legacy records and torn lines are not structured recovery events.
+      }
+    }
+    return tail.toList(growable: false);
+  }
+
   Future<String> get directoryPath => _logger.directoryPath;
 
   Future<List<RecoveryEvent>> readRecent() async {
