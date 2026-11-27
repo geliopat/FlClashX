@@ -548,7 +548,7 @@ void main() {
 
     expect(find.text(_ip), findsNothing);
     expect(find.text('*****'), findsNothing);
-    expect(find.byGlyph(AppGlyphs.swap), findsOneWidget);
+    expect(find.byGlyph(AppGlyphs.listChecks), findsOneWidget);
     await tester.tap(find.text('Amsterdam'));
     await tester.pumpAndSettle();
 
@@ -640,7 +640,7 @@ void main() {
     await pump(tester);
 
     expect(find.byTooltip('Change server'), findsNothing);
-    await tester.tap(find.byGlyph(AppGlyphs.swap));
+    await tester.tap(find.byGlyph(AppGlyphs.listChecks));
     await tester.pumpAndSettle();
 
     expect(find.byType(ProxiesView), findsOneWidget);

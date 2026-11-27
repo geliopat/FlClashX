@@ -220,7 +220,7 @@ class _CurrentOutboundCardState extends ConsumerState<CurrentOutboundCard>
                           Transform.translate(
                             offset: const Offset(8, 0),
                             child: DashboardIconButton(
-                              glyph: AppGlyphs.swap,
+                              glyph: AppGlyphs.listChecks,
                               tooltip: appLocalizations.changeServer,
                               onPressed: hasGroups
                                   ? () => showProxiesSheet(context)

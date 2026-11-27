@@ -160,7 +160,7 @@ class _ServerLocationCardState extends ConsumerState<ServerLocationCard>
                     ),
                     if (groups.isNotEmpty)
                       GlyphIcon(
-                        AppGlyphs.swap,
+                        AppGlyphs.listChecks,
                         size: 18,
                         color: colorScheme.onSurfaceVariant,
                       ),

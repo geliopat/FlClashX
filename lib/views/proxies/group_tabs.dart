@@ -142,7 +142,7 @@ class _GroupTabsState extends State<GroupTabs> {
           targetBuilder: (open) => IconButton(
             tooltip: context.appLocalizations.proxyGroup,
             onPressed: open,
-            icon: const GlyphIcon(AppGlyphs.chevronDown),
+            icon: const GlyphIcon(AppGlyphs.listChecks),
           ),
           popupBuilder: (_) => CommonPopupMenu(
             maxVisibleItems: 7,

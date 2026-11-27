@@ -281,7 +281,6 @@ class _GroupsHeader extends StatelessWidget {
     return DashboardCardHeader(
       glyph: AppGlyphs.layers,
       title: appLocalizations.proxyGroup,
-      chevron: mobile && groups.isNotEmpty,
       leading: [
         if (count && groups.isNotEmpty)
           Tooltip(
@@ -291,11 +290,17 @@ class _GroupsHeader extends StatelessWidget {
         _TimeoutChip(groups: groups),
       ],
       trailing: [
+        if (mobile && groups.isNotEmpty)
+          GlyphIcon(
+            AppGlyphs.listChecks,
+            size: 18,
+            color: context.colorScheme.onSurfaceVariant,
+          ),
         if (!mobile)
           Transform.translate(
             offset: const Offset(8, 0),
             child: DashboardIconButton(
-              glyph: AppGlyphs.chevronForward,
+              glyph: AppGlyphs.listChecks,
               tooltip: appLocalizations.proxyGroup,
               onPressed: groups.isEmpty
                   ? null
