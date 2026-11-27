@@ -8,6 +8,9 @@ import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/providers/action.dart';
 import 'package:fl_clash/providers/state.dart';
 import 'package:fl_clash/providers/window_material.dart';
+import 'package:fl_clash/providers/appearance.dart';
+import 'package:fl_clash/ui/hover_glow.dart';
+import 'package:fl_clash/ui/network_palette.dart';
 import 'package:window/window.dart' show WindowEffect;
 import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/views/font_family.dart';
@@ -35,6 +38,10 @@ class ThemeView extends StatelessWidget {
           const ManagedSettingsHint(keys: themePageKeys),
           if (system.isWindows && !safeModeBuild) ...const [
             _WindowMaterialItem(),
+            SizedBox(height: 8),
+            _WindowMaterialPreview(),
+            SizedBox(height: 16),
+            _GlowIntensityItem(),
             SizedBox(height: 16),
           ],
           const ManagedSetting(
@@ -121,6 +128,128 @@ class _WindowMaterialItem extends ConsumerWidget {
             }
           }
         },
+      ),
+    );
+  }
+}
+
+class _WindowMaterialPreview extends ConsumerWidget {
+  const _WindowMaterialPreview();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final actual = ref.watch(windowMaterialProvider);
+    final effect = actual.value ?? WindowEffect.none;
+    final scheme = context.colorScheme;
+    final ru = Localizations.localeOf(context).languageCode == 'ru';
+    final label = switch (effect) {
+      WindowEffect.mica => 'Mica',
+      WindowEffect.micaAlt => 'Mica Alt',
+      WindowEffect.acrylic => 'Acrylic',
+      _ => ru ? 'Без прозрачности' : 'Opaque',
+    };
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        spacing: 8,
+        children: [
+          Text('${ru ? 'Предпросмотр' : 'Preview'} · $label',
+            style: context.listCaptionStyle),
+          // The selected native effect is applied to the real window. This
+          // example uses its actual Flutter theme, not a simulated DWM panel.
+          SurfaceScope(
+            level: SurfaceLevel.card,
+            child: Builder(builder: (context) => Material(
+              color: SurfaceLevel.card.colorOf(scheme),
+              shape: AppShape.xl,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  spacing: 12,
+                  children: [
+                    Text(ru ? 'Соединения' : 'Connections',
+                        style: AppTextStyle.headline.of(context)),
+                    Wrap(
+                      spacing: 16, runSpacing: 8,
+                      children: [
+                        for (final (label, tone) in [
+                          ('TCP', NetworkTone.tcp), ('UDP', NetworkTone.udp),
+                          ('DIRECT', NetworkTone.direct), ('REJECT', NetworkTone.reject),
+                          ('PROXY', NetworkTone.proxy), ('↓ 12 MB/s', NetworkTone.download),
+                          ('↑ 2 MB/s', NetworkTone.upload), ('0 B/s', NetworkTone.inactive),
+                        ]) Text(label, style: TextStyle(color: tone.of(context))),
+                      ],
+                    ),
+                    TonalButtonTheme(
+                      child: Row(
+                        spacing: 8,
+                        children: [
+                          IconButton(
+                            onPressed: () {},
+                            tooltip: ru ? 'Пример кнопки' : 'Example button',
+                            icon: const GlyphIcon(AppGlyphs.refresh),
+                          ),
+                          Expanded(child: Text(ru ? 'Наведите курсор для проверки свечения'
+                              : 'Hover over the button to check the glow')),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )),
+          ),
+          Text(ru ? 'Образец использует текущую тему окна. Независимые материалы карточек и кнопок пока не применяются.'
+              : 'The sample uses the current window theme. Independent card and button materials are not yet applied.',
+              style: context.listCaptionStyle),
+        ],
+      ),
+    );
+  }
+}
+
+class _GlowIntensityItem extends ConsumerWidget {
+  const _GlowIntensityItem();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final value = ref.watch(glowIntensityProvider);
+    final ru = Localizations.localeOf(context).languageCode == 'ru';
+    Future<void> save(double value) async {
+      try {
+        await ref.read(glowIntensityProvider.notifier).save(value);
+      } catch (error) {
+        if (context.mounted) {
+          dialogs.showNotifier(error.toString(), level: MessageLevel.error);
+        }
+      }
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(children: [
+            Expanded(child: Text(ru ? 'Интенсивность свечения' : 'Glow intensity')),
+            Text('${(value * 100).round()}%'),
+            _ResetButton(onPressed: () => unawaited(save(defaultGlowIntensity))),
+          ]),
+          SliderTheme(
+            data: SliderDefaultsM3(context),
+            child: Slider(
+              value: value,
+              divisions: 20,
+              label: '${(value * 100).round()}%',
+              onChanged: ref.read(glowIntensityProvider.notifier).preview,
+              onChangeEnd: (value) => unawaited(save(value)),
+            ),
+          ),
+          Text(ru ? '0% — без свечения. Клавиатурный фокус сохраняется.'
+              : '0% disables glow. Keyboard focus remains visible.',
+              style: context.listCaptionStyle),
+        ],
       ),
     );
   }

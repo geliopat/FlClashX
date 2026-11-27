@@ -1,3 +1,4 @@
+import 'package:fl_clash/ui/hover_glow.dart';
 import 'package:fl_clash/ui/context.dart';
 import 'package:fl_clash/ui/typography.dart';
 import 'package:material_ui/material_ui.dart';
@@ -19,6 +20,7 @@ class PageTitleTabs extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colorScheme;
+    final glow = HoverGlowTheme.of(context);
     return SizedBox(
       height: 40,
       child: SingleChildScrollView(
@@ -49,9 +51,8 @@ class PageTitleTabs extends StatelessWidget {
                         context, emphasized: index == selectedIndex,
                       ).copyWith(
                         color: color,
-                        shadows: states.contains(WidgetState.hovered)
-                            ? [Shadow(color: colors.primary, blurRadius: 6)]
-                            : const [],
+                        shadows: glow.shadows(colors.primary,
+                          hovered: states.contains(WidgetState.hovered)),
                       );
                     }),
                   ),

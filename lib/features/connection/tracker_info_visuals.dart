@@ -1,3 +1,4 @@
+import 'package:fl_clash/ui/hover_glow.dart';
 import 'package:fl_clash/ui/network_palette.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/models/models.dart';
@@ -33,6 +34,7 @@ class _ColoredLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final style = AppTextStyle.caption1.of(context).copyWith(color: color);
+    final glow = HoverGlowTheme.of(context);
     if (onPressed == null) {
       return Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: style);
     }
@@ -47,9 +49,7 @@ class _ColoredLabel extends StatelessWidget {
         textStyle: style,
       ).copyWith(
         textStyle: WidgetStateProperty.resolveWith((states) => style.copyWith(
-          shadows: states.contains(WidgetState.hovered)
-              ? [Shadow(color: color, blurRadius: 6)]
-              : const [],
+          shadows: glow.shadows(color, hovered: states.contains(WidgetState.hovered)),
         )),
       ),
       onPressed: onPressed,

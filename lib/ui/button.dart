@@ -1,3 +1,4 @@
+import 'package:fl_clash/ui/hover_glow.dart';
 import 'dart:math' as math;
 
 import 'package:fl_clash/ui/context.dart';
@@ -452,9 +453,21 @@ class TonalButtonTheme extends StatelessWidget {
         overlayColor: const WidgetStatePropertyAll(Colors.transparent),
         backgroundColor: pane?.backgroundColor,
         backgroundBuilder: (context, states, child) {
+          final shadows = HoverGlowTheme.of(context).shadows(
+            colorScheme.primary,
+            hovered: states.contains(WidgetState.hovered) &&
+                !states.contains(WidgetState.disabled),
+          );
+          final foreground = IconTheme.merge(
+            data: IconThemeData(shadows: shadows),
+            child: DefaultTextStyle.merge(
+              style: TextStyle(shadows: shadows),
+              child: child!,
+            ),
+          );
           final content = behind == null
-              ? child!
-              : behind(context, states, child);
+              ? foreground
+              : behind(context, states, foreground);
           final mark = _HoverMarkScope.maybeOf(context);
           return mark == null
               ? ElasticHover(child: content)

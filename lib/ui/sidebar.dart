@@ -1,3 +1,4 @@
+import 'package:fl_clash/ui/hover_glow.dart';
 import 'dart:math' as math;
 import 'dart:ui' show lerpDouble;
 
@@ -458,9 +459,7 @@ class _SidebarButtonState extends State<_SidebarButton> {
   @override
   Widget build(BuildContext context) {
     final colors = widget.colors;
-    final shadows = _hovered
-        ? [Shadow(color: colors.accent.withValues(alpha: 0.75), blurRadius: 6)]
-        : const <Shadow>[];
+    final shadows = HoverGlowTheme.of(context).shadows(colors.accent, hovered: _hovered);
     return Padding(
       padding: EdgeInsets.symmetric(
         horizontal: widget.sideInset,

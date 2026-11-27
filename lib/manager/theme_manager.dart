@@ -7,6 +7,8 @@ import 'package:fl_clash/providers/action.dart';
 import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/providers/window_material.dart';
+import 'package:fl_clash/providers/appearance.dart';
+import 'package:fl_clash/ui/hover_glow.dart';
 import 'package:window/window.dart' show WindowEffect;
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
@@ -48,6 +50,7 @@ ThemeData watchAppTheme(WidgetRef ref, Brightness brightness) {
     themeSettingProvider.select((state) => state.fontFamily),
   );
   final baseScheme = ref.watch(genColorSchemeProvider(brightness));
+  final glowIntensity = ref.watch(glowIntensityProvider);
   final material = system.isWindows && !safeModeBuild
       ? ref.watch(windowMaterialProvider).value ?? WindowEffect.none
       : WindowEffect.none;
@@ -70,6 +73,7 @@ ThemeData watchAppTheme(WidgetRef ref, Brightness brightness) {
     platform: defaultTargetPlatform,
     fontFamily: fontFamily,
     colorScheme: colorScheme,
+    glowIntensity: glowIntensity,
     locales: locales.join(','),
   );
   if (_appThemes[brightness] case (
@@ -90,6 +94,7 @@ ThemeData watchAppTheme(WidgetRef ref, Brightness brightness) {
       fontFamily: fontFamily,
     ),
     extensions: [
+      HoverGlowTheme(glowIntensity),
       if (brightness == Brightness.dark)
         ElevatedColorScheme(baseScheme.elevated),
     ],
