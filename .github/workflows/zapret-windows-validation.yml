@@ -181,7 +181,7 @@ jobs:
         working-directory: core
         env:
           CGO_ENABLED: '0'
-        run: go test -tags with_gvisor -timeout 10m ./...
+        run: go test -count=1 -tags with_gvisor -timeout 10m ./...
 
       - name: Install Flutter dependencies
         run: flutter pub get
