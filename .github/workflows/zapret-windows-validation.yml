@@ -252,6 +252,11 @@ jobs:
           FLCLASHZ_ZAPRET_CACHE_DIR: ${{ env.BUILD_MODE != 'clean' && format('{0}/flclashz-zapret-downloads', runner.temp) || '' }}
         run: ./scripts/setup_zapret.ps1
 
+      - name: Validate startup, recovery and large feed regressions
+        env:
+          FLCLASHZ_TEST_STARTUP_TASK: '1'
+        run: flutter test test/common/windows_startup_test.dart test/common/recovery_journal_test.dart test/views/recovery_journal_test.dart test/widgets/keyed_animated_list_test.dart test/common/preferences_store_test.dart
+
       - name: Analyze Flutter sources
         run: flutter analyze --no-fatal-infos
 
