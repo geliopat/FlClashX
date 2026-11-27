@@ -1,6 +1,9 @@
 name: Zapret Windows validation
 
 on:
+  # Temporary opt-in validation of the cache integration branch; no publication.
+  push:
+    branches: [ci/windows-build-cache]
   workflow_dispatch:
     inputs:
       candidate_ref:
@@ -38,7 +41,8 @@ concurrency:
 env:
   FLUTTER_VERSION: '3.47.6'
   GO_VERSION: '1.27.1'
-  BUILD_MODE: ${{ inputs.build_mode || 'fast' }}
+  # Do not read or populate shared caches while executing a different candidate.
+  BUILD_MODE: ${{ (inputs.candidate_ref != '' && inputs.candidate_ref != github.sha && 'clean') || inputs.build_mode || 'fast' }}
   CARGO_INCREMENTAL: '0'
 
 jobs:
@@ -187,7 +191,11 @@ jobs:
         run: flutter pub get
 
       - name: Test native build cache
-        run: dart test plugins/setup/setup_hooks/test/build_cache_test.dart
+        working-directory: plugins/setup/setup_hooks
+        run: |
+          dart pub get --enforce-lockfile
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dart test test/build_cache_test.dart
 
       - name: Run Helper, Zapret and Windows packaging tests
         timeout-minutes: 15

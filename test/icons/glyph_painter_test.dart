@@ -152,7 +152,7 @@ final _glyphs = {
   'collapsed sidebar': AppGlyphs.sidebar(0),
   'expanded sidebar': AppGlyphs.sidebar(1),
   'play': AppGlyphs.playPause(0),
-  'pause': AppGlyphs.playPause(1),
+  'play pause end': AppGlyphs.playPause(1),
   'play pause midway': AppGlyphs.playPause(0.5),
   'play pause overshoot': AppGlyphs.playPause(1.1),
 };

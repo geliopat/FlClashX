@@ -5,6 +5,8 @@ Use **Zapret Windows validation** → Run workflow on the development branch. Ch
 - full: run native build commands again; Flutter/Go/Cargo dependency and pinned archive caches remain available.
 - clean: no GitHub Actions cache restore/save in validation; no sccache. Stable release always uses clean and keeps its existing explicit publication gate.
 
+A distinct candidate SHA checked out by the workflow uses Clean to avoid populating shared caches from another revision. The temporary cache integration branch has a push validation trigger, which never publishes a release.
+
 The existing setup build hook builds Mihomo first; Helper embeds the Core SHA-256. Separate exact cache keys include runner image, toolchain, source, build config and hook code; Helper additionally depends on Core identity. The hook still independently checks its own fingerprint and output SHA-256 before reuse. Tests, analyzer, ZIP/EXE packaging, installer and portable smoke checks remain mandatory. No Flutter build tree, signed manifest, secrets or release package is cached.
 
 Zapret/Flowseal archives are verified against their existing pinned SHA-256 on every use; raw files are cached by Git blob identity obtained independently from the pinned commit's tree. If the tree cannot be queried, raw files are downloaded without using that cache. Assets are staged anew every run. MSVC uses the preinstalled Windows runner toolchain; C++ compiler caching is not enabled for the Visual Studio generator. Rust incremental mode is disabled with sccache; its local store is capped at 1 GiB. Cargo registry is cached separately to avoid redundant target caches.
