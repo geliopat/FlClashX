@@ -111,8 +111,11 @@ class _CoreStatusButtonState extends ConsumerState<CoreStatusButton> {
     final appLocalizations = context.appLocalizations;
     final canRestart = !_requesting && !zapretBusy && initialized;
     const style = ElasticPress.buttonStyle;
-    final iconOnly =
-        coreStatus == CoreStatus.connected || ViewScope.isMobileOf(context);
+    // The Windows caption can live above the page's ViewScope. Keep the
+    // original desktop button rather than requiring a page scope there.
+    final mobile = InheritedModel.inheritFrom<ViewScope>(context,
+      aspect: ViewScopeAspect.isMobile)?.isMobile ?? false;
+    final iconOnly = coreStatus == CoreStatus.connected || mobile;
     final icon = CorePulse(status: coreStatus);
     return Tooltip(
       message: restartAll ? AppLocalizations.of(context).forkRestartAll : appLocalizations.coreStatus,

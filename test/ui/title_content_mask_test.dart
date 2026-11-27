@@ -35,13 +35,18 @@ void main() {
       )),
     ))));
     final render = boundary.currentContext!.findRenderObject()! as RenderRepaintBoundary;
-    final image = await render.toImage(pixelRatio: 1);
-    final bytes = (await image.toByteData(format: ui.ImageByteFormat.rawRgba))!;
-    int channel(int x, int y, int c) => bytes.getUint8((y * image.width + x) * 4 + c);
-    expect(channel(10, 10, 2), greaterThan(240));
-    expect(channel(80, 32, 2), greaterThan(240));
-    expect(channel(200, 32, 0), greaterThan(240));
-    image.dispose();
+    await tester.runAsync(() async {
+      final image = await render.toImage(pixelRatio: 1);
+      try {
+        final bytes = (await image.toByteData(format: ui.ImageByteFormat.rawRgba))!;
+        int channel(int x, int y, int c) => bytes.getUint8((y * image.width + x) * 4 + c);
+        expect(channel(10, 10, 2), greaterThan(240));
+        expect(channel(80, 32, 2), greaterThan(240));
+        expect(channel(200, 32, 0), greaterThan(240));
+      } finally {
+        image.dispose();
+      }
+    });
   });
   testWidgets('mask keeps its content mounted across anchor changes', (tester) async {
     final anchor = ValueNotifier<Rect?>(null);

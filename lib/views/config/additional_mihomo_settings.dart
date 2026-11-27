@@ -34,11 +34,22 @@ class AdditionalMihomoSettingsView extends ConsumerWidget {
     await BaseNavigator.push<void>(context, EditorPage(
       title: path, content: initial, readOnly: false,
       onSave: (editorContext, _, content) async {
-        final decoded = decodeAdditionalSettings(await content.readText());
-        if (!ref.context.mounted || decoded.length != 1 || !decoded.containsKey(path)) {
-          throw const FormatException('Only the selected setting may be edited');
+        try {
+          final decoded = decodeAdditionalSettings(await content.readText());
+          if (!ref.context.mounted) return;
+          if (decoded.length != 1 || !decoded.containsKey(path)) {
+            throw const FormatException('Only the selected setting may be edited');
+          }
+          _save(ref, path, decoded[path]);
+        } catch (_) {
+          if (!editorContext.mounted) return;
+          final ru = Localizations.localeOf(editorContext).languageCode == 'ru';
+          dialogs.showNotifier(
+            ru ? 'Недопустимое значение параметра. Изменения не сохранены.'
+                : 'Invalid setting value. Changes were not saved.',
+            level: MessageLevel.error,
+          );
         }
-        _save(ref, path, decoded[path]);
       },
       onPop: (editorContext, _, content) async {
         try {
