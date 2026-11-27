@@ -1302,5 +1302,13 @@
   "forkEmptyResponse": "Réponse vide",
   "forkInvalidRedirect": "Redirection invalide",
   "forkSourceTooLarge": "La source dépasse 10 Mio",
-  "forkTooManyRedirects": "Trop de redirections"
+  "forkTooManyRedirects": "Trop de redirections",
+  "forkSpeedTest": "Tester la vitesse",
+  "forkSpeedTestAll": "Tester la vitesse de tous les nœuds",
+  "forkSpeedTestUrl": "Service de test de débit",
+  "forkDirectYandex": "DIRECT utilise toujours Yandex Internetometer",
+  "forkSpeedDownloadUrl": "URL de téléchargement (GET)",
+  "forkSpeedUploadUrl": "URL d’envoi (POST)",
+  "forkSpeedMbps": "Mbit/s",
+  "forkSpeedFailed": "Échec du test"
 }

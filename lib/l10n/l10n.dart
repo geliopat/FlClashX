@@ -55,6 +55,15 @@ class AppLocalizations {
     return Localizations.of<AppLocalizations>(context, AppLocalizations);
   }
 
+  String get forkSpeedTest => Intl.message("Test speed", name: 'forkSpeedTest', desc: '', args: []);
+  String get forkSpeedTestAll => Intl.message("Test speed of all nodes", name: 'forkSpeedTestAll', desc: '', args: []);
+  String get forkSpeedTestUrl => Intl.message("Speed test service", name: 'forkSpeedTestUrl', desc: '', args: []);
+  String get forkDirectYandex => Intl.message("DIRECT always uses Yandex Internetometer", name: 'forkDirectYandex', desc: '', args: []);
+  String get forkSpeedDownloadUrl => Intl.message("Download test URL (GET)", name: 'forkSpeedDownloadUrl', desc: '', args: []);
+  String get forkSpeedUploadUrl => Intl.message("Upload test URL (POST)", name: 'forkSpeedUploadUrl', desc: '', args: []);
+  String get forkSpeedMbps => Intl.message("Mbps", name: 'forkSpeedMbps', desc: '', args: []);
+  String get forkSpeedFailed => Intl.message("Test failed", name: 'forkSpeedFailed', desc: '', args: []);
+
   String get forkExportServiceJournal => Intl.message("Export service journal", name: 'forkExportServiceJournal', desc: '', args: []);
 
   String get forkJournalUnavailable => Intl.message("Service journal unavailable", name: 'forkJournalUnavailable', desc: '', args: []);

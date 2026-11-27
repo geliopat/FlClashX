@@ -1302,5 +1302,13 @@
   "forkEmptyResponse": "Пустой ответ",
   "forkInvalidRedirect": "Некорректное перенаправление",
   "forkSourceTooLarge": "Источник превышает 10 МиБ",
-  "forkTooManyRedirects": "Слишком много перенаправлений"
+  "forkTooManyRedirects": "Слишком много перенаправлений",
+  "forkSpeedTest": "Проверить скорость",
+  "forkSpeedTestAll": "Проверить скорость всех узлов",
+  "forkSpeedTestUrl": "Сервис проверки скорости",
+  "forkDirectYandex": "DIRECT всегда использует Яндекс Интернетометр",
+  "forkSpeedDownloadUrl": "URL теста скачивания (GET)",
+  "forkSpeedUploadUrl": "URL теста отправки (POST)",
+  "forkSpeedMbps": "Мбит/с",
+  "forkSpeedFailed": "Ошибка теста"
 }
