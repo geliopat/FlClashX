@@ -145,6 +145,20 @@ mod tests {
     }
 
     #[test]
+    fn authenticates_published_core_with_compiled_release_key() {
+        let Some(directory) = std::env::var_os("FLCLASHZ_TEST_SIGNED_CORE_DIR") else {
+            return;
+        };
+        let directory = std::path::PathBuf::from(directory);
+        let bytes = std::fs::read(directory.join("core-manifest.json")).unwrap();
+        let manifest = Manifest::verify(&bytes).unwrap();
+        assert_eq!(manifest.version, "v1.19.34-z.1");
+        assert_eq!(manifest.engine_revision, "53d2f4fc1cb56aaeba947a1a557eeafd48050737");
+        let file = std::fs::File::open(directory.join(CORE_NAME)).unwrap();
+        manifest.verify_reader(file).unwrap();
+    }
+
+    #[test]
     fn refuses_changed_identity_or_missing_key() {
         assert!(Manifest::verify_with_key(JSON.as_bytes(), "").is_err());
         for modified in [
