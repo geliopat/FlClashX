@@ -239,6 +239,9 @@ Future<RealProfile> _makeRealProfileTask(MakeRealProfileState data) async {
     if (rawConfig['tun'] is Map) ...rawConfig['tun'] as Map,
     'dns-hijack': defaultDnsHijack,
     ...overrides.tun.overrideJson(overrides.tunOverrideKeys, keepEmpty: Platform.isWindows && data.keepEmptyDnsOverrides),
+    // Preserve resolver protection when the explicit list is empty.
+    if (Platform.isWindows && overrides.tunOverrideKeys.contains(TunOverrideKey.dnsHijack) &&
+        overrides.tun.dnsHijack.isEmpty) 'dns-hijack': defaultDnsHijack,
     ...realPatchConfig.tun.coreJson,
     'auto-detect-interface': true,
   };

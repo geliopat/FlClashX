@@ -4,6 +4,7 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/features/form/form.dart';
 import 'package:fl_clash/models/models.dart';
+import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/providers/action.dart';
 import 'package:fl_clash/providers/state.dart';
@@ -460,6 +461,12 @@ class TunSection extends ConsumerWidget {
       title: appLocalizations.tun,
       items: [
         const BypassPrivateRouteItem(key: ValueKey(#bypassPrivateRoute)),
+        if (isWindows) ...[
+          ListItem(key: const ValueKey('protected-auto-route'), title: const Text('auto-route'),
+            subtitle: Text(context.appLocalizations.enabled), trailing: const GlyphIcon(AppGlyphs.lock, size: 16)),
+          ListItem(key: const ValueKey('protected-auto-detect-interface'), title: const Text('auto-detect-interface'),
+            subtitle: Text(context.appLocalizations.enabled), trailing: const GlyphIcon(AppGlyphs.lock, size: 16)),
+        ],
         for (final key in listed)
           OverrideEntry(key: ValueKey(key), spec: spec, overrideKey: key),
         if (listed.length < spec.values.length)

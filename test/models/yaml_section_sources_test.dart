@@ -25,6 +25,14 @@ void main() {
     expect(overrideFieldDocument(DnsOverrideKey.fallbackFilterGeoip, false),
       {'fallback-filter': {'geoip': false}});
   });
+  test('DNS policy round trip preserves a group name containing spaces', () {
+    final parsed = defaultDns.applyOverrideYaml('''nameserver-policy:
+  example.org:
+    - "https://dns.example/dns-query#Автовыбор Москва"
+    - "https://dns2.example/dns-query#DIRECT"''');
+    expect(parsed.dns.overrideJson(parsed.keys), {'nameserver-policy': {'example.org': [
+      'https://dns.example/dns-query#Автовыбор Москва', 'https://dns2.example/dns-query#DIRECT']}});
+  });
   test('explicit empty TUN and sniffer overrides may clear inherited lists', () {
     expect(defaultProfileTun.overrideJson({TunOverrideKey.routeExcludeAddress}, keepEmpty: true),
       {'route-exclude-address': []});

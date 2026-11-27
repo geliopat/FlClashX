@@ -76,7 +76,7 @@ class _SnifferOverrideSpec extends OverrideSpec<SnifferOverrideKey, Sniffer>
 
   @override
   String overrideYaml(Sniffer model, Set<SnifferOverrideKey> keys) =>
-      model.overrideYaml(keys);
+      model.overrideYaml(keys, keepEmpty: !target.emptyCancels);
 
   @override
   _SnifferState applyOverrideYaml(Sniffer model, String content) {

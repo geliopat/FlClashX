@@ -1058,8 +1058,8 @@ extension SnifferOverrideExt on Sniffer {
   Map<String, Object?> overrideJson(Set<SnifferOverrideKey> keys, {bool keepEmpty = false}) =>
       _overrideJson(_json, SnifferOverrideKey.values, keys, keepEmpty: keepEmpty ? keys : const {});
 
-  String overrideYaml(Set<SnifferOverrideKey> keys) =>
-      yaml.encode(overrideJson(keys));
+  String overrideYaml(Set<SnifferOverrideKey> keys, {bool keepEmpty = false}) =>
+      yaml.encode(overrideJson(keys, keepEmpty: keepEmpty));
 
   ({Sniffer sniffer, Set<SnifferOverrideKey> keys}) applyOverrideYaml(
     String content,
@@ -1472,7 +1472,7 @@ const _policyKeys = [
 
 Map<String, Object> _splitPolicyServers(Map<String, String> policy) => {
   for (final entry in policy.entries)
-    entry.key: entry.value.splitByMultipleSeparators,
+    entry.key: entry.value.split(RegExp(r'[,\r\n]+')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList(),
 };
 
 Object? _joinPolicyServers(Object? value) => switch (value) {

@@ -686,13 +686,18 @@ class OverrideEntry<K extends OverrideKey, M> extends ConsumerWidget {
     final label = spec.label(overrideKey, context.appLocalizations);
     final value = source[overrideKey.path];
     final valueText = inheritedOverrideValueLabel(value, russian: ru);
+    final protectedHijack = overrideKey == TunOverrideKey.dnsHijack && !owned;
+    final sourceText = '$sourceLabel: $valueText';
+    final inheritedText = protectedHijack
+        ? '$sourceText · ${ru ? 'Защита приложения' : 'App protection'}: any:53'
+        : sourceText;
     void release() => target.update(ref, (state) => spec.withoutKeys(state, {overrideKey}));
     if (inherited && !owned) {
       // Inherited rows are never written into the stored override set by
       // rendering. Taking ownership seeds the existing typed editor.
       return ListItem(
         title: Text(label),
-        subtitle: Text('$sourceLabel: $valueText', maxLines: 3, overflow: TextOverflow.ellipsis),
+        subtitle: Text(inheritedText, maxLines: 3, overflow: TextOverflow.ellipsis),
         trailing: const GlyphIcon(AppGlyphs.lock, size: 16),
         onTap: () async {
           final agreed = await dialogs.showMessage(
