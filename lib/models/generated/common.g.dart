@@ -88,6 +88,8 @@ _TrackerInfo _$TrackerInfoFromJson(Map<String, dynamic> json) => _TrackerInfo(
   rulePayload: json['rulePayload'] as String,
   downloadSpeed: (json['downloadSpeed'] as num?)?.toInt(),
   uploadSpeed: (json['uploadSpeed'] as num?)?.toInt(),
+  closedAt: json['closedAt'] == null ? null : DateTime.parse(json['closedAt'] as String),
+  failure: json['failure'] == null ? null : RequestFailure.fromJson(json['failure'] as Map<String, dynamic>),
 );
 
 Map<String, dynamic> _$TrackerInfoToJson(_TrackerInfo instance) =>
@@ -102,6 +104,8 @@ Map<String, dynamic> _$TrackerInfoToJson(_TrackerInfo instance) =>
       'rulePayload': instance.rulePayload,
       'downloadSpeed': instance.downloadSpeed,
       'uploadSpeed': instance.uploadSpeed,
+      'closedAt': instance.closedAt?.toIso8601String(),
+      'failure': instance.failure?.toJson(),
     };
 
 _Log _$LogFromJson(Map<String, dynamic> json) => _Log(

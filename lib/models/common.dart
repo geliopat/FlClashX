@@ -105,6 +105,28 @@ abstract class Metadata with _$Metadata {
       _$MetadataFromJson(json);
 }
 
+/// Stable, forward-compatible IPC description of a failed dial.
+class RequestFailure {
+  final String kind;
+  final String message;
+
+  const RequestFailure({required this.kind, required this.message});
+
+  factory RequestFailure.fromJson(Map<String, dynamic> json) => RequestFailure(
+    kind: json['kind'] as String? ?? 'other',
+    message: json['message'] as String? ?? '',
+  );
+
+  Map<String, dynamic> toJson() => {'kind': kind, 'message': message};
+
+  @override
+  bool operator ==(Object other) =>
+      other is RequestFailure && other.kind == kind && other.message == message;
+
+  @override
+  int get hashCode => Object.hash(kind, message);
+}
+
 @freezed
 abstract class TrackerInfo with _$TrackerInfo {
   const factory TrackerInfo({
@@ -118,6 +140,8 @@ abstract class TrackerInfo with _$TrackerInfo {
     required String rulePayload,
     int? downloadSpeed,
     int? uploadSpeed,
+    DateTime? closedAt,
+    RequestFailure? failure,
   }) = _TrackerInfo;
 
   factory TrackerInfo.fromJson(Map<String, Object?> json) =>
@@ -174,6 +198,7 @@ extension TrackerInfoExt on TrackerInfo {
     rule,
     rulePayload,
     ...chains,
+    if (failure != null) ...[failure!.kind, failure!.message],
   ];
 }
 
