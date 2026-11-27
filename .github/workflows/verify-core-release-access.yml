@@ -1,0 +1,59 @@
+name: Verify independent core release access
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/zapret2-stability]
+    paths:
+      - '.github/workflows/verify-core-release-access.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    if: github.repository == 'geliopat/FlClashZ' && github.ref == 'refs/heads/fix/zapret2-stability'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check cross-repository token without changing releases
+        env:
+          GH_TOKEN: ${{ secrets.CORE_RELEASE_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$GH_TOKEN" || { echo "::error::CORE_RELEASE_TOKEN missing"; exit 1; }
+          gh api repos/geliopat/Clash.Meta --jq '.full_name' | grep -Fx 'geliopat/Clash.Meta'
+          for workflow in flclashz-core-auto.yml flclashz-core-release.yml; do
+            gh api "repos/geliopat/Clash.Meta/actions/workflows/$workflow" --jq '.state' | grep -Fx active
+            gh api "repos/geliopat/Clash.Meta/actions/workflows/$workflow/runs?per_page=1" --jq '.total_count' >/dev/null
+          done
+          gh api 'repos/geliopat/Clash.Meta/releases?per_page=1' --jq 'length' >/dev/null
+          echo "Cross-repository read requests succeeded. Release write access is not exercised." >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.27.1'
+          cache: false
+      - name: Verify existing signing key matches the pinned public key
+        env:
+          CORE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+          CORE_PUBLIC_KEY: ${{ vars.FLCLASHZ_UPDATE_PUBLIC_KEY }}
+          GO111MODULE: 'off'
+          GOWORK: 'off'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/check-core-key.go" <<'GO'
+          package main
+          import ("crypto/ed25519"; "encoding/base64"; "os"; "strings"; "fmt")
+          func main() {
+              seed, err := base64.StdEncoding.DecodeString(strings.TrimSpace(os.Getenv("CORE_SIGNING_KEY")))
+              if err != nil || len(seed) != ed25519.SeedSize { fmt.Fprintln(os.Stderr, "Missing or invalid signing seed"); os.Exit(1) }
+              pub, err := base64.StdEncoding.DecodeString(strings.TrimSpace(os.Getenv("CORE_PUBLIC_KEY")))
+              if err != nil || len(pub) != ed25519.PublicKeySize { fmt.Fprintln(os.Stderr, "Missing or invalid public key"); os.Exit(1) }
+              key := ed25519.NewKeyFromSeed(seed)
+              if !key.Public().(ed25519.PublicKey).Equal(ed25519.PublicKey(pub)) { fmt.Fprintln(os.Stderr, "Signing key mismatch"); os.Exit(1) }
+              msg := []byte("flclashz-core-access-self-test-v1")
+              if !ed25519.Verify(pub, msg, ed25519.Sign(key, msg)) { os.Exit(1) }
+              fmt.Println("Existing Ed25519 key self-test passed")
+          }
+          GO
+          go run "$RUNNER_TEMP/check-core-key.go"
+          echo "Existing Ed25519 signing key matches configured public key." >> "$GITHUB_STEP_SUMMARY"
