@@ -780,6 +780,11 @@ class SetupAction extends _$SetupAction {
         : profileBase?.base.config ?? await _core.getConfig(profileId);
     final proxyGroups = isCustom ? setupState.proxyGroups : <ProxyGroup>[];
     final rules = isCustom ? setupState.rules : <Rule>[];
+    if (system.isWindows && !isCustom && sourceBase != null) {
+      rawConfig = restoreExplicitMihomoSettings(
+        rawConfig, sourceBase.base.sourceSettings,
+      );
+    }
     if (hasScript) {
       rawConfig = await handleEvaluate(scriptContent!, rawConfig);
     }
