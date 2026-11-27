@@ -5,11 +5,24 @@ class _DelayTestTarget {
     required this.proxyName,
     required this.testUrl,
     required this.key,
+    this.displayUrls = const {},
   });
 
   final String proxyName;
   final String testUrl;
   final String key;
+
+  // A bulk test measures the node once using the app's test URL. These
+  // additional slots show that same measurement in groups with custom URLs;
+  // they are not additional network probes or automatic-test timestamps.
+  final Set<String> displayUrls;
+
+  Iterable<String> get displayKeys sync* {
+    yield key;
+    for (final url in displayUrls) {
+      if (url != testUrl) yield delayTestKey(url, proxyName);
+    }
+  }
 }
 
 typedef _DelayTestBatch = ({List<Proxy> proxies, String? testUrl});
@@ -614,18 +627,40 @@ class ProxiesAction extends _$ProxiesAction {
     }
   }
 
-  /// A node in several groups is tested once: targets are keyed by node and URL.
+  /// The global button measures every distinct resolved node once, using
+  /// the app's common test URL, regardless of group-specific URLs.
   Future<void> delayTestAllGroups() async {
     final testing = ref.read(delayTestingGroupsProvider.notifier);
+    // Use the unfiltered catalog so timed-out nodes can recover on a retry.
     final groups = [
-      for (final group in ref.read(visibleGroupsStateProvider).value)
+      for (final group in ref.read(currentGroupsStateProvider).value)
         if (testing.start(group.name)) group,
     ];
     if (groups.isEmpty) {
       return;
     }
     try {
-      await delayTestGroups(groups);
+      final resolved = _resolveDelayTestTargets([
+        for (final group in groups)
+          (proxies: group.all, testUrl: group.testUrl),
+      ]);
+      final urlsByNode = <String, Set<String>>{};
+      for (final target in resolved) {
+        if (!isAutoDelayProbeable(target.proxyName)) continue;
+        urlsByNode.putIfAbsent(target.proxyName, () => <String>{})
+            .add(target.testUrl);
+      }
+      final testUrl = ref.read(realTestUrlProvider());
+      await _runResolvedDelayTests([
+        for (final entry in urlsByNode.entries)
+          _DelayTestTarget(
+            proxyName: entry.key,
+            testUrl: testUrl,
+            key: delayTestKey(testUrl, entry.key),
+            displayUrls: entry.value,
+          ),
+      ]);
+      ref.read(sortNumProvider.notifier).add();
     } finally {
       for (final group in groups) {
         testing.stop(group.name);
@@ -735,13 +770,13 @@ class ProxiesAction extends _$ProxiesAction {
     }
     final pending = ref.read(pendingDelayTestsProvider.notifier);
     final job = _DelayTestJob(
-      targets.map((target) => target.key),
+      targets.expand((target) => target.displayKeys),
       Duration(milliseconds: ref.read(appSettingProvider).delayTestTimeout),
     );
     _delayTestJobs.add(job);
     // TaskPool.run starts a task synchronously while it has an idle slot.
     job.startedOnDispatch.addAll(
-      targets.take(_delayTestPool.idleSlots).map((target) => target.key),
+      targets.take(_delayTestPool.idleSlots).expand((target) => target.displayKeys),
     );
     pending.apply(acquired: job.held, started: job.startedOnDispatch);
     try {
@@ -769,7 +804,7 @@ class ProxiesAction extends _$ProxiesAction {
       return;
     }
     if (!job.startedOnDispatch.contains(target.key)) {
-      _bufferedStarts.add(target.key);
+      _bufferedStarts.addAll(target.displayKeys);
       _scheduleDelayFlush();
     }
     final asked = Stopwatch()..start();
@@ -783,6 +818,12 @@ class ProxiesAction extends _$ProxiesAction {
         // Native Mihomo events update the UI, but must not postpone our timer.
         _lastDelayTest[target.key] = DateTime.now();
         setDelay(delay);
+        // Only the bulk action shares its common measurement with the
+        // display slots of other groups. Individual group tests may later
+        // replace those slots with measurements of their own URLs.
+        for (final url in target.displayUrls) {
+          if (url != delay.url) setDelay(delay.copyWith(url: url));
+        }
       }
       // Each test queued behind would wait out the same guard.
       if (delay == null && asked.elapsed >= silentCoreAfter) {
@@ -797,8 +838,9 @@ class ProxiesAction extends _$ProxiesAction {
         logLevel: coreFailureLogLevel(error),
       );
     } finally {
-      if (job.held.remove(target.key)) {
-        _bufferedFinishes.add(target.key);
+      final finished = target.displayKeys.where(job.held.remove).toList();
+      if (finished.isNotEmpty) {
+        _bufferedFinishes.addAll(finished);
         _scheduleDelayFlush();
       }
     }

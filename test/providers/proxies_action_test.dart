@@ -1166,6 +1166,61 @@ void main() {
       expect(container.read(sortNumProvider), before + 1);
     });
 
+    test('global button probes each node once across different group URLs', () async {
+      const otherUrl = 'http://other.test';
+      final container = _delayContainer(buildContainer);
+      final release = Completer<Delay?>();
+      when(() => core.asyncTestDelay(_testUrl, 'HK-01', any()))
+          .thenAnswer((_) => release.future);
+      when(() => core.asyncTestDelay(_testUrl, 'HK-02', any()))
+          .thenAnswer((_) async => const Delay(
+            name: 'HK-02', url: _testUrl, value: 20,
+          ));
+      container.read(groupsProvider.notifier).update((_) => [
+        _group('A', const [_proxy]),
+        const Group(type: GroupType.Selector, name: 'B', testUrl: otherUrl,
+          all: [_proxy, Proxy(name: 'HK-02', type: 'ss')]),
+      ]);
+      final action = actionOf(container);
+      final run = action.delayTestAllGroups();
+      expect(container.read(pendingDelayTestsProvider)[
+          delayTestKey(otherUrl, 'HK-01')], DelayTestPhase.running);
+      await action.delayTestAllGroups();
+      release.complete(const Delay(name: 'HK-01', url: _testUrl, value: 10));
+      await run;
+      verify(() => core.asyncTestDelay(_testUrl, 'HK-01', any())).called(1);
+      verify(() => core.asyncTestDelay(_testUrl, 'HK-02', any())).called(1);
+      verifyNever(() => core.asyncTestDelay(otherUrl, any(), any()));
+      final delays = container.read(delayDataSourceProvider);
+      expect(delays[otherUrl]?['HK-01'], 10);
+      expect(delays[otherUrl]?['HK-02'], 20);
+      expect(container.read(pendingDelayTestsProvider), isEmpty);
+      expect(container.read(delayTestingGroupsProvider), isEmpty);
+    });
+
+    test('global test retries nodes hidden by the timeout filter', () async {
+      final container = _delayContainer(buildContainer);
+      container.read(groupsProvider.notifier).update((_) => [
+        _group('A', const [_proxy, Proxy(name: 'HK-02', type: 'ss')]),
+        _group('B', const [_proxy]),
+      ]);
+      container.read(delayDataSourceProvider.notifier).setDelay(
+        const Delay(name: 'HK-01', url: _testUrl, value: -1),
+      );
+      container.read(proxiesStyleSettingProvider.notifier).update(
+        (state) => state.copyWith(hideTimeoutProxies: true),
+      );
+      when(() => core.asyncTestDelay(_testUrl, any(), any())).thenAnswer(
+        (call) async => Delay(
+          name: call.positionalArguments[1] as String, url: _testUrl, value: 15,
+        ),
+      );
+      await actionOf(container).delayTestAllGroups();
+      verify(() => core.asyncTestDelay(_testUrl, 'HK-01', any())).called(1);
+      verify(() => core.asyncTestDelay(_testUrl, 'HK-02', any())).called(1);
+      expect(container.read(delayDataSourceProvider)[_testUrl]?['HK-01'], 15);
+    });
+
     test(
       'testing a page group probes the nodes the timeout filter hides',
       () async {

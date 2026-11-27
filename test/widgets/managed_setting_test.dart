@@ -206,7 +206,12 @@ void main() {
     final layout = find.widgetWithText(ListTile, 'Layout');
     expect(layout, findsOneWidget);
     expect(container.read(settingReleasableProvider('view.proxies.layout')), isTrue);
-    await tester.tap(layout, buttons: kSecondaryButton);
+    final value = find.descendant(
+      of: layout,
+      matching: find.text('Standard'),
+    );
+    expect(value, findsOneWidget);
+    await tester.tap(value, buttons: kSecondaryButton);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Hand back to provider'));
     await tester.pumpAndSettle();
