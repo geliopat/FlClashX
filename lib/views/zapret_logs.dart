@@ -3,6 +3,9 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:fl_clash/core/desktop/helper_client.dart';
+import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/common/file_logger.dart';
+import 'package:flutter/services.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/l10n/l10n.dart';
 import 'package:fl_clash/widgets/widgets.dart';
@@ -17,14 +20,22 @@ String _levelLabel(AppLocalizations l, String level) => switch (level) {
   _ => level,
 };
 
+/// The legacy journal has free-text messages, not structured recovery outcomes.
+bool isRecoveryJournalMessage(String message) {
+  final text = message.toLowerCase();
+  return text.contains('watchdog') || text.contains('restart') ||
+      text.contains('recover');
+}
+
 typedef _JournalEntry = ({HelperZapretLog log, String component});
 
 class ZapretLogsView extends StatefulWidget {
-  const ZapretLogsView({super.key, this.journalOnly = false, this.crashOnly = false, this.embedded = false})
-      : assert(!(journalOnly && crashOnly));
+  const ZapretLogsView({super.key, this.journalOnly = false, this.crashOnly = false, this.recoveryOnly = false, this.embedded = false})
+      : assert(!(journalOnly && crashOnly) && !(journalOnly && recoveryOnly) && !(crashOnly && recoveryOnly));
 
   final bool journalOnly;
   final bool crashOnly;
+  final bool recoveryOnly;
   final bool embedded;
 
   @override
@@ -33,7 +44,7 @@ class ZapretLogsView extends StatefulWidget {
 
 class _ZapretLogsViewState extends State<ZapretLogsView>
     with WidgetsBindingObserver, ActivePollingMixin<ZapretLogsView> {
-  late final int _tab = widget.journalOnly ? 2 : widget.crashOnly ? 1 : 0;
+  late final int _tab = widget.recoveryOnly ? 3 : widget.journalOnly ? 2 : widget.crashOnly ? 1 : 0;
   static const _filters = ['all', 'info', 'error', 'stderr', 'debug'];
   bool _loading = false;
   bool? _sectionActive;
@@ -118,6 +129,7 @@ class _ZapretLogsViewState extends State<ZapretLogsView>
     if (_tab == 1 && log.level != 'error' &&
         !log.message.toLowerCase().contains('watchdog') &&
         !log.message.toLowerCase().contains('engine exited')) return false;
+    if (_tab == 3 && !isRecoveryJournalMessage(log.message)) return false;
     return (_filter == 'all' || log.level == _filter) &&
         '${entry.component} ${log.level} ${log.message}'
             .toLowerCase().contains(_query.toLowerCase());
@@ -145,13 +157,34 @@ class _ZapretLogsViewState extends State<ZapretLogsView>
     );
   }
 
-  Widget _filterSection(BuildContext context, {String? error}) {
+  Widget _filterSection(BuildContext context, List<_JournalEntry> filtered, {String? error}) {
     final l = AppLocalizations.of(context);
     if (_tab == 0 && error == null) {
       return Text(l.forkLogFooter, style: context.listCaptionStyle);
     }
     return generateSection(
       items: [
+        if (widget.embedded) ...[
+          if (widget.crashOnly)
+            ListItem(
+              title: Text(l.openLogsFolder),
+              leading: const GlyphIcon(AppGlyphs.openExternal),
+              onTap: () async => system.openDirectory(await crashFileLogger.directoryPath),
+            ),
+          ListItem<String>.options(
+            title: Text(Localizations.localeOf(context).languageCode == 'ru' ? 'Уровень' : 'Level'),
+            options: _filters,
+            value: _filter,
+            textBuilder: (level) => level == 'all' ? l.forkAllEvents : _levelLabel(l, level),
+            onChanged: (level) => setState(() => _filter = level),
+          ),
+          ListItem(
+            title: Text(Localizations.localeOf(context).languageCode == 'ru' ? 'Копировать видимые записи' : 'Copy visible entries'),
+            onTap: filtered.isEmpty ? null : () async => Clipboard.setData(ClipboardData(
+              text: filtered.map((entry) => '[${entry.log.time.toLocal()}] [${entry.component}] [${entry.log.level}] ${entry.log.message}').join('\n'),
+            )),
+          ),
+        ],
         if (_tab != 0)
           ListItem(
             title: Text(l.update),
@@ -174,7 +207,7 @@ class _ZapretLogsViewState extends State<ZapretLogsView>
       itemCount: 1 + (filtered.isEmpty ? 1 : filtered.length),
       separatorBuilder: (_, _) => const SizedBox(height: recordListGap),
       itemBuilder: (context, index) {
-        if (index == 0) return _filterSection(context, error: error);
+        if (index == 0) return _filterSection(context, filtered, error: error);
         if (filtered.isEmpty) return ListItem(title: Text(l.forkNoEvents));
         return _record(context, filtered[index - 1]);
       },
