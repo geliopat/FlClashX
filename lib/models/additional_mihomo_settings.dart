@@ -69,6 +69,28 @@ Map<String, Object> decodeAdditionalSettings(String content) {
   return {for (final e in decoded.entries) e.key.toString(): validateAdditionalValue(e.key.toString(), e.value)};
 }
 
+/// Restore explicitly supplied section values before the application's
+/// controlled overlays. Do not let a typed/default-filled core representation
+/// turn an empty list/map, false or zero into an implicit default.
+Map<String, dynamic> restoreExplicitMihomoSettings(
+  Map<String, dynamic> raw, Map<String, dynamic> explicit,
+) {
+  final result = Map<String, dynamic>.of(raw);
+  for (final section in ['dns', 'tun', 'sniffer', 'ntp', 'profile', 'experimental']) {
+    final source = explicit[section];
+    if (source is! Map) continue;
+    final previous = result[section];
+    result[section] = <String, dynamic>{
+      if (previous is Map) ...previous.cast<String, dynamic>(),
+      ...source.cast<String, dynamic>(),
+    };
+  }
+  for (final key in additionalMihomoKeys.keys.where((key) => !key.contains('.'))) {
+    if (explicit.containsKey(key)) result[key] = explicit[key];
+  }
+  return result;
+}
+
 void applyAdditionalSettings(Map<dynamic, dynamic> raw, String content) {
   final values = decodeAdditionalSettings(content);
   for (final entry in values.entries) {
