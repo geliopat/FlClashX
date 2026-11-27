@@ -52,8 +52,10 @@ jobs:
             gh api "repos/$SOURCE_REPO/actions/runs/46067251590" | jq -er 'select(.conclusion == "success" and .event == "push" and .head_branch == "FlClashZ" and .head_repository.full_name == "geliopat/Clash.Meta" and .head_sha == "3159aaab96a28cdbff0f5358cc91587bc5e2dc7d") | .id' > "$tmp/runs"
           else
             for workflow in flclashz-core-auto.yml flclashz-core-release.yml; do
-              gh api "repos/$SOURCE_REPO/actions/workflows/$workflow/runs?branch=FlClashZ&status=success&per_page=30" \
-                --jq '.workflow_runs[] | select(.conclusion == "success" and .head_branch == "FlClashZ" and .head_repository.full_name == "geliopat/Clash.Meta" and (.event == "schedule" or .event == "workflow_dispatch")) | .id' > "$tmp/$workflow"
+              # Only the trusted automatic workflow may request publication on
+              # push. The manual workflow remains explicit-dispatch only.
+              gh api "repos/$SOURCE_REPO/actions/workflows/$workflow/runs?branch=FlClashZ&status=success&per_page=30" |
+                jq -r --arg workflow "$workflow" '.workflow_runs[] | select(.conclusion == "success" and .head_branch == "FlClashZ" and .head_repository.full_name == "geliopat/Clash.Meta" and (.event == "schedule" or .event == "workflow_dispatch" or ($workflow == "flclashz-core-auto.yml" and .event == "push"))) | .id' > "$tmp/$workflow"
             done
             sort -urn "$tmp/"*.yml > "$tmp/runs"
           fi
