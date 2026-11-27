@@ -186,9 +186,6 @@ class Bootstrap {
   Future<void> _initApp() async {
     unawaited(_container.read(systemActionProvider.notifier).updateTray());
     unawaited(_checkUpdate());
-    unawaited(
-      autoLaunch?.updateStatus(_container.read(appSettingProvider).autoLaunch),
-    );
     // A menu bar app waits in the status item for a click.
     if (!_container.read(appSettingProvider).silentLaunch &&
         !(window?.isMenuBarMode ?? false)) {
@@ -200,6 +197,10 @@ class Bootstrap {
     if (!await _handlerDisclaimer()) {
       return;
     }
+    unawaited(
+      autoLaunch?.updateStatus(_container.read(appSettingProvider).autoLaunch),
+    );
+
     await _showCrashRecoveryTip();
     await _showPreChannelTip();
     // Keep the resource timer available even after a startup recovery path.
