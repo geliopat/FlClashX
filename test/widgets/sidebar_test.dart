@@ -342,10 +342,10 @@ void main() {
       final colorScheme = Theme.of(tester.element(_sidebarFinder)).colorScheme;
       final pane = tester.widget<Material>(_paneFinder);
       expect(pane.color, colorScheme.chromeSurface);
-      expect(
-        (pane.shape! as BorderDirectional).end,
-        Divider.createBorderSide(tester.element(_sidebarFinder)),
-      );
+      // The pane uses elevation, not the removed contrasting divider.
+      expect(pane.shape, isNull);
+      expect(pane.elevation, 8);
+      expect(pane.shadowColor, colorScheme.shadow);
 
       await tester.tap(find.byTooltip('Collapse'));
       await tester.pumpAndSettle();

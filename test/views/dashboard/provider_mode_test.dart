@@ -106,6 +106,27 @@ Group _group(String name, List<String> proxies, {String? now}) => Group(
 
 void main() {
   late ProviderContainer container;
+  ProviderContainer? activeContainer;
+
+  // UncontrolledProviderScope does not own its container. Dispose it inside
+  // the widget test, before Flutter checks for pending periodic timers.
+  void testDashboardWidgets(
+    String description,
+    Future<void> Function(WidgetTester) callback,
+  ) {
+    testWidgets(description, (tester) async {
+      try {
+        await callback(tester);
+      } finally {
+        try {
+          await tester.pumpWidget(const SizedBox.shrink());
+        } finally {
+          activeContainer?.dispose();
+          activeContainer = null;
+        }
+      }
+    });
+  }
 
   setUpAll(() async {
     final home = Directory.systemTemp.createTempSync('hero_test');
@@ -142,8 +163,8 @@ void main() {
         viewSizeProvider.overrideWithBuild((_, _) => const Size(450, 900)),
       ],
     );
+    activeContainer = container;
     globalState.container = container;
-    addTearDown(container.dispose);
     container.listen(currentProfileIdProvider, (_, _) {});
     container.read(currentProfileIdProvider.notifier).value =
         profiles.firstOrNull?.id;
@@ -175,7 +196,7 @@ void main() {
     await tester.pump();
   }
 
-  testWidgets('names the service and its server', (tester) async {
+  testDashboardWidgets('names the service and its server', (tester) async {
     setUp_(
       profiles: [
         _profile(
@@ -218,7 +239,7 @@ void main() {
     _group('Auto', ['🇳🇱 Amsterdam'], now: '🇳🇱 Amsterdam'),
   ];
 
-  testWidgets('the logo shows from its file on disk', (tester) async {
+  testDashboardWidgets('the logo shows from its file on disk', (tester) async {
     setUp_(
       profiles: [
         _profile(headers: const {'flclashx-servicelogo': logo}),
@@ -231,7 +252,7 @@ void main() {
     expect(find.byWidgetPredicate(fromFile), findsOneWidget);
   });
 
-  testWidgets('nologo leaves the logo out and the name larger', (tester) async {
+  testDashboardWidgets('nologo leaves the logo out and the name larger', (tester) async {
     setUp_(
       profiles: [
         _profile(
@@ -254,7 +275,7 @@ void main() {
     );
   });
 
-  testWidgets('noservice leaves both the logo and the name out', (
+  testDashboardWidgets('noservice leaves both the logo and the name out', (
     tester,
   ) async {
     setUp_(
@@ -278,7 +299,7 @@ void main() {
     expect(find.text('Amsterdam', findRichText: true), findsOneWidget);
   });
 
-  testWidgets('the app icon stands in until the logo is on disk', (
+  testDashboardWidgets('the app icon stands in until the logo is on disk', (
     tester,
   ) async {
     setUp_(
@@ -296,7 +317,7 @@ void main() {
     );
   });
 
-  testWidgets('a flag in the node description stands in for one in its name', (
+  testDashboardWidgets('a flag in the node description stands in for one in its name', (
     tester,
   ) async {
     setUp_(
@@ -322,7 +343,7 @@ void main() {
     expect(find.text('Fast', findRichText: true), findsOneWidget);
   });
 
-  testWidgets('a nested group shows its own name, with the flag of its pick', (
+  testDashboardWidgets('a nested group shows its own name, with the flag of its pick', (
     tester,
   ) async {
     setUp_(
@@ -347,7 +368,7 @@ void main() {
     );
   });
 
-  testWidgets('counts flags through layers of groups that share members', (
+  testDashboardWidgets('counts flags through layers of groups that share members', (
     tester,
   ) async {
     const width = 30;
@@ -379,7 +400,7 @@ void main() {
     expect(watch.elapsed, lessThan(const Duration(seconds: 5)));
   });
 
-  testWidgets('the app name stands in for the service', (tester) async {
+  testDashboardWidgets('the app name stands in for the service', (tester) async {
     setUp_(profiles: [_profile()]);
     await pump(tester);
 
@@ -387,7 +408,7 @@ void main() {
     expect(find.text('Change server'), findsOneWidget);
   });
 
-  testWidgets('shows the exit address and run time while running', (
+  testDashboardWidgets('shows the exit address and run time while running', (
     tester,
   ) async {
     setUp_(
@@ -409,7 +430,7 @@ void main() {
   String? flagOf(WidgetTester tester) =>
       tester.widget<CountryFlag>(find.byType(CountryFlag)).countryCode;
 
-  testWidgets('the flag is the exit country while running', (tester) async {
+  testDashboardWidgets('the flag is the exit country while running', (tester) async {
     setUp_(
       profiles: [
         _profile(headers: const {'flclashx-serverinfo': 'Auto'}),
@@ -425,7 +446,7 @@ void main() {
     expect(flagOf(tester), 'GB');
   });
 
-  testWidgets('the name flag holds until the exit country is known', (
+  testDashboardWidgets('the name flag holds until the exit country is known', (
     tester,
   ) async {
     setUp_(
@@ -444,7 +465,7 @@ void main() {
     expect(flagOf(tester), 'NL');
   });
 
-  testWidgets('a hidden IP asks no checker, also once hidden later', (
+  testDashboardWidgets('a hidden IP asks no checker, also once hidden later', (
     tester,
   ) async {
     setUp_(
@@ -484,7 +505,7 @@ void main() {
     expect(flagOf(tester), 'NL');
   });
 
-  testWidgets('the flag rechecks the exit address while running', (
+  testDashboardWidgets('the flag rechecks the exit address while running', (
     tester,
   ) async {
     setUp_(
@@ -507,7 +528,7 @@ void main() {
     expect(find.byType(ProxiesView), findsNothing);
   });
 
-  testWidgets('the address opens the picker like the rest of the card', (
+  testDashboardWidgets('the address opens the picker like the rest of the card', (
     tester,
   ) async {
     setUp_(
@@ -528,7 +549,7 @@ void main() {
     expect(find.text(currentAppLocalizations.outboundIp), findsNothing);
   });
 
-  testWidgets('a hidden IP leaves the server card to a title that swaps', (
+  testDashboardWidgets('a hidden IP leaves the server card to a title that swaps', (
     tester,
   ) async {
     setUp_(
@@ -555,7 +576,7 @@ void main() {
     expect(find.byType(ProxiesView), findsOneWidget);
   });
 
-  testWidgets('the hideip special hides the IP and locks its switch', (
+  testDashboardWidgets('the hideip special hides the IP and locks its switch', (
     tester,
   ) async {
     setUp_(
@@ -598,7 +619,7 @@ void main() {
     expect(container.read(appSettingProvider).hideIp, isTrue);
   });
 
-  testWidgets('tapping the delay tests only the selected proxy, not the picker', (tester) async {
+  testDashboardWidgets('tapping the delay tests only the selected proxy, not the picker', (tester) async {
     final action = _RecordingDelayAction();
     const node = '🇳🇱 Amsterdam';
     setUp_(
@@ -628,7 +649,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('the whole card opens the server picker', (tester) async {
+  testDashboardWidgets('the whole card opens the server picker', (tester) async {
     setUp_(
       profiles: [
         _profile(headers: const {'flclashx-serverinfo': 'Auto'}),
@@ -646,7 +667,7 @@ void main() {
     expect(find.byType(ProxiesView), findsOneWidget);
   });
 
-  testWidgets('the connect button toggles the shared running state', (
+  testDashboardWidgets('the connect button toggles the shared running state', (
     tester,
   ) async {
     setUp_(profiles: [_profile()]);
@@ -665,7 +686,7 @@ void main() {
     expect(find.byTooltip('Start'), findsOneWidget);
   });
 
-  testWidgets('providermode dresses the dashboard as the provider', (
+  testDashboardWidgets('providermode dresses the dashboard as the provider', (
     tester,
   ) async {
     setUp_(
@@ -691,7 +712,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('a wide window keeps the provider cards a narrow column', (
+  testDashboardWidgets('a wide window keeps the provider cards a narrow column', (
     tester,
   ) async {
     setUp_(
@@ -714,7 +735,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('without providermode the dashboard keeps its status card', (
+  testDashboardWidgets('without providermode the dashboard keeps its status card', (
     tester,
   ) async {
     setUp_(profiles: [_profile()], groups: logoGroups());
