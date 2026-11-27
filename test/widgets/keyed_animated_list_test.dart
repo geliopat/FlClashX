@@ -122,4 +122,42 @@ void main() {
     expect(find.text('10'), findsOneWidget);
     expect(topOf(tester, '10'), 400);
   });
+  for (final count in [1000, 10000]) {
+    testWidgets('large feed $count rows stays lazy across refresh and scroll', (tester) async {
+      final scroll = ScrollController();
+      addTearDown(scroll.dispose);
+      var builds = 0;
+      Widget fixture(List<int> ids) => MaterialApp(
+        home: Scaffold(
+          body: KeyedAnimatedList<int>(
+            items: ids,
+            keyOf: (id) => id,
+            controller: scroll,
+            itemBuilder: (_, id) {
+              builds++;
+              return SizedBox(height: 40, child: Text('row-$id'));
+            },
+          ),
+        ),
+      );
+      final ids = List.generate(count, (i) => i);
+      await tester.pumpWidget(fixture(ids));
+      expect(builds, lessThan(200));
+      expect(find.text('row-0'), findsOneWidget);
+      for (var i = 0; i < 5; i++) {
+        await tester.pumpWidget(fixture(List.of(ids)));
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      expect(builds, lessThan(1000));
+      scroll.jumpTo(8000);
+      await tester.pumpAndSettle();
+      expect(find.text('row-200'), findsOneWidget);
+      await tester.pumpWidget(fixture([for (final id in ids) if (id != 0) id, count]));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(builds, lessThan(1500));
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
 }
