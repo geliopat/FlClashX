@@ -22,3 +22,18 @@ func TestSpeedURLValidation(t *testing.T) {
 	}
 	if !validSpeedURL("https://example.com/__up") { t.Fatal("valid URL rejected") }
 }
+
+
+func TestSpeedServiceNeverUsesYandexThroughVPN(t *testing.T) {
+    if service, err := speedServiceForRoute(true, "custom"); err != nil || service != "yandex" {
+        t.Fatal("DIRECT did not select Internetometer")
+    }
+    if _, err := speedServiceForRoute(false, "yandex"); err == nil {
+        t.Fatal("VPN accepted Internetometer")
+    }
+    for _, service := range []string{"cloudflare", "custom"} {
+        if actual, err := speedServiceForRoute(false, service); err != nil || actual != service {
+            t.Fatalf("VPN rejected %s", service)
+        }
+    }
+}

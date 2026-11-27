@@ -18,6 +18,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'config/advanced.dart';
+import 'config/network_tests.dart';
 import 'config/custom_resources.dart';
 import 'developer.dart';
 import 'diagnostics.dart';
@@ -64,6 +65,7 @@ class _ToolViewState extends ConsumerState<ToolsView> {
           if (Platform.isWindows) const _ZapretItem(),
           if (Platform.isWindows) const _DiagnosticsItem(),
           const _GeneralItem(),
+          if (Platform.isWindows) const _NetworkTestsItem(),
         ],
       );
     }
@@ -80,6 +82,7 @@ class _ToolViewState extends ConsumerState<ToolsView> {
         if (Platform.isWindows) const _ZapretItem(),
           if (Platform.isWindows) const _DiagnosticsItem(),
         const _GeneralItem(),
+        if (Platform.isWindows) const _NetworkTestsItem(),
       ],
       footer: [
         if (system.isAndroid) appLocalizations.accessControlDesc,
@@ -343,4 +346,17 @@ class _DeveloperItem extends StatelessWidget {
       widget: const DeveloperView(),
     );
   }
+}
+
+
+class _NetworkTestsItem extends StatelessWidget {
+  const _NetworkTestsItem();
+
+  @override
+  Widget build(BuildContext context) => ListItem.open(
+    leading: const GlyphIcon(AppGlyphs.heartPulse),
+    title: Text(Localizations.localeOf(context).languageCode == 'ru'
+        ? 'Сетевые тесты' : 'Network tests'),
+    widget: const NetworkTestsView(),
+  );
 }

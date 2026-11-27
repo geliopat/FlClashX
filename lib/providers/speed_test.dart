@@ -9,6 +9,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 enum SpeedTestService { cloudflare, yandex, custom }
 
+// The old Yandex selection is migrated for VPN tests only. DIRECT is fixed
+// to Internetometer independently, including at the Go IPC boundary.
+SpeedTestService vpnSpeedService(SpeedTestService service) =>
+    service == SpeedTestService.yandex ? SpeedTestService.cloudflare : service;
+
 const speedTestDefaultDownload = 'https://speed.cloudflare.com/__down?bytes=16777216';
 const speedTestDefaultUpload = 'https://speed.cloudflare.com/__up';
 
@@ -17,6 +22,11 @@ const delayTestPresets = <String, String>{
   'Cloudflare': 'https://cp.cloudflare.com/generate_204',
   'Microsoft': 'https://www.msftconnecttest.com/connecttest.txt',
   'Apple': 'https://captive.apple.com/hotspot-detect.html',
+  'Firefox': 'https://detectportal.firefox.com/success.txt',
+  'Ubuntu': 'http://connectivity-check.ubuntu.com/',
+  'Yandex': 'https://yandex.ru/',
+  'YouTube': 'https://www.youtube.com/generate_204',
+  'GitHub': 'https://github.com/',
 };
 
 bool validTestEndpoint(String text) {
@@ -61,9 +71,9 @@ class SpeedTestSettingsController extends Notifier<SpeedTestSettings> {
     final prefs = await SharedPreferences.getInstance();
     if (!ref.mounted || revision != _revision) return;
     state = SpeedTestSettings(
-      service: SpeedTestService.values.asNameMap()[
+      service: vpnSpeedService(SpeedTestService.values.asNameMap()[
         prefs.getString('speedTest.service')
-      ] ?? SpeedTestService.cloudflare,
+      ] ?? SpeedTestService.cloudflare),
       downloadUrl: prefs.getString('speedTest.download') ?? speedTestDefaultDownload,
       uploadUrl: prefs.getString('speedTest.upload') ?? speedTestDefaultUpload,
     );
@@ -73,7 +83,7 @@ class SpeedTestSettingsController extends Notifier<SpeedTestSettings> {
     if (!validTestEndpoint(settings.downloadUrl) ||
         !validTestEndpoint(settings.uploadUrl)) return;
     _revision++;
-    state = settings;
+    state = settings.copyWith(service: vpnSpeedService(settings.service));
     final prefs = await SharedPreferences.getInstance();
     if (!ref.mounted) return;
     final latest = state;
@@ -159,7 +169,7 @@ class SpeedTestController extends Notifier<SpeedTestState> {
           result = await ref.read(coreHandlerProvider).speedTest(
             ProxySpeedRequest(
               proxyName: name,
-              service: name == 'DIRECT' ? 'yandex' : settings.service.name,
+              service: name == 'DIRECT' ? 'yandex' : vpnSpeedService(settings.service).name,
               downloadUrl: settings.downloadUrl,
               uploadUrl: settings.uploadUrl,
             ),
@@ -176,6 +186,58 @@ class SpeedTestController extends Notifier<SpeedTestState> {
       }
     } finally {
       if (ref.mounted) state = SpeedTestState(results: state.results);
+    }
+  }
+}
+
+
+/// Keep the custom URL independently of the currently active preset. The
+/// actual probe still reads AppSettingProps.testUrl, so profile-specific
+/// health-check URLs and existing routing semantics are not changed.
+final customDelayUrlProvider = NotifierProvider<CustomDelayUrlController, String>(
+  CustomDelayUrlController.new,
+);
+class CustomDelayUrlController extends Notifier<String> {
+  int _revision = 0;
+  static const _key = 'networkTests.customDelayUrl';
+
+  @override
+  String build() {
+    final current = ref.read(appSettingProvider).testUrl;
+    final initial = validTestEndpoint(current) && !delayTestPresets.containsValue(current)
+        ? current : 'https://connectivitycheck.gstatic.com/generate_204';
+    unawaited(_load(initial));
+    return initial;
+  }
+
+  Future<void> _load(String initial) async {
+    final revision = _revision;
+    final prefs = await SharedPreferences.getInstance();
+    if (!ref.mounted || revision != _revision) return;
+    final current = ref.read(appSettingProvider).testUrl;
+    final saved = prefs.getString(_key);
+    // A restored legacy config containing a custom URL wins over stale prefs.
+    state = validTestEndpoint(current) && !delayTestPresets.containsValue(current)
+        ? current : saved != null && validTestEndpoint(saved) ? saved : initial;
+  }
+
+  Future<void> remember(String url) async {
+    if (!validTestEndpoint(url)) return;
+    final revision = ++_revision;
+    state = url;
+    final prefs = await SharedPreferences.getInstance();
+    if (!ref.mounted || revision != _revision) return;
+    await prefs.setString(_key, url);
+  }
+
+  void choose(String choice) {
+    final current = ref.read(appSettingProvider).testUrl;
+    if (choice != 'custom' && !delayTestPresets.containsValue(current)) {
+      unawaited(remember(current));
+    }
+    final url = choice == 'custom' ? state : delayTestPresets[choice];
+    if (url != null && validTestEndpoint(url)) {
+      ref.read(appSettingProvider.notifier).update((s) => s.copyWith(testUrl: url));
     }
   }
 }

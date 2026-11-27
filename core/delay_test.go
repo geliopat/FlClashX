@@ -218,3 +218,21 @@ func TestABalancerAnswersWhenAMemberProbePanics(t *testing.T) {
 		t.Fatal("the balancer kept waiting on the member whose probe panicked")
 	}
 }
+
+
+func TestKnownDelayPresetsCheckExpectedStatus(t *testing.T) {
+    for _, test := range []struct{url string; valid, invalid uint16}{
+        {defaultTestURL, 204, 200},
+        {"http://connectivity-check.ubuntu.com/", 204, 302},
+        {"https://github.com/", 200, 403},
+        {"https://captive.apple.com/hotspot-detect.html", 200, 302},
+    } {
+        status := delayStatusForURL(test.url)
+        if !status.Check(test.valid) || status.Check(test.invalid) {
+            t.Fatalf("unexpected status validation for %s", test.url)
+        }
+    }
+    if !delayStatusForURL("https://example.org/custom").Check(418) {
+        t.Fatal("custom URL lost existing status semantics")
+    }
+}

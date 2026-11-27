@@ -55,9 +55,7 @@ class TestUrlItem extends ConsumerWidget {
       value: chosen,
       textBuilder: (value) => value == 'custom' ? l.custom : value,
       onChanged: (value) {
-        if (value == 'custom') return;
-        ref.read(appSettingProvider.notifier)
-            .update((state) => state.copyWith(testUrl: delayTestPresets[value]!));
+        ref.read(customDelayUrlProvider.notifier).choose(value);
       },
     );
   }
@@ -81,6 +79,7 @@ class CustomDelayUrlItem extends ConsumerWidget {
           ? null : l.urlTip(l.testUrl),
       onChanged: (value) {
         if (value != null && validTestEndpoint(value.trim())) {
+          ref.read(customDelayUrlProvider.notifier).remember(value.trim());
           ref.read(appSettingProvider.notifier)
               .update((state) => state.copyWith(testUrl: value.trim()));
         }
@@ -100,8 +99,8 @@ class SpeedTestUrlItem extends ConsumerWidget {
     return ListItem<SpeedTestService>.options(
       title: Text(l.forkSpeedTestUrl),
       subtitle: Text(l.forkDirectYandex),
-      options: SpeedTestService.values,
-      value: settings.service,
+      options: const [SpeedTestService.cloudflare, SpeedTestService.custom],
+      value: vpnSpeedService(settings.service),
       textBuilder: (value) => switch (value) {
         SpeedTestService.cloudflare => 'Cloudflare',
         SpeedTestService.yandex => 'Yandex Internetometer',
@@ -553,21 +552,17 @@ class GeneralView extends ConsumerWidget {
 
   List<Widget> _connectionItems() {
     return [
-      const TestUrlItem(),
-      const CustomDelayUrlItem(),
-      if (system.isWindows) ...const [
-        SpeedTestUrlItem(),
-        CustomSpeedUrlItem(upload: false),
-        CustomSpeedUrlItem(upload: true),
+      if (!system.isWindows) ...[
+        const TestUrlItem(),
+        const CustomDelayUrlItem(),
+        const DelayTestTimeoutItem(),
+        _clashToggle(
+          title: (l) => l.unifiedDelay,
+          managedKey: 'clash.unified-delay',
+          select: (state) => state.unifiedDelay,
+          update: (state, value) => state.copyWith(unifiedDelay: value),
+        ),
       ],
-      const DelayTestTimeoutItem(),
-      if (system.isWindows) ...const [AutoDelayIntervalItem(active: true), AutoDelayIntervalItem(active: false), ZapretProbeIntervalItem()],
-      _clashToggle(
-        title: (l) => l.unifiedDelay,
-        managedKey: 'clash.unified-delay',
-        select: (state) => state.unifiedDelay,
-        update: (state, value) => state.copyWith(unifiedDelay: value),
-      ),
       _clashToggle(
         title: (l) => l.tcpConcurrent,
         managedKey: 'clash.tcp-concurrent',

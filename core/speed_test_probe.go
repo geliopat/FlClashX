@@ -76,10 +76,8 @@ func handleSpeedTest(params *ProxySpeedRequest) *ProxySpeedResult {
 	client := &http.Client{Transport: transport, CheckRedirect: func(*http.Request, []*http.Request) error {
 		return http.ErrUseLastResponse
 	}}
-	service := params.Service
-	if params.ProxyName == "DIRECT" {
-		service = "yandex"
-	}
+	service, err := speedServiceForRoute(params.ProxyName == "DIRECT", params.Service)
+	if err != nil { return failed("unsupported") }
 	down, up := params.DownloadURL, params.UploadURL
 	multipart := false
 	switch service {
@@ -96,6 +94,9 @@ func handleSpeedTest(params *ProxySpeedRequest) *ProxySpeedResult {
 		multipart = true
 	case "custom":
 	default:
+		return failed("unsupported")
+	}
+	if service != "yandex" && (validYandexSpeedURL(down) || validYandexSpeedURL(up)) {
 		return failed("unsupported")
 	}
 	if !validSpeedURL(down) || !validSpeedURL(up) {
@@ -263,4 +264,17 @@ func transferSpeed(client *http.Client, req *http.Request, payloadBytes int64, u
 	}
 	value := float64(count)*8/elapsed/1e6
 	return &value, ""
+}
+
+
+// Do not allow a stale client preference or an IPC caller to run Internetometer
+// through a VPN node. A named non-DIRECT route has no direct fallback.
+func speedServiceForRoute(direct bool, requested string) (string, error) {
+    if direct { return "yandex", nil }
+    switch requested {
+    case "cloudflare", "custom":
+        return requested, nil
+    default:
+        return "", fmt.Errorf("unsupported VPN speed service")
+    }
 }

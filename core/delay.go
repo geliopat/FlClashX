@@ -103,7 +103,7 @@ func testDelay(wait context.Context, proxy constant.Proxy, url string, timeout t
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	delay, err := proxy.URLTest(ctx, url, anyDelayTestStatus)
+	delay, err := proxy.URLTest(ctx, url, delayStatusForURL(url))
 	if err != nil {
 		delay = 0
 	}
@@ -161,4 +161,27 @@ func balancedNodes(balancer constant.Proxy) []constant.Proxy {
 	}
 	walk(balancer)
 	return nodes
+}
+
+
+// Strict status checks apply to the known presets only; unknown profile or
+// custom URLs keep Mihomo's original any-status URLTest semantics.
+func delayStatusForURL(url string) utils.IntRanges[uint16] {
+    expected := ""
+    switch url {
+    case defaultTestURL, "https://cp.cloudflare.com/generate_204",
+        "http://connectivity-check.ubuntu.com/", "https://www.youtube.com/generate_204",
+        "https://connectivitycheck.gstatic.com/generate_204":
+        expected = "204"
+    case "https://www.msftconnecttest.com/connecttest.txt",
+        "https://captive.apple.com/hotspot-detect.html",
+        "https://detectportal.firefox.com/success.txt",
+        "https://yandex.ru/", "https://github.com/":
+        expected = "200"
+    default:
+        return anyDelayTestStatus
+    }
+    statuses, err := utils.NewUnsignedRanges[uint16](expected)
+    if err != nil { return anyDelayTestStatus }
+    return statuses
 }
