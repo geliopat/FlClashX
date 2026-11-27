@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:fl_clash/common/boot_record.dart';
 import 'package:fl_clash/common/constant.dart';
@@ -173,6 +174,25 @@ void main() {
       expect(await preferences.saveConfig(config), isTrue);
       await store.remove(configKey);
       expect(Config.strictFromJson((await preferences.getConfigMap())!), config);
+    });
+
+    test('independent recovery survives loss of both preferences keys', () async {
+      final folder = await Directory.systemTemp.createTemp('flclashz-settings-');
+      final file = File('${folder.path}${Platform.pathSeparator}backup.json');
+      preferences.recoveryFileOverride = () async => file;
+      try {
+        const config = Config(themeProps: defaultThemeProps, currentProfileId: 42);
+        expect(await preferences.saveConfig(config), isTrue);
+        await store.setString(configKey, '{broken');
+        await store.setString('config.lastGood.v1', '{broken');
+        expect(Config.strictFromJson((await preferences.getConfigMap())!), config);
+        await preferences.clearPreferences();
+        expect(await file.exists(), isFalse);
+        expect(await preferences.getConfigMap(), isNull);
+      } finally {
+        preferences.recoveryFileOverride = () async => null;
+        await folder.delete(recursive: true);
+      }
     });
 
     test('getConfigMap returns null for malformed JSON', () async {
