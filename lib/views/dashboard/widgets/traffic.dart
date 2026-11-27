@@ -1,3 +1,4 @@
+import 'package:fl_clash/ui/network_palette.dart';
 import 'dart:math' as math;
 
 import 'package:fl_clash/common/common.dart';
@@ -24,13 +25,11 @@ enum TrafficDirection {
 
   Glyph get glyph => this == upload ? AppGlyphs.arrowUp : AppGlyphs.arrowDown;
 
-  Color colorOf(BuildContext context) => this == upload
-      ? DashboardColors.of(context).series2
-      : context.colorScheme.primary;
+  Color colorOf(BuildContext context) => (this == upload
+      ? NetworkTone.upload
+      : NetworkTone.download).of(context);
 
-  Color glyphColorOf(BuildContext context) => this == upload
-      ? context.colorScheme.onSurfaceVariant
-      : context.colorScheme.primary;
+  Color glyphColorOf(BuildContext context) => colorOf(context);
 
   String labelOf(BuildContext context) => this == upload
       ? context.appLocalizations.upload

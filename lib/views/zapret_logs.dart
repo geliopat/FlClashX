@@ -20,9 +20,11 @@ String _levelLabel(AppLocalizations l, String level) => switch (level) {
 typedef _JournalEntry = ({HelperZapretLog log, String component});
 
 class ZapretLogsView extends StatefulWidget {
-  const ZapretLogsView({super.key, this.journalOnly = false});
+  const ZapretLogsView({super.key, this.journalOnly = false, this.crashOnly = false})
+      : assert(!(journalOnly && crashOnly));
 
   final bool journalOnly;
+  final bool crashOnly;
 
   @override
   State<ZapretLogsView> createState() => _ZapretLogsViewState();
@@ -30,7 +32,8 @@ class ZapretLogsView extends StatefulWidget {
 
 class _ZapretLogsViewState extends State<ZapretLogsView>
     with WidgetsBindingObserver, ActivePollingMixin<ZapretLogsView> {
-  late int _tab = widget.journalOnly ? 2 : 0;
+  late final int _tab = widget.journalOnly ? 2 : widget.crashOnly ? 1 : 0;
+  static const _filters = ['all', 'info', 'error', 'stderr', 'debug'];
   bool _loading = false;
   String _query = '';
   String _filter = 'all';
@@ -97,15 +100,6 @@ class _ZapretLogsViewState extends State<ZapretLogsView>
     return events.reversed.toList(growable: false);
   }
 
-  void _selectTab(int value) {
-    if (_tab == value) return;
-    setState(() {
-      _tab = value;
-      _filter = 'all';
-    });
-    restartPolling();
-  }
-
   bool _matches(_JournalEntry entry) {
     final log = entry.log;
     if (_tab == 1 && log.level != 'error' &&
@@ -142,17 +136,6 @@ class _ZapretLogsViewState extends State<ZapretLogsView>
     final l = AppLocalizations.of(context);
     return generateSection(
       items: [
-        ListItem<String>.options(
-          title: Text(l.forkFilter),
-          options: const ['all', 'info', 'error', 'stderr', 'debug'],
-          value: _filter,
-          textBuilder: (value) => switch (value) {
-            'all' => l.forkAllEvents,
-            'error' => l.forkErrors,
-            _ => _levelLabel(l, value),
-          },
-          onChanged: (value) => setState(() => _filter = value),
-        ),
         if (_tab != 0)
           ListItem(
             title: Text(l.update),
@@ -211,11 +194,19 @@ class _ZapretLogsViewState extends State<ZapretLogsView>
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     return CommonScaffold(
-      title: widget.journalOnly ? l.forkServiceJournal : l.forkZapretLogs,
-      titleWidget: widget.journalOnly ? null : PageTitleTabs(
-        labels: [l.forkEvents, l.forkCrashHistory],
-        selectedIndex: _tab,
-        onSelected: _selectTab,
+      title: widget.journalOnly ? l.forkServiceJournal
+          : widget.crashOnly ? l.forkCrashHistory : l.forkZapretLogs,
+      titleWidget: PageTitleTabs(
+        labels: [
+          for (final level in _filters)
+            switch (level) {
+              'all' => l.forkAllEvents,
+              'error' => l.forkErrors,
+              _ => _levelLabel(l, level),
+            },
+        ],
+        selectedIndex: _filters.indexOf(_filter),
+        onSelected: (index) => setState(() => _filter = _filters[index]),
       ),
       searchState: AppBarSearchState(onSearch: (query) => setState(() => _query = query)),
       body: Builder(

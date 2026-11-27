@@ -1,6 +1,8 @@
 name: Zapret Windows validation
 
 on:
+  push:
+    branches: [work/v1.1.5-ui-config]
   workflow_dispatch:
     inputs:
       candidate_ref:

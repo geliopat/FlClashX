@@ -23,11 +23,11 @@ class _ConnectionFeedsViewState extends ConsumerState<ConnectionFeedsView> {
   Widget _titleTabs(RequestFeed feed) {
     final l = context.appLocalizations;
     return PageTitleTabs(
-      labels: [l.recentRequests, l.liveConnections],
-      selectedIndex: feed == RequestFeed.recent ? 0 : 1,
+      labels: [l.liveConnections, l.recentRequests],
+      selectedIndex: feed == RequestFeed.live ? 0 : 1,
       onSelected: (index) => ref.read(appSettingProvider.notifier).update(
         (state) => state.copyWith(requestFeed:
-            index == 0 ? RequestFeed.recent : RequestFeed.live),
+            index == 0 ? RequestFeed.live : RequestFeed.recent),
       ),
     );
   }

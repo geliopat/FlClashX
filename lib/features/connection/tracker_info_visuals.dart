@@ -1,3 +1,4 @@
+import 'package:fl_clash/ui/network_palette.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
@@ -6,37 +7,55 @@ import 'package:material_ui/material_ui.dart';
 
 typedef OutboundTone = ({Color color, Color foreground});
 
-OutboundTone _neutralTone(BuildContext context) {
-  final colorScheme = context.colorScheme;
-  return (
-    color: context.raisedSurfaceLevel.colorOf(colorScheme),
-    foreground: colorScheme.onSurfaceVariant,
-  );
+OutboundTone _neutralTone(BuildContext context) => (
+  color: Colors.transparent,
+  foreground: NetworkTone.inactive.of(context),
+);
+
+OutboundTone outboundTone(BuildContext context, String name) {
+  final upper = name.toUpperCase();
+  final tone = upper == 'DIRECT'
+      ? NetworkTone.direct
+      : upper.startsWith('REJECT') || upper == 'BLOCK'
+          ? NetworkTone.reject
+          : upper == 'PASS' || upper == 'COMPATIBLE'
+              ? NetworkTone.inactive
+              : NetworkTone.proxy;
+  return (color: Colors.transparent, foreground: tone.of(context));
 }
 
-/// Where the traffic ends up, told apart by colour: direct, blocked or a node.
-OutboundTone outboundTone(BuildContext context, String name) {
-  final colorScheme = context.colorScheme;
-  final upper = name.toUpperCase();
-  if (upper == 'DIRECT') {
-    return (
-      color: colorScheme.successContainer,
-      foreground: colorScheme.onSuccessContainer,
+class _ColoredLabel extends StatelessWidget {
+  const _ColoredLabel(this.label, this.color, {this.onPressed});
+  final String label;
+  final Color color;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = AppTextStyle.caption1.of(context).copyWith(color: color);
+    if (onPressed == null) {
+      return Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: style);
+    }
+    return TextButton(
+      style: TextButton.styleFrom(
+        foregroundColor: color,
+        backgroundColor: Colors.transparent,
+        overlayColor: Colors.transparent,
+        padding: EdgeInsets.zero,
+        minimumSize: Size.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        textStyle: style,
+      ).copyWith(
+        textStyle: WidgetStateProperty.resolveWith((states) => style.copyWith(
+          shadows: states.contains(WidgetState.hovered) || states.contains(WidgetState.focused)
+              ? [Shadow(color: color, blurRadius: 6)]
+              : const [],
+        )),
+      ),
+      onPressed: onPressed,
+      child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
     );
   }
-  if (upper.startsWith('REJECT') || upper == 'BLOCK') {
-    return (
-      color: colorScheme.errorContainer,
-      foreground: colorScheme.onErrorContainer,
-    );
-  }
-  if (upper == 'PASS' || upper == 'COMPATIBLE') {
-    return _neutralTone(context);
-  }
-  return (
-    color: colorScheme.primaryContainer,
-    foreground: colorScheme.onPrimaryContainer,
-  );
 }
 
 class OutboundChip extends StatelessWidget {
@@ -44,22 +63,12 @@ class OutboundChip extends StatelessWidget {
   final bool exit;
   final VoidCallback? onPressed;
 
-  const OutboundChip({
-    super.key,
-    required this.label,
-    this.exit = true,
-    this.onPressed,
-  });
+  const OutboundChip({super.key, required this.label, this.exit = true, this.onPressed});
 
   @override
   Widget build(BuildContext context) {
     final tone = exit ? outboundTone(context, label) : _neutralTone(context);
-    return TonalChip(
-      label: label,
-      color: tone.color,
-      foregroundColor: tone.foreground,
-      onPressed: onPressed,
-    );
+    return _ColoredLabel(label, tone.foreground, onPressed: onPressed);
   }
 }
 
@@ -70,23 +79,13 @@ class NetworkLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = context.colorScheme;
     final tone = switch (network.toLowerCase()) {
-      'tcp' => (
-        color: colorScheme.secondaryContainer,
-        foreground: colorScheme.onSecondaryContainer,
-      ),
-      'udp' => (
-        color: colorScheme.tertiaryContainer,
-        foreground: colorScheme.onTertiaryContainer,
-      ),
-      _ => _neutralTone(context),
+      'tcp' => NetworkTone.tcp,
+      'udp' => NetworkTone.udp,
+      'icmp' || 'icmpv6' => NetworkTone.icmp,
+      _ => NetworkTone.inactive,
     };
-    return TonalChip(
-      label: network.toUpperCase(),
-      color: tone.color,
-      foregroundColor: tone.foreground,
-    );
+    return _ColoredLabel(network.toUpperCase(), tone.of(context));
   }
 }
 
@@ -198,16 +197,14 @@ class RuleLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tone = _neutralTone(context);
     final payload = trackerInfo.rulePayload;
     return Row(
       mainAxisSize: MainAxisSize.min,
       spacing: 6,
       children: [
-        TonalChip(
-          label: trackerInfo.rule,
-          color: tone.color,
-          foregroundColor: tone.foreground,
+        _ColoredLabel(
+          trackerInfo.rule,
+          NetworkTone.rule.of(context),
           onPressed: onPressed,
         ),
         if (payload.isNotEmpty)
@@ -232,8 +229,7 @@ class SpeedText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = context.colorScheme;
-    final muted = colorScheme.onSurfaceVariant;
+    final muted = NetworkTone.inactive.of(context);
     InlineSpan part(Glyph glyph, int amount, Color active) {
       final color = amount > 0 ? active : muted;
       return TextSpan(
@@ -253,9 +249,9 @@ class SpeedText extends StatelessWidget {
     return Text.rich(
       TextSpan(
         children: [
-          part(AppGlyphs.arrowUp, upload, colorScheme.tertiary),
+          part(AppGlyphs.arrowUp, upload, NetworkTone.upload.of(context)),
           const TextSpan(text: '   '),
-          part(AppGlyphs.arrowDown, download, colorScheme.primary),
+          part(AppGlyphs.arrowDown, download, NetworkTone.download.of(context)),
         ],
       ),
     );

@@ -1,3 +1,4 @@
+import 'package:fl_clash/ui/network_palette.dart';
 import 'dart:async';
 import 'dart:ffi';
 import 'dart:io';
@@ -186,9 +187,8 @@ class _SidebarStatisticsState extends ConsumerState<SidebarStatistics> {
   Widget _trafficRow(String label, Traffic? value, TextStyle? style,
       {bool rate = false}) {
     final theme = Theme.of(context);
-    final dark = theme.brightness == Brightness.dark;
-    final down = dark ? const Color(0xff75cda1) : const Color(0xff237a4d);
-    final up = dark ? const Color(0xff82a8ed) : const Color(0xff2456a5);
+    final down = NetworkTone.download.of(context);
+    final up = NetworkTone.upload.of(context);
     final l = context.appLocalizations;
     Widget direction(bool download, Color color) => Expanded(
       child: Semantics(
@@ -199,7 +199,8 @@ class _SidebarStatisticsState extends ConsumerState<SidebarStatistics> {
               : AlignmentDirectional.centerEnd,
           child: Text(
             '${download ? '↓' : '↑'} ${_bytes(download ? value?.down : value?.up, rate: rate)}',
-            style: style?.copyWith(color: color,
+            style: style?.copyWith(color: (download ? value?.down : value?.up) == 0
+                    ? NetworkTone.inactive.of(context) : color,
                 fontFeatures: const [FontFeature.tabularFigures()]),
           ),
         ),

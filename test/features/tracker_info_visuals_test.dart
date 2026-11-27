@@ -1,6 +1,6 @@
+import 'package:fl_clash/ui/network_palette.dart';
 import 'package:fl_clash/features/features.dart';
 import 'package:fl_clash/models/models.dart';
-import 'package:fl_clash/ui/ui.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -34,13 +34,6 @@ Future<void> _pump(WidgetTester tester, Widget child) async {
   await tester.pump();
 }
 
-Color _chipColor(WidgetTester tester, String label) => tester
-    .widget<Material>(
-      find
-          .ancestor(of: find.text(label), matching: find.byType(Material))
-          .first,
-    )
-    .color!;
 
 void main() {
   testWidgets('the avatar shows the destination flag, else the host letter', (
@@ -58,7 +51,7 @@ void main() {
     expect(find.text('?'), findsOneWidget);
   });
 
-  testWidgets('outbound chips colour direct, blocked and proxied exits', (
+  testWidgets('outbound text uses semantic colours without chips', (
     tester,
   ) async {
     await _pump(
@@ -73,14 +66,11 @@ void main() {
       ),
     );
     final context = tester.element(find.text('DIRECT'));
-    final colorScheme = context.colorScheme;
-    expect(_chipColor(tester, 'DIRECT'), colorScheme.successContainer);
-    expect(_chipColor(tester, 'REJECT'), colorScheme.errorContainer);
-    expect(_chipColor(tester, 'HK 01'), colorScheme.primaryContainer);
-    expect(
-      _chipColor(tester, 'Auto'),
-      context.raisedSurfaceLevel.colorOf(colorScheme),
-    );
+    Color? color(String label) => tester.widget<Text>(find.text(label)).style?.color;
+    expect(color('DIRECT'), NetworkTone.direct.of(context));
+    expect(color('REJECT'), NetworkTone.reject.of(context));
+    expect(color('HK 01'), NetworkTone.proxy.of(context));
+    expect(color('Auto'), NetworkTone.inactive.of(context));
   });
 
   testWidgets('speeds are coloured only while traffic flows', (tester) async {
@@ -93,7 +83,7 @@ void main() {
       }
       return true;
     });
-    final colorScheme = tester.element(find.byType(Text).first).colorScheme;
-    expect(colors, [colorScheme.onSurfaceVariant, colorScheme.primary]);
+    final context = tester.element(find.byType(Text).first);
+    expect(colors, [NetworkTone.inactive.of(context), NetworkTone.download.of(context)]);
   });
 }

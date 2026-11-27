@@ -1,3 +1,4 @@
+import 'package:fl_clash/ui/network_palette.dart';
 import 'dart:math';
 
 import 'package:fl_clash/common/common.dart';
@@ -79,14 +80,14 @@ List<RecordColumn<TrackerInfo>> trackerInfoColumns(
         appLocalizations.download,
         (info) => info.downloadSpeed ?? 0,
         perSecond: true,
-        activeColor: (colorScheme) => colorScheme.primary,
+        activeTone: NetworkTone.download,
       ),
       _amountColumn(
         'uploadSpeed',
         appLocalizations.upload,
         (info) => info.uploadSpeed ?? 0,
         perSecond: true,
-        activeColor: (colorScheme) => colorScheme.tertiary,
+        activeTone: NetworkTone.upload,
       ),
     ],
     if (isLive && wide) ...[
@@ -145,18 +146,16 @@ RecordColumn<TrackerInfo> _amountColumn(
   int Function(TrackerInfo info) amountOf, {
   double width = 100,
   bool perSecond = false,
-  Color Function(ColorScheme colorScheme)? activeColor,
+  NetworkTone? activeTone,
 }) {
   return RecordColumn(
     TableColumn(id, label, width: width, end: true),
     cell: (context, info) {
       final amount = amountOf(info);
       final text = perSecond ? '${amount.traffic.show}/s' : amount.traffic.show;
-      if (activeColor != null && amount > 0) {
-        return Text(
-          text,
-          style: TextStyle(color: activeColor(context.colorScheme)),
-        );
+      if (activeTone != null) {
+        final tone = amount > 0 ? activeTone : NetworkTone.inactive;
+        return Text(text, style: TextStyle(color: tone.of(context)));
       }
       return RecordCellText(text, muted: perSecond && amount == 0);
     },

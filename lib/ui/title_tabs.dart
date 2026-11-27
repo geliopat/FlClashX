@@ -30,44 +30,32 @@ class PageTitleTabs extends StatelessWidget {
             for (var index = 0; index < labels.length; index++)
               Semantics(
                 selected: index == selectedIndex,
-                child: FilledButton(
-                  style: FilledButton.styleFrom(
+                child: TextButton(
+                  style: TextButton.styleFrom(
                     backgroundColor: Colors.transparent,
+                    overlayColor: Colors.transparent,
                     foregroundColor: index == selectedIndex
-                        ? colors.onSurface
-                        : colors.onSurfaceVariant,
+                        ? colors.primary : colors.onSurfaceVariant,
                     padding: const EdgeInsets.symmetric(horizontal: 10),
                     minimumSize: const Size(0, 40),
                     elevation: 0,
+                  ).copyWith(
+                    textStyle: WidgetStateProperty.resolveWith((states) {
+                      final color = index == selectedIndex
+                          ? colors.primary : colors.onSurfaceVariant;
+                      return AppTextStyle.headline.of(
+                        context, emphasized: index == selectedIndex,
+                      ).copyWith(
+                        color: color,
+                        shadows: states.contains(WidgetState.hovered) ||
+                                states.contains(WidgetState.focused)
+                            ? [Shadow(color: colors.primary, blurRadius: 6)]
+                            : const [],
+                      );
+                    }),
                   ),
                   onPressed: () => onSelected(index),
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      border: Border(
-                        bottom: BorderSide(
-                          width: 2,
-                          color: index == selectedIndex
-                              ? colors.primary
-                              : Colors.transparent,
-                        ),
-                      ),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 6),
-                      child: Text(
-                        labels[index],
-                        maxLines: 1,
-                        style: AppTextStyle.headline.of(
-                          context,
-                          emphasized: index == selectedIndex,
-                        ).copyWith(
-                          color: index == selectedIndex
-                              ? colors.onSurface
-                              : colors.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                  ),
+                  child: Text(labels[index], maxLines: 1),
                 ),
               ),
           ],
