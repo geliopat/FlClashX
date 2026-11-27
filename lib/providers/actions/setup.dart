@@ -765,10 +765,10 @@ class SetupAction extends _$SetupAction {
     final hasScript = scriptContent?.isNotEmpty == true;
     // Chains build on the profile's own proxies and groups, which a base
     // leaves out for the Core to merge back in.
-    final profileBase =
-        !isCustom && !hasScript && setupState.proxyChains.isEmpty
+    final sourceBase = !isCustom && (system.isWindows || (!hasScript && setupState.proxyChains.isEmpty))
         ? await _core.getProfileBase(profileId)
         : null;
+    final profileBase = !hasScript && setupState.proxyChains.isEmpty ? sourceBase : null;
     Map<String, dynamic> rawConfig = isCustom
         ? {
             'proxies': appProxiesPayload(
@@ -806,7 +806,10 @@ class SetupAction extends _$SetupAction {
         profilesPath: directory,
         profileId: profileId,
         rawConfig: rawConfig,
-        realPatchConfig: patchConfig,
+        realPatchConfig: system.isWindows && !isCustom
+            ? withProfileGeoUrls(patchConfig, hasScript
+                ? rawConfig['geox-url'] : sourceBase?.base.sourceSettings['geox-url'])
+            : patchConfig,
         overrides: setupState.overrides,
         bypassPrivateRoute: networkSetting.bypassPrivateRoute,
         keepEmptyDnsOverrides: setupState.profileType != ProfileType.custom,

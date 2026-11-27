@@ -477,6 +477,10 @@ class _GeoResourceItem extends ConsumerWidget {
     final url = ref.watch(
       patchClashConfigProvider.select((state) => state.geoXUrl[type]),
     );
+    final sources = ref.watch(yamlSectionSourcesProvider);
+    final supplied = sources?.profileId == ref.watch(currentProfileIdProvider)
+        ? profileGeoUrls(sources?.explicit['geox-url'])[type] : null;
+    final locked = system.isWindows && supplied != null;
     return _FileInfoBuilder(
       source: type,
       updatingKey: type.updatingKey,
@@ -484,7 +488,7 @@ class _GeoResourceItem extends ConsumerWidget {
       load: () => _geoFileInfo(type),
       builder: (context, fileInfo, pending) => _ResourceItem(
         title: type.name,
-        url: url,
+        url: locked ? supplied : url,
         chip: fileInfo?.size.traffic.show,
         lastUpdateTime: fileInfo?.lastModified,
         pending: pending,
@@ -492,7 +496,7 @@ class _GeoResourceItem extends ConsumerWidget {
         onSync: () => ref
             .read(geoResourceActionProvider.notifier)
             .updateGeoResource(type),
-        onEdit: url == null ? null : () => _updateUrl(context, ref, url),
+        onEdit: locked || url == null ? null : () => _updateUrl(context, ref, url),
       ),
     );
   }

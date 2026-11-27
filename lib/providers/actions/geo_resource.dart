@@ -110,6 +110,11 @@ class GeoResourceAction extends _$GeoResourceAction {
   }
 
   void updateGeoResourceUrl(GeoResource geoResource, String newUrl) {
+    final sources = ref.read(yamlSectionSourcesProvider);
+    if (system.isWindows && sources?.profileId == ref.read(currentProfileIdProvider) &&
+        profileGeoUrls(sources?.explicit['geox-url']).containsKey(geoResource)) {
+      throw StateError('This resource source is defined by the subscription');
+    }
     if (!newUrl.isUrl) {
       throw ArgumentError.value(newUrl, 'newUrl', 'Not a valid URL');
     }

@@ -2242,6 +2242,9 @@ extension PatchClashConfigExt on PatchClashConfig {
     unifiedDelay: defaultClashConfig.unifiedDelay,
     geoAutoUpdate: defaultClashConfig.geoAutoUpdate,
     geoUpdateInterval: defaultClashConfig.geoUpdateInterval,
-    geoXUrl: defaultClashConfig.geoXUrl,
+    // On Windows resource source changes require a complete profile build.
+    // A live patch cannot distinguish the previous applied subscription from
+    // a newly selected one.
+    geoXUrl: system.isWindows ? geoXUrl : defaultClashConfig.geoXUrl,
   );
 }

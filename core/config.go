@@ -398,8 +398,12 @@ func updateConfig(params *UpdateParams) error {
 		skipCertVerify.Store(*params.SkipCertVerify)
 	}
 	updateListeners(currentConfig)
-	for geoType, link := range params.GeoXUrl {
-		setGeoResourceUrl(geoType, link)
+	// Windows resolves resource sources during full profile setup. Never
+	// replace the applied profile's URLs via an unrelated live settings patch.
+	if runtime.GOOS != "windows" {
+		for geoType, link := range params.GeoXUrl {
+			setGeoResourceUrl(geoType, link)
+		}
 	}
 	syncGeoUpdater(params.GeoAutoUpdate, params.GeoUpdateInterval)
 	if routeChange != routeUnchanged {

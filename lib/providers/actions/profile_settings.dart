@@ -127,13 +127,18 @@ class ProfileSettingsAction extends _$ProfileSettingsAction {
     ref
         .read(patchClashConfigProvider.notifier)
         .update(
-          (state) => keepOwnedSettings(
-            state,
-            keepOwnedSettings(defaultClashConfig,
-              syncProfileSettings(state, base.config, base.present, modes: modes),
-              resetMissing),
-            kept,
-          ),
+          (state) {
+            final merged = keepOwnedSettings(
+              state,
+              keepOwnedSettings(defaultClashConfig,
+                syncProfileSettings(state, base.config, base.present, modes: modes),
+                resetMissing),
+              kept,
+            );
+            return system.isWindows
+                ? withProfileGeoUrls(merged, base.sourceSettings['geox-url'])
+                : merged;
+          },
         );
     if (!kept.contains(clashSettingKey('authentication'))) {
       ref

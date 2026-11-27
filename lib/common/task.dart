@@ -159,7 +159,10 @@ Future<RealProfile> _makeRealProfileTask(MakeRealProfileState data) async {
     }
     for (final name in providers.keys) {
       final provider = providers[name];
-      if (provider is! Map || provider['type'] == 'inline') {
+      if (provider is! Map || provider['type'] == 'inline' ||
+          (Platform.isWindows && provider['type'] == 'file')) {
+        // A file provider's path identifies the actual source, not an HTTP
+        // cache slot. Leave it to the core's safe-path validation.
         continue;
       }
       // Two providers may share a URL and differ only by header.

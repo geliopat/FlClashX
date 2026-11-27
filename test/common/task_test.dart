@@ -205,6 +205,11 @@ void main() {
       expect(config['mixed-port'], 7893);
       expect(config['allow-lan'], true);
       expect(config['global-ua'], 'FlClash-Test');
+      expect(config['proxy-providers']['remote']['url'], 'https://example.com/proxy.yaml');
+      expect(config['rule-providers']['remote']['url'], 'https://example.com/rule.yaml');
+      if (Platform.isWindows) {
+        expect(config['proxy-providers']['file']['path'], './local.yaml');
+      }
       expect(config['profile']['store-selected'], false);
       expect(
         config['dns']['nameserver'],

@@ -127,7 +127,7 @@ func sourceSettings(buf []byte) map[string]any {
 	if err != nil {
 		return result
 	}
-	for _, key := range []string{"dns", "tun", "sniffer", "ntp", "experimental", "profile", "inbound-tfo", "inbound-mptcp", "lan-allowed-ips", "lan-disallowed-ips", "bind-address", "geodata-mode", "geosite-matcher", "global-client-fingerprint", "etag-support"} {
+	for _, key := range []string{"dns", "tun", "sniffer", "ntp", "experimental", "profile", "inbound-tfo", "inbound-mptcp", "lan-allowed-ips", "lan-disallowed-ips", "bind-address", "geodata-mode", "geosite-matcher", "global-client-fingerprint", "etag-support", "geox-url"} {
 		node := mappingValue(root, key)
 		if node == nil {
 			continue

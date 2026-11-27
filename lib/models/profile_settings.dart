@@ -156,7 +156,7 @@ PatchClashConfig syncProfileSettings(
     next = next.copyWith(
       geoXUrl: {
         for (final resource in GeoResource.values)
-          resource: switch (geoXUrl[resource.jsonKey]) {
+          resource: switch (geoXUrl[resource.jsonKey] ?? geoXUrl[resource.legacyJsonKey]) {
             final String url when url.isNotEmpty => url,
             _ => next.geoXUrl[resource] ?? defaultGeoXUrl[resource]!,
           },
@@ -204,9 +204,31 @@ extension on GeoResource {
   String get jsonKey => switch (this) {
     GeoResource.MMDB => 'mmdb',
     GeoResource.ASN => 'asn',
+    GeoResource.GEOIP => 'geo-ip',
+    GeoResource.GEOSITE => 'geo-site',
+  };
+  String get legacyJsonKey => switch (this) {
     GeoResource.GEOIP => 'geoip',
     GeoResource.GEOSITE => 'geosite',
+    _ => jsonKey,
   };
+}
+
+/// Resource URLs explicitly supplied by a subscription must not be replaced
+/// by an app default or a remembered override. Missing entries may use the
+/// app's configured source. Empty URL values do not name a resource.
+Map<GeoResource, String> profileGeoUrls(Object? raw) => {
+  if (raw is Map)
+    for (final resource in GeoResource.values)
+      if ((raw[resource.jsonKey] ?? raw[resource.legacyJsonKey]) case final String url when url.trim().isNotEmpty)
+        resource: url,
+};
+
+PatchClashConfig withProfileGeoUrls(PatchClashConfig patch, Object? raw) {
+  final supplied = profileGeoUrls(raw);
+  return supplied.isEmpty ? patch : patch.copyWith(
+    geoXUrl: {...patch.geoXUrl, ...supplied},
+  );
 }
 
  

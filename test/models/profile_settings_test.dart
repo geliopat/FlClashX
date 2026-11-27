@@ -32,6 +32,20 @@ const _tuned = PatchClashConfig(
 );
 
 void main() {
+  test('explicit resource URLs outrank previously owned values and use canonical keys', () {
+    final patch = PatchClashConfig(geoXUrl: {
+      ...defaultGeoXUrl, GeoResource.GEOIP: 'https://old.example/geo.dat',
+    });
+    final next = withProfileGeoUrls(patch, {
+      'geo-ip': 'https://subscription.example/geo.dat',
+      'geo-site': 'https://subscription.example/site.dat',
+    });
+    expect(next.geoXUrl[GeoResource.GEOIP], 'https://subscription.example/geo.dat');
+    expect(next.geoXUrl[GeoResource.GEOSITE], 'https://subscription.example/site.dat');
+    expect(next.geoXUrl[GeoResource.MMDB], patch.geoXUrl[GeoResource.MMDB]);
+    expect(profileGeoUrls({'geoip': 'https://legacy.example/geo.dat'})[GeoResource.GEOIP],
+      'https://legacy.example/geo.dat');
+  });
   test(
     'a profile naming nothing leaves the sticky keys and resets the rest',
     () {
