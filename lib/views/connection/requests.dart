@@ -26,6 +26,7 @@ class RequestsView extends ConsumerStatefulWidget {
 class _RequestsViewState extends ConsumerState<RequestsView>
     with RouteMotionHoldMixin<RequestsView> {
   final _listController = TrackerInfoListController();
+  bool _pageActive = false;
   late final ScrollController _scrollController;
   late final _physics = FollowEndScrollPhysics(
     isFollowing: () => _listController.value.autoScrollToEnd,
@@ -42,8 +43,19 @@ class _RequestsViewState extends ConsumerState<RequestsView>
       _,
       _,
     ) {
-      updateRequestsThrottler();
+      if (_pageActive) updateRequestsThrottler();
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final active = PageActivityScope.isActiveOf(context);
+    if (active == _pageActive) return;
+    _pageActive = active;
+    // Keep the list controller and its state, but catch up with the
+    // shared request history only when the feed becomes visible.
+    if (active) updateRequestsThrottler();
   }
 
   @override
@@ -57,11 +69,14 @@ class _RequestsViewState extends ConsumerState<RequestsView>
 
   void updateRequestsThrottler() {
     throttler.call((FunctionTag.requests, this), () {
-      if (!mounted) {
+      if (!mounted || !_pageActive) {
         return;
       }
       updateWhenRouteSettled(
-        () => _listController.setTrackerInfos(ref.read(requestsProvider).list),
+        () {
+          if (!mounted || !_pageActive) return;
+          _listController.setTrackerInfos(ref.read(requestsProvider).list);
+        },
       );
     }, duration: renderThrottleDuration);
   }
