@@ -27,7 +27,18 @@ switch ($env:FLCLASHZ_STARTUP_OPERATION) {
   'enable' {
     $exe = $env:FLCLASHZ_STARTUP_EXE
     if (!(Test-Path -LiteralPath $exe -PathType Leaf)) { throw 'Executable missing' }
-    $action = New-ScheduledTaskAction -Execute $exe -WorkingDirectory ([IO.Path]::GetDirectoryName($exe))
+    $dir = [IO.Path]::GetDirectoryName($exe)
+    if ($null -ne $task -and $task.State -ne 'Disabled' -and
+        @($task.Actions).Count -eq 1 -and $task.Actions[0].Execute -eq $exe -and
+        $task.Actions[0].WorkingDirectory -eq $dir -and !$task.Actions[0].Arguments -and
+        $task.Principal.RunLevel -eq 'Limited' -and
+        $task.Settings.RestartCount -eq 3 -and
+        $task.Settings.RestartInterval -eq 'PT1M' -and
+        @($task.Triggers).Count -eq 1 -and $task.Triggers[0].Delay -eq 'PT10S') {
+      'ok'
+      break
+    }
+    $action = New-ScheduledTaskAction -Execute $exe -WorkingDirectory $dir
     $trigger = New-ScheduledTaskTrigger -AtLogOn -User $sid
     $trigger.Delay = 'PT10S'
     $principal = New-ScheduledTaskPrincipal -UserId $sid -LogonType Interactive -RunLevel Limited
