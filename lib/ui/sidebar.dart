@@ -252,8 +252,8 @@ class _SidebarOverlay extends StatelessWidget {
               child: FocusScope(
                 autofocus: true,
                 child: Material(
-                  color: colorScheme.chromeSurface,
-                  elevation: 8,
+                  color: colorScheme.chromeSurface.withValues(alpha: 1),
+                  elevation: Theme.of(context).platform == TargetPlatform.windows ? 0 : 8,
                   shadowColor: colorScheme.shadow,
                   child: AnimatedBuilder(
                     animation: progress,

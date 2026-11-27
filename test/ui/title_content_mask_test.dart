@@ -1,4 +1,7 @@
+import 'dart:ui' as ui;
+
 import 'package:fl_clash/ui/title_content_mask.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -15,6 +18,30 @@ void main() {
     final rtl = titleMaskExtent(body, const Rect.fromLTWH(879, 18, 71, 28), TextDirection.rtl);
     expect(rtl.width, a.width);
     expect(rtl.right, body.right);
+  });
+  testWidgets('mask reveals the real background, not a new colored scrim', (tester) async {
+    final boundary = GlobalKey();
+    await tester.pumpWidget(MaterialApp(home: Center(child: RepaintBoundary(
+      key: boundary,
+      child: SizedBox(width: 250, height: 120, child: Stack(
+        fit: StackFit.expand,
+        children: [
+          const ColoredBox(color: Color(0xFF0000FF)),
+          const TitleContentMask(
+            title: Rect.fromLTWH(50, 18, 71, 28),
+            child: ColoredBox(color: Color(0xFFFF0000)),
+          ),
+        ],
+      )),
+    ))));
+    final render = boundary.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+    final image = await render.toImage(pixelRatio: 1);
+    final bytes = (await image.toByteData(format: ui.ImageByteFormat.rawRgba))!;
+    int channel(int x, int y, int c) => bytes.getUint8((y * image.width + x) * 4 + c);
+    expect(channel(10, 10, 2), greaterThan(240));
+    expect(channel(80, 32, 2), greaterThan(240));
+    expect(channel(200, 32, 0), greaterThan(240));
+    image.dispose();
   });
   testWidgets('mask keeps its content mounted across anchor changes', (tester) async {
     final anchor = ValueNotifier<Rect?>(null);

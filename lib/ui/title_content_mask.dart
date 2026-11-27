@@ -27,7 +27,7 @@ class TitleContentMask extends StatelessWidget {
 Rect titleMaskExtent(Rect bounds, Rect title, TextDirection direction) {
   final distance = direction == TextDirection.ltr
       ? title.right - bounds.left : bounds.right - title.left;
-  final width = math.min(bounds.width, math.max(0.0, distance + 26));
+  final width = math.min(bounds.width, math.max(0.0, distance + math.max(26.0, distance * .14)));
   final height = math.min(bounds.height, math.max(65.0, title.bottom - bounds.top + 14));
   return direction == TextDirection.ltr
       ? Rect.fromLTWH(bounds.left, bounds.top, width, height)
@@ -48,7 +48,7 @@ ui.Shader titleContentShader(Rect bounds, Rect? title, TextDirection direction) 
   // The solid part protects the title; the outer ring eases into content.
   final cy = title.center.dy.clamp(area.top, area.bottom).toDouble();
   final cx = direction == TextDirection.ltr ? area.left : area.right;
-  final ry = math.max(cy - area.top, area.bottom - cy) + 6;
+  final ry = math.max(cy - area.top, area.bottom - cy) / .9;
   final matrix = Float64List.fromList([
     area.width, 0, 0, 0,
     0, ry, 0, 0,
@@ -59,7 +59,7 @@ ui.Shader titleContentShader(Rect bounds, Rect? title, TextDirection direction) 
     Offset.zero, 1,
     const [Color(0xFF000000), Color(0xFF000000), Color(0xB8000000),
       Color(0x40000000), Colors.transparent],
-    const [0, .73, .83, .94, 1],
+    const [0, .88, .93, .97, 1],
     TileMode.clamp, matrix,
   );
 }
