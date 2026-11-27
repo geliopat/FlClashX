@@ -31,6 +31,7 @@ class AcrylicMenu {
   static LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wp,
                                     LPARAM lp);
   LRESULT Handle(HWND window, UINT message, WPARAM wp, LPARAM lp);
+  bool RenderFrame();
   void Paint(HWND window);
   void Select(int index);
   void MoveSelection(int direction);

@@ -10,13 +10,11 @@
 #include <limits>
 #include <dwmapi.h>
 #include <objidl.h>
-#include <gdiplus.h>
 #include <shellscalingapi.h>
 #include <windowsx.h>
 
 namespace tray {
 namespace {
-using namespace Gdiplus;
 using Microsoft::WRL::ComPtr;
 
 constexpr wchar_t kClassName[] = L"FlClashZ.AcrylicTrayMenu";
@@ -89,90 +87,97 @@ bool ApplyAcrylic(HWND window, SetCompositionFn set_composition) {
   return set_composition(window, &data) != FALSE;
 }
 
-void RoundFill(Graphics& graphics, const RectF& r, REAL radius, Color color) {
-  const REAL d = radius * 2;
-  GraphicsPath path;
-  path.AddArc(r.X, r.Y, d, d, 180, 90);
-  path.AddArc(r.GetRight() - d, r.Y, d, d, 270, 90);
-  path.AddArc(r.GetRight() - d, r.GetBottom() - d, d, d, 0, 90);
-  path.AddArc(r.X, r.GetBottom() - d, d, d, 90, 90);
-  path.CloseFigure();
-  SolidBrush brush(color);
-  graphics.FillPath(&brush, &path);
+// All geometry is built in physical pixels, at a 96-DPI render target.
+float SnapStroke(float value, float stroke) {
+  const float phase = std::fmod(stroke, 2.0f) * 0.5f;
+  return std::round(value - phase) + phase;
 }
 
-void DrawIcon(Graphics& graphics, const AcrylicRow& row, REAL x, REAL y,
-              REAL size, Color color) {
-  if (row.icon.empty() && !row.checked) return;
-  // Build every glyph in the same design space, then center its actual
-  // outline rather than assuming that its hand-drawn coordinates are centered.
-  GraphicsPath path;
+float IconStroke(float size) {
+  return (std::max)(1.0f, std::round(1.3f * size / 16.0f));
+}
+
+// A common 16-unit vector grid, with balanced optical bounds and equal stroke
+// weight. Snap each control point rather than translating a rasterized icon.
+HRESULT CreateIconGeometry(ID2D1Factory* factory, const AcrylicRow& row,
+                           float x, float y, float size, float stroke,
+                           ID2D1PathGeometry** result) {
+  if (row.icon.empty() && !row.checked) return S_OK;
+  if (!row.checked && row.icon != "show" && row.icon != "start" &&
+      row.icon != "stop" && row.icon != "restart" && row.icon != "exit")
+    return S_OK;
+
+  ComPtr<ID2D1PathGeometry> path;
+  HRESULT hr = factory->CreatePathGeometry(path.GetAddressOf());
+  if (FAILED(hr)) return hr;
+  ComPtr<ID2D1GeometrySink> sink;
+  hr = path->Open(sink.GetAddressOf());
+  if (FAILED(hr)) return hr;
+  const float scale = size / 16.0f;
+  const auto point = [&](float px, float py) {
+    return D2D1::Point2F(SnapStroke(x + px * scale, stroke),
+                         SnapStroke(y + py * scale, stroke));
+  };
+  const auto begin = [&](float px, float py) {
+    sink->BeginFigure(point(px, py), D2D1_FIGURE_BEGIN_HOLLOW);
+  };
+  const auto line = [&](float px, float py) { sink->AddLine(point(px, py)); };
+  const auto end = [&](bool closed = false) {
+    sink->EndFigure(closed ? D2D1_FIGURE_END_CLOSED : D2D1_FIGURE_END_OPEN);
+  };
   if (row.checked) {
-    const PointF points[] = {{2, 8}, {6, 12}, {14, 4}};
-    path.AddLines(points, 3);
+    begin(2, 8); line(6, 12); line(14, 4); end();
   } else if (row.icon == "show") {
-    path.AddRectangle(RectF(1.5f, 2.5f, 13.0f, 11.0f));
-    path.StartFigure();
-    path.AddLine(1.5f, 5.5f, 14.5f, 5.5f);
+    begin(2, 3); line(14, 3); line(14, 13); line(2, 13); end(true);
+    begin(2, 6); line(14, 6); end();
   } else if (row.icon == "start") {
-    const PointF points[] = {{4, 2}, {13, 8}, {4, 14}};
-    path.AddPolygon(points, 3);
+    begin(3, 2); line(13, 8); line(3, 14); end(true);
   } else if (row.icon == "stop") {
-    path.AddRectangle(RectF(3.0f, 3.0f, 10.0f, 10.0f));
+    begin(2, 2); line(14, 2); line(14, 14); line(2, 14); end(true);
   } else if (row.icon == "restart") {
-    // Clockwise reload arrow: the arrowhead meets the arc endpoint at 330°.
-    path.AddArc(2.0f, 2.0f, 12.0f, 12.0f, 15.0f, 315.0f);
-    path.StartFigure();
-    const PointF points[] = {{13.2f, 1.3f}, {13.2f, 5.0f}, {9.5f, 5.0f}};
-    path.AddLines(points, 3);
+    // The clockwise circular arc and arrowhead share the same endpoint.
+    const auto tip = point(13.196f, 5.0f);
+    begin(14, 8);
+    sink->AddArc(D2D1::ArcSegment(tip, D2D1::SizeF(6 * scale, 6 * scale),
+        0.0f, D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_LARGE));
+    end();
+    begin(13.196f, 1.8f); line(13.196f, 5); line(9.8f, 5); end();
   } else if (row.icon == "exit") {
-    const PointF door[] = {{6, 2}, {2, 2}, {2, 14}, {6, 14}};
-    path.AddLines(door, 4);
-    path.StartFigure();
-    path.AddLine(5.0f, 8.0f, 14.0f, 8.0f);
-    path.StartFigure();
-    const PointF arrow[] = {{10, 4}, {14, 8}, {10, 12}};
-    path.AddLines(arrow, 3);
-  } else {
-    return;
+    begin(6, 2); line(2, 2); line(2, 14); line(6, 14); end();
+    begin(5, 8); line(14, 8); end();
+    begin(10, 4); line(14, 8); line(10, 12); end();
   }
-
-  // Normalize the longest dimension without distorting the aspect ratio.
-  // Transform the path, not the pen, to keep the stroke weight identical.
-  RectF bounds;
-  if (path.GetBounds(&bounds) != Ok) return;
-  const REAL extent = (std::max)(bounds.Width, bounds.Height);
-  if (extent <= 0.0f) return;
-  const REAL factor = 12.0f / extent;
-  Matrix normalize;
-  normalize.Translate(8.0f, 8.0f);
-  normalize.Scale(factor, factor);
-  normalize.Translate(-(bounds.X + bounds.Width / 2.0f),
-                      -(bounds.Y + bounds.Height / 2.0f));
-  if (path.Transform(&normalize) != Ok) return;
-
-  const auto saved = graphics.Save();
-  graphics.TranslateTransform(x, y);
-  graphics.ScaleTransform(size / 16.0f, size / 16.0f);
-  Pen pen(color, 1.3f);
-  pen.SetLineJoin(LineJoinRound);
-  pen.SetStartCap(LineCapRound);
-  pen.SetEndCap(LineCapRound);
-  graphics.DrawPath(&pen, &path);
-  graphics.Restore(saved);
+  hr = sink->Close();
+  if (FAILED(hr)) return hr;
+  *result = path.Detach();
+  return S_OK;
 }
+
+struct ComScope {
+  HRESULT result = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+  ~ComScope() { if (SUCCEEDED(result)) CoUninitialize(); }
+  bool valid() const { return SUCCEEDED(result) || result == RPC_E_CHANGED_MODE; }
+};
 }  // namespace
 
 struct AcrylicMenu::Render {
-  ULONG_PTR token = 0;
-  std::vector<BYTE> text_pixels;
-  Render() {
-    GdiplusStartupInput input;
-    if (GdiplusStartup(&token, &input, nullptr) != Ok) token = 0;
-  }
-  ~Render() {
-    if (token) GdiplusShutdown(token);
-  }
+  struct Row {
+    ComPtr<IDWriteTextLayout> label;
+    ComPtr<IDWriteTextLayout> detail;
+    ComPtr<ID2D1PathGeometry> icon;
+    D2D1_POINT_2F label_origin{};
+    D2D1_POINT_2F detail_origin{};
+  };
+
+  // Declare COM scope first so every COM object is released before uninit.
+  ComScope com;
+  ComPtr<IWICImagingFactory> wic;
+  ComPtr<ID2D1Factory> d2d;
+  ComPtr<ID2D1StrokeStyle> stroke_style;
+  std::vector<Row> rows;
+  std::vector<BYTE> pixels;
+  int painted_hover = -2;
+  int painted_pressed = -2;
 };
 
 AcrylicMenu::AcrylicMenu() = default;
@@ -188,8 +193,6 @@ bool AcrylicMenu::Open(HWND owner, POINT anchor,
   Close();
   const auto acrylic = AcrylicApi();
   if (!acrylic || rows.empty()) return false;
-  if (!render_) render_ = std::make_unique<Render>();
-  if (!render_->token) return false;
   const HMONITOR monitor = MonitorFromPoint(anchor, MONITOR_DEFAULTTONEAREST);
   MONITORINFO info{};
   info.cbSize = sizeof(info);
@@ -212,7 +215,7 @@ bool AcrylicMenu::Open(HWND owner, POINT anchor,
   ComPtr<IDWriteTextFormat> format;
   // Layout and rendering both use physical pixels at a 96-DPI render target.
   if (FAILED(write->CreateTextFormat(family, fonts.Get(),
-      DWRITE_FONT_WEIGHT_MEDIUM, DWRITE_FONT_STYLE_NORMAL,
+      DWRITE_FONT_WEIGHT_REGULAR, DWRITE_FONT_STYLE_NORMAL,
       DWRITE_FONT_STRETCH_NORMAL, 14.0f * static_cast<float>(dpi_) / 96.0f,
       L"", format.GetAddressOf()))) return false;
   if (FAILED(format->SetWordWrapping(DWRITE_WORD_WRAPPING_NO_WRAP)) ||
@@ -256,84 +259,64 @@ bool AcrylicMenu::Open(HWND owner, POINT anchor,
     bounds_.push_back(RECT{Scale(kPadding), top, width_ - Scale(kPadding), bottom});
     top = bottom;
   }
-  // Text does not change on hover. Rasterize once, before opening the window.
-  // Keep the existing GDI+ icons, highlights and acrylic composition untouched.
-  // WIC requires COM on this thread; balance successful initialization only.
-  struct ComScope {
-    HRESULT result = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
-    ~ComScope() { if (SUCCEEDED(result)) CoUninitialize(); }
-  } com;
-  if (FAILED(com.result) && com.result != RPC_E_CHANGED_MODE) return false;
-  ComPtr<IWICImagingFactory> wic;
+  // Cache layouts and vector geometries for the lifetime of this popup.
+  // Every frame is composed by Direct2D/DirectWrite into one PBGRA bitmap.
+  auto render = std::make_unique<Render>();
+  if (!render->com.valid()) return false;
   if (FAILED(CoCreateInstance(CLSID_WICImagingFactory, nullptr,
-      CLSCTX_INPROC_SERVER, IID_PPV_ARGS(wic.GetAddressOf())))) return false;
-  ComPtr<IWICBitmap> text_bitmap;
-  if (FAILED(wic->CreateBitmap(static_cast<UINT>(width_),
-      static_cast<UINT>(height_), GUID_WICPixelFormat32bppPBGRA,
-      WICBitmapCacheOnLoad, text_bitmap.GetAddressOf()))) return false;
-  ComPtr<ID2D1Factory> d2d;
+      CLSCTX_INPROC_SERVER, IID_PPV_ARGS(render->wic.GetAddressOf())))) return false;
   if (FAILED(D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED,
-                              d2d.GetAddressOf()))) return false;
-  ComPtr<ID2D1RenderTarget> target;
-  const auto properties = D2D1::RenderTargetProperties(
-      D2D1_RENDER_TARGET_TYPE_SOFTWARE,
-      D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM,
-                       D2D1_ALPHA_MODE_PREMULTIPLIED), 96.0f, 96.0f);
-  if (FAILED(d2d->CreateWicBitmapRenderTarget(text_bitmap.Get(),
-      properties, target.GetAddressOf()))) return false;
-  target->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE);
-  ComPtr<ID2D1SolidColorBrush> text_brush;
-  if (FAILED(target->CreateSolidColorBrush(
-      D2D1::ColorF(D2D1::ColorF::White), text_brush.GetAddressOf()))) return false;
-  const auto draw = [&](const std::wstring& text, float x, float y,
-                        float width, float height, bool trailing, float alpha) {
+                              render->d2d.GetAddressOf()))) return false;
+  const auto stroke_properties = D2D1::StrokeStyleProperties(
+      D2D1_CAP_STYLE_ROUND, D2D1_CAP_STYLE_ROUND, D2D1_CAP_STYLE_ROUND,
+      D2D1_LINE_JOIN_ROUND);
+  if (FAILED(render->d2d->CreateStrokeStyle(stroke_properties, nullptr, 0,
+      render->stroke_style.GetAddressOf()))) return false;
+  const auto layout = [&](const std::wstring& text, float width, float height,
+                          bool trailing, IDWriteTextLayout** result) {
     if (text.empty()) return true;
     if (width <= 0.0f || height <= 0.0f) return false;
-    ComPtr<IDWriteTextLayout> layout;
+    ComPtr<IDWriteTextLayout> value;
     if (FAILED(write->CreateTextLayout(text.c_str(),
         static_cast<UINT32>(text.size()), format.Get(), width, height,
-        layout.GetAddressOf())) ||
-        FAILED(layout->SetTextAlignment(trailing ? DWRITE_TEXT_ALIGNMENT_TRAILING
+        value.GetAddressOf())) ||
+        FAILED(value->SetTextAlignment(trailing ? DWRITE_TEXT_ALIGNMENT_TRAILING
                                                  : DWRITE_TEXT_ALIGNMENT_LEADING)))
       return false;
-    text_brush->SetOpacity(alpha);
-    target->DrawTextLayout(D2D1::Point2F(x, y), layout.Get(), text_brush.Get());
+    *result = value.Detach();
     return true;
   };
-  target->BeginDraw();
-  target->Clear(D2D1::ColorF(0.0f, 0.0f, 0.0f, 0.0f));
-  bool text_ok = true;
-  for (size_t i = 0; i < rows_.size() && text_ok; ++i) {
+  render->rows.resize(rows_.size());
+  for (size_t i = 0; i < rows_.size(); ++i) {
     const auto& row = rows_[i];
     if (row.separator) continue;
     const auto& rect = bounds_[i];
+    auto& visual = render->rows[i];
     const float x = static_cast<float>(rect.left + Scale(kInset) +
                                        Scale(kIcon + kGap));
     const float y = static_cast<float>(rect.top);
     const float h = static_cast<float>(rect.bottom - rect.top);
     const float label_width = static_cast<float>(label_width_ + Scale(2));
-    text_ok = draw(row.label, x, y, label_width, h, false,
-                   row.enabled ? 1.0f : 115.0f / 255.0f);
-    if (text_ok && !row.detail.empty()) {
+    visual.label_origin = D2D1::Point2F(x, y);
+    if (!layout(row.label, label_width, h, false,
+                visual.label.GetAddressOf())) return false;
+    if (!row.detail.empty()) {
       const float detail_x = x + static_cast<float>(label_width_ + Scale(kDetailGap));
       const float detail_end = static_cast<float>(rect.right - Scale(kInset));
-      text_ok = draw(row.detail, detail_x, y, detail_end - detail_x, h, true,
-                     row.enabled ? 190.0f / 255.0f : 100.0f / 255.0f);
+      visual.detail_origin = D2D1::Point2F(detail_x, y);
+      if (!layout(row.detail, detail_end - detail_x, h, true,
+                  visual.detail.GetAddressOf())) return false;
     }
+    const float icon = static_cast<float>(Scale(kIcon));
+    if (FAILED(CreateIconGeometry(render->d2d.Get(), row,
+        static_cast<float>(rect.left + Scale(kInset)), y + (h - icon) / 2.0f,
+        icon, IconStroke(icon), visual.icon.GetAddressOf()))) return false;
   }
-  const HRESULT draw_result = target->EndDraw();
-  if (!text_ok || FAILED(draw_result)) return false;
-  // Release the render target before reading the premultiplied text bitmap.
-  text_brush.Reset();
-  target.Reset();
-  const size_t stride = static_cast<size_t>(width_) * 4;
-  const size_t bytes = stride * static_cast<size_t>(height_);
-  if (stride > (std::numeric_limits<UINT>::max)() ||
-      bytes > (std::numeric_limits<UINT>::max)()) return false;
-  render_->text_pixels.resize(bytes);
-  if (FAILED(text_bitmap->CopyPixels(nullptr, static_cast<UINT>(stride),
-      static_cast<UINT>(bytes), render_->text_pixels.data()))) {
-    render_->text_pixels.clear();
+  render_ = std::move(render);
+  // Validate the first frame before showing the window; the caller can still
+  // fall back to the system menu if Direct2D/WIC initialization fails.
+  if (!RenderFrame()) {
+    Close();
     return false;
   }
 
@@ -343,8 +326,10 @@ bool AcrylicMenu::Open(HWND owner, POINT anchor,
   wc.hInstance = instance;
   wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
   wc.lpszClassName = kClassName;
-  if (!RegisterClassW(&wc) && GetLastError() != ERROR_CLASS_ALREADY_EXISTS)
+  if (!RegisterClassW(&wc) && GetLastError() != ERROR_CLASS_ALREADY_EXISTS) {
+    Close();
     return false;
+  }
 
   const int left = (std::clamp)(static_cast<int>(anchor.x) - width_,
       static_cast<int>(info.rcWork.left), static_cast<int>(info.rcWork.right) - width_);
@@ -356,7 +341,10 @@ bool AcrylicMenu::Open(HWND owner, POINT anchor,
   window_ = CreateWindowExW(WS_EX_TOOLWINDOW | WS_EX_TOPMOST, kClassName,
       L"FlClashZ", WS_POPUP, left, y, width_, height_, owner, nullptr,
       instance, this);
-  if (!window_) return false;
+  if (!window_) {
+    Close();
+    return false;
+  }
   if (!ApplyAcrylic(window_, acrylic)) {
     Close();
     return false;
@@ -388,6 +376,7 @@ void AcrylicMenu::Close() {
     if (GetCapture() == old) ReleaseCapture();
     DestroyWindow(old);
   }
+  render_.reset();
 }
 
 int AcrylicMenu::Hit(POINT point) const {
@@ -424,75 +413,114 @@ void AcrylicMenu::MoveSelection(int direction) {
   }
 }
 
+bool AcrylicMenu::RenderFrame() {
+  if (!render_ || width_ <= 0 || height_ <= 0) return false;
+  auto& render = *render_;
+  if (render.painted_hover == hover_ && render.painted_pressed == pressed_)
+    return true;
+
+  const size_t stride = static_cast<size_t>(width_) * 4;
+  const size_t bytes = stride * static_cast<size_t>(height_);
+  if (stride > (std::numeric_limits<UINT>::max)() ||
+      bytes > (std::numeric_limits<UINT>::max)()) return false;
+  ComPtr<IWICBitmap> bitmap;
+  if (FAILED(render.wic->CreateBitmap(static_cast<UINT>(width_),
+      static_cast<UINT>(height_), GUID_WICPixelFormat32bppPBGRA,
+      WICBitmapCacheOnLoad, bitmap.GetAddressOf()))) return false;
+  ComPtr<ID2D1RenderTarget> target;
+  const auto properties = D2D1::RenderTargetProperties(
+      D2D1_RENDER_TARGET_TYPE_SOFTWARE,
+      D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM,
+                       D2D1_ALPHA_MODE_PREMULTIPLIED), 96.0f, 96.0f);
+  if (FAILED(render.d2d->CreateWicBitmapRenderTarget(bitmap.Get(),
+      properties, target.GetAddressOf()))) return false;
+  target->SetAntialiasMode(D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+  target->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE);
+  ComPtr<ID2D1SolidColorBrush> brush;
+  if (FAILED(target->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::White),
+      brush.GetAddressOf()))) return false;
+
+  target->BeginDraw();
+  target->Clear(D2D1::ColorF(0.0f, 0.0f, 0.0f, 0.0f));
+  const float icon_stroke = IconStroke(static_cast<float>(Scale(kIcon)));
+  for (size_t i = 0; i < rows_.size(); ++i) {
+    const auto& row = rows_[i];
+    const auto& visual = render.rows[i];
+    const auto& rect = bounds_[i];
+    const float x = static_cast<float>(rect.left);
+    const float y = static_cast<float>(rect.top);
+    const float right = static_cast<float>(rect.right);
+    const float bottom = static_cast<float>(rect.bottom);
+    const float h = bottom - y;
+    if (row.separator) {
+      brush->SetOpacity(42.0f / 255.0f);
+      const float mid = SnapStroke(y + h / 2.0f, 1.0f);
+      target->DrawLine(D2D1::Point2F(x + Scale(8), mid),
+          D2D1::Point2F(right - Scale(8), mid), brush.Get(), 1.0f);
+      continue;
+    }
+    if (static_cast<int>(i) == hover_) {
+      brush->SetOpacity((pressed_ == hover_ ? 38.0f : 24.0f) / 255.0f);
+      const float radius = static_cast<float>(Scale(5));
+      target->FillRoundedRectangle(D2D1::RoundedRect(
+          D2D1::RectF(x, y, right, bottom), radius, radius), brush.Get());
+    }
+    brush->SetOpacity(row.enabled ? 1.0f : 115.0f / 255.0f);
+    if (visual.icon)
+      target->DrawGeometry(visual.icon.Get(), brush.Get(), icon_stroke,
+                           render.stroke_style.Get());
+    if (visual.label)
+      target->DrawTextLayout(visual.label_origin, visual.label.Get(), brush.Get());
+    if (visual.detail) {
+      brush->SetOpacity((row.enabled ? 190.0f : 100.0f) / 255.0f);
+      target->DrawTextLayout(visual.detail_origin, visual.detail.Get(), brush.Get());
+    }
+  }
+  const HRESULT draw_result = target->EndDraw();
+  if (FAILED(draw_result)) return false;
+  brush.Reset();
+  target.Reset();
+  std::vector<BYTE> pixels(bytes);
+  if (FAILED(bitmap->CopyPixels(nullptr, static_cast<UINT>(stride),
+      static_cast<UINT>(bytes), pixels.data()))) return false;
+  render.pixels.swap(pixels);
+  render.painted_hover = hover_;
+  render.painted_pressed = pressed_;
+  return true;
+}
+
 void AcrylicMenu::Paint(HWND window) {
   PAINTSTRUCT paint{};
   HDC dc = BeginPaint(window, &paint);
   if (!dc) return;
-  BITMAPINFO info{};
-  info.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-  info.bmiHeader.biWidth = width_;
-  info.bmiHeader.biHeight = -height_;
-  info.bmiHeader.biPlanes = 1;
-  info.bmiHeader.biBitCount = 32;
-  info.bmiHeader.biCompression = BI_RGB;
-  void* pixels = nullptr;
-  HBITMAP bitmap = CreateDIBSection(dc, &info, DIB_RGB_COLORS, &pixels, nullptr, 0);
-  HDC memory = CreateCompatibleDC(dc);
-  if (bitmap && memory && pixels) {
-    {
-      Bitmap surface(width_, height_, width_ * 4, PixelFormat32bppPARGB,
-                     static_cast<BYTE*>(pixels));
-      Graphics graphics(&surface);
-      graphics.Clear(Color(0, 0, 0, 0));
-      graphics.SetSmoothingMode(SmoothingModeAntiAlias);
-      for (size_t i = 0; i < rows_.size(); ++i) {
-        const auto& row = rows_[i];
-        const auto& rect = bounds_[i];
-        const REAL x = static_cast<REAL>(rect.left);
-        const REAL y = static_cast<REAL>(rect.top);
-        const REAL w = static_cast<REAL>(rect.right - rect.left);
-        const REAL h = static_cast<REAL>(rect.bottom - rect.top);
-        if (row.separator) {
-          Pen separator(Color(42, 255, 255, 255), 1.0f);
-          graphics.DrawLine(&separator, x + static_cast<REAL>(Scale(8)), y + h / 2,
-                            x + w - static_cast<REAL>(Scale(8)), y + h / 2);
-          continue;
-        }
-        if (static_cast<int>(i) == hover_)
-          RoundFill(graphics, RectF(x, y, w, h), static_cast<REAL>(Scale(5)),
-                    Color(static_cast<BYTE>(pressed_ == hover_ ? 38 : 24), 255, 255, 255));
-        const Color foreground(static_cast<BYTE>(row.enabled ? 255 : 115), 255, 255, 255);
-        const REAL icon = static_cast<REAL>(Scale(kIcon));
-        const REAL inset = static_cast<REAL>(Scale(kInset));
-        DrawIcon(graphics, row, x + inset, y + (h - icon) / 2, icon, foreground);
-
+  // GDI is used only to present the finished Direct2D bitmap to DWM.
+  // No GDI/GDI+ drawing or manual blending of separate layers occurs here.
+  const bool ready = RenderFrame();
+  if (render_ && !render_->pixels.empty()) {
+    BITMAPINFO info{};
+    info.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    info.bmiHeader.biWidth = width_;
+    info.bmiHeader.biHeight = -height_;
+    info.bmiHeader.biPlanes = 1;
+    info.bmiHeader.biBitCount = 32;
+    info.bmiHeader.biCompression = BI_RGB;
+    void* pixels = nullptr;
+    HBITMAP bitmap = CreateDIBSection(dc, &info, DIB_RGB_COLORS, &pixels, nullptr, 0);
+    HDC memory = CreateCompatibleDC(dc);
+    if (bitmap && memory && pixels) {
+      std::copy(render_->pixels.begin(), render_->pixels.end(),
+                static_cast<BYTE*>(pixels));
+      const HGDIOBJ previous = SelectObject(memory, bitmap);
+      if (previous && previous != HGDI_ERROR) {
+        BitBlt(dc, 0, 0, width_, height_, memory, 0, 0, SRCCOPY);
+        SelectObject(memory, previous);
       }
     }
-    // Source-over composition of two premultiplied BGRA layers. Preserve
-    // the text's grayscale coverage (including alpha) on the acrylic surface.
-    auto* destination = static_cast<BYTE*>(pixels);
-    const auto& text = render_->text_pixels;
-    const size_t expected = static_cast<size_t>(width_) *
-                            static_cast<size_t>(height_) * 4;
-    if (text.size() == expected) {
-      for (size_t i = 0; i < text.size(); i += 4) {
-        const unsigned alpha = text[i + 3];
-        if (!alpha) continue;
-        const unsigned inverse = 255 - alpha;
-        for (size_t channel = 0; channel < 4; ++channel) {
-          const unsigned value = text[i + channel] +
-              (destination[i + channel] * inverse + 127) / 255;
-          destination[i + channel] = static_cast<BYTE>((std::min)(value, 255u));
-        }
-      }
-    }
-    const HGDIOBJ previous = SelectObject(memory, bitmap);
-    BitBlt(dc, 0, 0, width_, height_, memory, 0, 0, SRCCOPY);
-    SelectObject(memory, previous);
+    if (memory) DeleteDC(memory);
+    if (bitmap) DeleteObject(bitmap);
   }
-  if (memory) DeleteDC(memory);
-  if (bitmap) DeleteObject(bitmap);
   EndPaint(window, &paint);
+  if (!ready) Close();
 }
 
 LRESULT CALLBACK AcrylicMenu::WindowProc(HWND window, UINT message, WPARAM wp,

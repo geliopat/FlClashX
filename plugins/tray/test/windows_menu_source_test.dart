@@ -46,43 +46,66 @@ void main() {
     expect(pluginSource, contains('TPM_RETURNCMD'));
   });
 
-  test('acrylic text uses medium DirectWrite and premultiplied grayscale', () {
+  test('one Direct2D frame uses regular DirectWrite and premultiplied grayscale', () {
     final source = _resolveSource('windows/acrylic_menu.cpp').readAsStringSync();
     final cmake = _resolveSource('windows/CMakeLists.txt').readAsStringSync();
-    expect(source, contains('DWRITE_FONT_WEIGHT_MEDIUM'));
+    final frame = _body(source, 'bool AcrylicMenu::RenderFrame(');
+    expect(source, contains('DWRITE_FONT_WEIGHT_REGULAR'));
+    expect(source, isNot(contains('DWRITE_FONT_WEIGHT_MEDIUM')));
     expect(source, contains('Segoe UI Variable Text'));
-    expect(source, contains('D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE'));
-    expect(source, contains('D2D1_ALPHA_MODE_PREMULTIPLIED'));
-    expect(source, contains('GUID_WICPixelFormat32bppPBGRA'));
-    expect(source, contains('DrawTextLayout'));
-    expect(source, contains('text_bitmap->CopyPixels'));
-    expect(source, isNot(contains('graphics.DrawString')));
+    expect(frame, contains('D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE'));
+    expect(frame, contains('D2D1_ALPHA_MODE_PREMULTIPLIED'));
+    expect(frame, contains('GUID_WICPixelFormat32bppPBGRA'));
+    expect(frame, contains('DrawTextLayout'));
+    expect(frame, contains('DrawGeometry'));
+    expect(frame, contains('FillRoundedRectangle'));
+    expect(frame, contains('DrawLine'));
+    expect(frame, contains('bitmap->CopyPixels'));
+    expect(frame.indexOf('target->EndDraw()'), lessThan(frame.indexOf('bitmap->CopyPixels')));
+    expect(source, isNot(contains('#include <gdiplus.h>')));
+    expect(source, isNot(contains('GdiplusStartup')));
+    expect(source, isNot(contains('text_pixels')));
+    expect(cmake, isNot(contains('gdiplus')));
     expect(cmake, contains('d2d1 dwrite windowscodecs ole32'));
   });
 
-  test('restart glyph joins its clockwise arc to the arrowhead', () {
+  test('restart vector shares its clockwise arc endpoint with the arrowhead', () {
     final source = _resolveSource('windows/acrylic_menu.cpp').readAsStringSync();
-    final start = source.indexOf('row.icon == "restart"');
-    final end = source.indexOf('row.icon == "exit"', start);
+    final start = source.indexOf('} else if (row.icon == "restart")');
+    final end = source.indexOf('} else if (row.icon == "exit")', start);
     expect(start, isNonNegative);
     expect(end, greaterThan(start));
     final glyph = source.substring(start, end);
-    expect(glyph, contains('15.0f, 315.0f'));
-    expect(glyph, contains('{13.2f, 5.0f}'));
+    expect(glyph, contains('point(13.196f, 5.0f)'));
+    expect(glyph, contains('line(13.196f, 5)'));
+    expect(glyph, contains('D2D1_SWEEP_DIRECTION_CLOCKWISE'));
+    expect(glyph, contains('D2D1_ARC_SIZE_LARGE'));
   });
 
-  test('all tray glyphs share centered bounds and uniform stroke weight', () {
+  test('vector icons snap to physical pixel centers with a common stroke', () {
     final source = _resolveSource('windows/acrylic_menu.cpp').readAsStringSync();
-    final glyph = _body(source, 'void DrawIcon(');
-    expect(glyph, contains('path.GetBounds(&bounds)'));
-    expect(glyph, contains('12.0f / extent'));
-    expect(glyph, contains('normalize.Translate(8.0f, 8.0f)'));
-    expect(glyph, contains('bounds.X + bounds.Width / 2.0f'));
-    expect(glyph, contains('bounds.Y + bounds.Height / 2.0f'));
-    expect(glyph, contains('path.Transform(&normalize)'));
-    expect(glyph, contains('Pen pen(color, 1.3f)'));
-    expect(glyph, contains('graphics.DrawPath(&pen, &path)'));
-    expect(source, contains('y + (h - icon) / 2'));
+    final geometry = _body(source, 'HRESULT CreateIconGeometry(');
+    final snap = _body(source, 'float SnapStroke(');
+    final frame = _body(source, 'bool AcrylicMenu::RenderFrame(');
+    expect(geometry, contains('CreatePathGeometry'));
+    expect(geometry, contains('size / 16.0f'));
+    expect(geometry, contains('SnapStroke(x + px * scale, stroke)'));
+    expect(geometry, contains('SnapStroke(y + py * scale, stroke)'));
+    expect(snap, contains('std::round(value - phase) + phase'));
+    expect(frame, contains('IconStroke(static_cast<float>(Scale(kIcon)))'));
+    expect(frame, contains('SnapStroke(y + h / 2.0f, 1.0f)'));
+    expect(source, contains('y + (h - icon) / 2.0f'));
+  });
+
+  test('first frame is validated before showing and repaint is cached', () {
+    final source = _resolveSource('windows/acrylic_menu.cpp').readAsStringSync();
+    final open = _body(source, 'bool AcrylicMenu::Open(');
+    final frame = _body(source, 'bool AcrylicMenu::RenderFrame(');
+    final close = _body(source, 'void AcrylicMenu::Close(');
+    expect(open.indexOf('if (!RenderFrame())'), lessThan(open.indexOf('CreateWindowExW')));
+    expect(frame, contains('render.painted_hover == hover_'));
+    expect(frame, contains('render.painted_pressed == pressed_'));
+    expect(close, contains('render_.reset()'));
   });
 
   test('windows puts the detail in the accelerator column', () {
