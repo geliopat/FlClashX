@@ -1,0 +1,107 @@
+name: Validate independent core client integration
+on:
+  push:
+    branches: [work/v1.1.5-ui-config]
+    paths:
+      - '.github/workflows/validate-independent-core-client.yml'
+      - 'lib/features/update/core_release*'
+      - 'lib/views/core_release_section.dart'
+      - 'lib/core/desktop/core_release_selection.dart'
+      - 'services/helper/src/service/core_release.rs'
+      - 'core/third_party/mihomo'
+      - 'core/**'
+      - 'test/features/update/core_release*'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: independent-core-client-validation
+  cancel-in-progress: true
+
+jobs:
+  public-key:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      key: ${{ steps.derive.outputs.key }}
+    steps:
+      - name: Derive only the existing public update key
+        id: derive
+        env:
+          SIGNING_SEED: ${{ secrets.UPDATE_SIGNING_KEY }}
+          PINNED_KEY: ${{ vars.FLCLASHZ_UPDATE_PUBLIC_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import base64, os, subprocess
+          seed = base64.b64decode(os.environ["SIGNING_SEED"].strip(), validate=True)
+          if len(seed) != 32:
+              raise SystemExit("Invalid existing signing seed")
+          der = subprocess.run(["openssl", "pkey", "-inform", "DER", "-pubout", "-outform", "DER"], input=bytes.fromhex("302e020100300506032b657004220420") + seed, capture_output=True, check=True).stdout
+          prefix = bytes.fromhex("302a300506032b6570032100")
+          if len(der) != len(prefix) + 32 or not der.startswith(prefix):
+              raise SystemExit("Unexpected Ed25519 public key format")
+          key = base64.b64encode(der[len(prefix):]).decode()
+          pinned = os.environ["PINNED_KEY"].strip()
+          if pinned and pinned != key:
+              raise SystemExit("Existing public key pin differs from release signer")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write("key=" + key + "\n")
+          PY
+
+  windows:
+    needs: public-key
+    runs-on: windows-2022
+    timeout-minutes: 45
+    env:
+      FLCLASHZ_UPDATE_PUBLIC_KEY: ${{ needs.public-key.outputs.key }}
+      GOWORK: 'off'
+      CGO_ENABLED: '0'
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          submodules: true
+          persist-credentials: false
+      - name: Verify pinned core revision and common public key
+        shell: pwsh
+        run: |
+          if (!$env:FLCLASHZ_UPDATE_PUBLIC_KEY) { throw 'Missing release public key' }
+          if ((git -C core/third_party/mihomo rev-parse HEAD).Trim() -cne '53d2f4fc1cb56aaeba947a1a557eeafd48050737') { throw 'Unexpected engine revision' }
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.27.1'
+          cache-dependency-path: core/go.sum
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.47.6'
+          cache: true
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Obtain actual published signed package
+        shell: pwsh
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP 'signed-core'
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          $base = 'https://github.com/geliopat/Clash.Meta/releases/download/flclashz-core-v1.19.34-z.1'
+          foreach ($name in @('core-manifest.json', 'FlClashCore.exe')) {
+            curl.exe --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --output (Join-Path $dir $name) "$base/$name"
+            if ($LASTEXITCODE -ne 0) { throw "Download failed: $name" }
+          }
+          if ((Get-FileHash (Join-Path $dir 'FlClashCore.exe') -Algorithm SHA256).Hash.ToLowerInvariant() -cne 'd5e224231c9bc7f48fb9d8b5feebbff62f64439552ce00f4cf328c9be7c1ce79') { throw 'Published core differs from verified release' }
+          "FLCLASHZ_TEST_SIGNED_CORE_DIR=$dir" >> $env:GITHUB_ENV
+      - name: Validate core adapter
+        working-directory: core
+        run: go test -mod=readonly -count=1 -tags with_gvisor -timeout 10m ./...
+      - name: Verify actual release and tamper rejection in Helper
+        run: cargo test --locked --manifest-path services/helper/Cargo.toml --features windows-service core_release::
+      - name: Install Flutter dependencies
+        run: flutter pub get
+      - name: Verify actual release, rollback and UI
+        shell: pwsh
+        run: |
+          flutter test "--dart-define=FLCLASHZ_UPDATE_PUBLIC_KEY=$env:FLCLASHZ_UPDATE_PUBLIC_KEY" test/features/update/core_release_manifest_test.dart test/core/desktop/core_release_selection_test.dart test/core/desktop/helper_client_test.dart test/views/about_test.dart test/setup_test.dart
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Analyze Dart sources
+        run: flutter analyze --no-fatal-infos
