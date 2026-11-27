@@ -71,6 +71,20 @@ void main() {
     expect(glyph, contains('{13.2f, 5.0f}'));
   });
 
+  test('all tray glyphs share centered bounds and uniform stroke weight', () {
+    final source = _resolveSource('windows/acrylic_menu.cpp').readAsStringSync();
+    final glyph = _body(source, 'void DrawIcon(');
+    expect(glyph, contains('path.GetBounds(&bounds)'));
+    expect(glyph, contains('12.0f / extent'));
+    expect(glyph, contains('normalize.Translate(8.0f, 8.0f)'));
+    expect(glyph, contains('bounds.X + bounds.Width / 2.0f'));
+    expect(glyph, contains('bounds.Y + bounds.Height / 2.0f'));
+    expect(glyph, contains('path.Transform(&normalize)'));
+    expect(glyph, contains('Pen pen(color, 1.3f)'));
+    expect(glyph, contains('graphics.DrawPath(&pen, &path)'));
+    expect(source, contains('y + (h - icon) / 2'));
+  });
+
   test('windows puts the detail in the accelerator column', () {
     expect(pluginSource, contains('StringAt(*entry, "detail")'));
     expect(pluginSource, contains("text += L'\\t';"));

@@ -104,36 +104,61 @@ void RoundFill(Graphics& graphics, const RectF& r, REAL radius, Color color) {
 void DrawIcon(Graphics& graphics, const AcrylicRow& row, REAL x, REAL y,
               REAL size, Color color) {
   if (row.icon.empty() && !row.checked) return;
+  // Build every glyph in the same design space, then center its actual
+  // outline rather than assuming that its hand-drawn coordinates are centered.
+  GraphicsPath path;
+  if (row.checked) {
+    const PointF points[] = {{2, 8}, {6, 12}, {14, 4}};
+    path.AddLines(points, 3);
+  } else if (row.icon == "show") {
+    path.AddRectangle(RectF(1.5f, 2.5f, 13.0f, 11.0f));
+    path.StartFigure();
+    path.AddLine(1.5f, 5.5f, 14.5f, 5.5f);
+  } else if (row.icon == "start") {
+    const PointF points[] = {{4, 2}, {13, 8}, {4, 14}};
+    path.AddPolygon(points, 3);
+  } else if (row.icon == "stop") {
+    path.AddRectangle(RectF(3.0f, 3.0f, 10.0f, 10.0f));
+  } else if (row.icon == "restart") {
+    // Clockwise reload arrow: the arrowhead meets the arc endpoint at 330°.
+    path.AddArc(2.0f, 2.0f, 12.0f, 12.0f, 15.0f, 315.0f);
+    path.StartFigure();
+    const PointF points[] = {{13.2f, 1.3f}, {13.2f, 5.0f}, {9.5f, 5.0f}};
+    path.AddLines(points, 3);
+  } else if (row.icon == "exit") {
+    const PointF door[] = {{6, 2}, {2, 2}, {2, 14}, {6, 14}};
+    path.AddLines(door, 4);
+    path.StartFigure();
+    path.AddLine(5.0f, 8.0f, 14.0f, 8.0f);
+    path.StartFigure();
+    const PointF arrow[] = {{10, 4}, {14, 8}, {10, 12}};
+    path.AddLines(arrow, 3);
+  } else {
+    return;
+  }
+
+  // Normalize the longest dimension without distorting the aspect ratio.
+  // Transform the path, not the pen, to keep the stroke weight identical.
+  RectF bounds;
+  if (path.GetBounds(&bounds) != Ok) return;
+  const REAL extent = (std::max)(bounds.Width, bounds.Height);
+  if (extent <= 0.0f) return;
+  const REAL factor = 12.0f / extent;
+  Matrix normalize;
+  normalize.Translate(8.0f, 8.0f);
+  normalize.Scale(factor, factor);
+  normalize.Translate(-(bounds.X + bounds.Width / 2.0f),
+                      -(bounds.Y + bounds.Height / 2.0f));
+  if (path.Transform(&normalize) != Ok) return;
+
   const auto saved = graphics.Save();
   graphics.TranslateTransform(x, y);
-  graphics.ScaleTransform(size / 16, size / 16);
+  graphics.ScaleTransform(size / 16.0f, size / 16.0f);
   Pen pen(color, 1.3f);
   pen.SetLineJoin(LineJoinRound);
   pen.SetStartCap(LineCapRound);
   pen.SetEndCap(LineCapRound);
-  if (row.checked) {
-    const PointF points[] = {{2, 8}, {6, 12}, {14, 4}};
-    graphics.DrawLines(&pen, points, 3);
-  } else if (row.icon == "show") {
-    graphics.DrawRectangle(&pen, 1.5f, 2.5f, 13.0f, 11.0f);
-    graphics.DrawLine(&pen, 1.5f, 5.5f, 14.5f, 5.5f);
-  } else if (row.icon == "start") {
-    const PointF points[] = {{4, 2}, {13, 8}, {4, 14}, {4, 2}};
-    graphics.DrawLines(&pen, points, 4);
-  } else if (row.icon == "stop") {
-    graphics.DrawRectangle(&pen, 3.0f, 3.0f, 10.0f, 10.0f);
-  } else if (row.icon == "restart") {
-    // Clockwise reload arrow: the arrowhead meets the arc endpoint at 330°.
-    graphics.DrawArc(&pen, 2.0f, 2.0f, 12.0f, 12.0f, 15.0f, 315.0f);
-    const PointF points[] = {{13.2f, 1.3f}, {13.2f, 5.0f}, {9.5f, 5.0f}};
-    graphics.DrawLines(&pen, points, 3);
-  } else if (row.icon == "exit") {
-    const PointF door[] = {{6, 2}, {2, 2}, {2, 14}, {6, 14}};
-    graphics.DrawLines(&pen, door, 4);
-    graphics.DrawLine(&pen, 5.0f, 8.0f, 14.0f, 8.0f);
-    const PointF arrow[] = {{10, 4}, {14, 8}, {10, 12}};
-    graphics.DrawLines(&pen, arrow, 3);
-  }
+  graphics.DrawPath(&pen, &path);
   graphics.Restore(saved);
 }
 }  // namespace
