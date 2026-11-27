@@ -159,10 +159,11 @@ Future<RealProfile> _makeRealProfileTask(MakeRealProfileState data) async {
     }
     for (final name in providers.keys) {
       final provider = providers[name];
-      if (provider is! Map || provider['type'] == 'inline' ||
-          (Platform.isWindows && provider['type'] == 'file')) {
-        // A file provider's path identifies the actual source, not an HTTP
-        // cache slot. Leave it to the core's safe-path validation.
+      if (provider is! Map || provider['type'] == 'inline') continue;
+      if (Platform.isWindows && (provider['type'] == 'file' ||
+          (provider['path'] is String && (provider['path'] as String).trim().isNotEmpty))) {
+        // Both file sources and explicitly configured HTTP caches belong to
+        // the subscription. The core still validates allowed resource paths.
         continue;
       }
       // Two providers may share a URL and differ only by header.
