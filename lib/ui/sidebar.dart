@@ -248,9 +248,6 @@ class _SidebarOverlay extends StatelessWidget {
                 autofocus: true,
                 child: Material(
                   color: colorScheme.chromeSurface,
-                  shape: BorderDirectional(
-                    end: Divider.createBorderSide(context),
-                  ),
                   elevation: 8,
                   shadowColor: colorScheme.shadow,
                   child: AnimatedBuilder(
