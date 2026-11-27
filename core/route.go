@@ -73,7 +73,7 @@ func readPicks() (map[string]string, map[string]uint32) {
 			picks[name] = group.Now()
 		}
 	}
-	providers := tunnel.Providers()
+	providers := providersSnapshot()
 	versions := make(map[string]uint32, len(providers))
 	for name, p := range providers {
 		versions[name] = p.Version()
@@ -84,7 +84,7 @@ func readPicks() (map[string]string, map[string]uint32) {
 // mihomo swaps in a new strategy each time a rule set, manually or on its
 // interval, loads new content.
 func readRuleSets() map[string]any {
-	providers := tunnel.RuleProviders()
+	providers := ruleProvidersSnapshot()
 	ruleSets := make(map[string]any, len(providers))
 	for name, p := range providers {
 		ruleSets[name] = p.Strategy()
