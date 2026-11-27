@@ -52,6 +52,8 @@ class LogsView extends ConsumerStatefulWidget {
 class _LogsViewState extends ConsumerState<LogsView>
     with RouteMotionHoldMixin<LogsView> {
   final _listController = LogListController();
+  bool _pageActive = true;
+  bool? _sectionActive;
   late final ScrollController _scrollController;
   late final _physics = FollowEndScrollPhysics(
     isFollowing: () => _listController.value.autoScrollToEnd,
@@ -66,8 +68,23 @@ class _LogsViewState extends ConsumerState<LogsView>
     );
     _listController.setLogs(ref.read(logsProvider).list);
     ref.listenManual(logsProvider.select((state) => state.revision), (_, _) {
-      updateLogsThrottler();
+      if (_pageActive) updateLogsThrottler();
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final active = PageActivityScope.isActiveOf(context);
+    final resumed = active && !_pageActive;
+    _pageActive = active;
+    final section = SectionActivityScope.isActiveOf(context);
+    final left = _sectionActive == true && !section;
+    _sectionActive = section;
+    if (left) WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _listController.resumeAutoScrollToEnd(ref.read(logsProvider).list);
+    });
+    if (resumed) updateLogsThrottler();
   }
 
   List<IconButtonData> _buildActions() {
@@ -102,12 +119,14 @@ class _LogsViewState extends ConsumerState<LogsView>
   }
 
   void updateLogsThrottler() {
-    throttler.call(FunctionTag.logs, () {
-      if (!mounted) {
+    throttler.call((FunctionTag.logs, this), () {
+      if (!mounted || !_pageActive) {
         return;
       }
       updateWhenRouteSettled(
-        () => _listController.setLogs(ref.read(logsProvider).list),
+        () {
+          if (mounted && _pageActive) _listController.setLogs(ref.read(logsProvider).list);
+        },
       );
     }, duration: renderThrottleDuration);
   }

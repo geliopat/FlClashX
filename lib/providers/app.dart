@@ -295,8 +295,41 @@ class CurrentPageLabel extends _$CurrentPageLabel
     return PageLabel.dashboard;
   }
 
+  final _sectionExit = <PageLabel, Future<bool>? Function()>{};
+  bool _leavingSection = false;
+
+  /// A desktop section owns its nested navigator. A null result means that
+  /// there is no open route and switching can happen synchronously.
+  void registerSectionExit(PageLabel label, Future<bool>? Function() callback) {
+    _sectionExit[label] = callback;
+  }
+
+  void unregisterSectionExit(PageLabel label, Future<bool>? Function() callback) {
+    if (_sectionExit[label] == callback) _sectionExit.remove(label);
+  }
+
   void toPage(PageLabel pageLabel) {
-    value = pageLabel;
+    if (_leavingSection) return;
+    final previous = state;
+    final closing = _sectionExit[previous]?.call();
+    if (closing == null) {
+      if (pageLabel != previous) value = pageLabel;
+      return;
+    }
+    _leavingSection = true;
+    unawaited(_finishSectionExit(previous, pageLabel, closing));
+  }
+
+  Future<void> _finishSectionExit(PageLabel previous, PageLabel next, Future<bool> closing) async {
+    try {
+      if (await closing && ref.mounted && state == previous && next != previous) {
+        value = next;
+      }
+    } catch (error) {
+      commonPrint.log('Section navigation blocked: $error', logLevel: LogLevel.warning);
+    } finally {
+      _leavingSection = false;
+    }
   }
 
   void toProfiles() {

@@ -177,7 +177,7 @@ class _NavigationPadding extends StatelessWidget {
   }
 }
 
-class _NavigationPage extends StatefulWidget {
+class _NavigationPage extends ConsumerStatefulWidget {
   const _NavigationPage({
     super.key,
     required this.item,
@@ -190,12 +190,50 @@ class _NavigationPage extends StatefulWidget {
   final Widget view;
 
   @override
-  State<_NavigationPage> createState() => _NavigationPageState();
+  ConsumerState<_NavigationPage> createState() => _NavigationPageState();
 }
 
-class _NavigationPageState extends State<_NavigationPage> {
+class _NavigationPageState extends ConsumerState<_NavigationPage> {
   late final _routes = _OpenRoutes(onClosed: _dropNavigator);
+  final _navigatorKey = GlobalKey<NavigatorState>();
   late bool _nested = !widget.isMobile;
+  late final CurrentPageLabel _selection;
+  late final Future<bool>? Function() _exit = _closeSectionRoutes;
+
+  @override
+  void initState() {
+    super.initState();
+    _selection = ref.read(currentPageLabelProvider.notifier);
+    _selection.registerSectionExit(widget.item.label, _exit);
+  }
+
+  Future<bool>? _closeSectionRoutes() {
+    final navigator = _navigatorKey.currentState;
+    if (navigator == null || _routes.open == 0 || !navigator.canPop()) return null;
+    return _returnToRoot(navigator);
+  }
+
+  Future<bool> _returnToRoot(NavigatorState navigator) async {
+    // maybePop honours PopScope and LocalHistoryEntry. Never force-pop an
+    // editor that vetoes navigation; keep the original section selected.
+    while (mounted && navigator.mounted && _routes.open > 0) {
+      final before = _routes.open;
+      final top = _routes.top;
+      final hadLocalHistory = top?.willHandlePopInternally ?? false;
+      if (!await navigator.maybePop()) return false;
+      if (!mounted || !navigator.mounted) return false;
+      if (_routes.open < before) continue;
+      if (hadLocalHistory && top?.willHandlePopInternally == false) continue;
+      return false;
+    }
+    return mounted && _routes.open == 0;
+  }
+
+  @override
+  void dispose() {
+    _selection.unregisterSectionExit(widget.item.label, _exit);
+    super.dispose();
+  }
 
   @override
   void didUpdateWidget(covariant _NavigationPage oldWidget) {
@@ -219,7 +257,7 @@ class _NavigationPageState extends State<_NavigationPage> {
       key: ValueKey(item.label),
       child: _nested
           ? Navigator(
-              key: ValueKey('${item.label.name}_navigator'),
+              key: _navigatorKey,
               observers: [_routes],
               pages: [MaterialPage(child: scopedView)],
               onDidRemovePage: (_) {},
@@ -233,13 +271,16 @@ class _NavigationPageState extends State<_NavigationPage> {
         );
         // A kept-alive page off screen still ticks its animations, and
         // each tick asks for a frame.
-        return PageActivityScope(
+        return SectionActivityScope(
           isActive: isActive,
-          child: TickerMode(
-            enabled: isActive,
-            child: ExcludeFocus(
-              excluding: !isActive,
-              child: KeyboardInsetHold(child: child!),
+          child: PageActivityScope(
+            isActive: isActive,
+            child: TickerMode(
+              enabled: isActive,
+              child: ExcludeFocus(
+                excluding: !isActive,
+                child: _SectionScrollReset(child: KeyboardInsetHold(child: child!)),
+              ),
             ),
           ),
         );
@@ -255,11 +296,26 @@ class _OpenRoutes extends NavigatorObserver {
   _OpenRoutes({required this.onClosed});
 
   final VoidCallback onClosed;
-  int open = 0;
+  final _stack = <Route<dynamic>>[];
+  int get open => _stack.isEmpty ? 0 : _stack.length - 1;
+  Route<dynamic>? get top => _stack.isEmpty ? null : _stack.last;
 
   @override
   void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
-    open = previousRoute == null ? 0 : open + 1;
+    if (previousRoute == null) _stack.clear();
+    _stack.add(route);
+  }
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    if (oldRoute == null) return;
+    final index = _stack.indexOf(oldRoute);
+    if (index < 0) return;
+    if (newRoute == null) {
+      _stack.removeAt(index);
+    } else {
+      _stack[index] = newRoute;
+    }
   }
 
   @override
@@ -271,7 +327,7 @@ class _OpenRoutes extends NavigatorObserver {
       _closed(route);
 
   void _closed(Route<dynamic> route) {
-    if (open == 0 || --open > 0) {
+    if (!_stack.remove(route) || open > 0) {
       return;
     }
     if (route is TransitionRoute) {
@@ -280,6 +336,56 @@ class _OpenRoutes extends NavigatorObserver {
       WidgetsBinding.instance.addPostFrameCallback((_) => onClosed());
     }
   }
+}
+
+/// Reset only visual scroll positions; preserve elements, service state and
+/// archives. A section's vertical scrollables include nested list controllers,
+/// whereas the horizontal home pager is deliberately outside this subtree.
+class _SectionScrollReset extends StatefulWidget {
+  const _SectionScrollReset({required this.child});
+  final Widget child;
+
+  @override
+  State<_SectionScrollReset> createState() => _SectionScrollResetState();
+}
+
+class _SectionScrollResetState extends State<_SectionScrollReset> {
+  bool? _active;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final active = SectionActivityScope.isActiveOf(context);
+    final left = _active == true && !active;
+    _active = active;
+    if (!left) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final positions = <ScrollPosition>{};
+      void collect(Element element) {
+        if (element is StatefulElement && element.state is ScrollableState) {
+          final scrollable = element.state as ScrollableState;
+          if (scrollable.mounted) {
+            final position = scrollable.position;
+            if (position.axis == Axis.vertical && position.hasContentDimensions) {
+              positions.add(position);
+            }
+          }
+        }
+        element.visitChildren(collect);
+      }
+      context.visitChildElements(collect);
+      for (final position in positions) {
+        // Reverse history lists start at their newest end.
+        final target = position.axisDirection == AxisDirection.up
+            ? position.maxScrollExtent : position.minScrollExtent;
+        if (target.isFinite && position.pixels != target) position.jumpTo(target);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 class _HomePageView extends ConsumerStatefulWidget {

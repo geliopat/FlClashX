@@ -301,6 +301,30 @@ class CommonScaffoldState extends State<CommonScaffold>
     return true;
   }
 
+  bool? _sectionActive;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final active = SectionActivityScope.isActiveOf(context);
+    final left = _sectionActive == true && !active;
+    _sectionActive = active;
+    if (!left) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      // Clear the query even when the search field was docked. No animation
+      // is needed on an invisible page and callbacks must run outside build.
+      if (_textController.text.isNotEmpty || _isSearch) _handleClearInput();
+      _updateSearchState((state) => state?.copyWith(query: null));
+      _searchFocusNode.unfocus();
+      _searchMotion.jumpTo(open: false);
+      _searchCovered.value = false;
+      _searchOrigin.value = null;
+      if (_keywordsNotifier.value.isNotEmpty) _setKeywords(const []);
+      if (_sorting) setState(() => _sorting = false);
+    });
+  }
+
   @override
   void didUpdateWidget(CommonScaffold oldWidget) {
     super.didUpdateWidget(oldWidget);

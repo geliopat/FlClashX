@@ -3,6 +3,19 @@ import 'package:fl_clash/ui/sheet.dart';
 import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 
+/// Whole-section activity, independent of tabs, modal routes or window
+/// visibility. Used only for ephemeral UI reset, not engine lifecycle.
+class SectionActivityScope extends InheritedWidget {
+  const SectionActivityScope({super.key, required this.isActive, required super.child});
+  final bool isActive;
+
+  static bool isActiveOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<SectionActivityScope>()?.isActive ?? true;
+
+  @override
+  bool updateShouldNotify(SectionActivityScope oldWidget) => isActive != oldWidget.isActive;
+}
+
 class PageActivityScope extends InheritedWidget {
   final bool isActive;
 

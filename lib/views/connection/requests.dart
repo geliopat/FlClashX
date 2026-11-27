@@ -27,6 +27,7 @@ class _RequestsViewState extends ConsumerState<RequestsView>
     with RouteMotionHoldMixin<RequestsView> {
   final _listController = TrackerInfoListController();
   bool _pageActive = false;
+  bool? _sectionActive;
   late final ScrollController _scrollController;
   late final _physics = FollowEndScrollPhysics(
     isFollowing: () => _listController.value.autoScrollToEnd,
@@ -50,6 +51,12 @@ class _RequestsViewState extends ConsumerState<RequestsView>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    final sectionActive = SectionActivityScope.isActiveOf(context);
+    final left = _sectionActive == true && !sectionActive;
+    _sectionActive = sectionActive;
+    if (left) WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _listController.resumeAutoScrollToEnd(ref.read(requestsProvider).list);
+    });
     final active = PageActivityScope.isActiveOf(context);
     if (active == _pageActive) return;
     _pageActive = active;

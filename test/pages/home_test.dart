@@ -1265,7 +1265,7 @@ void main() {
     expect(tester.binding.hasScheduledFrame, isFalse);
   });
 
-  testWidgets('desktop nested route inherits home page activity', (
+  testWidgets('switching desktop sections closes nested routes and clears search', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(1200, 800);
@@ -1332,8 +1332,47 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Nested search'), findsOneWidget);
+    expect(find.text('Open nested search'), findsOneWidget);
+    expect(find.text('Nested search'), findsNothing);
     expect(find.byType(TextField), findsNothing);
+  });
+
+  testWidgets('reselect closes nested page but a guarded page blocks switching', (tester) async {
+    tester.view.physicalSize = const Size(1200, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final results = <String?>[];
+    final container = ProviderContainer(overrides: [
+      navigationItemsStateProvider.overrideWithValue(NavigationItemsState(value: [
+        NavigationItem(glyph: AppGlyphs.dashboard, label: PageLabel.dashboard,
+          builder: (_) => _PageOpener(onClosed: results.add)),
+        NavigationItem(glyph: AppGlyphs.settings, label: PageLabel.tools,
+          builder: (_) => _PageOpener(onClosed: results.add, guarded: true)),
+      ])),
+    ]);
+    addTearDown(container.dispose);
+    globalState.container = container;
+    container.read(viewSizeProvider.notifier).value = const Size(1200, 800);
+    await tester.pumpWidget(UncontrolledProviderScope(container: container,
+      child: const TestApp(includeNavigatorKey: false, child: HomePage())));
+    await tester.pumpAndSettle();
+    Future<void> select(PageLabel label) async {
+      container.read(currentPageLabelProvider.notifier).toPage(label);
+      await tester.pumpAndSettle();
+    }
+    await tester.tap(find.text('Open page'));
+    await tester.pumpAndSettle();
+    await select(PageLabel.dashboard);
+    expect(find.text('Sub page'), findsNothing);
+    expect(results, [null]);
+    await select(PageLabel.tools);
+    await tester.tap(find.text('Open page'));
+    await tester.pumpAndSettle();
+    await select(PageLabel.dashboard);
+    expect(container.read(currentPageLabelProvider), PageLabel.tools);
+    expect(find.text('Sub page'), findsOneWidget);
+    expect(results, [null]);
   });
 
   testWidgets('a desktop page left open stays open, state and all, in the '

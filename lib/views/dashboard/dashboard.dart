@@ -33,6 +33,18 @@ class DashboardView extends ConsumerStatefulWidget {
 
 class _DashboardViewState extends ConsumerState<DashboardView> {
   var _editing = false;
+  bool? _sectionActive;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final active = SectionActivityScope.isActiveOf(context);
+    if (_sectionActive == true && !active) {
+      _editing = false;
+      _editedArrangement = null;
+    }
+    _sectionActive = active;
+  }
   var _wide = false;
 
   /// What editing started from, kept across resizes until the cards are picked.

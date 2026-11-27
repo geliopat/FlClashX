@@ -35,6 +35,18 @@ class _ZapretLogsViewState extends State<ZapretLogsView>
   late final int _tab = widget.journalOnly ? 2 : widget.crashOnly ? 1 : 0;
   static const _filters = ['all', 'info', 'error', 'stderr', 'debug'];
   bool _loading = false;
+  bool? _sectionActive;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final active = SectionActivityScope.isActiveOf(context);
+    if (_sectionActive == true && !active) {
+      _filter = 'all';
+      _query = '';
+    }
+    _sectionActive = active;
+  }
   String _query = '';
   String _filter = 'all';
   String? _error;
