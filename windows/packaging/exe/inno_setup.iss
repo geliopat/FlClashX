@@ -310,6 +310,25 @@ begin
     RegDeleteValue(HKEY_CURRENT_USER, Key, '{{DISPLAY_NAME}}');
 end;
 
+// Remove only tasks created by this client and still pointing to this installation.
+procedure RemoveOwnedStartupTask;
+var
+  Exe, NamePrefix, Params: String;
+begin
+  Exe := ExpandConstant('{app}\{{EXECUTABLE_NAME}}');
+  NamePrefix := '{{DISPLAY_NAME}}-';
+  StringChangeEx(Exe, '''', '''''', True);
+  StringChangeEx(NamePrefix, '''', '''''', True);
+  Params := '-NoProfile -NonInteractive -Command "' +
+    '$ErrorActionPreference = ''Stop''; Get-ScheduledTask -TaskPath ''\'' | ' +
+    'Where-Object { $_.Description -eq ''FlClashZ owned user logon task v1'' -and ' +
+    '$_.TaskName.StartsWith(''' + NamePrefix + ''', [StringComparison]::OrdinalIgnoreCase) -and ' +
+    '@($_.Actions).Count -eq 1 -and $_.Actions[0].Execute -eq ''' + Exe + ''' } | ' +
+    'Unregister-ScheduledTask -Confirm:$false"';
+  if RunHidden(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'), Params) <> 0 then
+    Log('Unable to remove owned FlClashZ scheduled startup task');
+end;
+
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
   case CurUninstallStep of
@@ -318,6 +337,7 @@ begin
       ShutDownApp;
       RunHidden('sc.exe', 'delete "' + HelperService + '"');
       RemoveOwnedAutostart;
+      RemoveOwnedStartupTask;
       RemoveOwnedProtocol(HKEY_CURRENT_USER, 'flclashz');
       RemoveOwnedProtocol(HKEY_CURRENT_USER, 'clashz');
       RemoveOwnedProtocol(HKEY_LOCAL_MACHINE, 'flclashz');
