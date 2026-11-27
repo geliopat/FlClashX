@@ -388,10 +388,16 @@ class _EditProfileViewState extends ConsumerState<EditProfileView> {
     final appLocalizations = context.appLocalizations;
     final isUrl = widget.profile.type == ProfileType.url;
     final issue = _attempted ? _issue(appLocalizations) : null;
-    final providerInterval = ref.watch(profilesProvider.select(
+    final intervalProvider = profilesProvider.select(
       (profiles) => (profiles.getProfile(widget.profile.id) ?? widget.profile)
           .headers.updateInterval,
-    ));
+    );
+    final providerInterval = ref.watch(intervalProvider);
+    ref.listen(intervalProvider, (_, next) {
+      if (!_intervalOwned && next != null) {
+        _autoUpdateDurationController.text = next.inMinutes.toString();
+      }
+    });
     final sections = [
       generateSection(
         items: [

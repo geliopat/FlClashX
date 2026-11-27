@@ -101,6 +101,16 @@ void main() {
     },
   );
 
+  test('widget ownership is releasable unless editing is forbidden', () async {
+    await select(_profile(1, widgets: 'currentOutbound,profiles'));
+    expect(container.read(settingLockedProvider(dashboardWidgetsSetting)), isTrue);
+    container.read(managedSettingsActionProvider.notifier)
+        .takeOver(dashboardWidgetsSetting);
+    expect(container.read(settingReleasableProvider(dashboardWidgetsSetting)), isTrue);
+    await select(_profile(2, widgets: 'profiles', special: 'denywidgets'));
+    expect(container.read(settingReleasableProvider(dashboardWidgetsSetting)), isFalse);
+  });
+
   test('the view header hides the proxies that timed out', () async {
     await select(_profile(1, view: 'proxies.hidetimeout:true'));
     expect(

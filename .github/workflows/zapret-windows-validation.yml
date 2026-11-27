@@ -103,6 +103,10 @@ jobs:
         timeout-minutes: 5
         run: flutter test test/pages/home_test.dart --plain-name "desktop destinations remain clickable after window restoration"
 
+      - name: Run provider ownership and context menu regression tests
+        timeout-minutes: 15
+        run: flutter test test/widgets/managed_setting_test.dart test/providers/profile_headers_action_test.dart test/views/profiles/edit_profile_device_headers_test.dart
+
       - name: Run signed manifest and updater tests
         timeout-minutes: 15
         shell: pwsh

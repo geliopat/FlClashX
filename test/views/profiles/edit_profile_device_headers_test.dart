@@ -109,7 +109,8 @@ void main() {
       of: interval, matching: find.byType(TextFormField),
     );
     await tester.enterText(field, '60');
-    await tester.tap(interval, buttons: kSecondaryButton);
+    await tester.tap(find.text(currentAppLocalizations.autoUpdateInterval),
+        buttons: kSecondaryButton);
     await tester.pumpAndSettle();
     await tester.tap(find.text(currentAppLocalizations.returnToProvider));
     await tester.pumpAndSettle();

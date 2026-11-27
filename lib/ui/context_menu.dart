@@ -196,10 +196,12 @@ class _ContextMenuRegionState extends State<ContextMenuRegion> {
       skipTraversal: true,
       onKeyEvent: enabled ? (_, event) => _handleKey(event) : null,
       child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
         onSecondaryTapUp: enabled
             ? (details) => _open(details.globalPosition)
             : null,
         child: GestureDetector(
+          behavior: HitTestBehavior.translucent,
           supportedDevices: _touchDevices,
           onLongPressStart: enabled
               ? (details) {
