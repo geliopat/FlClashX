@@ -194,6 +194,8 @@ struct ManagedCore {
     session_id: String,
     child: Child,
     #[cfg(windows)]
+    _verified_release: Option<VerifiedCore>,
+    #[cfg(windows)]
     _job: Option<CoreJob>,
 }
 
@@ -227,6 +229,7 @@ impl ManagedCore {
                         session_id,
                         child,
                         _job: None,
+                        _verified_release: None,
                     }),
                 });
             }
@@ -236,6 +239,8 @@ impl ManagedCore {
             child,
             #[cfg(windows)]
             _job: Some(job),
+            #[cfg(windows)]
+            _verified_release: None,
         })
     }
 
@@ -317,6 +322,8 @@ struct VerifiedCore {
     path: PathBuf,
     directory: PathBuf,
     _handle: File,
+    #[cfg(windows)]
+    _directories: Vec<File>,
 }
 
 impl VerifiedCore {
@@ -331,6 +338,21 @@ impl VerifiedCore {
             path,
             directory,
             _handle: handle,
+            #[cfg(windows)]
+            _directories: Vec::new(),
+        })
+    }
+
+    #[cfg(windows)]
+    fn open_release(hash: &str) -> Result<Self, Error> {
+        let verified = super::core_store::open_release(hash)?;
+        let directory = verified.path.parent()
+            .ok_or_else(|| Error::other("Missing core release directory"))?.to_path_buf();
+        Ok(Self {
+            path: verified.path,
+            directory,
+            _handle: verified.file,
+            _directories: verified.guards,
         })
     }
 
@@ -1695,6 +1717,19 @@ fn launch_failure_response(error: &Error) -> warp::reply::Response {
 }
 
 fn start(start_params: StartParams) -> warp::reply::Response {
+    start_selected(start_params, None)
+}
+
+#[cfg(windows)]
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ReleaseStartParams {
+    address: String,
+    session_id: String,
+    core_sha256: String,
+}
+
+fn start_selected(start_params: StartParams, release: Option<String>) -> warp::reply::Response {
     if !is_allowed_core_address(&start_params.address) {
         return error_response(
             "invalidRequest",
@@ -1713,12 +1748,20 @@ fn start(start_params: StartParams) -> warp::reply::Response {
     if let Err(error) = super::linux::ensure_owner_socket(&start_params.address) {
         return error_response("invalidRequest", error.to_string(), StatusCode::BAD_REQUEST);
     }
-    launch(start_params)
+    if release.is_none() {
+        launch(start_params)
+    } else {
+        launch_selected(start_params, release)
+    }
 }
 
 /// Releases the managed Core before anything else, so a request reaching this
 /// point must already be accepted: a rejected one has to leave it running.
 fn launch(start_params: StartParams) -> warp::reply::Response {
+    launch_selected(start_params, None)
+}
+
+fn launch_selected(start_params: StartParams, release: Option<String>) -> warp::reply::Response {
     let mut managed = lock_surviving_poison(&MANAGED_CORE);
     if SHUTTING_DOWN.load(Ordering::SeqCst) {
         return error_response(
@@ -1727,6 +1770,16 @@ fn launch(start_params: StartParams) -> warp::reply::Response {
             StatusCode::SERVICE_UNAVAILABLE,
         );
     }
+    // Validate an independent candidate before disturbing a working core.
+    #[cfg(windows)]
+    let selected = match release.as_deref().map(VerifiedCore::open_release).transpose() {
+        Ok(value) => value,
+        Err(error) => return error_response("coreReleaseVerificationFailed", error.to_string(), StatusCode::CONFLICT),
+    };
+    #[cfg(not(windows))]
+    let selected: Option<VerifiedCore> = if release.is_some() {
+        return error_response("invalidRequest", "Independent core releases require Windows", StatusCode::BAD_REQUEST);
+    } else { None };
     if let Err(error) = release_managed_core(&mut managed) {
         log_message(format!(
             "Helper could not release the managed Core: {error}"
@@ -1737,7 +1790,7 @@ fn launch(start_params: StartParams) -> warp::reply::Response {
             StatusCode::INTERNAL_SERVER_ERROR,
         );
     }
-    let core = match VerifiedCore::open() {
+    let core = match selected.map(Ok).unwrap_or_else(VerifiedCore::open) {
         Ok(core) => core,
         Err(error) => {
             return error_response(
@@ -1768,9 +1821,10 @@ fn launch(start_params: StartParams) -> warp::reply::Response {
                     reap_exited_core(&session_id);
                 });
             }
-            let core = match ManagedCore::adopt(start_params.session_id.clone(), child) {
+            #[allow(unused_mut)]
+            let mut owned = match ManagedCore::adopt(start_params.session_id.clone(), child) {
                 Ok(core) => core,
-                Err(failed) => {
+                Err(mut failed) => {
                     let error = &failed.error;
                     log_message(format!("Helper could not confine the Core: {error}"));
                     let response = error_response(
@@ -1778,11 +1832,21 @@ fn launch(start_params: StartParams) -> warp::reply::Response {
                         format!("Core confinement failed: {error}"),
                         StatusCode::INTERNAL_SERVER_ERROR,
                     );
+                    #[cfg(windows)]
+                    if release.is_some() {
+                        if let Some(unconfirmed) = failed.unconfirmed.as_mut() {
+                            unconfirmed._verified_release = Some(core);
+                        }
+                    }
                     *managed = failed.unconfirmed;
                     return response;
                 }
             };
-            *managed = Some(core);
+            #[cfg(windows)]
+            if release.is_some() {
+                owned._verified_release = Some(core);
+            }
+            *managed = Some(owned);
             json_response(
                 &StartResponse {
                     session_id: start_params.session_id,
@@ -2162,6 +2226,42 @@ async fn start_request(start_params: StartParams) -> Result<warp::reply::Respons
     )
 }
 
+#[cfg(windows)]
+async fn start_release_request(params: ReleaseStartParams) -> Result<warp::reply::Response, Infallible> {
+    Ok(tokio::task::spawn_blocking(move || {
+        start_selected(StartParams { address: params.address, session_id: params.session_id }, Some(params.core_sha256))
+    }).await.unwrap_or_else(|error| error_response("internalError", format!("Core release start task failed: {error}"), StatusCode::INTERNAL_SERVER_ERROR)))
+}
+
+#[cfg(windows)]
+static CORE_STAGE_LIMIT: Lazy<std::sync::Arc<tokio::sync::Semaphore>> =
+    Lazy::new(|| std::sync::Arc::new(tokio::sync::Semaphore::new(1)));
+
+#[cfg(windows)]
+#[derive(Debug)]
+struct CoreStageBusy;
+#[cfg(windows)]
+impl warp::reject::Reject for CoreStageBusy {}
+
+#[cfg(windows)]
+async fn acquire_core_stage() -> Result<tokio::sync::OwnedSemaphorePermit, Rejection> {
+    CORE_STAGE_LIMIT.clone().try_acquire_owned().map_err(|_| warp::reject::custom(CoreStageBusy))
+}
+
+#[cfg(windows)]
+async fn stage_core_request(permit: tokio::sync::OwnedSemaphorePermit, bytes: bytes::Bytes) -> Result<warp::reply::Response, Infallible> {
+    Ok(tokio::task::spawn_blocking(move || {
+        let _permit = permit;
+        if SHUTTING_DOWN.load(Ordering::SeqCst) {
+            return error_response("helperStopping", "Helper is stopping", StatusCode::SERVICE_UNAVAILABLE);
+        }
+        match super::core_store::stage(&bytes) {
+            Ok(hash) => warp::reply::json(&serde_json::json!({"coreSha256": hash})).into_response(),
+            Err(error) => error_response("coreReleaseVerificationFailed", error.to_string(), StatusCode::CONFLICT),
+        }
+    }).await.unwrap_or_else(|error| error_response("internalError", format!("Core stage task failed: {error}"), StatusCode::INTERNAL_SERVER_ERROR)))
+}
+
 async fn stop_request(stop_params: StopParams) -> Result<warp::reply::Response, Infallible> {
     Ok(
         match tokio::task::spawn_blocking(move || stop_core(stop_params)).await {
@@ -2252,6 +2352,10 @@ async fn handle_rejection(rejection: Rejection) -> Result<warp::reply::Response,
             "invalid request header",
             StatusCode::BAD_REQUEST,
         ));
+    }
+    #[cfg(windows)]
+    if rejection.find::<CoreStageBusy>().is_some() {
+        return Ok(error_response("coreStageBusy", "A core package is already being staged", StatusCode::CONFLICT));
     }
     if rejection.find::<warp::reject::MethodNotAllowed>().is_some() {
         return Ok(error_response(
@@ -2416,9 +2520,7 @@ pub(super) fn routes() -> impl Filter<Extract = (impl Reply,), Error = Infallibl
         .and(warp::header::<u64>("x-zapret-command"))
         .and_then(stop_zapret_request);
 
-    native_client
-        .and(
-            api_ping
+    let api = api_ping
                 .or(api_start)
                 .or(api_stop)
                 .or(api_logs)
@@ -2435,9 +2537,17 @@ pub(super) fn routes() -> impl Filter<Extract = (impl Reply,), Error = Infallibl
                 .or(api_zapret_watchdog)
                 .or(api_zapret_start)
                 .or(api_zapret_restart)
-                .or(api_zapret_stop),
-        )
-        .recover(handle_rejection)
+                .or(api_zapret_stop);
+    #[cfg(windows)]
+    let api = api
+        .or(warp::path("core").and(warp::path("stage")).and(warp::path::end())
+            .and(warp::post()).and(warp::any().and_then(acquire_core_stage))
+            .and(warp::body::content_length_limit(super::core_store::MAX_PACKAGE))
+            .and(warp::body::bytes()).and_then(stage_core_request))
+        .or(warp::path("core").and(warp::path("start")).and(warp::path::end())
+            .and(warp::post()).and(warp::body::content_length_limit(MAX_REQUEST_BODY_BYTES))
+            .and(warp::body::json()).and_then(start_release_request));
+    native_client.and(api).recover(handle_rejection)
 }
 
 pub(super) fn ensure_core_sha256_configured() -> anyhow::Result<()> {

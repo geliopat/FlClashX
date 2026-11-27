@@ -16,3 +16,6 @@ mod journal;
 
 #[cfg(any(windows, test))]
 mod core_release;
+
+#[cfg(windows)]
+mod core_store;
