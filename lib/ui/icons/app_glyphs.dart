@@ -1814,14 +1814,10 @@ abstract final class AppGlyphs {
     ], role: GlyphRole.line),
   ]);
 
-  // Open, symmetric gauge with a separated needle, using the same
-  // round stroke as the latency clock and strategy checklist.
+  // Download and upload: distinct from the clock and horizontal swap.
   static const speed = Glyph([
-    GlyphPath(
-      'M5.64 18.36 A9 9 0 1 1 18.36 18.36',
-      role: GlyphRole.line,
-    ),
-    GlyphPath('M12 16L16 9.5', role: GlyphRole.line),
+    GlyphPath('M7 3.5V20.5M3 16.5L7 20.5L11 16.5', role: GlyphRole.line),
+    GlyphPath('M17 20.5V3.5M13 7.5L17 3.5L21 7.5', role: GlyphRole.line),
   ]);
 
   static const dataUsage = Glyph([

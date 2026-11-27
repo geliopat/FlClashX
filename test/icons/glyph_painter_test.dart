@@ -225,7 +225,7 @@ void main() {
     expect(checklist, isNot(await _render(AppGlyphs.filter, 0)));
   });
 
-  test('latency clock and speed gauge are distinct from history and bolt', () async {
+  test('latency clock and transfer arrows are distinct from history and bolt', () async {
     final latency = await _render(AppGlyphs.latency, 0);
     expect(latency, isNot(await _render(AppGlyphs.clock, 0)));
     expect(latency, isNot(await _render(AppGlyphs.speed, 0)));
@@ -233,15 +233,15 @@ void main() {
     expect(_alphaAt(latency, 14, 12), greaterThan(0));
   });
 
-  test('speed gauge has a clear open dial and separated needle', () async {
+  test('speed uses separated download and upload arrows', () async {
     final pixels = await _render(AppGlyphs.speed, 0);
-    expect(_alphaAt(pixels, 12, 3), greaterThan(200));
-    expect(_alphaAt(pixels, 3, 12), greaterThan(200));
-    expect(_alphaAt(pixels, 21, 12), greaterThan(200));
-    expect(_alphaAt(pixels, 12, 16), greaterThan(200));
-    expect(_alphaAt(pixels, 14, 12.75), greaterThan(200));
-    expect(_alphaAt(pixels, 17.5, 8), lessThan(20));
-    expect(_alphaAt(pixels, 12, 20), lessThan(20));
+    expect(_alphaAt(pixels, 7, 12), greaterThan(200));
+    expect(_alphaAt(pixels, 17, 12), greaterThan(200));
+    expect(_alphaAt(pixels, 4, 17.5), greaterThan(200));
+    expect(_alphaAt(pixels, 20, 6.5), greaterThan(200));
+    expect(_alphaAt(pixels, 12, 12), lessThan(20));
+    expect(pixels, isNot(await _render(AppGlyphs.swap, 0)));
+    expect(pixels, isNot(await _render(AppGlyphs.sort, 0)));
   });
 
   test('a body fills inward from its outline', () async {
