@@ -19,7 +19,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  public-key:
+  public_key:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -51,11 +51,11 @@ jobs:
           PY
 
   windows:
-    needs: public-key
+    needs: public_key
     runs-on: windows-2022
     timeout-minutes: 45
     env:
-      FLCLASHZ_UPDATE_PUBLIC_KEY: ${{ needs.public-key.outputs.key }}
+      FLCLASHZ_UPDATE_PUBLIC_KEY: ${{ needs.public_key.outputs.key }}
       GOWORK: 'off'
       CGO_ENABLED: '0'
     steps:
@@ -95,7 +95,9 @@ jobs:
         working-directory: core
         run: go test -mod=readonly -count=1 -tags with_gvisor -timeout 10m ./...
       - name: Verify actual release and tamper rejection in Helper
-        run: cargo test --locked --manifest-path services/helper/Cargo.toml --features windows-service core_release::
+        run: |
+          cargo test --locked --manifest-path services/helper/Cargo.toml --features windows-service 'core_release::'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Install Flutter dependencies
         run: flutter pub get
       - name: Verify actual release, rollback and UI
