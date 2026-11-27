@@ -5,6 +5,8 @@ import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/views/zapret_logs.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show compute;
+import 'package:fl_clash/core/desktop/helper_client.dart';
 import 'package:material_ui/material_ui.dart';
 
 class RecoveryHistoryView extends StatefulWidget {
@@ -15,7 +17,21 @@ class RecoveryHistoryView extends StatefulWidget {
 }
 
 class _RecoveryHistoryViewState extends State<RecoveryHistoryView> {
-  late Future<List<RecoveryEvent>> _events = recoveryJournal.readRecent();
+  late Future<({List<RecoveryEvent> events, bool helperUnavailable})> _events = _load();
+
+  Future<({List<RecoveryEvent> events, bool helperUnavailable})> _load() async {
+    final local = await recoveryJournal.readRecent();
+    var unavailable = false;
+    List<RecoveryEvent> native = const [];
+    try {
+      native = await compute(RecoveryJournal.parseNativeArchive, await helperClient.zapretLogArchive());
+    } catch (_) {
+      unavailable = true;
+    }
+    final merged = [...local, ...native]..sort((a, b) => b.time.compareTo(a.time));
+    return (events: merged.take(RecoveryJournal.maxEntries).toList(growable: false),
+      helperUnavailable: unavailable);
+  }
 
   String _outcome(RecoveryOutcome value, bool ru) => switch (value) {
     RecoveryOutcome.started => ru ? 'Начато' : 'Started',
@@ -38,10 +54,10 @@ class _RecoveryHistoryViewState extends State<RecoveryHistoryView> {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final ru = Localizations.localeOf(context).languageCode == 'ru';
-    return FutureBuilder<List<RecoveryEvent>>(
+    return FutureBuilder<({List<RecoveryEvent> events, bool helperUnavailable})>(
       future: _events,
       builder: (context, snapshot) {
-        final events = snapshot.data ?? const <RecoveryEvent>[];
+        final events = snapshot.data?.events ?? const <RecoveryEvent>[];
         return ListView.separated(
           padding: EdgeInsets.fromLTRB(16, context.sectionsTopPadding, 16, 16 + context.bottomInset),
           itemCount: 1 + events.length,
@@ -51,7 +67,7 @@ class _RecoveryHistoryViewState extends State<RecoveryHistoryView> {
               return generateSection(items: [
                 ListItem(title: Text(l.update), leading: const GlyphIcon(AppGlyphs.refresh),
                   onTap: snapshot.connectionState == ConnectionState.waiting ? null :
-                    () => setState(() => _events = recoveryJournal.readRecent())),
+                    () => setState(() => _events = _load())),
                 ListItem(title: Text(l.openLogsFolder), leading: const GlyphIcon(AppGlyphs.openExternal),
                   onTap: () async => system.openDirectory(await recoveryJournal.directoryPath)),
                 ListItem(title: Text(ru ? 'Копировать записи' : 'Copy entries'),
@@ -62,6 +78,8 @@ class _RecoveryHistoryViewState extends State<RecoveryHistoryView> {
                   title: Text(ru ? 'События Helper / Zapret' : 'Helper / Zapret events'),
                   widget: const ZapretLogsView(recoveryOnly: true),
                 ),
+                if (snapshot.data?.helperUnavailable == true)
+                  ListItem(title: Text(l.forkJournalUnavailable)),
                 if (snapshot.connectionState == ConnectionState.waiting)
                   const Center(child: CircularProgressIndicator())
                 else if (snapshot.hasError)
