@@ -1080,6 +1080,8 @@
   "forkCrashHistory": "Historique des pannes et du watchdog",
   "forkEvents": "Événements",
   "forkNoEvents": "Aucun événement",
+  "forkAutoTuneOnFailureWithoutResults": "Ajustement automatique sans résultat confirmé",
+  "forkRetuneOnFailure": "Relancer l’ajustement automatique en cas d’échec",
   "forkAutoTuneMode": "Mode de réglage automatique",
   "forkState": "État",
   "forkStarted": "Démarré",

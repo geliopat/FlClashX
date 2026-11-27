@@ -1,4 +1,5 @@
 import 'package:fl_clash/l10n/l10n.dart';
+import 'package:fl_clash/models/managed_settings.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:fl_clash/views/dashboard/widgets/zapret_strategy_sheet.dart';
@@ -107,18 +108,16 @@ class ZapretView extends ConsumerWidget {
               maxLines: 3,
             ),
           ),
-          if (zapret.supportsSplitMode && zapret.headerModeManaged)
-            ListItem(
-              title: Text(AppLocalizations.of(context).forkSelectedMode),
-              subtitle: Text(zapret.mode == ZapretMode.strictSplit ? 'STRICT SPLIT' : 'FULL BYPASS'),
-            ),
-          if (zapret.supportsSplitMode && !zapret.headerModeManaged)
-            ListItem<ZapretMode>.options(
-              title: Text(AppLocalizations.of(context).forkSelectedMode),
-              options: ZapretMode.values,
-              value: zapret.mode,
-              textBuilder: (mode) => mode == ZapretMode.strictSplit ? 'STRICT SPLIT' : 'FULL BYPASS',
-              onChanged: (mode) => ref.read(zapretControllerProvider.notifier).setMode(mode),
+          if (zapret.supportsSplitMode)
+            ManagedSetting(
+              settingKey: zapretModeSetting,
+              child: ListItem<ZapretMode>.options(
+                title: Text(AppLocalizations.of(context).forkSelectedMode),
+                options: ZapretMode.values,
+                value: zapret.mode,
+                textBuilder: (mode) => mode == ZapretMode.strictSplit ? 'STRICT SPLIT' : 'FULL BYPASS',
+                onChanged: (mode) => ref.read(zapretControllerProvider.notifier).setMode(mode),
+              ),
             ),
           if (zapret.running) ...[
             ListItem(
@@ -181,11 +180,40 @@ class ZapretView extends ConsumerWidget {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => BaseNavigator.push<void>(context, const _ZapretHistoryView()),
           ),
-          ListItem(
-            title: Text(AppLocalizations.of(context).forkAutoFallback),
-            subtitle: Text(AppLocalizations.of(context).forkFallbackHint),
-            trailing: Switch(value: zapret.autoFallback,
-              onChanged: zapret.headerManaged ? null : ref.read(zapretControllerProvider.notifier).setAutoFallback),
+          ManagedSetting(
+            settingKey: zapretFallbackSetting,
+            child: ListItem(
+              title: Text(AppLocalizations.of(context).forkAutoFallback),
+              subtitle: Text(AppLocalizations.of(context).forkFallbackHint),
+              trailing: Switch(value: zapret.autoFallback,
+                onChanged: zapret.busy ? null : ref.read(zapretControllerProvider.notifier).setAutoFallback),
+            ),
+          ),
+          ManagedSetting(
+            settingKey: zapretAutoTuneSetting,
+            child: ListItem(
+              title: Text(AppLocalizations.of(context).forkAutoTuneOnFailureWithoutResults),
+              trailing: Switch(value: zapret.autoTune,
+                onChanged: zapret.busy ? null : ref.read(zapretControllerProvider.notifier).setAutoTune),
+            ),
+          ),
+          ManagedSetting(
+            settingKey: zapretTuneOnFailSetting,
+            child: ListItem(
+              title: Text(AppLocalizations.of(context).forkRetuneOnFailure),
+              trailing: Switch(value: zapret.tuneOnFail,
+                onChanged: zapret.busy ? null : ref.read(zapretControllerProvider.notifier).setTuneOnFail),
+            ),
+          ),
+          ManagedSetting(
+            settingKey: zapretTuneModeSetting,
+            child: ListItem<ZapretAutoTuneMode>.options(
+              title: Text(AppLocalizations.of(context).forkAutoTuneMode),
+              options: ZapretAutoTuneMode.values,
+              value: zapret.tuneMode,
+              textBuilder: (mode) => mode.localizedLabel(AppLocalizations.of(context)),
+              onChanged: (mode) => ref.read(zapretControllerProvider.notifier).setTuneMode(mode),
+            ),
           ),
         ],
       ),

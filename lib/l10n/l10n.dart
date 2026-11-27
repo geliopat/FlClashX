@@ -133,6 +133,8 @@ class AppLocalizations {
 
   String get forkNoEvents => Intl.message("No events", name: 'forkNoEvents', desc: '', args: []);
 
+  String get forkAutoTuneOnFailureWithoutResults => Intl.message("Auto-tune when no confirmed results exist", name: 'forkAutoTuneOnFailureWithoutResults', desc: '', args: []);
+  String get forkRetuneOnFailure => Intl.message("Repeat auto-tuning on failure", name: 'forkRetuneOnFailure', desc: '', args: []);
   String get forkAutoTuneMode => Intl.message("Auto-tuning mode", name: 'forkAutoTuneMode', desc: '', args: []);
 
   String get forkState => Intl.message("Status", name: 'forkState', desc: '', args: []);

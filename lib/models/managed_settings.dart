@@ -22,6 +22,45 @@ const vibrationSetting = 'app.vibration';
 /// `denywidgets`.
 const dashboardWidgetsSetting = 'app.dashboardWidgets';
 
+// Each Zapret option has the same ownership semantics as other settings.
+const zapretStartSetting = 'zapret.autostart';
+const zapretFallbackSetting = 'zapret.autofallback';
+const zapretAutoTuneSetting = 'zapret.autotune';
+const zapretTuneOnFailSetting = 'zapret.tuneonfail';
+const zapretModeSetting = 'zapret.mode';
+const zapretTuneModeSetting = 'zapret.tunemode';
+
+const zapretPageKeys = {
+  zapretStartSetting, zapretFallbackSetting, zapretAutoTuneSetting,
+  zapretTuneOnFailSetting, zapretModeSetting, zapretTuneModeSetting,
+};
+
+Set<String> managedZapretKeysOf(ZapretHeaderSettings? header) => {
+  if (header != null) ...{
+    zapretStartSetting, zapretFallbackSetting,
+    zapretAutoTuneSetting, zapretTuneOnFailSetting,
+  },
+  if (header?.mode != null) zapretModeSetting,
+  if (header?.tunemode != null) zapretTuneModeSetting,
+};
+
+ZapretHeaderSettings effectiveZapretSettings(
+  ZapretHeaderSettings? header,
+  ZapretHeaderSettings personal,
+  Set<String> owned,
+) {
+  T pick<T>(String key, T? supplied, T local) =>
+      owned.contains(key) ? local : supplied ?? local;
+  return (
+    autostart: pick(zapretStartSetting, header?.autostart, personal.autostart),
+    autofallback: pick(zapretFallbackSetting, header?.autofallback, personal.autofallback),
+    autotune: pick(zapretAutoTuneSetting, header?.autotune, personal.autotune),
+    tuneonfail: pick(zapretTuneOnFailSetting, header?.tuneonfail, personal.tuneonfail),
+    mode: pick(zapretModeSetting, header?.mode, personal.mode),
+    tunemode: pick(zapretTuneModeSetting, header?.tunemode, personal.tunemode),
+  );
+}
+
 /// The config keys a subscription takes over and the user may take back.
 const managedClashKeys = {
   'mode',

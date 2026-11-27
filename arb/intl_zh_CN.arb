@@ -1080,6 +1080,8 @@
   "forkCrashHistory": "崩溃与看门狗历史",
   "forkEvents": "事件",
   "forkNoEvents": "暂无事件",
+  "forkAutoTuneOnFailureWithoutResults": "无已确认结果时自动优选",
+  "forkRetuneOnFailure": "失败时重新自动优选",
   "forkAutoTuneMode": "自动调优模式",
   "forkState": "状态",
   "forkStarted": "已启动",

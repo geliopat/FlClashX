@@ -461,6 +461,8 @@ class MessageLookup extends MessageLookupByLibrary {
     "forkCrashHistory": MessageLookupByLibrary.simpleMessage("История аварий и Watchdog"),
     "forkEvents": MessageLookupByLibrary.simpleMessage("События"),
     "forkNoEvents": MessageLookupByLibrary.simpleMessage("Нет событий"),
+    "forkAutoTuneOnFailureWithoutResults": MessageLookupByLibrary.simpleMessage("Автоподбор при отсутствии проверенных результатов"),
+    "forkRetuneOnFailure": MessageLookupByLibrary.simpleMessage("Повторный автоподбор при сбое"),
     "forkAutoTuneMode": MessageLookupByLibrary.simpleMessage("Режим автоподбора"),
     "forkState": MessageLookupByLibrary.simpleMessage("Состояние"),
     "forkStarted": MessageLookupByLibrary.simpleMessage("Запущен"),

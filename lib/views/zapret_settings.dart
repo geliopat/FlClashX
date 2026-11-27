@@ -1,4 +1,5 @@
 import 'package:fl_clash/l10n/l10n.dart';
+import 'package:fl_clash/models/managed_settings.dart';
 import 'dart:async';
 import 'package:fl_clash/providers/zapret_list_updater.dart';
 import 'package:fl_clash/core/desktop/helper_client.dart';
@@ -259,12 +260,15 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
             subtitle: Text(AppLocalizations.of(context).forkWatchdogHint),
             trailing: Switch(value: zapret.watchdog, onChanged: ref.read(zapretControllerProvider.notifier).setWatchdog),
           ),
-          ListItem(
-            title: Text(AppLocalizations.of(context).forkStartWithMihomo),
-            subtitle: Text(AppLocalizations.of(context).forkStopWithMihomo),
-            trailing: Switch(
-              value: zapret.startWithMihomo,
-              onChanged: zapret.headerManaged ? null : ref.read(zapretControllerProvider.notifier).setStartWithMihomo,
+          ManagedSetting(
+            settingKey: zapretStartSetting,
+            child: ListItem(
+              title: Text(AppLocalizations.of(context).forkStartWithMihomo),
+              subtitle: Text(AppLocalizations.of(context).forkStopWithMihomo),
+              trailing: Switch(
+                value: zapret.startWithMihomo,
+                onChanged: zapret.busy ? null : ref.read(zapretControllerProvider.notifier).setStartWithMihomo,
+              ),
             ),
           ),
             ListItem(

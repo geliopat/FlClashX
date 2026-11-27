@@ -59,6 +59,9 @@ class ZapretState {
   final bool startWithMihomo;
   final bool watchdog;
   final bool autoFallback;
+  final bool autoTune;
+  final bool tuneOnFail;
+  final ZapretAutoTuneMode tuneMode;
   final bool headerManaged;
   final bool headerModeManaged;
   final String? testProgress;
@@ -88,6 +91,9 @@ class ZapretState {
     this.startWithMihomo = defaultStartWithMihomo,
     this.watchdog = true,
     this.autoFallback = false,
+    this.autoTune = false,
+    this.tuneOnFail = false,
+    this.tuneMode = ZapretAutoTuneMode.fast,
     this.headerManaged = false,
     this.headerModeManaged = false,
     this.testProgress,
@@ -118,6 +124,9 @@ class ZapretState {
     bool? startWithMihomo,
     bool? watchdog,
     bool? autoFallback,
+    bool? autoTune,
+    bool? tuneOnFail,
+    ZapretAutoTuneMode? tuneMode,
     bool? headerManaged,
     bool? headerModeManaged,
     String? testProgress,
@@ -154,6 +163,9 @@ class ZapretState {
       startWithMihomo: startWithMihomo ?? this.startWithMihomo,
       watchdog: watchdog ?? this.watchdog,
       autoFallback: autoFallback ?? this.autoFallback,
+      autoTune: autoTune ?? this.autoTune,
+      tuneOnFail: tuneOnFail ?? this.tuneOnFail,
+      tuneMode: tuneMode ?? this.tuneMode,
       headerManaged: headerManaged ?? this.headerManaged,
       headerModeManaged: headerModeManaged ?? this.headerModeManaged,
       testProgress: clearTestProgress ? null : testProgress ?? this.testProgress,
@@ -378,17 +390,64 @@ class ZapretController extends Notifier<ZapretState> {
   ZapretHeaderSettings? get _header =>
       ref.read(currentProfileProvider)?.headers.zapret;
 
-  ZapretMode? get _headerMode => switch (_header?.mode) {
+  Set<String> get _owned => ref.read(appSettingProvider).ownedSettings;
+  bool _locked(String key) =>
+      managedZapretKeysOf(_header).contains(key) && !_owned.contains(key);
+
+  Object get _headerSignature => (
+    _header,
+    _locked(zapretStartSetting), _locked(zapretFallbackSetting),
+    _locked(zapretAutoTuneSetting), _locked(zapretTuneOnFailSetting),
+    _locked(zapretModeSetting), _locked(zapretTuneModeSetting),
+  );
+  Object get _policySignature => (
+    _headerSignature, state.autoFallback, state.autoTune,
+    state.tuneOnFail, state.tuneMode,
+  );
+
+  ZapretMode? get _headerMode => switch (
+      _locked(zapretModeSetting) ? _header?.mode : null) {
     'strictsplit' => ZapretMode.strictSplit,
     'fullbypass' => ZapretMode.fullBypass,
     _ => null,
   };
 
-  ZapretAutoTuneMode get _headerTuneMode => switch (_header?.tunemode) {
+  ZapretAutoTuneMode _tuneModeOf(String? value) => switch (value?.toLowerCase()) {
     'veryfast' => ZapretAutoTuneMode.veryFast,
     'full' => ZapretAutoTuneMode.full,
     _ => ZapretAutoTuneMode.fast,
   };
+
+  ZapretHeaderSettings _personalPolicy(SharedPreferences prefs) => (
+    autostart: readStartWithMihomo(prefs),
+    autofallback: prefs.getBool('zapret.autoFallback') ?? false,
+    autotune: prefs.getBool(zapretAutoTuneSetting) ?? false,
+    tuneonfail: prefs.getBool(zapretTuneOnFailSetting) ?? false,
+    mode: _personalMode(prefs).name.toLowerCase(),
+    tunemode: prefs.getString(zapretTuneModeSetting) ?? 'fast',
+  );
+
+  // Unlock without jumping back to the old pre-subscription value.
+  Future<void> preserveManagedValue(String key) async {
+    if (!_locked(key)) return;
+    final prefs = await SharedPreferences.getInstance();
+    if (!ref.mounted || !_locked(key)) return;
+    final header = _header!;
+    switch (key) {
+      case zapretStartSetting:
+        await prefs.setBool(_linkedStartPreferenceKey, header.autostart);
+      case zapretFallbackSetting:
+        await prefs.setBool('zapret.autoFallback', header.autofallback);
+      case zapretAutoTuneSetting:
+        await prefs.setBool(key, header.autotune);
+      case zapretTuneOnFailSetting:
+        await prefs.setBool(key, header.tuneonfail);
+      case zapretModeSetting:
+        await prefs.setString(_modePreferenceKey, _headerMode!.name);
+      case zapretTuneModeSetting:
+        await prefs.setString(key, _tuneModeOf(header.tunemode).name);
+    }
+  }
 
   ZapretMode _personalMode(SharedPreferences preferences) =>
       ZapretMode.values.firstWhere(
@@ -400,19 +459,24 @@ class ZapretController extends Notifier<ZapretState> {
 
   // A subscription is an overlay, never a rewrite of personal preferences.
   void _applyHeaderOverlay(SharedPreferences preferences) {
-    final header = _header;
-    final autostart = header?.autostart ?? readStartWithMihomo(preferences);
-    final fallback = header?.autofallback ??
-        preferences.getBool('zapret.autoFallback') ?? false;
+    final policy = effectiveZapretSettings(_header, _personalPolicy(preferences), _owned);
     final mode = _effectiveMode(_personalMode(preferences));
-    final managed = header != null;
-    final modeManaged = _headerMode != null;
-    if (state.startWithMihomo == autostart && state.autoFallback == fallback &&
-        state.mode == mode && state.headerManaged == managed &&
-        state.headerModeManaged == modeManaged) return;
+    final tuneMode = _tuneModeOf(policy.tunemode);
+    final managed = _locked(zapretStartSetting) || _locked(zapretFallbackSetting);
+    final modeManaged = _locked(zapretModeSetting);
+    if (state.startWithMihomo == policy.autostart &&
+        state.autoFallback == policy.autofallback &&
+        state.autoTune == policy.autotune && state.tuneOnFail == policy.tuneonfail &&
+        state.tuneMode == tuneMode && state.mode == mode &&
+        state.headerManaged == managed && state.headerModeManaged == modeManaged) {
+      return;
+    }
     state = state.copyWith(
-      startWithMihomo: autostart,
-      autoFallback: fallback,
+      startWithMihomo: policy.autostart,
+      autoFallback: policy.autofallback,
+      autoTune: policy.autotune,
+      tuneOnFail: policy.tuneonfail,
+      tuneMode: tuneMode,
       mode: mode,
       headerManaged: managed,
       headerModeManaged: modeManaged,
@@ -420,7 +484,7 @@ class ZapretController extends Notifier<ZapretState> {
   }
 
   bool _syncingHeader = false;
-  (int?, ZapretHeaderSettings?)? _checkedHeader;
+  Object? _checkedHeader;
   bool _initialTuneAttempted = false;
 
   Future<void> _syncHeaderOverlay() async {
@@ -429,7 +493,7 @@ class ZapretController extends Notifier<ZapretState> {
     try {
       final preferences = await SharedPreferences.getInstance();
       if (!ref.mounted || state.busy) return;
-      final key = (ref.read(currentProfileIdProvider), _header);
+      final key = (ref.read(currentProfileIdProvider), _headerSignature);
       final changed = key != _checkedHeader;
       if (changed) {
         _checkedHeader = key;
@@ -735,8 +799,17 @@ class ZapretController extends Notifier<ZapretState> {
           unawaited(_syncHeaderOverlay());
         });
       });
+      ref.listen(appSettingProvider.select((settings) =>
+          zapretPageKeys.map(settings.ownedSettings.contains).join(',')), (_, _) {
+        scheduleMicrotask(() {
+          if (!ref.mounted) return;
+          if (state.testProgress != null) _cancelTrial = true;
+          unawaited(_syncHeaderOverlay());
+        });
+      });
       scheduleMicrotask(() {
         if (!ref.mounted) return;
+        unawaited(_syncHeaderOverlay());
         unawaited(loadStrategies());
         unawaited(refresh());
         unawaited(collectPersistentLogs());
@@ -764,7 +837,6 @@ class ZapretController extends Notifier<ZapretState> {
       final strategies = await _client.zapretStrategies();
       final preferences = await SharedPreferences.getInstance();
       final savedId = preferences.getString(_selectedStrategyPreferenceKey);
-      final selectedMode = _personalMode(preferences);
       final currentId = state.selectedStrategyId;
       final selectedId = strategies.isEmpty
           ? currentId
@@ -780,16 +852,12 @@ class ZapretController extends Notifier<ZapretState> {
         available: strategies.isNotEmpty,
         strategies: strategies,
         selectedStrategyId: selectedId,
-        mode: _effectiveMode(selectedMode),
         debugLogs: preferences.getBool(_debugPreferenceKey) ?? false,
-        startWithMihomo: _header?.autostart ?? readStartWithMihomo(preferences),
         watchdog: preferences.getBool('zapret.watchdog') ?? true,
-        autoFallback: _header?.autofallback ?? preferences.getBool('zapret.autoFallback') ?? false,
-        headerManaged: _header != null,
-        headerModeManaged: _headerMode != null,
         trials: _restoreTrials(preferences, strategies.map((item) => item.id).toSet()),
         clearError: strategies.isNotEmpty,
       );
+      _applyHeaderOverlay(preferences);
       if (strategies.isNotEmpty && savedId != selectedId) {
         await preferences.setString(_selectedStrategyPreferenceKey, selectedId);
       }
@@ -889,10 +957,10 @@ class ZapretController extends Notifier<ZapretState> {
   }
 
   Future<void> setStartWithMihomo(bool enabled) async {
-    if (_header != null) return;
+    if (_locked(zapretStartSetting)) return;
     final preferences = await SharedPreferences.getInstance();
     await preferences.setBool(_linkedStartPreferenceKey, enabled);
-    if (ref.mounted) state = state.copyWith(startWithMihomo: enabled);
+    if (ref.mounted) _applyHeaderOverlay(preferences);
   }
 
   /// Start only after the new Mihomo run is ready. A later stop supersedes this.
@@ -1210,11 +1278,35 @@ class ZapretController extends Notifier<ZapretState> {
   }
 
   Future<void> setAutoFallback(bool value) async {
-    if (_header != null) return;
+    if (_locked(zapretFallbackSetting)) return;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('zapret.autoFallback', value);
     _failedChecks = 0;
-    if (ref.mounted) state = state.copyWith(autoFallback: value);
+    if (ref.mounted) _applyHeaderOverlay(prefs);
+  }
+
+  Future<void> setAutoTune(bool value) async {
+    if (_locked(zapretAutoTuneSetting)) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(zapretAutoTuneSetting, value);
+    if (!ref.mounted) return;
+    _initialTuneAttempted = false;
+    _failedChecks = 0;
+    _applyHeaderOverlay(prefs);
+  }
+
+  Future<void> setTuneOnFail(bool value) async {
+    if (_locked(zapretTuneOnFailSetting)) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(zapretTuneOnFailSetting, value);
+    if (ref.mounted) _applyHeaderOverlay(prefs);
+  }
+
+  Future<void> setTuneMode(ZapretAutoTuneMode value) async {
+    if (state.busy || _locked(zapretTuneModeSetting)) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(zapretTuneModeSetting, value.name);
+    if (ref.mounted) _applyHeaderOverlay(prefs);
   }
 
   void cancelTrials() => _cancelTrial = true;
@@ -1465,10 +1557,10 @@ class ZapretController extends Notifier<ZapretState> {
         state.strategies.isEmpty) return;
     final revision = _lifecycleRevision;
     final profile = ref.read(currentProfileIdProvider);
-    final policy = _header;
-    await testStrategies(tuneMode: _headerTuneMode);
+    final policy = _policySignature;
+    await testStrategies(tuneMode: state.tuneMode);
     if (!ref.mounted || revision != _lifecycleRevision ||
-        profile != ref.read(currentProfileIdProvider) || policy != _header ||
+        profile != ref.read(currentProfileIdProvider) || policy != _policySignature ||
         _cancelTrial || _launchBlocked || state.busy || !state.running ||
         state.error != null) return;
     final winner = state.trials.where(_compatibleTrial).firstOrNull;
@@ -1477,14 +1569,14 @@ class ZapretController extends Notifier<ZapretState> {
 
   Future<void> checkFallback(Map<ZapretProbeTarget, ZapretProbeResult> checks) async {
     if (!ref.mounted || !Platform.isWindows) return;
-    final policy = _header;
+    final policy = _policySignature;
     final profile = ref.read(currentProfileIdProvider);
     final revision = _lifecycleRevision;
     bool samePolicy() => ref.mounted && revision == _lifecycleRevision &&
-        profile == ref.read(currentProfileIdProvider) && policy == _header;
-    final fallback = policy?.autofallback ?? state.autoFallback;
+        profile == ref.read(currentProfileIdProvider) && policy == _policySignature;
+    final fallback = state.autoFallback;
     if (_launchBlocked || _checkingFallback || state.busy || !state.running ||
-        (!fallback && policy?.autotune != true && policy?.tuneonfail != true) ||
+        (!fallback && !state.autoTune && !state.tuneOnFail) ||
         state.activeStrategyId == null ||
         ref.read(coreStatusProvider) != CoreStatus.connected ||
         (_fallbackAfter != null && DateTime.now().isBefore(_fallbackAfter!))) {
@@ -1511,10 +1603,10 @@ class ZapretController extends Notifier<ZapretState> {
       }
       if (++_failedChecks < 3) return;
       _failedChecks = 0;
-      final initialTune = policy?.autotune == true && !_initialTuneAttempted &&
+      final initialTune = state.autoTune && !_initialTuneAttempted &&
           !state.trials.any(_compatibleTrial);
       _initialTuneAttempted = true;
-      final retune = policy?.tuneonfail == true;
+      final retune = state.tuneOnFail;
       if (backup == null && !initialTune && !retune) return;
       _fallbackAfter = DateTime.now().add(const Duration(minutes: 5));
       if (backup == null) {

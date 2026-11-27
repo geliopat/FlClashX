@@ -1080,6 +1080,8 @@
   "forkCrashHistory": "История аварий и Watchdog",
   "forkEvents": "События",
   "forkNoEvents": "Нет событий",
+  "forkAutoTuneOnFailureWithoutResults": "Автоподбор при отсутствии проверенных результатов",
+  "forkRetuneOnFailure": "Повторный автоподбор при сбое",
   "forkAutoTuneMode": "Режим автоподбора",
   "forkState": "Состояние",
   "forkStarted": "Запущен",

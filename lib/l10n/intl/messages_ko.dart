@@ -428,6 +428,8 @@ class MessageLookup extends MessageLookupByLibrary {
     "forkCrashHistory": MessageLookupByLibrary.simpleMessage("충돌 및 워치독 기록"),
     "forkEvents": MessageLookupByLibrary.simpleMessage("이벤트"),
     "forkNoEvents": MessageLookupByLibrary.simpleMessage("이벤트 없음"),
+    "forkAutoTuneOnFailureWithoutResults": MessageLookupByLibrary.simpleMessage("확인된 결과가 없을 때 자동 조정"),
+    "forkRetuneOnFailure": MessageLookupByLibrary.simpleMessage("실패 시 자동 조정 반복"),
     "forkAutoTuneMode": MessageLookupByLibrary.simpleMessage("자동 조정 모드"),
     "forkState": MessageLookupByLibrary.simpleMessage("상태"),
     "forkStarted": MessageLookupByLibrary.simpleMessage("시작됨"),

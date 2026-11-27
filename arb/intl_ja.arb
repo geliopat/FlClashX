@@ -1080,6 +1080,8 @@
   "forkCrashHistory": "クラッシュと監視の履歴",
   "forkEvents": "イベント",
   "forkNoEvents": "イベントなし",
+  "forkAutoTuneOnFailureWithoutResults": "確認済みの結果がない場合に自動調整",
+  "forkRetuneOnFailure": "失敗時に自動調整を再実行",
   "forkAutoTuneMode": "自動調整モード",
   "forkState": "状態",
   "forkStarted": "起動済み",

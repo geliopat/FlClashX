@@ -30,6 +30,10 @@ class ManagedSettingsAction extends _$ManagedSettingsAction {
     if (agreed != true || !ref.mounted) {
       return false;
     }
+    if (zapretPageKeys.contains(key)) {
+      await ref.read(zapretControllerProvider.notifier).preserveManagedValue(key);
+      if (!ref.mounted) return false;
+    }
     takeOver(key);
     return true;
   }
@@ -55,7 +59,7 @@ class ManagedSettingsAction extends _$ManagedSettingsAction {
 
   void release(String key) {
     disown(key);
-    _reapply();
+    if (!zapretPageKeys.contains(key)) _reapply();
   }
 
   void releaseAll() {

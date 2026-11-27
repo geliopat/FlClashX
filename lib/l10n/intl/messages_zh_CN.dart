@@ -422,6 +422,8 @@ class MessageLookup extends MessageLookupByLibrary {
     "forkCrashHistory": MessageLookupByLibrary.simpleMessage("崩溃与看门狗历史"),
     "forkEvents": MessageLookupByLibrary.simpleMessage("事件"),
     "forkNoEvents": MessageLookupByLibrary.simpleMessage("暂无事件"),
+    "forkAutoTuneOnFailureWithoutResults": MessageLookupByLibrary.simpleMessage("无已确认结果时自动优选"),
+    "forkRetuneOnFailure": MessageLookupByLibrary.simpleMessage("失败时重新自动优选"),
     "forkAutoTuneMode": MessageLookupByLibrary.simpleMessage("自动调优模式"),
     "forkState": MessageLookupByLibrary.simpleMessage("状态"),
     "forkStarted": MessageLookupByLibrary.simpleMessage("已启动"),

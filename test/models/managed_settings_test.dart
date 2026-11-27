@@ -3,6 +3,23 @@ import 'package:fl_clash/models/models.dart';
 import 'package:test/test.dart';
 
 void main() {
+  test('Zapret ownership is independent for each header field', () {
+    const personal = (autostart: false, autofallback: false, autotune: false,
+      tuneonfail: true, mode: 'fullbypass', tunemode: 'veryfast');
+    final header = parseZapretHeader('autostart,autofallback,autotune,mode:strictsplit,tunemode:full')!;
+    expect(managedZapretKeysOf(header), zapretPageKeys);
+    expect(effectiveZapretSettings(header, personal, {}), header);
+    expect(effectiveZapretSettings(header, personal, zapretPageKeys), personal);
+    final mixed = effectiveZapretSettings(header, personal, {zapretStartSetting, zapretTuneModeSetting});
+    expect(mixed.autostart, isFalse);
+    expect(mixed.autofallback, isTrue);
+    expect(mixed.tunemode, 'veryfast');
+    expect(mixed.mode, 'strictsplit');
+    expect(effectiveZapretSettings(null, personal, {}), personal);
+    expect(managedZapretKeysOf(parseZapretHeader('')), {
+      zapretStartSetting, zapretFallbackSetting, zapretAutoTuneSetting, zapretTuneOnFailSetting,
+    });
+  });
   test('only the keys a subscription may take over count as managed', () {
     expect(
       managedClashKeysOf([

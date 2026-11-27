@@ -1080,6 +1080,8 @@
   "forkCrashHistory": "Crash and watchdog history",
   "forkEvents": "Events",
   "forkNoEvents": "No events",
+  "forkAutoTuneOnFailureWithoutResults": "Auto-tune when no confirmed results exist",
+  "forkRetuneOnFailure": "Repeat auto-tuning on failure",
   "forkAutoTuneMode": "Auto-tuning mode",
   "forkState": "Status",
   "forkStarted": "Started",

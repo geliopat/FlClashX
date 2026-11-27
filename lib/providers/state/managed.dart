@@ -36,6 +36,7 @@ Set<String> managedSettings(Ref ref) {
     if (hideIp) hideIpSetting,
     if (noVibration) vibrationSetting,
     ...managedViewKeysOf(view),
+    ...managedZapretKeysOf(ref.watch(currentProfileProvider.select((profile) => profile?.headers.zapret))),
     ...ref.watch(managedClashKeysProvider),
   };
 }

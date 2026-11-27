@@ -1,4 +1,5 @@
 import 'package:fl_clash/l10n/l10n.dart';
+import 'package:fl_clash/models/managed_settings.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/providers/providers.dart';
@@ -35,19 +36,13 @@ class ZapretStrategySheet extends ConsumerWidget {
           bottom: 16 + context.bottomInset,
         ),
         children: [
-          if (state.supportsSplitMode && state.headerModeManaged)
-            generateSection(
-              title: AppLocalizations.of(context).forkMode,
-              items: [ListItem(
-                title: Text(AppLocalizations.of(context).forkProcessingMode),
-                subtitle: Text(state.mode == ZapretMode.strictSplit ? 'STRICT SPLIT' : 'FULL BYPASS'),
-              )],
-            ),
-          if (state.supportsSplitMode && !state.headerModeManaged)
+          if (state.supportsSplitMode)
             generateSection(
               title: AppLocalizations.of(context).forkMode,
               items: [
-                ListItem<ZapretMode>.options(
+                ManagedSetting(
+                  settingKey: zapretModeSetting,
+                  child: ListItem<ZapretMode>.options(
                   title: Text(AppLocalizations.of(context).forkProcessingMode),
                   options: ZapretMode.values,
                   value: state.mode,
@@ -61,6 +56,7 @@ class ZapretStrategySheet extends ConsumerWidget {
                       if (context.mounted) dialogs.showNotifier(error.toString(), level: MessageLevel.error);
                     }
                   },
+                  ),
                 ),
               ],
               footer: AppLocalizations.of(context).forkModeRestartHint,
