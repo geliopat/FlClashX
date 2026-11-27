@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:archive/archive_io.dart';
@@ -82,7 +83,10 @@ class FileLogger {
     _drain = _drain.then((_) => _flush()).catchError((_) {});
   }
 
-  Future<void> flush() => _drain;
+  Future<void> flush() {
+    if (_pending.isNotEmpty) _schedule();
+    return _drain;
+  }
 
   /// How long [archiveToday] keeps an archive for the app still reading it.
   static const shareRetention = Duration(days: 1);
@@ -156,7 +160,7 @@ class FileLogger {
   }
 
   Future<void> dispose() async {
-    await _drain;
+    await flush();
     _file = null;
     _day = null;
   }
@@ -165,11 +169,23 @@ class FileLogger {
     if (_pending.isEmpty) {
       return;
     }
-    final lines = '${_pending.join('\n')}\n';
+    final batch = List<String>.of(_pending);
     _pending.clear();
-    final file = await _target(lines.length);
-    await file.writeAsString(lines, mode: FileMode.append, flush: true);
-    _size += lines.length;
+    final bytes = utf8.encode('${batch.join('\n')}\n');
+    try {
+      final file = await _target(bytes.length);
+      await file.writeAsBytes(bytes, mode: FileMode.append, flush: true);
+      _size += bytes.length;
+    } catch (_) {
+      // Retry on the next write/flush, with a bounded queue. An interrupted
+      // OS append can leave a partial line; never truncate existing history.
+      _file = null;
+      _pending.insertAll(0, batch);
+      if (_pending.length > _pendingLimit) {
+        _pending.removeRange(0, _pending.length - _pendingLimit);
+      }
+      rethrow;
+    }
   }
 
   Future<File> _target(int incoming) async {
@@ -242,4 +258,9 @@ final zapretFileLogger = FileLogger(
 final crashFileLogger = FileLogger(
   prefix: 'Crashes',
   directory: () async => join(await appPath.homeDirPath, logsDirectoryName, 'crashes'),
+);
+
+final appFileLogger = FileLogger(
+  prefix: 'Application',
+  directory: () async => join(await appPath.homeDirPath, logsDirectoryName, 'application'),
 );
