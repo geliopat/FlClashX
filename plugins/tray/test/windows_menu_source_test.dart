@@ -60,6 +60,17 @@ void main() {
     expect(cmake, contains('d2d1 dwrite windowscodecs ole32'));
   });
 
+  test('restart glyph joins its clockwise arc to the arrowhead', () {
+    final source = _resolveSource('windows/acrylic_menu.cpp').readAsStringSync();
+    final start = source.indexOf('row.icon == "restart"');
+    final end = source.indexOf('row.icon == "exit"', start);
+    expect(start, isNonNegative);
+    expect(end, greaterThan(start));
+    final glyph = source.substring(start, end);
+    expect(glyph, contains('15.0f, 315.0f'));
+    expect(glyph, contains('{13.2f, 5.0f}'));
+  });
+
   test('windows puts the detail in the accelerator column', () {
     expect(pluginSource, contains('StringAt(*entry, "detail")'));
     expect(pluginSource, contains("text += L'\\t';"));

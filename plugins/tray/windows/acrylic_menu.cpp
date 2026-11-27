@@ -123,8 +123,9 @@ void DrawIcon(Graphics& graphics, const AcrylicRow& row, REAL x, REAL y,
   } else if (row.icon == "stop") {
     graphics.DrawRectangle(&pen, 3.0f, 3.0f, 10.0f, 10.0f);
   } else if (row.icon == "restart") {
-    graphics.DrawArc(&pen, 2.0f, 2.0f, 12.0f, 12.0f, -45.0f, 300.0f);
-    const PointF points[] = {{14, 1}, {14, 6}, {9, 6}};
+    // Clockwise reload arrow: the arrowhead meets the arc endpoint at 330°.
+    graphics.DrawArc(&pen, 2.0f, 2.0f, 12.0f, 12.0f, 15.0f, 315.0f);
+    const PointF points[] = {{13.2f, 1.3f}, {13.2f, 5.0f}, {9.5f, 5.0f}};
     graphics.DrawLines(&pen, points, 3);
   } else if (row.icon == "exit") {
     const PointF door[] = {{6, 2}, {2, 2}, {2, 14}, {6, 14}};
