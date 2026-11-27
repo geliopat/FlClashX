@@ -11,3 +11,5 @@ export 'profile_settings.dart';
 export 'provider_headers.dart';
 export 'references.dart';
 export 'state.dart';
+
+export 'speed_test.dart';
