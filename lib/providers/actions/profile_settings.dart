@@ -60,6 +60,20 @@ class ProfileSettingsAction extends _$ProfileSettingsAction {
     if (id == null ||
         source.type == ProfileType.custom ||
         source.extendType == ExtendType.script) {
+      // Returning a locally owned setting when there is no YAML source
+      // means restoring its app default, not silently keeping the old value.
+      final reset = _released.difference(ref.read(appSettingProvider).ownedSettings);
+      if (reset.isNotEmpty) {
+        ref.read(patchClashConfigProvider.notifier).update(
+          (state) => keepOwnedSettings(defaultClashConfig, state, reset),
+        );
+        if (reset.contains(clashSettingKey('authentication'))) {
+          ref.read(networkSettingProvider.notifier).update(
+            (state) => state.copyWith(authentication: const AuthenticationProps()),
+          );
+        }
+      }
+      _released.clear();
       ref.read(yamlSettingReferencesProvider.notifier).set(const {});
       ref.read(managedClashKeysProvider.notifier).set(const {});
       ref.read(globalOverrideProvider.notifier).value = false;

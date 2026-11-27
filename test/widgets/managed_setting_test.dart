@@ -5,6 +5,7 @@ import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/ui/context_menu.dart';
+import 'package:fl_clash/ui/list.dart' as app_ui;
 import 'package:fl_clash/views/config/general.dart';
 import 'package:fl_clash/views/proxies/setting.dart';
 import 'package:fl_clash/views/theme.dart';
@@ -38,6 +39,33 @@ void main() {
     expect(yamlSourceCaption(null, 'clash.ipv6', owned: false, russian: false), isNull);
   });
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets('Windows setting shows updated subscription value under its title', (tester) async {
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    globalState.container = container;
+    final keep = container.listen(appSettingProvider, (_, _) {});
+    addTearDown(keep.close);
+    container.read(appSettingProvider.notifier).update((s) => s.copyWith(
+      ownedSettings: {'clash.keep-alive-idle'},
+    ));
+    container.read(managedClashKeysProvider.notifier).set({'clash.keep-alive-idle'});
+    container.read(yamlSettingReferencesProvider.notifier).set({'clash.keep-alive-idle': 60});
+    await tester.pumpWidget(UncontrolledProviderScope(container: container,
+      child: TestApp(theme: ThemeData(platform: TargetPlatform.windows),
+        locale: const Locale('en'), includeNavigatorKey: false,
+        child: const Scaffold(body: ManagedSetting(settingKey: 'clash.keep-alive-idle',
+          child: app_ui.ListItem(title: Text('Keep-alive idle'), trailing: Text('15')))))),
+    );
+    expect(find.text('From subscription: 60'), findsOneWidget);
+    expect(find.text('15'), findsOneWidget);
+    container.read(yamlSettingReferencesProvider.notifier).set({'clash.keep-alive-idle': 90});
+    await tester.pump();
+    expect(find.text('From subscription: 90'), findsOneWidget);
+    expect(find.text('15'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 
   late ProviderContainer container;
   ProviderContainer? activeContainer;

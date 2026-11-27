@@ -1009,6 +1009,12 @@ void main() {
       ]);
     });
 
+    test('fresh config does not migrate its defaults into local ownership', () {
+      final config = Config.realFromJson(null);
+      expect(hasYamlSourceVersion(config.appSettingProps.panelSetSettings), isTrue);
+      expect(config.appSettingProps.ownedSettings, isEmpty);
+    });
+
     test('realFromJson handles null', () {
       final result = Config.realFromJson(null);
       expect(result.appSettingProps.onlyStatisticsProxy, false);
