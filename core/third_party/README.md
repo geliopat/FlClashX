@@ -1,12 +1,9 @@
-# Patched Go modules
+# Third-party Go modules
+
+## Mihomo
+
+`mihomo` is a Git submodule pinned to the reviewed FlClashZ core commit. Initialize it with `git submodule update --init` after checkout. The root Go module selects it through a local replacement.
 
 ## sing-tun
 
-`github.com/metacubex/sing-tun v0.4.29`, copied from the module cache, with one
-change in `tun_darwin.go`: `flushDNSCache` runs `dscacheutil -flushcache` with
-`go ... .Run()` instead of `.Start()`, so the finished child is reaped and the
-core no longer keeps a `<defunct>` process per TUN start on macOS. Upstream
-(`meta` branch, October 2026) still has the `.Start()` call.
-
-To update: copy the new version from `$(go env GOMODCACHE)/github.com/metacubex/sing-tun@<ver>`,
-re-apply the one-line change, bump the comment on the `replace` line in `../go.mod`.
+Use the upstream Go module `github.com/metacubex/sing-tun` (currently v0.4.29, as required by Mihomo). No local copy or replacement is maintained. Its checksums are pinned in `core/go.sum`. The removed local change only reaped the macOS `dscacheutil` child process and is unnecessary for the Windows target. When updating Mihomo, reconcile the root indirect dependency and checksums with the new module graph.

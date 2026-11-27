@@ -2,9 +2,6 @@ module core
 
 go 1.26.0
 
-// v0.4.29 plus the darwin dscacheutil reap, see third_party/README.md.
-replace github.com/metacubex/sing-tun => ./third_party/sing-tun
-
 // Pinned Git submodule; update only with the matching client IPC contract.
 replace github.com/metacubex/mihomo => ./third_party/mihomo
 

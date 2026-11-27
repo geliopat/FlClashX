@@ -13,17 +13,17 @@ Core repository: https://github.com/geliopat/Clash.Meta
 ## Implementation order
 
 1. Review candidate patch dependencies and compile compatibility statically; complete remaining selected core fixes. Do not copy unrelated platform, TLS or listener changes.
-2. Pin a core revision by commit, preserving root module's local sing-tun replacement. Prefer a pinned Git submodule/local Go module replacement; update only the checkout/build inputs that need it. Do not update production releases.
+2. Pin a core revision by commit, using upstream sing-tun without a local replacement. Prefer a pinned Git submodule/local Go module replacement; update only the checkout/build inputs that need it. Do not update production releases.
 3. Replace host-side duplicate accounting with native counters and request events, preserving early inbound closure and probe-route settlement. Move DNS and URL-test notifications into hooks, with the same bounded queues and inactive-host behavior. Use native route resolution and network resets, preserve route epoch checks and held picks. Do not count bytes twice or run two health/geo schedulers. Keep existing IPC messages compatible; version new fields explicitly and preserve unknown ones. Add contract regressions.
 4. Adapt the FlClash connection log, typed numeric samples, incremental rows and filters to the existing FlClashZ UI. One lifecycle-aware publisher for traffic and active connection statistics; controls, sidebar, dashboard and details use projections from the same state.
 5. Merge optional general overrides with the existing per-key ownership, inheritance, explicit values, resource URLs/paths, protected TUN settings and managed Remnawave locks. Retain old migration and recovery compatibility.
 6. Complete the rest of docs/next-release-acceptance.md, static review, and only then user-authorized Windows testing. No stable release without explicit approval.
 
-Preserve all existing FlClashZ features, UI, Helper security, Zapret2 strategy and recovery behavior. Source-code work is not equivalent to acceptance. Client now pins the candidate as a Git submodule at core/third_party/mihomo. Run git submodule update --init after checkout. Existing sing-tun replacement remains authoritative. Native integration and acceptance are not complete.
+Preserve all existing FlClashZ features, UI, Helper security, Zapret2 strategy and recovery behavior. Source-code work is not equivalent to acceptance. Client now pins the candidate as a Git submodule at core/third_party/mihomo. Run git submodule update --init after checkout. The macOS-only sing-tun patch and local replacement were removed; use the version selected by Mihomo and the root Go module. Native integration and acceptance are not complete.
 
 ## Client integration progress
 
-- Pinned local Mihomo module, with original sing-tun replacement and manual validation submodule checkout.
+- Pinned local Mihomo module, with the upstream sing-tun dependency and manual validation submodule checkout.
 - Native tracker counters, new-request hook, early pending inbound ownership, native DNS record and ClearAll, route matcher and synchronized proxy/provider snapshots. Native provider mapping replaces approximate override replay while retaining path/membership checks.
 - Native delay events include proxy identity and history timestamp; old results are rejected, bounded overflow reconciles histories. No periodic full-history scan remains.
 - Native failed dials use the existing request message with optional failure and closedAt fields. Old payloads remain readable. UI marks the failure and avoids claiming a successful egress. Generated model files were updated alongside source; code-generation and compatibility still need verification.
