@@ -139,6 +139,44 @@ void main() {
     expect(dirEntries(), ['shared_preferences.json']);
   });
 
+  test('failed mutation is not committed by a later successful save', () async {
+    final store = openStore();
+    expect(await store.setValue('String', 'flutter.original', 'keep'), isTrue);
+    final obstruction = Directory('$path.$pid.tmp')..createSync();
+    expect(await store.setValue('String', 'flutter.failed', 'discard'), isFalse);
+    await obstruction.delete();
+    expect(await store.setValue('String', 'flutter.next', 'ok'), isTrue);
+    expect(readFile(), {'flutter.original': 'keep', 'flutter.next': 'ok'});
+  });
+
+  test('full recovery restores unrelated preferences and retains corrupt evidence', () async {
+    final store = AtomicFilePreferencesStore(Future.value(path), enableRecovery: true);
+    await store.setValue('String', 'flutter.config', '{"profile":42}');
+    await store.setValue('Bool', 'flutter.zapret.watchdog', false);
+    await store.setValue('String', 'other.unknown', 'keep');
+    final damaged = '{"flutter.config":';
+    await File(path).writeAsString(damaged, flush: true);
+    final reopened = AtomicFilePreferencesStore(Future.value(path), enableRecovery: true);
+    expect(await reopened.getAll(), {
+      'flutter.config': '{"profile":42}',
+      'flutter.zapret.watchdog': false,
+    });
+    expect(readFile(), containsPair('other.unknown', 'keep'));
+    final evidence = dir.listSync().whereType<File>().singleWhere(
+      (file) => file.path.contains('.corrupt-'),
+    );
+    expect(await evidence.readAsString(), damaged);
+  });
+
+  test('explicit clear updates backup and never resurrects cleared settings', () async {
+    final store = AtomicFilePreferencesStore(Future.value(path), enableRecovery: true);
+    await store.setValue('Int', 'flutter.version', 42);
+    expect(await store.clear(), isTrue);
+    await File(path).delete();
+    final reopened = AtomicFilePreferencesStore(Future.value(path), enableRecovery: true);
+    expect(await reopened.getAll(), isEmpty);
+  });
+
   test('backs SharedPreferences', () async {
     addTearDown(SharedPreferences.resetStatic);
     SharedPreferencesStorePlatform.instance = openStore();
