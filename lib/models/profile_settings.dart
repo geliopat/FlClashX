@@ -204,12 +204,12 @@ extension on GeoResource {
   String get jsonKey => switch (this) {
     GeoResource.MMDB => 'mmdb',
     GeoResource.ASN => 'asn',
-    GeoResource.GEOIP => 'geo-ip',
-    GeoResource.GEOSITE => 'geo-site',
-  };
-  String get legacyJsonKey => switch (this) {
     GeoResource.GEOIP => 'geoip',
     GeoResource.GEOSITE => 'geosite',
+  };
+  String get legacyJsonKey => switch (this) {
+    GeoResource.GEOIP => 'geo-ip',
+    GeoResource.GEOSITE => 'geo-site',
     _ => jsonKey,
   };
 }
