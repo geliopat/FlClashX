@@ -1,4 +1,5 @@
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/pages/editor.dart';
 import 'package:fl_clash/providers/providers.dart';
@@ -79,6 +80,8 @@ class AdditionalMihomoSettingsView extends ConsumerWidget {
     final profile = ref.watch(profileProvider(profileId));
     final sources = ref.watch(yamlSectionSourcesProvider);
     final sameSource = sources?.profileId == profileId;
+    final sourcePending = profile != null && profile.type != ProfileType.custom &&
+        profile.extendType != ExtendType.script && !sameSource;
     final explicit = sameSource ? sources!.explicit : const <String, dynamic>{};
     final defaults = sameSource ? sources!.defaults : const <String, dynamic>{};
     Map<String, Object> local;
@@ -126,7 +129,9 @@ class AdditionalMihomoSettingsView extends ConsumerWidget {
                     }),
                 );
               }),
-            if (absent.isNotEmpty)
+            if (sourcePending)
+              ListItem(title: Text(ru ? 'Параметры подписки пока недоступны' : 'Subscription settings are not available yet')),
+            if (!sourcePending && absent.isNotEmpty)
               ListItem(title: Text(ru ? 'Добавить параметр' : 'Add parameter'),
                 onTap: () async {
                   final selected = await showDialog<String>(context: context, builder: (ctx) => SimpleDialog(
@@ -135,6 +140,10 @@ class AdditionalMihomoSettingsView extends ConsumerWidget {
                       SimpleDialogOption(onPressed: () => Navigator.of(ctx).pop(path), child: Text(path))],
                   ));
                   if (selected == null || !context.mounted) return;
+                  final latest = ref.read(yamlSectionSourcesProvider);
+                  if (latest?.profileId == profileId && additionalSourceOf(latest!.explicit, selected).present) return;
+                  final current = ref.read(profileProvider(profileId));
+                  if (current == null || decodeAdditionalSettings(current.overrides.additionalSettingsYaml).containsKey(selected)) return;
                   final fallback = additionalSourceOf(defaults, selected);
                   final initial = fallback.value ?? additionalDefault(additionalMihomoKeys[selected]!);
                   try { _save(ref, selected, initial); } catch (_) { return; }
