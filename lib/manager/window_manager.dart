@@ -60,13 +60,6 @@ class _WindowContainerState extends ConsumerState<WindowManager>
         });
       }
     });
-    if (system.isWindows) {
-      ref.listenManual(initProvider, (previous, ready) {
-        if (ready && previous != true) {
-          unawaited(autoLaunch?.updateStatus(ref.read(appSettingProvider).autoLaunch));
-        }
-      }, fireImmediately: true);
-    }
     if (system.isMacOS) {
       ref.listenManual(
         appSettingProvider.select((state) => state.menuBarMode),
