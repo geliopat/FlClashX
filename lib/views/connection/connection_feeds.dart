@@ -1,44 +1,51 @@
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
-import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/ui/ui.dart';
 import 'package:fl_clash/ui/title_tabs.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'connections.dart';
 import 'requests.dart';
 
-class ConnectionFeedsView extends ConsumerStatefulWidget {
+class ConnectionFeedsView extends StatefulWidget {
   const ConnectionFeedsView({super.key});
 
   @override
-  ConsumerState<ConnectionFeedsView> createState() =>
+  State<ConnectionFeedsView> createState() =>
       _ConnectionFeedsViewState();
 }
 
-class _ConnectionFeedsViewState extends ConsumerState<ConnectionFeedsView> {
+class _ConnectionFeedsViewState extends State<ConnectionFeedsView> {
   final _shown = <RequestFeed>{};
+  RequestFeed _feed = RequestFeed.live;
+  bool _pageActive = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final active = PageActivityScope.isActiveOf(context);
+    if (active && !_pageActive) {
+      _feed = RequestFeed.live;
+    }
+    _pageActive = active;
+  }
 
   Widget _titleTabs(RequestFeed feed) {
     final l = context.appLocalizations;
     return PageTitleTabs(
       labels: [l.liveConnections, l.recentRequests],
       selectedIndex: feed == RequestFeed.live ? 0 : 1,
-      onSelected: (index) => ref.read(appSettingProvider.notifier).update(
-        (state) => state.copyWith(requestFeed:
-            index == 0 ? RequestFeed.live : RequestFeed.recent),
-      ),
+      onSelected: (index) => setState(() {
+        _feed = index == 0 ? RequestFeed.live : RequestFeed.recent;
+      }),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final feed = ref.watch(
-      appSettingProvider.select((state) => state.requestFeed),
-    );
+    final feed = _feed;
     _shown.add(feed);
-    final pageActive = PageActivityScope.isActiveOf(context);
+    final pageActive = _pageActive;
     final titleTabs = _titleTabs(feed);
     return IndexedStack(
       index: feed.index,
