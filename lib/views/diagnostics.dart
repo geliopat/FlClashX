@@ -1,5 +1,6 @@
 import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/views/zapret_logs.dart';
+import 'package:fl_clash/views/recovery_history.dart';
 import 'package:fl_clash/views/resources.dart';
 import 'package:fl_clash/ui/title_tabs.dart';
 import 'package:fl_clash/views/config/general.dart' show MihomoWatchdogItem;
@@ -167,7 +168,7 @@ class _DiagnosticsViewState extends ConsumerState<DiagnosticsView> {
       body: Builder(builder: (context) => switch (_tab) {
         1 => _watchdog(context),
         2 => const ZapretLogsView(key: ValueKey('crash-archive'), crashOnly: true, embedded: true),
-        3 => const ZapretLogsView(key: ValueKey('recovery-archive'), recoveryOnly: true, embedded: true),
+        3 => const RecoveryHistoryView(),
         _ => _diagnostics(context),
       }),
     );
