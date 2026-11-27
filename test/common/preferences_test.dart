@@ -195,6 +195,28 @@ void main() {
       }
     });
 
+    test('compatible saves preserve unknown model fields and explicit removals', () async {
+      await preferences.setVersion(1);
+      final old = Config(themeProps: defaultThemeProps).copyWith.patchClashConfig(
+        hosts: {'remove.example': '127.0.0.1'},
+      );
+      final raw = jsonDecode(jsonEncode(old)) as Map<String, Object?>;
+      raw['futureSetting'] = {'enabled': false, 'value': 0};
+      (raw['appSettingProps'] as Map)['futureOption'] = [];
+      (raw['patchClashConfig'] as Map)['future-tunable'] = 'keep';
+      await store.setString(configKey, jsonEncode(raw));
+      final next = old.copyWith.patchClashConfig(hosts: {});
+      expect(await preferences.saveConfig(next), isTrue);
+      final saved = (await preferences.getConfigMap())!;
+      expect(saved['futureSetting'], raw['futureSetting']);
+      expect((saved['appSettingProps'] as Map)['futureOption'], isEmpty);
+      expect((saved['patchClashConfig'] as Map)['future-tunable'], 'keep');
+      expect((saved['patchClashConfig'] as Map)['hosts'], isEmpty);
+      expect(Config.strictFromJson(saved), next);
+      expect(await preferences.saveConfig(next), isTrue);
+      expect(await preferences.getConfigMap(), saved);
+    });
+
     test('getConfigMap returns null for malformed JSON', () async {
       await store.setString(configKey, 'not-json');
 
