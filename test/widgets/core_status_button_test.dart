@@ -15,11 +15,20 @@ import '../helpers/test_app.dart';
 CoreStatus _shown(WidgetTester tester) =>
     tester.widget<CorePulse>(find.byType(CorePulse)).status;
 
+class _IdleZapret extends ZapretController {
+  @override
+  ZapretState build() => const ZapretState();
+}
+
+ProviderContainer _container() => ProviderContainer(
+  overrides: [zapretControllerProvider.overrideWith(_IdleZapret.new)],
+);
+
 void main() {
   testWidgets(
     'holds connecting for the minimum duration after a fast restart',
     (tester) async {
-      final container = ProviderContainer();
+      final container = _container();
       addTearDown(container.dispose);
       globalState.container = container;
       container.read(coreStatusProvider.notifier).value = CoreStatus.connected;
@@ -62,7 +71,7 @@ void main() {
   testWidgets(
     'shows disconnected immediately when restart fails during the hold',
     (tester) async {
-      final container = ProviderContainer();
+      final container = _container();
       addTearDown(container.dispose);
       globalState.container = container;
       container.read(coreStatusProvider.notifier).value = CoreStatus.connected;
@@ -100,7 +109,7 @@ void main() {
   testWidgets('labels the status on desktop and keeps it an icon on mobile', (
     tester,
   ) async {
-    final container = ProviderContainer();
+    final container = _container();
     addTearDown(container.dispose);
     globalState.container = container;
     container.read(coreStatusProvider.notifier).value = CoreStatus.disconnected;
@@ -141,7 +150,7 @@ void main() {
   testWidgets('does not clip a connecting state longer than the hold', (
     tester,
   ) async {
-    final container = ProviderContainer();
+    final container = _container();
     addTearDown(container.dispose);
     globalState.container = container;
     container.read(coreStatusProvider.notifier).value = CoreStatus.connected;
@@ -175,7 +184,7 @@ void main() {
   testWidgets('holds connecting when restarting from disconnected', (
     tester,
   ) async {
-    final container = ProviderContainer();
+    final container = _container();
     addTearDown(container.dispose);
     globalState.container = container;
     container.read(coreStatusProvider.notifier).value = CoreStatus.disconnected;

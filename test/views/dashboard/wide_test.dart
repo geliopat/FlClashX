@@ -56,7 +56,7 @@ void main() {
     );
     expect(
       _rows(wideDashboardWidgetsOf(SupportPlatform.Windows), 4),
-      contains([DashboardWidget.zapret]),
+      contains(equals([DashboardWidget.zapret])),
     );
   });
 
