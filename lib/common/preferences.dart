@@ -1,5 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
+import 'package:path/path.dart' as p;
+import 'package:fl_clash/common/settings_recovery.dart';
 
 import 'package:fl_clash/common/boot_record.dart';
 import 'package:fl_clash/common/common.dart';
@@ -16,6 +19,22 @@ class Preferences {
   Future<bool> _configWrite = Future.value(true);
 
   Future<bool> get isInit async => await _store.value != null;
+
+  Future<SettingsRecovery?> _recoveryFile() async {
+    if (!Platform.isWindows) return null;
+    return SettingsRecovery(File(p.join(await appPath.homeDirPath, 'settings.last-good.v1.json')), _validateConfig);
+  }
+
+  Future<Map<String, Object?>?> _readRecoveryFile() async {
+    try {
+      final map = await (await _recoveryFile())?.read();
+      if (map != null) commonPrint.log('Recovered settings from independent backup', logLevel: LogLevel.warning);
+      return map;
+    } catch (_) {
+      commonPrint.log('Independent settings backup unavailable', logLevel: LogLevel.warning);
+      return null;
+    }
+  }
 
   Preferences._internal();
 
@@ -105,7 +124,7 @@ class Preferences {
       final preferences = await _store.value;
       final configString = preferences?.getString(configKey);
       if (configString == null) {
-        if (preferences?.containsKey(_lastGoodConfigKey) != true) return null;
+        if (preferences?.containsKey(_lastGoodConfigKey) != true) return _readRecoveryFile();
         throw const FormatException('missing primary config');
       }
       final decoded = json.decode(configString);
@@ -118,7 +137,7 @@ class Preferences {
       try {
         final store = await _store.value;
         final raw = store?.getString(_lastGoodConfigKey);
-        if (raw == null) return primary;
+        if (raw == null) return await _readRecoveryFile() ?? primary;
         final map = jsonDecode(raw) as Map<String, Object?>;
         _validateConfig(map);
         commonPrint.log('Recovered last known good settings', logLevel: LogLevel.warning);
@@ -130,7 +149,7 @@ class Preferences {
           commonPrint.log('No valid settings backup; using legacy field recovery',
               logLevel: LogLevel.warning);
         }
-        return primary;
+        return await _readRecoveryFile() ?? primary;
       }
     }
   }
@@ -180,8 +199,21 @@ class Preferences {
       if (store == null) return false;
       final encoded = jsonEncode(config);
       _validateConfig(jsonDecode(encoded) as Map<String, Object?>);
+      // Keep an independent copy of the prior valid state before touching
+      // the preferences file on first migration. Never write corrupt data.
+      final recovery = await _recoveryFile();
+      if (recovery != null && !await recovery.file.exists()) {
+        final previous = store.getString(configKey) ?? store.getString(_lastGoodConfigKey);
+        if (previous != null) {
+          var valid = false;
+          try { recovery.decode(previous); valid = true; } catch (_) {}
+          if (valid) await recovery.save(previous);
+        }
+      }
       if (!await store.setString(configKey, encoded)) return false;
-      return store.setString(_lastGoodConfigKey, encoded);
+      if (!await store.setString(_lastGoodConfigKey, encoded)) return false;
+      await recovery?.save(encoded);
+      return true;
     });
     _configWrite = operation;
     return operation;
@@ -256,7 +288,10 @@ class Preferences {
 
   Future<void> clearPreferences() async {
     final sharedPreferencesIns = await _store.value;
-    await sharedPreferencesIns?.clear();
+    await _configWrite.catchError((_) => false);
+    if (sharedPreferencesIns != null && await sharedPreferencesIns.clear()) {
+      await (await _recoveryFile())?.clear();
+    }
   }
 }
 
