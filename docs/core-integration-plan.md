@@ -1,6 +1,6 @@
 # Native Mihomo integration: v1.1.5
 
-Status: pinned core candidate, client integration in progress. No build or validation workflow may run until agreed implementation and static review are complete.
+Status: pinned core candidate; independent core release infrastructure is the current stage. Previously started integration is preserved. No build or validation workflow may run until agreed implementation and static review are complete.
 
 Checkpoint: `archive/v1.1.5-before-core-integration` at `64b3a6a1f8285f32822eceb5eac192eb0e9a381f`. Keep this branch unchanged for rollback.
 
@@ -10,7 +10,16 @@ Core repository: https://github.com/geliopat/Clash.Meta
 - FlClashZ candidate: `FlClashZ`, `2732d34e4b32d5b5d1f8d36223d77b4813babaa7`
 - Provenance and replay guide: https://github.com/geliopat/Clash.Meta/blob/5a55a1bb96d9b62a73c5463f333c5afb1f8b3762/docs/flclashz-patch-stack.md
 
-## Implementation order
+## Mandatory development order (user-approved)
+
+1. Independent core infrastructure: pristine upstream reference, reviewable patch replay, pinned independent Windows core build, signed releases, compatibility contract and safe replacement/rollback infrastructure. No automatic installation. Default release source is geliopat/Clash.Meta; allow a manual HTTPS manifest URL and a signed local package. No validation/build dispatch without explicit approval.
+2. Core: complete the remaining native integration, review, optimize, minimize patches, and preserve IPC compatibility.
+3. Client: integrate core features and independently review all existing implementations in FlClash, FlClashX and FlClashZ. Identify semantic duplicates, competing timers, caches, IPC requests and lifecycle owners. Select or combine the best implementation by correctness, security, performance and maintainability. Remove superseded code only after equivalent behavior is verified. Preserve the agreed design, Remnawave, Helper, Zapret2 and settings ownership. Complete update UI and all v1.1.5 acceptance items.
+4. Full validation/build only on explicit authorization; no stable publication without explicit approval.
+
+Do not advance to the next stage until the previous stage's implementation and static review are complete. Runtime validation remains a separate authorized gate. Do not ask again for the order.
+
+## Detailed implementation tasks (within the stages above)
 
 1. Review candidate patch dependencies and compile compatibility statically; complete remaining selected core fixes. Do not copy unrelated platform, TLS or listener changes.
 2. Pin a core revision by commit, using upstream sing-tun without a local replacement. Prefer a pinned Git submodule/local Go module replacement; update only the checkout/build inputs that need it. Do not update production releases.
