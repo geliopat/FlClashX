@@ -60,7 +60,7 @@ class ZapretDiagnosticsCard extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           DashboardCardHeader(
-            glyph: AppGlyphs.speed,
+            glyph: AppGlyphs.latency,
             title: AppLocalizations.of(context).forkHttpsLatency,
             trailing: [
               DashboardIconButton(
@@ -69,7 +69,7 @@ class ZapretDiagnosticsCard extends ConsumerWidget {
                 onPressed: () => showZapretStrategiesSheet(context),
               ),
               DashboardIconButton(
-                glyph: AppGlyphs.refresh,
+                glyph: AppGlyphs.latency,
                 tooltip: AppLocalizations.of(context).forkCheckNow,
                 onPressed: () =>
                     ref.read(zapretDiagnosticsProvider.notifier).refresh(),

@@ -863,7 +863,7 @@ class _GroupActions extends StatelessWidget {
             onPressed: isDelayTesting ? null : onDelayTest,
             icon: isDelayTesting
                 ? CommonCircleLoading(size: TonalButtonSize.compact.icon)
-                : const GlyphIcon(AppGlyphs.bolt),
+                : const GlyphIcon(AppGlyphs.latency),
           ),
           const SizedBox(width: 6),
           ElasticPress(

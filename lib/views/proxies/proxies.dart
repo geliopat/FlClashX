@@ -65,7 +65,7 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> {
     }
     final isDelayTesting = ref.watch(currentGroupDelayTestingProvider);
     return IconButtonData(
-      glyph: AppGlyphs.bolt,
+      glyph: AppGlyphs.latency,
       onPressed: () {
         _proxiesTabKey.currentState?.delayTestCurrentGroup();
       },
@@ -170,7 +170,7 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> {
                 .pickMode(mode == Mode.global ? Mode.rule : Mode.global),
           ),
         IconButtonData(
-          glyph: AppGlyphs.bolt,
+          glyph: AppGlyphs.latency,
           tooltip: appLocalizations.delayTestAll,
           isLoading: isTestingAll,
           onPressed: isTestingAll

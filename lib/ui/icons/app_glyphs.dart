@@ -62,6 +62,16 @@ abstract final class AppGlyphs {
 
   static const clock = requests;
 
+  // Clock at 3:00: dedicated to latency tests, not history or queued work.
+  static const latency = Glyph([
+    GlyphCircle(12, 12, 8.8),
+    GlyphPolyline([
+      GlyphVertex(12, 6.5),
+      GlyphVertex(12, 12, 0.6),
+      GlyphVertex(16.8, 12),
+    ], role: GlyphRole.detail),
+  ]);
+
   static const connections = Glyph([
     GlyphCircle(12, 5.2, 2.4),
     GlyphCircle(5.2, 17.6, 2.4),

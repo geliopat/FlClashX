@@ -121,6 +121,7 @@ final _glyphs = {
   'shuffle': AppGlyphs.shuffle,
   'split': AppGlyphs.split,
   'speed': AppGlyphs.speed,
+  'latency': AppGlyphs.latency,
   'dataUsage': AppGlyphs.dataUsage,
   'memory': AppGlyphs.memory,
   'cpu': AppGlyphs.cpu,
@@ -192,6 +193,14 @@ void main() {
       GlyphVertex(12, 20),
     ], role: GlyphRole.detail),
   ]);
+
+  test('latency clock and speed gauge are distinct from history and bolt', () async {
+    final latency = await _render(AppGlyphs.latency, 0);
+    expect(latency, isNot(await _render(AppGlyphs.clock, 0)));
+    expect(latency, isNot(await _render(AppGlyphs.speed, 0)));
+    expect(latency, isNot(await _render(AppGlyphs.bolt, 0)));
+    expect(_alphaAt(latency, 14, 12), greaterThan(0));
+  });
 
   test('a body fills inward from its outline', () async {
     final pixels = await _render(ring, 0.5);

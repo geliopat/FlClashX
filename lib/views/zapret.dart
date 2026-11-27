@@ -1,4 +1,5 @@
 import 'package:fl_clash/l10n/l10n.dart';
+import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/models/managed_settings.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/widgets/widgets.dart';
@@ -268,7 +269,7 @@ class ZapretView extends ConsumerWidget {
               ),
             ),
           ListItem(
-            leading: const Icon(Icons.speed),
+            leading: const GlyphIcon(AppGlyphs.latency),
             title: Text(AppLocalizations.of(context).forkCheckNow),
             onTap: () => ref
                 .read(zapretDiagnosticsProvider.notifier)

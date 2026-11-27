@@ -427,7 +427,7 @@ class _DelayTextState extends ConsumerState<_DelayText> {
                           behavior: HitTestBehavior.opaque,
                           onTap: _handleTestCurrentDelay,
                           child: GlyphIcon(
-                            AppGlyphs.bolt,
+                            AppGlyphs.latency,
                             size: measure.textHeight(AppTextStyle.caption2),
                           ),
                         ),
