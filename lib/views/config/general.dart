@@ -99,10 +99,11 @@ class SpeedTestUrlItem extends ConsumerWidget {
     return ListItem<SpeedTestService>.options(
       title: Text(l.forkSpeedTestUrl),
       subtitle: Text(l.forkDirectYandex),
-      options: const [SpeedTestService.cloudflare, SpeedTestService.custom],
+      options: const [SpeedTestService.cloudflare, SpeedTestService.cachefly, SpeedTestService.custom],
       value: vpnSpeedService(settings.service),
       textBuilder: (value) => switch (value) {
         SpeedTestService.cloudflare => 'Cloudflare',
+        SpeedTestService.cachefly => 'CacheFly (download)',
         SpeedTestService.yandex => 'Yandex Internetometer',
         SpeedTestService.custom => l.custom,
       },

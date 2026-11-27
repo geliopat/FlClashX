@@ -15,7 +15,9 @@ class NetworkTestsView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final ru = Localizations.localeOf(context).languageCode == 'ru';
     final url = ref.watch(appSettingProvider.select((s) => s.testUrl));
-    final speedService = ref.watch(speedTestSettingsProvider.select((s) => s.service));
+    final speed = ref.watch(speedTestSettingsProvider);
+    final speedService = speed.service;
+    final speedAction = ref.read(speedTestSettingsProvider.notifier);
     // Keep the saved custom value loaded while showing the preset selector.
     ref.watch(customDelayUrlProvider);
     final probes = ref.watch(networkProbeSettingsProvider);
@@ -53,6 +55,22 @@ class NetworkTestsView extends ConsumerWidget {
                 CustomSpeedUrlItem(upload: false),
                 CustomSpeedUrlItem(upload: true),
               ],
+              ListItem<int>.options(title: Text(ru ? 'Параллельные потоки' : 'Parallel streams'),
+                options: SpeedTestSettings.streamOptions, value: speed.streams,
+                textBuilder: (v) => '$v', onChanged: (v) => speedAction.set(speed.copyWith(streams: v))),
+              ListItem<int>.options(title: Text(ru ? 'Тайм-аут направления' : 'Timeout per direction'),
+                options: SpeedTestSettings.timeOptions, value: speed.seconds,
+                textBuilder: seconds, onChanged: (v) => speedAction.set(speed.copyWith(seconds: v))),
+              ListItem<int>.options(title: Text(ru ? 'Лимит данных на направление' : 'Data cap per direction'),
+                options: SpeedTestSettings.volumeOptions, value: speed.maxMB,
+                textBuilder: (v) => '$v MB', onChanged: (v) => speedAction.set(speed.copyWith(maxMB: v))),
+              ListItem<String>.options(title: Text(ru ? 'Направление' : 'Direction'),
+                options: const ['both', 'download', 'upload'], value: speed.direction,
+                textBuilder: (v) => switch(v) {
+                  'download' => ru ? 'Загрузка' : 'Download',
+                  'upload' => ru ? 'Отправка' : 'Upload',
+                  _ => ru ? 'Оба' : 'Both',
+                }, onChanged: (v) => speedAction.set(speed.copyWith(direction: v))),
             ],
             footer: ru ? 'Тест скорости запускается только вручную.' : 'Speed measurements are manual only.',
           ),

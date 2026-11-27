@@ -1,13 +1,13 @@
 package core
 
 import (
-	"bytes"
 	"context"
-	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/url"
+	"net"
+	"github.com/metacubex/mihomo/adapter/outboundgroup"
 	"strings"
 	"sync"
 	"time"
@@ -28,6 +28,10 @@ type ProxySpeedRequest struct {
 	ProxyName string `json:"proxy-name"`
 	Service string `json:"service"`
 	DownloadURL string `json:"download-url"`
+	Streams int `json:"streams"`
+	Seconds int `json:"seconds"`
+	MaxMB int `json:"max-mb"`
+	Direction string `json:"direction"`
 	UploadURL string `json:"upload-url"`
 }
 
@@ -36,6 +40,8 @@ type ProxySpeedResult struct {
 	Upload *float64 `json:"upload"`
 	DownloadError string `json:"download-error,omitempty"`
 	UploadError string `json:"upload-error,omitempty"`
+	DownloadBytes int64 `json:"download-bytes,omitempty"`
+	UploadBytes int64 `json:"upload-bytes,omitempty"`
 }
 
 // One measurement at a time across the core, including independent UI calls.
@@ -49,34 +55,45 @@ func handleSpeedTest(params *ProxySpeedRequest) *ProxySpeedResult {
 		return failed("busy")
 	}
 	defer speedTestLock.Unlock()
-	proxy := lookupProxy(params.ProxyName)
-	if proxy == nil || isProxyGroupType(proxy.Type()) {
-		return failed("unsupported")
-	}
-	switch strings.ToUpper(params.ProxyName) {
-	case "REJECT", "REJECT-DROP", "PASS", "COMPATIBLE":
-		return failed("unsupported")
-	}
-	if proxy.Type() == constant.Direct && params.ProxyName != "DIRECT" {
-		return failed("unsupported")
-	}
+	proxy, direct, err := resolveSpeedRoute(lookupProxy(params.ProxyName))
+	if err != nil { return failed(err.Error()) }
 	dialer := &probeDialer{proxy: proxy}
 	tlsConfig, err := ca.GetTLSConfig(ca.Option{})
 	if err != nil {
 		return failed("failed")
 	}
 	transport := &http.Transport{
-		DialContext: dialer.dial,
+		DialContext: func(ctx context.Context, network, address string) (net.Conn, error) {
+			// Recheck a dynamic group's current members before each connection.
+			// No fallback to the system network or a DIRECT member is allowed.
+			_, nowDirect, routeErr := resolveSpeedRoute(proxy)
+			if routeErr != nil || nowDirect != direct { return nil, fmt.Errorf("speed route changed") }
+			conn, err := dialer.dial(ctx, network, address)
+			if err != nil { return nil, err }
+			if !direct {
+				if routed, ok := conn.(constant.Conn); ok {
+					for _, name := range routed.Chains() {
+						if p := lookupProxy(name); p != nil && p.Type() == constant.Direct {
+							_ = conn.Close()
+							return nil, fmt.Errorf("DIRECT exit refused")
+						}
+					}
+				}
+			}
+			return conn, nil
+		},
 		TLSClientConfig: tlsConfig,
 		TLSHandshakeTimeout: 10 * time.Second,
 		DisableCompression: true,
-		MaxIdleConns: 2,
+		MaxIdleConns: 8,
+		MaxIdleConnsPerHost: 8,
+		DisableKeepAlives: true,
 	}
 	defer transport.CloseIdleConnections()
 	client := &http.Client{Transport: transport, CheckRedirect: func(*http.Request, []*http.Request) error {
 		return http.ErrUseLastResponse
 	}}
-	service, err := speedServiceForRoute(params.ProxyName == "DIRECT", params.Service)
+	service, err := speedServiceForRoute(direct, params.Service)
 	if err != nil { return failed("unsupported") }
 	down, up := params.DownloadURL, params.UploadURL
 	multipart := false
@@ -92,6 +109,9 @@ func handleSpeedTest(params *ProxySpeedRequest) *ProxySpeedResult {
 			return failed("discovery")
 		}
 		multipart = true
+	case "cachefly":
+		down = "https://cachefly.cachefly.net/100mb.test"
+		up = ""
 	case "custom":
 	default:
 		return failed("unsupported")
@@ -99,12 +119,20 @@ func handleSpeedTest(params *ProxySpeedRequest) *ProxySpeedResult {
 	if service != "yandex" && (validYandexSpeedURL(down) || validYandexSpeedURL(up)) {
 		return failed("unsupported")
 	}
-	if !validSpeedURL(down) || !validSpeedURL(up) {
-		return failed("invalid-url")
-	}
+	options := normalizedSpeedOptions(params)
 	result := &ProxySpeedResult{}
-	result.Download, result.DownloadError = measureSpeed(client, down, false, false)
-	result.Upload, result.UploadError = measureSpeed(client, up, true, multipart)
+	if options.direction != "upload" {
+		if !validSpeedURL(down) { result.DownloadError = "invalid-url" } else {
+			result.Download, result.DownloadBytes, result.DownloadError = measureSpeedPhase(client, service, down, false, false, options)
+		}
+	}
+	if options.direction != "download" {
+		if service == "cachefly" { result.UploadError = "unsupported" } else if !validSpeedURL(up) {
+			result.UploadError = "invalid-url"
+		} else {
+			result.Upload, result.UploadBytes, result.UploadError = measureSpeedPhase(client, service, up, true, multipart, options)
+		}
+	}
 	return result
 }
 
@@ -191,90 +219,59 @@ func speedHeaders(req *http.Request) {
 	}
 }
 
-// This is a bounded single-connection sample, not the service's multi-stream
-// browser score. No partial upload is reported as successful.
-func measureSpeed(client *http.Client, endpoint string, upload, multipart bool) (*float64, string) {
-	ctx, cancel := context.WithTimeout(context.Background(), speedPhaseTimeout)
-	defer cancel()
-	var body io.Reader
-	var payload []byte
-	method := http.MethodGet
-	contentType := "application/octet-stream"
-	if upload {
-		method = http.MethodPost
-		payload = make([]byte, speedUploadBytes)
-		if _, err := rand.Read(payload); err != nil {
-			return nil, "failed"
-		}
-		if multipart {
-			const boundary = "FlClashZSpeedSample"
-			prefix := "--"+boundary+"\r\nContent-Disposition: form-data; name=\"data\"; filename=\"blob\"\r\nContent-Type: application/octet-stream\r\n\r\n"
-			suffix := "\r\n--"+boundary+"--\r\n"
-			body = io.MultiReader(strings.NewReader(prefix), bytes.NewReader(payload), strings.NewReader(suffix))
-			contentType = "multipart/form-data; boundary="+boundary
-			req, err := http.NewRequestWithContext(ctx, method, endpoint, body)
-			if err != nil { return nil, "failed" }
-			req.ContentLength = int64(len(prefix)+len(payload)+len(suffix))
-			req.Header.Set("Content-Type", contentType)
-			return transferSpeed(client, req, int64(len(payload)), true)
-		}
-		body = bytes.NewReader(payload)
-	}
-	req, err := http.NewRequestWithContext(ctx, method, endpoint, body)
-	if err != nil {
-		return nil, "failed"
-	}
-	if upload {
-		req.Header.Set("Content-Type", contentType)
-	}
-	return transferSpeed(client, req, int64(len(payload)), upload)
-}
-
-func transferSpeed(client *http.Client, req *http.Request, payloadBytes int64, upload bool) (*float64, string) {
-	speedHeaders(req)
-	start := time.Now()
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, probeErrorKind(err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, "http"
-	}
-	var count int64
-	if upload {
-		_, err = io.Copy(io.Discard, io.LimitReader(resp.Body, 64*1024))
-		count = payloadBytes
-	} else {
-		// A download URL must return data, not a successful HTML landing page.
-		if strings.Contains(strings.ToLower(resp.Header.Get("Content-Type")), "text/html") {
-			return nil, "invalid-body"
-		}
-		count, err = io.Copy(io.Discard, io.LimitReader(resp.Body, speedDownloadBytes))
-	}
-	if err != nil {
-		return nil, probeErrorKind(err)
-	}
-	if count < 64*1024 {
-		return nil, "invalid-body"
-	}
-	elapsed := time.Since(start).Seconds()
-	if elapsed <= 0 {
-		return nil, "failed"
-	}
-	value := float64(count)*8/elapsed/1e6
-	return &value, ""
-}
-
-
 // Do not allow a stale client preference or an IPC caller to run Internetometer
 // through a VPN node. A named non-DIRECT route has no direct fallback.
 func speedServiceForRoute(direct bool, requested string) (string, error) {
     if direct { return "yandex", nil }
     switch requested {
-    case "cloudflare", "custom":
+    case "cloudflare", "cachefly", "custom":
         return requested, nil
     default:
         return "", fmt.Errorf("unsupported VPN speed service")
     }
+}
+
+
+// A selector is pinned to its current leaf without changing selection. A
+// load balancer is tested as the actual group, not as its fastest member.
+// A mixed group cannot guarantee that a VPN endpoint stays off DIRECT.
+func resolveSpeedRoute(root constant.Proxy) (constant.Proxy, bool, error) {
+	active := map[constant.Proxy]bool{}
+	var walk func(constant.Proxy) (constant.Proxy, bool, error)
+	walk = func(p constant.Proxy) (constant.Proxy, bool, error) {
+		if p == nil || active[p] { return nil, false, fmt.Errorf("unsupported") }
+		active[p] = true
+		defer delete(active,p)
+		if group, ok := adapterAs[*outboundgroup.LoadBalance](p); ok {
+			var first constant.Proxy
+			var direct bool
+			for _, member := range group.Proxies() {
+				leaf, isDirect, err := walk(member)
+				if err != nil { return nil, false, err }
+				if first == nil { first, direct = leaf, isDirect } else if direct != isDirect {
+					return nil, false, fmt.Errorf("mixed-direct-group")
+				}
+			}
+			if first == nil { return nil, false, fmt.Errorf("unsupported") }
+			if direct { return first, true, nil }
+			return p, false, nil
+		}
+		if isProxyGroupType(p.Type()) {
+			return walk(p.Unwrap(nil, false))
+		}
+		if p.Type() == constant.Direct {
+			if p.Name() != "DIRECT" { return nil, false, fmt.Errorf("unsupported") }
+			return p, true, nil
+		}
+		switch strings.ToUpper(p.Name()) {
+		case "REJECT", "REJECT-DROP", "PASS", "COMPATIBLE":
+			return nil, false, fmt.Errorf("unsupported")
+		}
+		switch p.Type().String() {
+		case "Reject", "RejectDrop", "Pass", "Compatible":
+			return nil, false, fmt.Errorf("unsupported")
+		}
+		return p, false, nil
+	}
+	return walk(root)
 }

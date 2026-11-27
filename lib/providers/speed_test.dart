@@ -7,7 +7,7 @@ import 'package:fl_clash/providers/providers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-enum SpeedTestService { cloudflare, yandex, custom }
+enum SpeedTestService { cloudflare, yandex, custom, cachefly }
 
 // The old Yandex selection is migrated for VPN tests only. DIRECT is fixed
 // to Internetometer independently, including at the Go IPC boundary.
@@ -40,16 +40,30 @@ class SpeedTestSettings {
     this.service = SpeedTestService.cloudflare,
     this.downloadUrl = speedTestDefaultDownload,
     this.uploadUrl = speedTestDefaultUpload,
+    this.streams = 4,
+    this.seconds = 8,
+    this.maxMB = 100,
+    this.direction = 'both',
   });
   final SpeedTestService service;
   final String downloadUrl;
   final String uploadUrl;
+  final int streams, seconds, maxMB;
+  final String direction;
+  static const streamOptions = [1, 2, 4, 6, 8];
+  static const timeOptions = [3, 5, 8, 10, 15, 20, 25];
+  static const volumeOptions = [10, 25, 50, 100, 200, 500];
   SpeedTestSettings copyWith({
     SpeedTestService? service, String? downloadUrl, String? uploadUrl,
+    int? streams, int? seconds, int? maxMB, String? direction,
   }) => SpeedTestSettings(
     service: service ?? this.service,
     downloadUrl: downloadUrl ?? this.downloadUrl,
     uploadUrl: uploadUrl ?? this.uploadUrl,
+    streams: streams ?? this.streams,
+    seconds: seconds ?? this.seconds,
+    maxMB: maxMB ?? this.maxMB,
+    direction: direction ?? this.direction,
   );
 }
 
@@ -76,6 +90,10 @@ class SpeedTestSettingsController extends Notifier<SpeedTestSettings> {
       ] ?? SpeedTestService.cloudflare),
       downloadUrl: prefs.getString('speedTest.download') ?? speedTestDefaultDownload,
       uploadUrl: prefs.getString('speedTest.upload') ?? speedTestDefaultUpload,
+      streams: SpeedTestSettings.streamOptions.contains(prefs.getInt('speedTest.streams')) ? prefs.getInt('speedTest.streams')! : 4,
+      seconds: SpeedTestSettings.timeOptions.contains(prefs.getInt('speedTest.seconds')) ? prefs.getInt('speedTest.seconds')! : 8,
+      maxMB: SpeedTestSettings.volumeOptions.contains(prefs.getInt('speedTest.maxMB')) ? prefs.getInt('speedTest.maxMB')! : 100,
+      direction: const ['both', 'download', 'upload'].contains(prefs.getString('speedTest.direction')) ? prefs.getString('speedTest.direction')! : 'both',
     );
   }
 
@@ -90,6 +108,10 @@ class SpeedTestSettingsController extends Notifier<SpeedTestSettings> {
     await prefs.setString('speedTest.service', latest.service.name);
     await prefs.setString('speedTest.download', latest.downloadUrl);
     await prefs.setString('speedTest.upload', latest.uploadUrl);
+    await prefs.setInt('speedTest.streams', latest.streams);
+    await prefs.setInt('speedTest.seconds', latest.seconds);
+    await prefs.setInt('speedTest.maxMB', latest.maxMB);
+    await prefs.setString('speedTest.direction', latest.direction);
   }
 }
 
@@ -146,9 +168,26 @@ class SpeedTestController extends Notifier<SpeedTestState> {
   Future<void> testAll() => _run(speedTestTargets(ref.read(groupsProvider)));
 
   Future<void> testProxy(Proxy proxy) async {
-    if (!speedTestableProxy(proxy)) return;
-    if (ref.read(groupsProvider).any((group) => group.name == proxy.name)) return;
+    final group = ref.read(groupsProvider).getGroup(proxy.name);
+    if (!speedTestableProxy(proxy) && group == null) return;
     await _run({proxy.name});
+  }
+
+  Future<void> testGroupMembers(String name) async {
+    final groups = ref.read(groupsProvider);
+    final visited = <String>{};
+    final targets = <String>{};
+    void walk(String groupName) {
+      if (!visited.add(groupName)) return;
+      final group = groups.getGroup(groupName);
+      if (group == null) return;
+      for (final p in group.all) {
+        if (groups.getGroup(p.name) != null) { walk(p.name); }
+        else if (speedTestableProxy(p)) { targets.add(p.name); }
+      }
+    }
+    walk(name);
+    await _run(targets);
   }
 
   Future<void> _run(Set<String> targets) async {
@@ -172,6 +211,10 @@ class SpeedTestController extends Notifier<SpeedTestState> {
               service: name == 'DIRECT' ? 'yandex' : vpnSpeedService(settings.service).name,
               downloadUrl: settings.downloadUrl,
               uploadUrl: settings.uploadUrl,
+              streams: settings.streams,
+              seconds: settings.seconds,
+              maxMB: settings.maxMB,
+              direction: settings.direction,
             ),
           );
         } catch (_) {

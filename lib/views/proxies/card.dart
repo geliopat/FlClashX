@@ -106,6 +106,8 @@ class ProxyCard extends ConsumerWidget {
     required bool addable,
   }) {
     final appLocalizations = context.appLocalizations;
+    final speedGroup = ref.watch(groupsProvider).getGroup(proxy.name);
+    final speedReady = system.isWindows && !ref.watch(speedTestProvider.select((state) => state.busy)) && ref.watch(coreStatusProvider) == CoreStatus.connected;
     return [
       if (groupType == GroupType.Selector)
         CommonPopupMenuItem(
@@ -121,13 +123,17 @@ class ProxyCard extends ConsumerWidget {
           checked: pinned,
           onPressed: () => _handleSelect(ref),
         ),
-      if (system.isWindows && speedTestableProxy(proxy) &&
-          !ref.watch(speedTestProvider.select((state) => state.busy)) &&
-          ref.watch(coreStatusProvider) == CoreStatus.connected)
+      if (system.isWindows && (speedTestableProxy(proxy) || speedGroup != null))
         CommonPopupMenuItem(
           glyph: AppGlyphs.speed,
           label: appLocalizations.forkSpeedTest,
-          onPressed: () => ref.read(speedTestProvider.notifier).testProxy(proxy),
+          onPressed: speedReady ? () => ref.read(speedTestProvider.notifier).testProxy(proxy) : null,
+        ),
+      if (system.isWindows && speedGroup != null)
+        CommonPopupMenuItem(
+          glyph: AppGlyphs.speed,
+          label: Localizations.localeOf(context).languageCode == 'ru' ? 'Проверить серверы группы' : 'Test group members',
+          onPressed: speedReady ? () => ref.read(speedTestProvider.notifier).testGroupMembers(proxy.name) : null,
         ),
       if (addable)
         CommonPopupMenuItem(
@@ -146,7 +152,7 @@ class ProxyCard extends ConsumerWidget {
     final showSpeed = showProxySpeedMetrics(
       ref.watch(proxiesStyleSettingProvider.select((state) => state.layout)),
       isWindows: system.isWindows,
-    ) && speedTestableProxy(proxy);
+    ) && (speedTestableProxy(proxy) || ref.watch(groupsProvider.select((groups) => groups.getGroup(proxy.name) != null)));
     final delayText = _DelayText(
       proxy: proxy,
       testUrl: testUrl,

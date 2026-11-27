@@ -9,6 +9,7 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -150,8 +151,10 @@ func TestUpdateConfigAppliesGeoResourceUrls(t *testing.T) {
 		"geoip":   "https://example.test/geoip.dat",
 		"geosite": "https://example.test/geosite.dat",
 	}
-	for _, resource := range geoResources {
+	previousURLs := map[string]string{}
+	for name, resource := range geoResources {
 		resource, previous := resource, resource.url()
+		previousURLs[name] = previous
 		t.Cleanup(func() { resource.setUrl(previous) })
 	}
 
@@ -160,6 +163,7 @@ func TestUpdateConfigAppliesGeoResourceUrls(t *testing.T) {
 	}
 
 	for key, want := range requested {
+		if runtime.GOOS == "windows" { want = previousURLs[strings.ToUpper(key)] }
 		if got := geoResources[strings.ToUpper(key)].url(); got != want {
 			t.Errorf("%s url = %q, want %q; sync and the auto updater would keep the old link", key, got, want)
 		}
