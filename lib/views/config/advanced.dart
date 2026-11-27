@@ -3,6 +3,8 @@ import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/ui/ui.dart';
 import 'package:fl_clash/views/config/dns.dart';
 import 'package:fl_clash/views/config/sniffer.dart';
+import 'package:fl_clash/views/config/ntp.dart';
+import 'package:fl_clash/views/config/additional_mihomo_settings.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_clash/views/config/network.dart';
@@ -37,6 +39,12 @@ class AdvancedConfigView extends ConsumerWidget {
           title: Text(appLocalizations.sniffer),
           widget: SnifferView(activeId, preserveEmpty: true),
         ),
+      if (system.isWindows && activeId != null) ...[
+        ListItem.open(title: const Text('NTP'), widget: NtpView(activeId)),
+        ListItem.open(title: Text(Localizations.localeOf(context).languageCode == 'ru'
+            ? 'Дополнительные параметры Mihomo' : 'Additional Mihomo settings'),
+          widget: AdditionalMihomoSettingsView(profileId: activeId)),
+      ],
       ListItem.open(
         title: Text(appLocalizations.addedRules),
         leading: const GlyphIcon(AppGlyphs.rules),

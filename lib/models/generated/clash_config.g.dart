@@ -571,6 +571,7 @@ Map<String, dynamic> _$ProfileTunToJson(_ProfileTun instance) =>
 
 _ProfileOverrides _$ProfileOverridesFromJson(Map<String, dynamic> json) =>
     _ProfileOverrides(
+      additionalSettingsYaml: json['additional-settings-yaml'] as String? ?? '',
       dns: json['dns'] == null
           ? defaultDns
           : Dns.safeDnsFromJson(json['dns'] as Map<String, Object?>),
@@ -626,6 +627,7 @@ Map<String, dynamic> _$ProfileOverridesToJson(_ProfileOverrides instance) =>
           .map((e) => _$TunOverrideKeyEnumMap[e]!)
           .toList(),
       'proxy-providers': instance.proxyProviders,
+      'additional-settings-yaml': instance.additionalSettingsYaml,
     };
 
 const _$DnsOverrideKeyEnumMap = {

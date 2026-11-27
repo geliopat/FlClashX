@@ -136,6 +136,9 @@ Future<RealProfile> _makeRealProfileTask(MakeRealProfileState data) async {
   final profilesPath = data.profilesPath;
   final profileId = data.profileId;
   final overrides = data.overrides;
+  if (Platform.isWindows && !data.safeMode) {
+    applyAdditionalSettings(rawConfig, overrides.additionalSettingsYaml);
+  }
   final addedRules = data.addedRules;
   final appendSystemDns = data.appendSystemDns;
   final defaultUA = data.defaultUA;

@@ -248,11 +248,17 @@ typedef YamlSectionSources = ({
   Map<String, Object?> dns,
   Map<String, Object?> tun,
   Map<String, Object?> sniffer,
+  Map<String, Object?> ntp,
+  Map<String, dynamic> explicit,
+  Map<String, dynamic> defaults,
 });
 
-YamlSectionSources yamlSectionSourcesOf(int id, Map<String, dynamic> config) => (
+YamlSectionSources yamlSectionSourcesOf(int id, Map<String, dynamic> config, {Map<String, dynamic> defaults = const {}}) => (
   profileId: id,
   dns: sectionOverrideValues(config, 'dns', DnsOverrideKey.values),
   tun: sectionOverrideValues(config, 'tun', TunOverrideKey.values),
   sniffer: sectionOverrideValues(config, 'sniffer', SnifferOverrideKey.values),
+  ntp: sectionOverrideValues(config, 'ntp', NtpOverrideKey.values),
+  explicit: Map.unmodifiable(config),
+  defaults: Map.unmodifiable(defaults),
 );

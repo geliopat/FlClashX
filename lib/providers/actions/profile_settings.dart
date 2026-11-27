@@ -147,7 +147,7 @@ class ProfileSettingsAction extends _$ProfileSettingsAction {
     ref.read(yamlSettingReferencesProvider.notifier).set(
       yamlSettingReferences(inherited, inheritedAuthentication, named),
     );
-    ref.read(yamlSectionSourcesProvider.notifier).set(yamlSectionSourcesOf(id, base.sourceSettings));
+    ref.read(yamlSectionSourcesProvider.notifier).set(yamlSectionSourcesOf(id, base.sourceSettings, defaults: {for (final key in ['tun','profile','experimental','sniffer',...additionalMihomoKeys.keys.where((key) => !key.contains('.'))]) if (base.config.containsKey(key)) key: base.config[key]}));
     _released.removeAll(released);
   }
 }

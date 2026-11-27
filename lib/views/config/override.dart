@@ -377,6 +377,7 @@ abstract class OverrideSpec<K extends OverrideKey, M> {
       'dns' => sources.dns,
       'tun' => sources.tun,
       'sniffer' => sources.sniffer,
+      'ntp' => sources.ntp,
       _ => const <String, Object?>{},
     };
   }
@@ -400,6 +401,7 @@ abstract class OverrideSpec<K extends OverrideKey, M> {
       Dns() => defaultDns.applyOverrideYaml(yaml.encode(fragment)).dns as M,
       ProfileTun() => ProfileTun.fromJson(fragment) as M,
       Sniffer() => defaultSniffer.applyOverrideYaml(yaml.encode(fragment)).sniffer as M,
+      Ntp() => defaultNtp.applyOverrideYaml(yaml.encode(fragment)).ntp as M,
       _ => throw const FormatException('Unsupported inherited field'),
     };
     return result;

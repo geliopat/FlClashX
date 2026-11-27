@@ -8,6 +8,7 @@ export 'ip_quality.dart';
 export 'profile.dart';
 export 'managed_settings.dart';
 export 'profile_settings.dart';
+export 'additional_mihomo_settings.dart';
 export 'provider_headers.dart';
 export 'references.dart';
 export 'state.dart';

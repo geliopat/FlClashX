@@ -64,6 +64,9 @@ class _NtpOverrideSpec extends OverrideSpec<NtpOverrideKey, Ntp>
   List<NtpOverrideKey> get values => NtpOverrideKey.values;
 
   @override
+  String get yamlSection => 'ntp';
+
+  @override
   String overrideYaml(Ntp model, Set<NtpOverrideKey> keys) =>
       model.overrideYaml(keys);
 

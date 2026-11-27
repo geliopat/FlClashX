@@ -243,6 +243,9 @@ Future<SetupState> setupState(Ref ref, int? profileId) async {
               dnsOverrideKeys: system.isWindows ? state.dnsOverrideKeys : state.dnsOverrideKeys.intersection(
                 DnsOverrideKey.normalProfileKeys,
               ),
+              additionalSettingsYaml: system.isWindows ? profile?.overrides.additionalSettingsYaml ?? '' : '',
+              ntp: system.isWindows ? profile?.overrides.ntp ?? defaultNtp : defaultNtp,
+              ntpOverrideKeys: system.isWindows ? profile?.overrides.ntpOverrideKeys ?? const {} : const {},
               sniffer: system.isWindows ? profile?.overrides.sniffer ?? defaultSniffer : defaultSniffer,
               snifferOverrideKeys: system.isWindows ? profile?.overrides.snifferOverrideKeys ?? const {} : const {},
               tun: state.tunOverride,
