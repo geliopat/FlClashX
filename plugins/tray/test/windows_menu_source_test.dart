@@ -10,7 +10,13 @@ File _resolveSource(String relativePath) {
   return File(relativePath);
 }
 
+String _normalizeSource(String source) => source.replaceAll('\r\n', '\n');
+
+String _readSource(String relativePath) =>
+    _normalizeSource(_resolveSource(relativePath).readAsStringSync());
+
 String _body(String source, String signature) {
+  source = _normalizeSource(source);
   final start = source.indexOf(signature);
   expect(start, isNonNegative, reason: signature);
   final end = source.indexOf('\n}\n', start);
@@ -22,9 +28,14 @@ void main() {
   late String pluginSource;
 
   setUpAll(() {
-    pluginSource = _resolveSource('windows/tray_plugin.cpp')
-        .readAsStringSync()
-        .replaceAll('\r\n', '\n');
+    pluginSource = _readSource('windows/tray_plugin.cpp');
+  });
+
+  test('source body extraction works with LF and CRLF', () {
+    const source = 'void Example() {\n  Draw();\n}\n';
+    const expected = 'void Example() {\n  Draw();';
+    expect(_body(source, 'void Example('), expected);
+    expect(_body(source.replaceAll('\n', '\r\n'), 'void Example('), expected);
   });
 
   test('native fallback still uses TrackPopupMenu, not WM_COMMAND', () {
@@ -33,7 +44,7 @@ void main() {
   });
 
   test('acrylic menu uses measured labels, tint and no outline', () {
-    final source = _resolveSource('windows/acrylic_menu.cpp').readAsStringSync();
+    final source = _readSource('windows/acrylic_menu.cpp');
     expect(source, contains('0x65000000'));
     expect(source, contains('0xfffffffe'));
     expect(source, contains('CreateTextLayout'));
@@ -47,8 +58,8 @@ void main() {
   });
 
   test('one Direct2D frame uses regular DirectWrite and premultiplied grayscale', () {
-    final source = _resolveSource('windows/acrylic_menu.cpp').readAsStringSync();
-    final cmake = _resolveSource('windows/CMakeLists.txt').readAsStringSync();
+    final source = _readSource('windows/acrylic_menu.cpp');
+    final cmake = _readSource('windows/CMakeLists.txt');
     final frame = _body(source, 'bool AcrylicMenu::RenderFrame(');
     expect(source, contains('DWRITE_FONT_WEIGHT_REGULAR'));
     expect(source, isNot(contains('DWRITE_FONT_WEIGHT_MEDIUM')));
@@ -70,7 +81,7 @@ void main() {
   });
 
   test('restart vector shares its clockwise arc endpoint with the arrowhead', () {
-    final source = _resolveSource('windows/acrylic_menu.cpp').readAsStringSync();
+    final source = _readSource('windows/acrylic_menu.cpp');
     final start = source.indexOf('} else if (row.icon == "restart")');
     final end = source.indexOf('} else if (row.icon == "exit")', start);
     expect(start, isNonNegative);
@@ -83,7 +94,7 @@ void main() {
   });
 
   test('vector icons snap to physical pixel centers with a common stroke', () {
-    final source = _resolveSource('windows/acrylic_menu.cpp').readAsStringSync();
+    final source = _readSource('windows/acrylic_menu.cpp');
     final geometry = _body(source, 'HRESULT CreateIconGeometry(');
     final snap = _body(source, 'float SnapStroke(');
     final frame = _body(source, 'bool AcrylicMenu::RenderFrame(');
@@ -98,7 +109,7 @@ void main() {
   });
 
   test('first frame is validated before showing and repaint is cached', () {
-    final source = _resolveSource('windows/acrylic_menu.cpp').readAsStringSync();
+    final source = _readSource('windows/acrylic_menu.cpp');
     final open = _body(source, 'bool AcrylicMenu::Open(');
     final frame = _body(source, 'bool AcrylicMenu::RenderFrame(');
     final close = _body(source, 'void AcrylicMenu::Close(');
