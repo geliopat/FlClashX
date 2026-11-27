@@ -453,6 +453,15 @@ class TunSection extends ConsumerWidget {
     final spec = appTunOverrideSpec(isLinux: isLinux, isWindows: isWindows);
     final picked = spec.listedKeys(ref, watch: true);
     final sourcePending = spec.sourcePending(ref, watch: true);
+    final sources = isWindows ? ref.watch(yamlSectionSourcesProvider) : null;
+    final rawTun = sources?.explicit['tun'];
+    final ru = Localizations.localeOf(context).languageCode == 'ru';
+    String protectedCaption(String field, String effective) {
+      final raw = rawTun;
+      return raw is Map && raw.containsKey(field)
+          ? '$effective · ${ru ? 'Из подписки' : 'From subscription'}: ${inheritedOverrideValueLabel(raw[field], russian: ru)}'
+          : effective;
+    }
     final listed = [
       for (final key in spec.values)
         if (picked.contains(key)) key,
@@ -464,9 +473,11 @@ class TunSection extends ConsumerWidget {
         const BypassPrivateRouteItem(key: ValueKey(#bypassPrivateRoute)),
         if (isWindows) ...[
           ListItem(key: const ValueKey('protected-auto-route'), title: const Text('auto-route'),
-            subtitle: Text(context.appLocalizations.enabled), trailing: const GlyphIcon(AppGlyphs.lock, size: 16)),
+            subtitle: Text(protectedCaption('auto-route', context.appLocalizations.enabled)), trailing: const GlyphIcon(AppGlyphs.lock, size: 16)),
           ListItem(key: const ValueKey('protected-auto-detect-interface'), title: const Text('auto-detect-interface'),
-            subtitle: Text(context.appLocalizations.enabled), trailing: const GlyphIcon(AppGlyphs.lock, size: 16)),
+            subtitle: Text(protectedCaption('auto-detect-interface', context.appLocalizations.enabled)), trailing: const GlyphIcon(AppGlyphs.lock, size: 16)),
+          ListItem(key: const ValueKey('protected-dns-mode'), title: const Text('dns-mode'),
+            subtitle: Text(protectedCaption('dns-mode', 'hijack')), trailing: const GlyphIcon(AppGlyphs.lock, size: 16)),
         ],
         for (final key in listed)
           OverrideEntry(key: ValueKey(key), spec: spec, overrideKey: key),
