@@ -2,8 +2,6 @@ import 'dart:io';
 
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/file_logger.dart';
-import 'package:fl_clash/core/desktop/helper_client.dart';
-import 'package:path/path.dart' as p;
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/features/form/form.dart';
 import 'package:fl_clash/l10n/l10n.dart';
@@ -741,52 +739,10 @@ class GeneralView extends ConsumerWidget {
                   ),
                 ),
                 ListItem(
+                  leading: const GlyphIcon(AppGlyphs.openExternal),
                   title: Text(AppLocalizations.of(context).forkOpenZapretLogs),
                   onTap: () async => system.openDirectory(await zapretFileLogger.directoryPath),
                 ),
-                ListItem(
-                  title: Text(AppLocalizations.of(context).forkCrashHistory),
-                  onTap: () async => system.openDirectory(await crashFileLogger.directoryPath),
-                ),
-              ListItem(
-                title: Text(AppLocalizations.of(context).forkExportTodayLogs),
-                onTap: () async {
-                  try {
-                    final temp = await appPath.shareDirPath;
-                    await Directory(temp).create(recursive: true);
-                    final archive = await zapretFileLogger.archiveToday(temp);
-                    if (!context.mounted) return;
-                    if (archive == null) {
-                      dialogs.showNotifier(AppLocalizations.of(context).forkNoTodayLogs);
-                    } else {
-                      final folder = await appPath.downloadDirPath;
-                      final name = p.basenameWithoutExtension(archive);
-                      var target = File(p.join(folder, '$name.zip'));
-                      for (var suffix = 2; await target.exists(); suffix++) {
-                        target = File(p.join(folder, '${name}_$suffix.zip'));
-                      }
-                      await File(archive).copy(target.path);
-                      if (context.mounted) dialogs.showNotifier('${AppLocalizations.of(context).forkArchiveSaved}: ${target.path}');
-                    }
-                  } catch (_) {
-                    if (context.mounted) dialogs.showNotifier(AppLocalizations.of(context).forkExportLogsFailed);
-                  }
-                },
-              ),
-              ListItem(
-                title: Text(context.appLocalizations.forkExportServiceJournal),
-                onTap: () async {
-                  try {
-                    final content = await helperClient.zapretLogArchive();
-                    final stamp = DateTime.now().millisecondsSinceEpoch;
-                    final file = File(p.join(await appPath.downloadDirPath, 'FlClashZ-service-$stamp.jsonl'));
-                    await file.writeAsString(content, flush: true);
-                    if (context.mounted) dialogs.showNotifier(file.path);
-                  } catch (_) {
-                    if (context.mounted) dialogs.showNotifier(context.appLocalizations.forkJournalUnavailable);
-                  }
-                },
-              ),
               ],
               footer: AppLocalizations.of(context).forkEngineDebugTip,
             ),
