@@ -5,6 +5,8 @@ import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
+import 'package:fl_clash/common/file_logger.dart';
+import 'package:flutter/services.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:material_ui/material_ui.dart';
@@ -88,11 +90,28 @@ class _LogsViewState extends ConsumerState<LogsView>
   }
 
   List<IconButtonData> _buildActions() {
+    if (!system.isWindows) {
+      return [
+        IconButtonData(
+          glyph: AppGlyphs.export,
+          tooltip: context.appLocalizations.exportLogs,
+          onPressed: _handleExport,
+        ),
+      ];
+    }
+    final ru = Localizations.localeOf(context).languageCode == 'ru';
     return [
       IconButtonData(
-        glyph: AppGlyphs.export,
-        tooltip: context.appLocalizations.exportLogs,
-        onPressed: _handleExport,
+        glyph: AppGlyphs.openExternal,
+        tooltip: context.appLocalizations.openLogsFolder,
+        onPressed: () async => system.openDirectory(await fileLogger.directoryPath),
+      ),
+      IconButtonData(
+        glyph: AppGlyphs.copy,
+        tooltip: ru ? 'Копировать видимые записи' : 'Copy visible entries',
+        onPressed: () async => Clipboard.setData(ClipboardData(
+          text: _listController.value.list.reversed.map((log) => log.toString()).join('\n'),
+        )),
       ),
     ];
   }
