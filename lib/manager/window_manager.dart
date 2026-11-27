@@ -344,12 +344,15 @@ class WindowEngineActions extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final safeMode = ref.watch(safeModeProvider);
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const CoreStatusButton(compact: true, restartAll: false),
-        if (!safeMode) const ZapretStatusButton(compact: true),
-      ],
+    return Material(
+      type: MaterialType.transparency,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const CoreStatusButton(compact: true, restartAll: false),
+          if (!safeMode) const ZapretStatusButton(compact: true),
+        ],
+      ),
     );
   }
 }

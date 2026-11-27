@@ -1,4 +1,5 @@
 import 'dart:ui' show ClipOp;
+import 'package:flutter/foundation.dart' show listEquals;
 
 import 'package:material_ui/material_ui.dart';
 
@@ -14,25 +15,36 @@ class CaptionIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color =
-        IconTheme.of(context).color ?? Theme.of(context).colorScheme.onSurface;
+    final theme = IconTheme.of(context);
+    final color = theme.color ?? Theme.of(context).colorScheme.onSurface;
     return CustomPaint(
       size: const Size.square(captionGlyphSize),
-      painter: _CaptionGlyphPainter(glyph: glyph, color: color),
+      painter: _CaptionGlyphPainter(glyph: glyph, color: color, shadows: theme.shadows ?? const []),
     );
   }
 }
 
 class _CaptionGlyphPainter extends CustomPainter {
-  const _CaptionGlyphPainter({required this.glyph, required this.color});
+  const _CaptionGlyphPainter({required this.glyph, required this.color, required this.shadows});
 
   final CaptionGlyph glyph;
   final Color color;
+  final List<Shadow> shadows;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
+    for (final shadow in shadows) {
+      canvas.save();
+      canvas.translate(shadow.offset.dx, shadow.offset.dy);
+      _draw(canvas, size, Paint()..color = shadow.color
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, shadow.blurRadius));
+      canvas.restore();
+    }
+    _draw(canvas, size, Paint()..color = color);
+  }
+
+  void _draw(Canvas canvas, Size size, Paint paint) {
+    paint
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1
       ..strokeJoin = StrokeJoin.round;
@@ -78,5 +90,5 @@ class _CaptionGlyphPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_CaptionGlyphPainter oldDelegate) =>
-      glyph != oldDelegate.glyph || color != oldDelegate.color;
+      glyph != oldDelegate.glyph || color != oldDelegate.color || !listEquals(shadows, oldDelegate.shadows);
 }

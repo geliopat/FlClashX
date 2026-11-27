@@ -115,8 +115,6 @@ class _CoreStatusButtonState extends ConsumerState<CoreStatusButton> {
     final appLocalizations = context.appLocalizations;
     final canRestart = !_requesting && !zapretBusy && initialized && coreStatus != CoreStatus.connecting;
     const style = ElasticPress.buttonStyle;
-    final iconOnly =
-        coreStatus == CoreStatus.connected || ViewScope.isMobileOf(context);
     final icon = CorePulse(status: coreStatus);
     if (widget.compact) {
       final ru = Localizations.localeOf(context).languageCode == 'ru';
@@ -133,6 +131,7 @@ class _CoreStatusButtonState extends ConsumerState<CoreStatusButton> {
         icon: icon,
       );
     }
+    final iconOnly = coreStatus == CoreStatus.connected || ViewScope.isMobileOf(context);
     return Tooltip(
       message: restartAll ? AppLocalizations.of(context).forkRestartAll : appLocalizations.coreStatus,
       child: FadeScaleBox(

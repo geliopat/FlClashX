@@ -332,7 +332,7 @@ void main() {
       );
     });
 
-    testWidgets('caption buttons are flat rectangles that keep the ripple', (
+    testWidgets('caption buttons are flat rectangles with platform feedback', (
       tester,
     ) async {
       await pumpBar(tester, width: 900);
@@ -345,9 +345,9 @@ void main() {
       final onSurface = Theme.of(context).colorScheme.onSurface;
       expect(themeStyle.shape?.resolve({}), AppShape.none);
       expect(themeStyle.minimumSize?.resolve({}), size);
-      expect(themeStyle.splashFactory, isNull);
+      expect(themeStyle.splashFactory, system.isWindows ? NoSplash.splashFactory : null);
       expect(themeStyle.animationDuration, isNull);
-      expect(themeStyle.overlayColor, isNull);
+      expect(themeStyle.overlayColor?.resolve({WidgetState.hovered}), system.isWindows ? Colors.transparent : null);
       expect(themeStyle.foregroundColor?.resolve({}), onSurface);
       expect(
         themeStyle.foregroundColor?.resolve({WidgetState.pressed}),
@@ -365,15 +365,15 @@ void main() {
 
       expect(
         style.backgroundColor?.resolve({WidgetState.hovered}),
-        colorScheme.error,
+        system.isWindows ? null : colorScheme.error,
       );
       expect(
         style.foregroundColor?.resolve({WidgetState.hovered}),
-        colorScheme.onError,
+        system.isWindows ? colorScheme.error : colorScheme.onError,
       );
       expect(
         style.backgroundColor?.resolve({WidgetState.pressed}),
-        colorScheme.error,
+        system.isWindows ? null : colorScheme.error,
       );
       expect(style.backgroundColor?.resolve({}), isNull);
       expect(style.foregroundColor?.resolve({}), isNull);
@@ -383,7 +383,7 @@ void main() {
       );
       expect(
         style.overlayColor?.resolve({WidgetState.pressed}),
-        colorScheme.onError.opacity12,
+        system.isWindows ? Colors.transparent : colorScheme.onError.opacity12,
         reason:
             'the ripple on the error colored close button must stay visible',
       );
@@ -415,7 +415,7 @@ void main() {
 
       final context = tester.element(_glyph(CaptionGlyph.close));
       final colorScheme = Theme.of(context).colorScheme;
-      expect(IconTheme.of(context).color, colorScheme.onError);
+      expect(IconTheme.of(context).color, system.isWindows ? colorScheme.error : colorScheme.onError);
       final material = tester.widget<Material>(
         find
             .descendant(
@@ -424,7 +424,11 @@ void main() {
             )
             .first,
       );
-      expect(material.color, colorScheme.error);
+      if (system.isWindows) {
+        expect(material.color, isNot(colorScheme.error));
+      } else {
+        expect(material.color, colorScheme.error);
+      }
     });
 
     testWidgets('the bar keeps its height in a narrow window', (tester) async {
