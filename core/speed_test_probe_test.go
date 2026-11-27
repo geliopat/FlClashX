@@ -110,6 +110,16 @@ func TestSpeedGroupResolvesSelectedLeafAndRejectsMixed(t *testing.T) {
 }
 
 
+// Give the real body transfer a measurable interval on Windows and on
+// runners with a coarse clock. Do not use a synthetic duration in production.
+func writeTimedSpeedTestBody(w stdhttp.ResponseWriter) {
+    w.Header().Set("Content-Type", "application/octet-stream")
+    _, _ = io.WriteString(w, strings.Repeat("x", 128000))
+    w.(stdhttp.Flusher).Flush()
+    time.Sleep(30 * time.Millisecond)
+    _, _ = io.WriteString(w, strings.Repeat("x", 128000))
+}
+
 func TestSpeedPhaseRetriesTransientWaveWithinBudget(t *testing.T) {
     var calls atomic.Int64
     server := httptest.NewServer(stdhttp.HandlerFunc(func(w stdhttp.ResponseWriter, r *stdhttp.Request) {
@@ -117,8 +127,7 @@ func TestSpeedPhaseRetriesTransientWaveWithinBudget(t *testing.T) {
             w.WriteHeader(503)
             return
         }
-        w.Header().Set("Content-Type", "application/octet-stream")
-        _, _ = io.WriteString(w, strings.Repeat("x", 256000))
+        writeTimedSpeedTestBody(w)
     }))
     defer server.Close()
     rate, n, err := measureSpeedPhase(&http.Client{}, "custom", server.URL, false, false,
@@ -135,8 +144,7 @@ func TestSpeedPhaseRejectsPartiallyFailedWave(t *testing.T) {
             w.WriteHeader(503)
             return
         }
-        w.Header().Set("Content-Type", "application/octet-stream")
-        _, _ = io.WriteString(w, strings.Repeat("x", 256000))
+        writeTimedSpeedTestBody(w)
     }))
     defer server.Close()
     rate, n, err := measureSpeedPhase(&http.Client{}, "custom", server.URL, false, false,
