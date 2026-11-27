@@ -156,16 +156,18 @@ class _DiagnosticsViewState extends ConsumerState<DiagnosticsView> {
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+    final ru = Localizations.localeOf(context).languageCode == 'ru';
     return CommonScaffold(
       title: l.forkDiagnostics,
       titleWidget: PageTitleTabs(
-        labels: [l.forkDiagnostics, 'Watchdog', l.forkCrashHistory],
+        labels: [l.forkDiagnostics, 'Watchdog', l.forkCrashHistory, ru ? 'Восстановления' : 'Recoveries'],
         selectedIndex: _tab,
         onSelected: (index) => setState(() => _tab = index),
       ),
       body: Builder(builder: (context) => switch (_tab) {
         1 => _watchdog(context),
-        2 => const ZapretLogsView(crashOnly: true, embedded: true),
+        2 => const ZapretLogsView(key: ValueKey('crash-archive'), crashOnly: true, embedded: true),
+        3 => const ZapretLogsView(key: ValueKey('recovery-archive'), recoveryOnly: true, embedded: true),
         _ => _diagnostics(context),
       }),
     );
