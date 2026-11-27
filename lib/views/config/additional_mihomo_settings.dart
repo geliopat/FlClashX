@@ -4,6 +4,7 @@ import 'package:fl_clash/pages/editor.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/views/config/override.dart';
 import 'package:fl_clash/widgets/widgets.dart';
+import 'package:fl_clash/ui/ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -30,8 +31,15 @@ class AdditionalMihomoSettingsView extends ConsumerWidget {
 
   Future<void> _edit(BuildContext context, WidgetRef ref, String path, Object? value) async {
     final initial = yaml.encode({path: value});
-    await sheetNavigatorOf(context).push(CommonDesktopRoute(builder: (_) => EditorPage(
+    await BaseNavigator.push<void>(context, EditorPage(
       title: path, content: initial, readOnly: false,
+      onSave: (editorContext, _, content) async {
+        final decoded = decodeAdditionalSettings(await content.readText());
+        if (!ref.context.mounted || decoded.length != 1 || !decoded.containsKey(path)) {
+          throw const FormatException('Only the selected setting may be edited');
+        }
+        _save(ref, path, decoded[path]);
+      },
       onPop: (editorContext, _, content) async {
         try {
           final decoded = decodeAdditionalSettings(await content.readText());
@@ -51,7 +59,7 @@ class AdditionalMihomoSettingsView extends ConsumerWidget {
           ) == true;
         }
       },
-    )));
+    ));
   }
 
   @override

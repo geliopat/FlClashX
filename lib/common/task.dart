@@ -302,7 +302,10 @@ Future<RealProfile> _makeRealProfileTask(MakeRealProfileState data) async {
   confineProviders('rule-providers', rulesProviderDirectoryName);
   injectUnconfinedProviders('proxy-providers', data.injectedProxyProviders);
   injectUnconfinedProviders('rule-providers', data.injectedRuleProviders);
-  rawConfig['profile']['store-selected'] = false;
+  rawConfig['profile'] = {
+    if (rawConfig['profile'] is Map) ...rawConfig['profile'] as Map,
+    'store-selected': false,
+  };
   rawConfig['geox-url'] = realPatchConfig.geoXUrl.raw;
   rawConfig['global-ua'] = realPatchConfig.globalUa ?? defaultUA;
   if (rawConfig['hosts'] == null) {

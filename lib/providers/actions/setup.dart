@@ -1170,6 +1170,19 @@ class SetupAction extends _$SetupAction {
             _pushes++;
           }
           if (message.isNotEmpty) {
+            if (system.isWindows && (message.contains('geo resource source changed;') ||
+                message.contains('geo resource source verification failed'))) {
+              // Do not report a successful profile switch or a zero-proxy
+              // fallback: the core deliberately kept its previous config.
+              final ru = currentAppLocalizations.localeName.startsWith('ru');
+              dialogs.showNotifier(
+                message.contains('geo resource source changed;')
+                    ? (ru ? 'Ресурсы нового профиля подготовлены. Перезапустите Mihomo для применения.' : 'New profile resources are ready. Restart Mihomo to apply them.')
+                    : (ru ? 'Не удалось подтвердить источник Geo-ресурса. Подписка не применена.' : 'Geo resource source could not be verified. Profile was not applied.'),
+                level: MessageLevel.error,
+              );
+              throw MessageException(message);
+            }
             globalState.lastConfigCounts = configCountsOf(const {});
             await globalState.safeRun(() => onUpdated?.call());
             throw MessageException(message);

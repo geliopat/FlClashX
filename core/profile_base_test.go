@@ -561,3 +561,64 @@ func TestSourceSettingsDoNotInventDefaults(t *testing.T) {
 		t.Fatalf("explicit TUN settings: %#v", tun)
 	}
 }
+
+func TestEffectiveProfileSettingsReachMihomoParserAndDisk(t *testing.T) {
+    path := writeBaseProfile(t, "mixed-port: 7890\nkeep-alive-idle: 30\ntcp-concurrent: true\ndns:\n  enable: true\n  nameserver: [1.1.1.1]\nrules: ['MATCH,DIRECT']\n")
+    // As in a real profile build, the host supplies only the effective values,
+    // leaving the source's proxy and rule definitions to the base merge.
+    overlay := `mixed-port: 7890
+keep-alive-idle: 0
+keep-alive-interval: 45
+disable-keep-alive: true
+tcp-concurrent: false
+geox-url:
+  geoip: https://resources.example/geoip.dat
+  geosite: https://resources.example/geosite.dat
+dns:
+  enable: true
+  nameserver: [1.1.1.1]
+  prefer-h3: false
+  fallback: []
+tun:
+  enable: false
+  auto-route: true
+  auto-detect-interface: true
+  strict-route: false
+  dns-hijack: [any:53]
+ntp:
+  enable: false
+  interval: 60
+profile:
+  store-selected: false
+  store-fake-ip: false
+rules: []
+`
+    configPath := filepath.Join(t.TempDir(), "config.yaml")
+    cfg, err := loadConfigWithBase(&SetupBase{Path:path, Overlay:overlay}, configPath)
+    if err != nil { t.Fatal(err) }
+    check := func(c *config.Config) {
+        t.Helper()
+        if c.General.KeepAliveIdle != 0 || c.General.KeepAliveInterval != 45 || !c.General.DisableKeepAlive || c.General.TCPConcurrent {
+            t.Fatalf("effective keepalive or TCP values differ: %+v", c.General)
+        }
+        if c.General.GeoXUrl.GeoIp != "https://resources.example/geoip.dat" || c.General.GeoXUrl.GeoSite != "https://resources.example/geosite.dat" {
+            t.Fatal("resource source replaced by the parser")
+        }
+        if !c.General.Tun.AutoRoute || !c.General.Tun.AutoDetectInterface || c.General.Tun.StrictRoute || c.General.Tun.Enable {
+            t.Fatal("TUN protection or explicit values changed")
+        }
+        if c.DNS.PreferH3 || len(c.DNS.Fallback) != 0 || len(c.DNS.NameServer) != 1 {
+            t.Fatal("effective DNS settings differ")
+        }
+        if c.Profile.StoreSelected || c.Profile.StoreFakeIP { t.Fatal("explicit profile values changed") }
+    }
+    check(cfg)
+    reloaded, err := loadConfig(configPath)
+    if err != nil { t.Fatal(err) }
+    check(reloaded)
+    raw, err := handleGetConfig(configPath)
+    if err != nil { t.Fatal(err) }
+    if raw.KeepAliveIdle != 0 || raw.GeoXUrl.GeoSite != "https://resources.example/geosite.dat" {
+        t.Fatal("written config does not match effective values")
+    }
+}
