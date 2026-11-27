@@ -721,6 +721,16 @@ fn ensure_zapret_watchdog() {
                     intent.attempts, intent.strategy_id
                 ),
             );
+            #[cfg(feature = "windows-service")]
+            let recovery_id = {
+                let stamp = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_nanos();
+                let id = format!("helper-{}-{stamp}", std::process::id());
+                persist_watchdog_recovery(&id, "started", intent.attempts);
+                id
+            };
             let response = launch_zapret(
                 true,
                 intent.strategy_id.clone(),
@@ -728,6 +738,16 @@ fn ensure_zapret_watchdog() {
                 intent.debug,
                 &intent.infrastructure,
                 "watchdog",
+            );
+            #[cfg(feature = "windows-service")]
+            persist_watchdog_recovery(
+                &recovery_id,
+                if response.status() == StatusCode::OK {
+                    "succeeded"
+                } else {
+                    "failed"
+                },
+                intent.attempts,
             );
             if response.status() == StatusCode::OK {
                 zapret_log("info", "Watchdog: replacement process started".into());
@@ -1868,15 +1888,40 @@ fn zapret_log(level: &'static str, message: String) {
 }
 
 #[cfg(all(feature = "windows-service", target_os = "windows"))]
+fn persist_watchdog_recovery(id: &str, outcome: &str, attempt: u8) {
+    let timestamp_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64;
+    let value = serde_json::json!({
+        "timestampMs": timestamp_ms,
+        "level": if outcome == "failed" { "error" } else { "info" },
+        "component": "Zapret",
+        "message": format!("Watchdog recovery {attempt}/3: {outcome}"),
+        "recovery": {
+            "id": id,
+            "action": "watchdog",
+            "outcome": outcome,
+        },
+    });
+    persist_journal_value(&value);
+}
+
+#[cfg(all(feature = "windows-service", target_os = "windows"))]
 fn persist_service_event(entry: &ZapretLogEntry, component: &str) {
-    static JOURNAL_FAILED: AtomicBool = AtomicBool::new(false);
     let value = serde_json::json!({
         "timestampMs": entry.timestamp_ms,
         "level": entry.level,
         "component": component,
         "message": entry.message,
     });
-    if let Ok(bytes) = serde_json::to_vec(&value) {
+    persist_journal_value(&value);
+}
+
+#[cfg(all(feature = "windows-service", target_os = "windows"))]
+fn persist_journal_value(value: &serde_json::Value) {
+    static JOURNAL_FAILED: AtomicBool = AtomicBool::new(false);
+    if let Ok(bytes) = serde_json::to_vec(value) {
         match super::journal::append(&bytes) {
             Ok(()) => JOURNAL_FAILED.store(false, Ordering::Relaxed),
             Err(error) => {
