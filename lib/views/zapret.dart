@@ -75,6 +75,7 @@ class ZapretView extends ConsumerWidget {
     );
 
     final sections = <Widget>[
+      ManagedSettingsHint(keys: zapretPageKeys.difference({zapretStartSetting})),
       generateSection(
         title: AppLocalizations.of(context).forkState,
         items: [

@@ -174,6 +174,50 @@ void main() {
     expect(setting().minimizeOnExit, isTrue);
   });
 
+  testWidgets('the visible page reset preserves unrelated overrides', (
+    tester,
+  ) async {
+    await pumpGeneral(tester);
+    container.read(appSettingProvider.notifier).update(
+      (state) => state.copyWith(
+        ownedSettings: {'app.minimizeOnExit', 'zapret.mode'},
+        minimizeOnExit: false,
+      ),
+    );
+    await tester.pumpAndSettle();
+    final reset = find.descendant(
+      of: find.byType(ManagedSettingsHint),
+      matching: find.byType(TextButton),
+    );
+    expect(reset, findsOneWidget);
+    await tester.tap(reset);
+    await tester.pumpAndSettle();
+    expect(setting().ownedSettings, {'zapret.mode'});
+    expect(setting().minimizeOnExit, isTrue);
+  });
+
+  testWidgets('the open lock restores the provider setting directly', (
+    tester,
+  ) async {
+    await pumpGeneral(tester);
+    container.read(appSettingProvider.notifier).update(
+      (state) => state.copyWith(
+        ownedSettings: {'app.minimizeOnExit'},
+        minimizeOnExit: false,
+      ),
+    );
+    await tester.pumpAndSettle();
+    final button = find.descendant(
+      of: row(),
+      matching: find.byTooltip('Hand back to provider'),
+    );
+    expect(button, findsOneWidget);
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+    expect(setting().ownedSettings, isEmpty);
+    expect(setting().minimizeOnExit, isTrue);
+  });
+
   testWidgets('one row in diagnostics hands every setting back', (
     tester,
   ) async {

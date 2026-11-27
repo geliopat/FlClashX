@@ -22,12 +22,16 @@ class ManagedSettingsHint extends ConsumerWidget {
       appSettingProvider.select((state) => state.ownedSettings),
     );
     final appLocalizations = context.appLocalizations;
+    final releasable = managed.where(owned.contains).toSet();
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          GlyphIcon(
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              GlyphIcon(
             AppGlyphs.info,
             size: 18,
             color: context.colorScheme.onSurfaceVariant,
@@ -42,6 +46,18 @@ class ManagedSettingsHint extends ConsumerWidget {
               style: context.listCaptionStyle,
             ),
           ),
+            ],
+          ),
+          if (releasable.isNotEmpty)
+            TextButton.icon(
+              onPressed: () => ref
+                  .read(managedSettingsActionProvider.notifier)
+                  .releaseKeys(releasable),
+              icon: const Icon(Icons.restore, size: 18),
+              label: Text(
+                '${appLocalizations.returnAllToProvider} (${releasable.length})',
+              ),
+            ),
         ],
       ),
     );
@@ -80,12 +96,12 @@ class ManagedSetting extends ConsumerWidget {
     }
   }
 
-  Widget _withLock(Widget child, {required bool locked}) {
+  Widget _withLock(Widget child, {required bool locked, VoidCallback? onRelease}) {
     if (!showsLock) {
       return child;
     }
     return TitleBadge(
-      badge: SettingLock(locked: locked),
+      badge: SettingLock(locked: locked, onRelease: onRelease),
       child: child,
     );
   }
@@ -117,7 +133,13 @@ class ManagedSetting extends ConsumerWidget {
       ],
       child: Semantics(
         hint: context.appLocalizations.managedByYou,
-        child: _withLock(child, locked: false),
+        child: _withLock(
+          child,
+          locked: false,
+          onRelease: () => ref
+              .read(managedSettingsActionProvider.notifier)
+              .release(settingKey),
+        ),
       ),
     );
   }
@@ -126,19 +148,30 @@ class ManagedSetting extends ConsumerWidget {
 /// Closed while the subscription speaks for a setting, open once it is the
 /// user's.
 class SettingLock extends StatelessWidget {
-  const SettingLock({super.key, required this.locked});
+  const SettingLock({super.key, required this.locked, this.onRelease});
 
   final bool locked;
+  final VoidCallback? onRelease;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = context.colorScheme;
-    return ExcludeSemantics(
-      child: GlyphIcon(
-        locked ? AppGlyphs.lock : AppGlyphs.lockOpen,
-        size: 16,
-        color: locked ? colorScheme.onSurfaceVariant : colorScheme.primary,
-      ),
+    final glyph = GlyphIcon(
+      locked ? AppGlyphs.lock : AppGlyphs.lockOpen,
+      size: 16,
+      color: locked ? colorScheme.onSurfaceVariant : colorScheme.primary,
+    );
+    if (locked || onRelease == null) {
+      return ExcludeSemantics(child: glyph);
+    }
+    return IconButton(
+      tooltip: context.appLocalizations.returnToProvider,
+      onPressed: onRelease,
+      icon: glyph,
+      iconSize: 16,
+      padding: const EdgeInsets.all(4),
+      constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+      visualDensity: VisualDensity.compact,
     );
   }
 }

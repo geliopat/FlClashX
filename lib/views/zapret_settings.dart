@@ -252,6 +252,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
     final zapret = ref.watch(zapretControllerProvider);
     final listsBusy = _loading || _saving || _updating || _updatingHelper;
     final sections = <Widget>[
+      const ManagedSettingsHint(keys: {zapretStartSetting}),
       generateSection(
         title: AppLocalizations.of(context).forkHelperService,
         items: [
