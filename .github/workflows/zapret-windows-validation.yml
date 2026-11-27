@@ -159,9 +159,11 @@ jobs:
         if: env.BUILD_MODE == 'fast'
         shell: pwsh
         run: |
-          'RUSTC_WRAPPER=sccache' >> $env:GITHUB_ENV
+          "RUSTC_WRAPPER=$((Get-Command sccache -ErrorAction Stop).Source)" >> $env:GITHUB_ENV
           'SCCACHE_GHA_ENABLED=false' >> $env:GITHUB_ENV
           'SCCACHE_CACHE_SIZE=1G' >> $env:GITHUB_ENV
+          'SCCACHE_IDLE_TIMEOUT=0' >> $env:GITHUB_ENV
+          New-Item -ItemType Directory -Force "$env:RUNNER_TEMP/flclashz-sccache" | Out-Null
           "SCCACHE_DIR=$env:RUNNER_TEMP/flclashz-sccache" >> $env:GITHUB_ENV
 
       - name: Enable git long paths
@@ -268,6 +270,18 @@ jobs:
       - name: Build Windows Release portable ZIP and installer
         run: dart setup.dart windows --env stable --arch amd64 --targets zip,exe -v
 
+      - name: Collect compiler cache statistics
+        if: env.BUILD_MODE == 'fast'
+        shell: pwsh
+        run: |
+          # Installer validation can stop processes; collect stats before it.
+          sccache --show-stats | Tee-Object -FilePath "$env:RUNNER_TEMP/sccache-stats.txt"
+          if ($LASTEXITCODE -ne 0) { Write-Warning "sccache statistics unavailable" }
+          # The server may already have stopped. This is not a build failure.
+          sccache --stop-server
+          if ($LASTEXITCODE -ne 0) { Write-Warning "sccache server already stopped or unavailable" }
+          exit 0
+
       - name: Verify packaged artifacts
         shell: pwsh
         run: |
@@ -288,13 +302,6 @@ jobs:
         shell: pwsh
         run: ./scripts/windows_installer_test.ps1
 
-      - name: Stop compiler cache and report statistics
-        if: env.BUILD_MODE == 'fast'
-        shell: pwsh
-        run: |
-          sccache --show-stats | Tee-Object -FilePath "$env:RUNNER_TEMP/sccache-stats.txt"
-          sccache --stop-server
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Save verified Go core
         if: env.BUILD_MODE == 'fast' && (inputs.candidate_ref == '' || inputs.candidate_ref == github.sha) && steps.core_cache.outputs.cache-hit != 'true'
