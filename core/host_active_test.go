@@ -22,9 +22,9 @@ func TestAnInactiveHostGetsNoConnectionStreamAndNoDelayWatch(t *testing.T) {
 		t.Fatalf("%d requests watched for an inactive host, want none", watched)
 	}
 	startDelayWatch()
-	delayWatcher.mu.Lock()
-	running := delayWatcher.cancel != nil
-	delayWatcher.mu.Unlock()
+	delayWatcher.Lock()
+	running := delayWatcher.session != nil
+	delayWatcher.Unlock()
 	if running {
 		t.Fatal("the delay watch runs for an inactive host")
 	}
