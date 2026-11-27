@@ -16,12 +16,24 @@ $ZapretSourceBase = "https://raw.githubusercontent.com/geliopat/zapret2-gui/$Zap
 
 function Get-PinnedArchive {
     param([string]$Url, [string]$Path, [string]$ExpectedSha256, [string]$Label)
-    Write-Host "Downloading $Label..."
-    Invoke-WebRequest -Uri $Url -OutFile $Path
+    $CachePath = $null
+    if ($env:FLCLASHZ_ZAPRET_CACHE_DIR) {
+        New-Item -ItemType Directory -Path $env:FLCLASHZ_ZAPRET_CACHE_DIR -Force | Out-Null
+        $CachePath = Join-Path $env:FLCLASHZ_ZAPRET_CACHE_DIR "$ExpectedSha256.zip"
+    }
+    if ($CachePath -and (Test-Path -LiteralPath $CachePath -PathType Leaf) -and
+        (Get-FileHash -LiteralPath $CachePath -Algorithm SHA256).Hash -ieq $ExpectedSha256) {
+        Write-Host "Cache hit: $Label"
+        Copy-Item -LiteralPath $CachePath -Destination $Path -Force
+    } else {
+        Write-Host "Downloading $Label..."
+        Invoke-WebRequest -Uri $Url -OutFile $Path
+    }
     $Actual = (Get-FileHash -Path $Path -Algorithm SHA256).Hash.ToLowerInvariant()
     if ($Actual -ne $ExpectedSha256.ToLowerInvariant()) {
         throw "SHA256 mismatch for $Label. Expected $ExpectedSha256, got $Actual."
     }
+    if ($CachePath) { Copy-Item -LiteralPath $Path -Destination $CachePath -Force }
     Write-Host "Verified SHA256: $Label"
 }
 

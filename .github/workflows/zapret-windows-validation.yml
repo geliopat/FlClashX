@@ -2,6 +2,16 @@ name: Zapret Windows validation
 
 on:
   workflow_dispatch:
+    inputs:
+      candidate_ref:
+        description: Exact candidate commit (empty = selected branch)
+        type: string
+        required: false
+      build_mode:
+        description: Fast / Full / Clean
+        type: choice
+        default: fast
+        options: [fast, full, clean]
   workflow_call:
     inputs:
       candidate_ref:
@@ -13,6 +23,9 @@ on:
         type: string
         required: false
         default: ''
+      build_mode:
+        type: string
+        default: fast
 
 permissions:
   contents: read
@@ -25,6 +38,8 @@ concurrency:
 env:
   FLUTTER_VERSION: '3.47.6'
   GO_VERSION: '1.27.1'
+  BUILD_MODE: ${{ inputs.build_mode || 'fast' }}
+  CARGO_INCREMENTAL: '0'
 
 jobs:
   windows:
@@ -41,6 +56,12 @@ jobs:
           ref: ${{ inputs.candidate_ref || github.sha }}
           persist-credentials: false
 
+      - name: Validate build mode
+        shell: pwsh
+        run: |
+          if ($env:BUILD_MODE -cnotin @('fast', 'full', 'clean')) { throw 'Invalid build mode' }
+          "Build mode: $env:BUILD_MODE" >> $env:GITHUB_STEP_SUMMARY
+
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
@@ -48,6 +69,7 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
+          cache: ${{ env.BUILD_MODE != 'clean' }}
           cache-dependency-path: core/go.sum
 
       - name: Setup Flutter
@@ -55,7 +77,88 @@ jobs:
         with:
           channel: stable
           flutter-version: ${{ env.FLUTTER_VERSION }}
-          cache: true
+          cache: ${{ env.BUILD_MODE != 'clean' }}
+          pub-cache: ${{ env.BUILD_MODE != 'clean' }}
+
+      - name: Cache Cargo dependencies
+        if: env.BUILD_MODE != 'clean'
+        uses: Swatinem/rust-cache@v2.9.3
+        with:
+          workspaces: |
+            services/helper -> target
+            plugins/rust_api/rust -> target
+          cache-targets: false
+          cache-bin: false
+          save-if: ${{ inputs.candidate_ref == '' || inputs.candidate_ref == github.sha }}
+
+      - name: Setup sccache
+        if: env.BUILD_MODE == 'fast'
+        uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          version: v0.10.0
+
+      - name: Compute native cache identities
+        id: native
+        shell: pwsh
+        env:
+          CORE_INPUTS: ${{ hashFiles('core/**', 'build_config.yaml', 'plugins/setup/**') }}
+          HELPER_INPUTS: ${{ hashFiles('services/helper/**', 'build_config.yaml', 'plugins/setup/**') }}
+          RUST_INPUTS: ${{ hashFiles('services/helper/Cargo.lock', 'plugins/rust_api/rust/Cargo.lock', 'services/helper/**', 'plugins/rust_api/rust/**') }}
+        run: |
+          $rust = (rustc -Vv | Out-String).Trim()
+          if ($LASTEXITCODE -ne 0) { throw 'rustc version failed' }
+          $go = (go version | Out-String).Trim()
+          if ($LASTEXITCODE -ne 0) { throw 'go version failed' }
+          function Hash-Text([string]$value) {
+            [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($value))).ToLowerInvariant()
+          }
+          $image = "$env:ImageOS-$env:ImageVersion-$env:RUNNER_ARCH"
+          $core = Hash-Text "$image|$go|$env:CORE_INPUTS"
+          $helper = Hash-Text "$core|$rust|$env:HELPER_INPUTS"
+          $compiler = Hash-Text "$image|$rust|sccache-0.10.0"
+          "core=$core" >> $env:GITHUB_OUTPUT
+          "helper=$helper" >> $env:GITHUB_OUTPUT
+          "compiler=$compiler" >> $env:GITHUB_OUTPUT
+          "rust_inputs=$env:RUST_INPUTS" >> $env:GITHUB_OUTPUT
+
+      - name: Restore Go core binary and fingerprint
+        id: core_cache
+        if: env.BUILD_MODE == 'fast'
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            libclash/windows/FlClashCore.exe
+            .dart_tool/setup_build_cache/v2/windows-amd64-core.json
+          key: flclashz-core-v2-${{ steps.native.outputs.core }}
+
+      - name: Restore Helper binary and fingerprint
+        id: helper_cache
+        if: env.BUILD_MODE == 'fast'
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            libclash/windows/FlClashZHelperService.exe
+            .dart_tool/setup_build_cache/v2/windows-amd64-helper-release.json
+          key: flclashz-helper-v2-${{ steps.native.outputs.helper }}
+
+      - name: Restore bounded compiler cache
+        id: compiler_cache
+        if: env.BUILD_MODE == 'fast'
+        uses: actions/cache/restore@v5
+        with:
+          path: ${{ runner.temp }}/flclashz-sccache
+          key: flclashz-sccache-${{ steps.native.outputs.compiler }}-${{ steps.native.outputs.rust_inputs }}
+          restore-keys: |
+            flclashz-sccache-${{ steps.native.outputs.compiler }}-
+
+      - name: Configure local sccache
+        if: env.BUILD_MODE == 'fast'
+        shell: pwsh
+        run: |
+          'RUSTC_WRAPPER=sccache' >> $env:GITHUB_ENV
+          'SCCACHE_GHA_ENABLED=false' >> $env:GITHUB_ENV
+          'SCCACHE_CACHE_SIZE=1G' >> $env:GITHUB_ENV
+          "SCCACHE_DIR=$env:RUNNER_TEMP/flclashz-sccache" >> $env:GITHUB_ENV
 
       - name: Enable git long paths
         run: git config --global core.longpaths true
@@ -64,6 +167,13 @@ jobs:
         run: |
           cargo fmt --manifest-path services/helper/Cargo.toml -- --check
           cargo fmt --manifest-path plugins/rust_api/rust/Cargo.toml -- --check
+
+      - name: Test native build cache
+        working-directory: plugins/setup/setup_hooks
+        run: |
+          dart pub get
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dart test test/build_cache_test.dart
 
       - name: Run Helper unit tests
         timeout-minutes: 15
@@ -122,8 +232,18 @@ jobs:
           flutter test "--dart-define=FLCLASHZ_UPDATE_PUBLIC_KEY=$env:FLCLASHZ_UPDATE_PUBLIC_KEY" test/features/update/manifest_test.dart test/features/update/asset_test.dart test/features/update/controller_test.dart test/features/update/download_test.dart test/features/update/identity_test.dart test/features/update/platform_test.dart test/tool/sign_update_manifest_test.dart
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Restore pinned Zapret downloads
+        id: zapret_cache
+        if: env.BUILD_MODE != 'clean'
+        uses: actions/cache/restore@v5
+        with:
+          path: ${{ runner.temp }}/flclashz-zapret-downloads
+          key: flclashz-zapret-v1-${{ hashFiles('scripts/setup_zapret.ps1') }}
+
       - name: Stage pinned Zapret2 and Flowseal assets
         shell: pwsh
+        env:
+          FLCLASHZ_ZAPRET_CACHE_DIR: ${{ env.BUILD_MODE != 'clean' && format('{0}/flclashz-zapret-downloads', runner.temp) || '' }}
         run: ./scripts/setup_zapret.ps1
 
       - name: Analyze Flutter sources
@@ -162,6 +282,65 @@ jobs:
       - name: Verify install, startup, uninstall and FlClashX isolation
         shell: pwsh
         run: ./scripts/windows_installer_test.ps1
+
+      - name: Stop compiler cache and report statistics
+        if: env.BUILD_MODE == 'fast'
+        shell: pwsh
+        run: |
+          sccache --show-stats | Tee-Object -FilePath "$env:RUNNER_TEMP/sccache-stats.txt"
+          sccache --stop-server
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Save verified Go core
+        if: env.BUILD_MODE == 'fast' && (inputs.candidate_ref == '' || inputs.candidate_ref == github.sha) && steps.core_cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            libclash/windows/FlClashCore.exe
+            .dart_tool/setup_build_cache/v2/windows-amd64-core.json
+          key: ${{ steps.core_cache.outputs.cache-primary-key }}
+
+      - name: Save verified Helper
+        if: env.BUILD_MODE == 'fast' && (inputs.candidate_ref == '' || inputs.candidate_ref == github.sha) && steps.helper_cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            libclash/windows/FlClashZHelperService.exe
+            .dart_tool/setup_build_cache/v2/windows-amd64-helper-release.json
+          key: ${{ steps.helper_cache.outputs.cache-primary-key }}
+
+      - name: Save compiler cache
+        if: env.BUILD_MODE == 'fast' && (inputs.candidate_ref == '' || inputs.candidate_ref == github.sha) && steps.compiler_cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ runner.temp }}/flclashz-sccache
+          key: ${{ steps.compiler_cache.outputs.cache-primary-key }}
+
+      - name: Save pinned Zapret downloads
+        if: env.BUILD_MODE != 'clean' && (inputs.candidate_ref == '' || inputs.candidate_ref == github.sha) && steps.zapret_cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ runner.temp }}/flclashz-zapret-downloads
+          key: ${{ steps.zapret_cache.outputs.cache-primary-key }}
+
+      - name: Report cache restore results
+        if: always()
+        shell: pwsh
+        env:
+          CORE_HIT: ${{ steps.core_cache.outputs.cache-hit }}
+          HELPER_HIT: ${{ steps.helper_cache.outputs.cache-hit }}
+          COMPILER_HIT: ${{ steps.compiler_cache.outputs.cache-hit }}
+          ZAPRET_HIT: ${{ steps.zapret_cache.outputs.cache-hit }}
+        run: |
+          @(
+            '### Cache restore (native fingerprints are validated separately)'
+            "| Mode | Core | Helper | Compiler | Zapret |"
+            '|---|---|---|---|---|'
+            "| $env:BUILD_MODE | $env:CORE_HIT | $env:HELPER_HIT | $env:COMPILER_HIT | $env:ZAPRET_HIT |"
+          ) >> $env:GITHUB_STEP_SUMMARY
+          if (Test-Path "$env:RUNNER_TEMP/sccache-stats.txt") {
+            Get-Content "$env:RUNNER_TEMP/sccache-stats.txt" | ForEach-Object { "    $_" } >> $env:GITHUB_STEP_SUMMARY
+          }
 
       - name: Upload Windows Release bundle
         uses: actions/upload-artifact@v6
