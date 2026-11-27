@@ -114,7 +114,8 @@ final class CoreReleaseManifest {
     }
     final uri = Uri.tryParse(field('url'));
     if (uri == null || uri.scheme != 'https' || !uri.hasAuthority ||
-        uri.host.isEmpty || uri.userInfo.isNotEmpty || uri.hasFragment) {
+        uri.host.isEmpty || uri.userInfo.isNotEmpty || uri.hasFragment ||
+        (uri.hasPort && uri.port != 443)) {
       throw const FormatException('Invalid core asset URL');
     }
     final result = CoreReleaseManifest._(

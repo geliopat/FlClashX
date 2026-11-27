@@ -147,6 +147,19 @@ class UpdateDownloader {
     return kept;
   }
 
+  /// Fetch a bounded signed component manifest using the existing redirect
+  /// and transport checks, rather than a second download implementation.
+  Future<List<int>> fetchBytes(Uri uri, {
+    required int limit,
+    required Set<String> hosts,
+    CancelToken? cancelToken,
+  }) async {
+    final bytes = BytesBuilder(copy: false);
+    await _receive(uri, limit: limit, hosts: hosts, cancelToken: cancelToken,
+      onChunk: (chunk) async => bytes.add(chunk));
+    return bytes.takeBytes();
+  }
+
   Future<String> fetchChecksum(
     UpdateAsset asset, {
     CancelToken? cancelToken,

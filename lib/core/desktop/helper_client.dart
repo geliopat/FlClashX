@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
@@ -9,11 +10,13 @@ import 'package:fl_clash/common/constant.dart';
 import 'package:fl_clash/common/desktop_channel.dart';
 import 'package:fl_clash/common/print.dart';
 import 'package:fl_clash/enum/enum.dart';
+import 'package:fl_clash/features/update/core_release_manifest.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:win32_registry/win32_registry.dart';
 
 import 'core_manifest.dart';
+import 'core_release_selection.dart';
 import 'launcher.dart';
 import 'model.dart';
 import 'process_probe.dart';
@@ -192,13 +195,16 @@ final class HelperClient {
   final Future<String> Function() _readCoreSha256;
   final String Function() _baseUrl;
   String? _coreSha256Cache;
+  final Future<CoreReleaseRef?> Function()? _selectedRelease;
 
   HelperClient({
     Dio? dio,
     String Function()? expectedHelperPath,
     Future<String> Function()? readCoreSha256,
     String? baseUrl,
-  }) : _dio = dio ?? _createDio(),
+    Future<CoreReleaseRef?> Function()? selectedRelease,
+  }) : _selectedRelease = selectedRelease,
+       _dio = dio ?? _createDio(),
        _baseUrl = baseUrl == null ? _defaultBaseUrl : (() => baseUrl),
        _expectedHelperPath = expectedHelperPath ?? _defaultHelperPath,
        _readCoreSha256 = readCoreSha256 ?? _readBundledCoreSha256;
@@ -441,9 +447,11 @@ final class HelperClient {
   }) async {
     _validateSessionId(sessionId);
     try {
+      final selected = await _selectedRelease?.call();
       final response = await _dio.post<Object?>(
-        '$baseUrl/start',
-        data: {'address': address, 'sessionId': sessionId},
+        '$baseUrl/${selected == null ? 'start' : 'core/start'}',
+        data: {'address': address, 'sessionId': sessionId,
+          if (selected != null) 'coreSha256': selected.hash},
         options: _options(ResponseType.json, receiveTimeout: startTimeout),
       );
       final data = _responseMap(response, operation: 'start');
@@ -469,6 +477,50 @@ final class HelperClient {
         message: 'Unable to start Core through Helper',
         details: error.toString(),
       );
+    }
+  }
+
+  Future<void> stageCoreRelease({
+    required CoreReleaseManifest manifest,
+    required List<int> manifestBytes,
+    required File binary,
+  }) async {
+    if (manifestBytes.isEmpty || manifestBytes.length > coreManifestMaxBytes) {
+      throw const FormatException('Invalid core manifest length');
+    }
+    // Recheck signed bytes before upload; the privileged service verifies
+    // independently and never receives a caller-supplied filesystem path.
+    final verified = await CoreReleaseManifest.verify(manifestBytes);
+    if (verified.hash != manifest.hash || verified.version.value != manifest.version.value) {
+      throw const FormatException('Core manifest changed');
+    }
+    await verified.verifyBinary(binary);
+    final prefix = ByteData(4)..setUint32(0, manifestBytes.length);
+    Stream<List<int>> body() async* {
+      yield prefix.buffer.asUint8List();
+      yield manifestBytes;
+      yield* binary.openRead();
+    }
+    try {
+      final response = await _dio.post<Object?>(
+        '$baseUrl/core/stage',
+        data: body(),
+        options: Options(
+          contentType: 'application/octet-stream',
+          headers: {HttpHeaders.contentLengthHeader: 4 + manifestBytes.length + manifest.size},
+          connectTimeout: const Duration(seconds: 3),
+          sendTimeout: const Duration(minutes: 2),
+          receiveTimeout: const Duration(minutes: 2),
+          followRedirects: false,
+          responseType: ResponseType.json,
+        ),
+      );
+      final result = _responseMap(response, operation: 'stage core release');
+      if (result['coreSha256'] != manifest.hash) {
+        throw const HelperException(code: 'invalidResponse', message: 'Helper staged a different core');
+      }
+    } on DioException catch (error) {
+      throw _mapDioException(error, operation: 'stage core release');
     }
   }
 
@@ -1115,4 +1167,7 @@ final class HelperCoreLease implements CoreProcessLease {
   }
 }
 
-final helperClient = HelperClient();
+final helperClient = HelperClient(
+  selectedRelease: Platform.isWindows && !safeModeBuild
+      ? coreReleaseSelection.selectedForLaunch : null,
+);

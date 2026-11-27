@@ -153,11 +153,14 @@ List<String> createBuildDefines({
   required String appVersion,
   required String coreVersion,
   String updatePublicKey = '',
+  String coreUpdatePublicKey = '',
 }) => [
   '--dart-define=APP_VERSION=$appVersion',
   if (coreVersion.isNotEmpty) '--dart-define=CORE_VERSION=$coreVersion',
   if (updatePublicKey.isNotEmpty)
     '--dart-define=FLCLASHZ_UPDATE_PUBLIC_KEY=$updatePublicKey',
+  if (coreUpdatePublicKey.isNotEmpty)
+    '--dart-define=FLCLASHZ_CORE_UPDATE_PUBLIC_KEY=$coreUpdatePublicKey',
 ];
 
 /// The tag CI builds from when it is a release tag, else the pubspec version.
@@ -373,6 +376,7 @@ class _Build {
       appVersion: appVersion,
       coreVersion: coreVersion,
       updatePublicKey: Platform.environment['FLCLASHZ_UPDATE_PUBLIC_KEY'] ?? '',
+      coreUpdatePublicKey: Platform.environment['FLCLASHZ_CORE_UPDATE_PUBLIC_KEY'] ?? '',
     ),
   ];
 
