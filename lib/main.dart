@@ -33,6 +33,7 @@ void main(List<String> args) {
       if (Platform.isWindows || Platform.isLinux) {
         SharedPreferencesStorePlatform.instance = AtomicFilePreferencesStore(
           appPath.sharedPreferencesPath,
+          enableRecovery: Platform.isWindows,
         );
       }
       if (Platform.isLinux) {
