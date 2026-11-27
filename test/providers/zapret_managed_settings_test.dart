@@ -1,3 +1,4 @@
+import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +10,8 @@ void main() {
   test('Zapret ownership survives header refresh and can be released', () {
     const profile = Profile(
       id: 1,
+      type: ProfileType.url,
+      autoUpdateDuration: Duration.zero,
       label: 'Zapret',
       providerHeaders: {
         'flclashz-zapret': 'autostart,autofallback,mode:strictsplit',
