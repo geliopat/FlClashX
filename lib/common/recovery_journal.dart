@@ -103,6 +103,8 @@ class RecoveryJournal {
     return tail.toList(growable: false);
   }
 
+  Future<void> flush() => _logger.flush();
+
   Future<String> get directoryPath => _logger.directoryPath;
 
   Future<List<RecoveryEvent>> readRecent() async {
