@@ -95,7 +95,7 @@ jobs:
         if: env.BUILD_MODE == 'fast'
         uses: mozilla-actions/sccache-action@v0.0.11
         with:
-          version: v0.10.0
+          version: v0.16.0
 
       - name: Compute native cache identities
         id: native
@@ -115,7 +115,7 @@ jobs:
           $image = "$env:ImageOS-$env:ImageVersion-$env:RUNNER_ARCH"
           $core = Hash-Text "$image|$go|$env:CORE_INPUTS"
           $helper = Hash-Text "$core|$rust|$env:HELPER_INPUTS"
-          $compiler = Hash-Text "$image|$rust|sccache-0.10.0"
+          $compiler = Hash-Text "$image|$rust|sccache-0.16.0"
           "core=$core" >> $env:GITHUB_OUTPUT
           "helper=$helper" >> $env:GITHUB_OUTPUT
           "compiler=$compiler" >> $env:GITHUB_OUTPUT
@@ -168,13 +168,6 @@ jobs:
           cargo fmt --manifest-path services/helper/Cargo.toml -- --check
           cargo fmt --manifest-path plugins/rust_api/rust/Cargo.toml -- --check
 
-      - name: Test native build cache
-        working-directory: plugins/setup/setup_hooks
-        run: |
-          dart pub get
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          dart test test/build_cache_test.dart
-
       - name: Run Helper unit tests
         timeout-minutes: 15
         run: cargo test --manifest-path services/helper/Cargo.toml
@@ -192,6 +185,9 @@ jobs:
 
       - name: Install Flutter dependencies
         run: flutter pub get
+
+      - name: Test native build cache
+        run: dart test plugins/setup/setup_hooks/test/build_cache_test.dart
 
       - name: Run Helper, Zapret and Windows packaging tests
         timeout-minutes: 15
