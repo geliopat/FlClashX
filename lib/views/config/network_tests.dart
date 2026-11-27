@@ -73,6 +73,7 @@ class NetworkTestsView extends ConsumerWidget {
               if (probes.ipSource == 'custom')
                 ListItem.input(
                   title: Text(ru ? 'Свой URL' : 'Custom URL'),
+                  dialogTitle: ru ? 'Свой URL' : 'Custom URL',
                   value: probes.customIpUrl,
                   subtitle: Text(probes.customIpUrl),
                   resetValue: const NetworkProbeSettings().customIpUrl,

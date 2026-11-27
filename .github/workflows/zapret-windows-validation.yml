@@ -224,7 +224,7 @@ jobs:
 
       - name: Run speed test target and card layout regressions
         timeout-minutes: 5
-        run: flutter test test/providers/speed_test_test.dart test/widgets/proxy_card_oneline_test.dart
+        run: flutter test test/providers/speed_test_test.dart test/providers/network_probe_settings_test.dart test/common/service_probe_test.dart test/providers/outbound_ip_test.dart test/widgets/proxy_card_oneline_test.dart
 
       - name: Run provider ownership and context menu regression tests
         timeout-minutes: 15

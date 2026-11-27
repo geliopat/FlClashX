@@ -212,22 +212,30 @@ class CustomDelayUrlController extends Notifier<String> {
 
   Future<void> _load(String initial) async {
     final revision = _revision;
-    final prefs = await SharedPreferences.getInstance();
-    if (!ref.mounted || revision != _revision) return;
-    final current = ref.read(appSettingProvider).testUrl;
-    final saved = prefs.getString(_key);
-    // A restored legacy config containing a custom URL wins over stale prefs.
-    state = validTestEndpoint(current) && !delayTestPresets.containsValue(current)
-        ? current : saved != null && validTestEndpoint(saved) ? saved : initial;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (!ref.mounted || revision != _revision) return;
+      final current = ref.read(appSettingProvider).testUrl;
+      final saved = prefs.getString(_key);
+      // A restored legacy config containing a custom URL wins over stale prefs.
+      state = validTestEndpoint(current) && !delayTestPresets.containsValue(current)
+          ? current : saved != null && validTestEndpoint(saved) ? saved : initial;
+    } catch (_) {
+      // Keep the in-memory value if preferences are temporarily unavailable.
+    }
   }
 
   Future<void> remember(String url) async {
     if (!validTestEndpoint(url)) return;
     final revision = ++_revision;
     state = url;
-    final prefs = await SharedPreferences.getInstance();
-    if (!ref.mounted || revision != _revision) return;
-    await prefs.setString(_key, url);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (!ref.mounted || revision != _revision) return;
+      await prefs.setString(_key, url);
+    } catch (_) {
+      // Keep the current session's custom URL.
+    }
   }
 
   void choose(String choice) {

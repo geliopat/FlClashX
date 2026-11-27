@@ -5,6 +5,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fl_clash/views/proxies/common.dart';
 
 void main() {
+  test('legacy Yandex VPN selection migrates to Cloudflare', () {
+    expect(vpnSpeedService(SpeedTestService.yandex), SpeedTestService.cloudflare);
+    expect(vpnSpeedService(SpeedTestService.custom), SpeedTestService.custom);
+  });
   test('dense layout never shows speed measurements', () {
     expect(showProxySpeedMetrics(ProxiesLayout.tight, isWindows: true), isFalse);
     expect(showProxySpeedMetrics(ProxiesLayout.standard, isWindows: true), isTrue);

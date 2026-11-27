@@ -197,7 +197,12 @@ IpInfo? parseFlexibleIpBody(String body) {
   if (InternetAddress.tryParse(plain) != null) {
     ip = plain;
   } else if (plain.startsWith('{')) {
-    final value = jsonDecode(plain);
+    final Object? value;
+    try {
+      value = jsonDecode(plain);
+    } on FormatException {
+      return null;
+    }
     if (value is! Map || value['success'] == false ||
         value['error'] == true || value['status'] == 'fail') return null;
     final address = value['ip'] ?? value['query'] ?? value['ipAddress'];
