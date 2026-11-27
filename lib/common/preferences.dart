@@ -20,9 +20,15 @@ class Preferences {
 
   Future<bool> get isInit async => await _store.value != null;
 
+  @visibleForTesting
+  Future<File?> Function()? recoveryFileOverride;
+
   Future<SettingsRecovery?> _recoveryFile() async {
-    if (!Platform.isWindows) return null;
-    return SettingsRecovery(File(p.join(await appPath.homeDirPath, 'settings.last-good.v1.json')), _validateConfig);
+    final override = recoveryFileOverride;
+    final file = override != null ? await override() : Platform.isWindows
+        ? File(p.join(await appPath.homeDirPath, 'settings.last-good.v1.json'))
+        : null;
+    return file == null ? null : SettingsRecovery(file, _validateConfig);
   }
 
   Future<Map<String, Object?>?> _readRecoveryFile() async {
@@ -48,6 +54,8 @@ class Preferences {
 
   @visibleForTesting
   Future<void> rebind() async {
+    await _configWrite.catchError((_) => false);
+    recoveryFileOverride = () async => null;
     _store = ResolveOnce(_open);
     await _store.value;
   }
@@ -203,11 +211,11 @@ class Preferences {
       // the preferences file on first migration. Never write corrupt data.
       final recovery = await _recoveryFile();
       if (recovery != null && !await recovery.file.exists()) {
-        final previous = store.getString(configKey) ?? store.getString(_lastGoodConfigKey);
-        if (previous != null) {
-          var valid = false;
-          try { recovery.decode(previous); valid = true; } catch (_) {}
-          if (valid) await recovery.save(previous);
+        for (final previous in [store.getString(configKey), store.getString(_lastGoodConfigKey)]) {
+          if (previous == null) continue;
+          try { recovery.decode(previous); } catch (_) { continue; }
+          await recovery.save(previous);
+          break;
         }
       }
       if (!await store.setString(configKey, encoded)) return false;
@@ -287,11 +295,14 @@ class Preferences {
   }
 
   Future<void> clearPreferences() async {
-    final sharedPreferencesIns = await _store.value;
-    await _configWrite.catchError((_) => false);
-    if (sharedPreferencesIns != null && await sharedPreferencesIns.clear()) {
+    final operation = _configWrite.catchError((_) => false).then((_) async {
+      final store = await _store.value;
+      if (store == null || !await store.clear()) return false;
       await (await _recoveryFile())?.clear();
-    }
+      return true;
+    });
+    _configWrite = operation;
+    await operation;
   }
 }
 
