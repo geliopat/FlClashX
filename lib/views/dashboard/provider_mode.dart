@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
@@ -10,6 +11,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'style.dart';
+import 'widgets/engine_controls.dart';
 
 const _logoSize = 56.0;
 const _connectHeight = 56.0;
@@ -109,6 +111,18 @@ class ProviderConnectButton extends ConsumerWidget {
         : appLocalizations.start;
     final duration = context.motionDuration(_duration);
     void toggle() => ref.read(commonActionProvider.notifier).toggleRunning();
+    if (system.isWindows) {
+      final initialized = ref.watch(initProvider);
+      final connecting = ref.watch(coreStatusProvider) == CoreStatus.connecting;
+      final restarting = initialized && !ref.watch(safeModeProvider) &&
+          ref.watch(zapretControllerProvider.select((s) => s.dashboardRestarting));
+      return EngineControlButton(
+        name: 'VPN', actionLabel: label, running: isStart,
+        suspended: suspended, elapsedMilliseconds: runTime,
+        busy: connecting || restarting,
+        onPressed: initialized && !connecting && !restarting ? toggle : null,
+      );
+    }
     return Tooltip(
       message: label,
       child: Semantics(

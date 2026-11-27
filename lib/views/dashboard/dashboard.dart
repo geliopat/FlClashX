@@ -17,6 +17,7 @@ import 'style.dart';
 import 'wide.dart';
 import 'widget_registry.dart';
 import 'widgets/core_status_button.dart';
+import 'widgets/engine_controls.dart';
 import 'widgets/zapret_status_button.dart';
 import 'widgets/profile_detail.dart';
 
@@ -131,12 +132,17 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
             return DashboardDensityScope(
               density: layout,
               scale: scale,
-              child: _WideCards(
-                platform: platform,
-                arranged: arranged,
-                columns: dashboardColumnsOf(room.width),
-                gap: gap,
-              ),
+              child: platform == SupportPlatform.Windows
+                  ? Column(children: [
+                      Expanded(child: _WideCards(platform: platform, arranged: arranged,
+                        columns: dashboardColumnsOf(room.width), gap: gap)),
+                      Padding(
+                        padding: EdgeInsets.only(bottom: 16 + context.bottomInset),
+                        child: const EngineControlsLayout(vpn: ProviderConnectButton(), zapret: ProviderZapretButton()),
+                      ),
+                    ])
+                  : _WideCards(platform: platform, arranged: arranged,
+                    columns: dashboardColumnsOf(room.width), gap: gap),
             );
           }
           return DashboardDensityScope(
@@ -223,7 +229,7 @@ class _MobileDashboard extends ConsumerWidget {
         );
     final announcement = ref.watch(announcementProvider) != null;
     final top = MediaQuery.paddingOf(context).top + 4;
-    final footed = providerMode && !editing;
+    final footed = !editing && (providerMode || platform == SupportPlatform.Windows);
     // The start button takes the bottom inset when it holds the foot.
     final bottom = footed ? 12.0 : 16 + context.bottomInset;
     final pullable =
@@ -315,15 +321,11 @@ class _MobileDashboard extends ConsumerWidget {
       children: [
         Expanded(child: content),
         Padding(
-          padding: EdgeInsets.fromLTRB(side, 0, side, 16 + context.bottomInset),
-          child: zapretWidgetEnabled && platform == SupportPlatform.Windows
-              ? const Row(
-                  spacing: 8,
-                  children: [
-                    Expanded(child: ProviderConnectButton()),
-                    Expanded(child: ProviderZapretButton()),
-                  ],
-                )
+          padding: EdgeInsets.fromLTRB(platform == SupportPlatform.Windows ? 0 : side,
+            0, platform == SupportPlatform.Windows ? 0 : side, 16 + context.bottomInset),
+          child: platform == SupportPlatform.Windows
+              ? EngineControlsLayout(vpn: const ProviderConnectButton(),
+                  zapret: !providerMode || zapretWidgetEnabled ? const ProviderZapretButton() : null)
               : const ProviderConnectButton(),
         ),
       ],

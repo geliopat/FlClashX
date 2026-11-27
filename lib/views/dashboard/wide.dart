@@ -268,9 +268,7 @@ class _WideCard extends StatelessWidget {
         const NetworkTakeoverTile(TakeoverSwitch.systemProxy),
         const NetworkTakeoverTile(TakeoverSwitch.tun),
       ),
-      DashboardWidget.vpnButton => system.isWindows
-          ? pair(const VpnTile(), const ZapretTile())
-          : const VpnTile(),
+      DashboardWidget.vpnButton => const VpnTile(),
       DashboardWidget.serviceStatus => LayoutBuilder(
         builder: (context, constraints) =>
             ServiceStatusCard(columns: serviceColumns(constraints.maxWidth)),

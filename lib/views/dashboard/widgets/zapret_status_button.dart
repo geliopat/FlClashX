@@ -3,6 +3,7 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/core/desktop/helper_client.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/views/dashboard/style.dart';
+import 'engine_controls.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -135,7 +136,22 @@ class ProviderZapretButton extends ConsumerWidget {
     final state = ref.watch(zapretControllerProvider);
     final scheme = context.colorScheme;
     final duration = context.motionDuration(_duration);
-    final label = state.running ? 'Остановить Zapret' : 'Запустить Zapret';
+    final ru = Localizations.localeOf(context).languageCode == 'ru';
+    final label = state.running ? (ru ? 'Остановить Zapret' : 'Stop Zapret')
+        : (ru ? 'Запустить Zapret' : 'Start Zapret');
+    if (system.isWindows) {
+      final initialized = ref.watch(initProvider);
+      final safe = ref.watch(safeModeProvider);
+      final connecting = ref.watch(coreStatusProvider) == CoreStatus.connecting;
+      return EngineControlButton(
+        name: 'Zapret', actionLabel: label, running: state.running,
+        elapsedMilliseconds: state.elapsed.inMilliseconds,
+        busy: state.busy || state.dashboardRestarting || connecting,
+        error: state.error,
+        onPressed: initialized && !safe && !connecting && state.available &&
+            !state.busy && !state.dashboardRestarting ? () => _toggle(ref, state) : null,
+      );
+    }
     return Tooltip(
       message: state.error ?? label,
       child: Semantics(

@@ -2090,6 +2090,12 @@ abstract final class AppGlyphs {
     ], matchTextDirection: true);
   }
 
+  static const enginePlay = Glyph([
+    GlyphPolyline([GlyphVertex(7, 4.5, 1.8), GlyphVertex(19, 12, 1.8),
+      GlyphVertex(7, 19.5, 1.8)], closed: true),
+  ]);
+  static const engineStop = Glyph([GlyphBox(5, 5, 19, 19, 2.5)]);
+
   /// Play at 0, pause at 1; past either end it keeps turning, so it bounces.
   static Glyph playPause(double progress) {
     final fold = progress.clamp(0.0, 1.0);
