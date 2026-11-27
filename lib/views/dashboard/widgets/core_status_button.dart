@@ -12,10 +12,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class CoreStatusButton extends ConsumerStatefulWidget {
-  const CoreStatusButton({super.key, this.compact = false, this.restartAll = true});
-
-  final bool compact;
-  final bool restartAll;
+  const CoreStatusButton({super.key});
 
   @override
   ConsumerState<CoreStatusButton> createState() => _CoreStatusButtonState();
@@ -73,7 +70,7 @@ class _CoreStatusButtonState extends ConsumerState<CoreStatusButton> {
     }
     final coreStatus = ref.read(coreStatusProvider);
     if (coreStatus == CoreStatus.connecting) return;
-    final restartAll = widget.restartAll && system.isWindows && !ref.read(safeModeProvider);
+    final restartAll = system.isWindows && !ref.read(safeModeProvider);
     if (restartAll) {
       final zapret = ref.read(zapretControllerProvider);
       if (zapret.busy || zapret.dashboardRestarting) return;
@@ -107,31 +104,16 @@ class _CoreStatusButtonState extends ConsumerState<CoreStatusButton> {
 
   @override
   Widget build(BuildContext context) {
-    final safeMode = ref.watch(safeModeProvider);
-    final restartAll = widget.restartAll && system.isWindows && !safeMode;
+    final restartAll = system.isWindows && !ref.watch(safeModeProvider);
     final initialized = !system.isWindows || ref.watch(initProvider);
-    final zapretBusy = system.isWindows && initialized && !safeMode && ref.watch(zapretControllerProvider.select((state) => state.busy || state.dashboardRestarting));
+    final zapretBusy = restartAll && initialized && ref.watch(zapretControllerProvider.select((state) => state.busy || state.dashboardRestarting));
     final coreStatus = _holdTimer != null || _requesting ? CoreStatus.connecting : _status;
     final appLocalizations = context.appLocalizations;
-    final canRestart = !_requesting && !zapretBusy && initialized && coreStatus != CoreStatus.connecting;
+    final canRestart = !_requesting && !zapretBusy && initialized;
     const style = ElasticPress.buttonStyle;
+    final iconOnly =
+        coreStatus == CoreStatus.connected || ViewScope.isMobileOf(context);
     final icon = CorePulse(status: coreStatus);
-    if (widget.compact) {
-      final ru = Localizations.localeOf(context).languageCode == 'ru';
-      final status = switch (coreStatus) {
-        CoreStatus.connecting => appLocalizations.connecting,
-        CoreStatus.connected => appLocalizations.connected,
-        CoreStatus.disconnected => appLocalizations.disconnected,
-      };
-      return IconButton(
-        key: const ValueKey('window-mihomo-restart'),
-        tooltip: 'Mihomo · $status · ${ru ? 'Перезапуск' : 'Restart'}',
-        style: compactEngineButtonStyle,
-        onPressed: canRestart ? _handleConnection : null,
-        icon: icon,
-      );
-    }
-    final iconOnly = coreStatus == CoreStatus.connected || ViewScope.isMobileOf(context);
     return Tooltip(
       message: restartAll ? AppLocalizations.of(context).forkRestartAll : appLocalizations.coreStatus,
       child: FadeScaleBox(
@@ -414,15 +396,3 @@ class _PulsePainter extends CustomPainter {
       oldDelegate.sweep != sweep ||
       oldDelegate.lineWidth != lineWidth;
 }
-
-const compactEngineButtonStyle = ButtonStyle(
-  minimumSize: WidgetStatePropertyAll(Size(32, 28)),
-  maximumSize: WidgetStatePropertyAll(Size(32, 32)),
-  padding: WidgetStatePropertyAll(EdgeInsets.zero),
-  iconSize: WidgetStatePropertyAll(22),
-  visualDensity: VisualDensity.standard,
-  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-  backgroundColor: WidgetStatePropertyAll(Colors.transparent),
-  overlayColor: WidgetStatePropertyAll(Colors.transparent),
-  splashFactory: NoSplash.splashFactory,
-);

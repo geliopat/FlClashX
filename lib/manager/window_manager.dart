@@ -10,7 +10,6 @@ import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/ui/ui.dart';
 import 'package:fl_clash/views/dashboard/widgets/core_status_button.dart';
-import 'package:fl_clash/views/dashboard/widgets/zapret_status_button.dart';
 import 'package:fl_clash/ui/hover_glow.dart';
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:material_ui/material_ui.dart';
@@ -328,8 +327,12 @@ class WindowHeaderLayout extends StatelessWidget {
               top: integrated ? height : 0,
               right: integrated ? 8 : null,
               left: integrated ? null : 8,
-              height: height,
-              child: statusActions!,
+              height: integrated ? pageToolbarHeight - height : height,
+              width: integrated ? integratedCaptionWidth(height) - 16 : null,
+              child: Align(
+                alignment: integrated ? Alignment.centerRight : Alignment.centerLeft,
+                child: FittedBox(fit: BoxFit.scaleDown, child: statusActions!),
+              ),
             ),
         ],
       ),
@@ -337,21 +340,18 @@ class WindowHeaderLayout extends StatelessWidget {
   }
 }
 
-/// The engine controls are owned by the window, not a retained dashboard.
-class WindowEngineActions extends ConsumerWidget {
+/// Keep the original combined restart control and its adaptive status UI.
+/// Only its ownership/position changes; the coordinated recovery stays intact.
+class WindowEngineActions extends StatelessWidget {
   const WindowEngineActions({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final safeMode = ref.watch(safeModeProvider);
+  Widget build(BuildContext context) {
     return Material(
       type: MaterialType.transparency,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const CoreStatusButton(compact: true, restartAll: false),
-          if (!safeMode) const ZapretStatusButton(compact: true),
-        ],
+      child: TonalButtonTheme(
+        glass: LiquidGlassScope.of(context),
+        child: const CoreStatusButton(),
       ),
     );
   }

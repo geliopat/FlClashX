@@ -1,6 +1,8 @@
 import 'dart:io';
 
 import 'package:fl_clash/enum/enum.dart';
+import 'package:fl_clash/manager/window_manager.dart';
+import 'package:fl_clash/views/dashboard/widgets/zapret_status_button.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
@@ -25,6 +27,25 @@ ProviderContainer _container() => ProviderContainer(
 );
 
 void main() {
+  testWidgets('window uses the original single combined restart control', (tester) async {
+    final container = _container();
+    addTearDown(container.dispose);
+    globalState.container = container;
+    container.read(viewSizeProvider.notifier).value = const Size(1200, 800);
+    container.read(coreStatusProvider.notifier).value = CoreStatus.disconnected;
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: const TestApp(includeNavigatorKey: false, child: Scaffold(
+        body: Center(child: WindowEngineActions()),
+      )),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.byType(CoreStatusButton), findsOneWidget);
+    expect(find.byType(ZapretStatusButton), findsNothing);
+    expect(find.byType(CorePulse), findsOneWidget);
+    expect(find.text('Disconnected'), findsOneWidget);
+    expect(find.byTooltip(Platform.isWindows ? 'Restart all' : 'Core status'), findsOneWidget);
+  });
   testWidgets(
     'holds connecting for the minimum duration after a fast restart',
     (tester) async {
