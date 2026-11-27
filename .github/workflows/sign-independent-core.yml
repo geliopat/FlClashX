@@ -1,5 +1,10 @@
 name: Sign and publish independent FlClashZ core
 on:
+  push:
+    branches: [fix/zapret2-stability]
+    paths:
+      - '.github/workflows/sign-independent-core.yml'
+      - '.github/scripts/sign-core-manifest.go'
   schedule:
     - cron: '8,38 * * * *'
   workflow_dispatch:
@@ -39,23 +44,33 @@ jobs:
             exit 0
           fi
           tmp=$(mktemp -d)
-          for workflow in flclashz-core-auto.yml flclashz-core-release.yml; do
-            gh api "repos/$SOURCE_REPO/actions/workflows/$workflow/runs?branch=FlClashZ&status=success&per_page=30" \
-              --jq '.workflow_runs[] | select(.conclusion == "success" and .head_branch == "FlClashZ" and .head_repository.full_name == "geliopat/Clash.Meta" and (.event == "schedule" or .event == "workflow_dispatch")) | .id' > "$tmp/$workflow"
-          done
-          sort -urn "$tmp/"*.yml > "$tmp/runs"
+          artifact_name=core-release-request
+          if [[ "$GITHUB_EVENT_NAME" == push ]]; then
+            # Exercise real cross-repository transfer and signing, but never
+            # publish a validation artifact. Only the tested immutable run.
+            artifact_name=flclashz-core-windows-amd64
+            gh api "repos/$SOURCE_REPO/actions/runs/46067251590" | jq -er 'select(.conclusion == "success" and .event == "push" and .head_branch == "FlClashZ" and .head_repository.full_name == "geliopat/Clash.Meta" and .head_sha == "3159aaab96a28cdbff0f5358cc91587bc5e2dc7d") | .id' > "$tmp/runs"
+          else
+            for workflow in flclashz-core-auto.yml flclashz-core-release.yml; do
+              gh api "repos/$SOURCE_REPO/actions/workflows/$workflow/runs?branch=FlClashZ&status=success&per_page=30" \
+                --jq '.workflow_runs[] | select(.conclusion == "success" and .head_branch == "FlClashZ" and .head_repository.full_name == "geliopat/Clash.Meta" and (.event == "schedule" or .event == "workflow_dispatch")) | .id' > "$tmp/$workflow"
+            done
+            sort -urn "$tmp/"*.yml > "$tmp/runs"
+          fi
           run_id=""
           artifact_id=""
           while IFS= read -r candidate; do
             [[ "$candidate" =~ ^[0-9]+$ ]]
             response=$(gh api "repos/$SOURCE_REPO/actions/runs/$candidate/artifacts?per_page=100")
-            matches=$(jq '[.artifacts[] | select(.name == "core-release-request" and .expired == false)]' <<< "$response")
+            matches=$(jq --arg name "$artifact_name" '[.artifacts[] | select(.name == $name and .expired == false)]' <<< "$response")
             if [[ "$(jq length <<< "$matches")" == 0 ]]; then
               continue
             fi
             [[ "$(jq length <<< "$matches")" == 1 ]]
             artifact_id=$(jq -er '.[0].id' <<< "$matches")
             size=$(jq -er '.[0].size_in_bytes' <<< "$matches")
+            digest=$(jq -er '.[0].digest' <<< "$matches")
+            [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
             [[ "$artifact_id" =~ ^[0-9]+$ && "$size" =~ ^[0-9]+$ ]]
             (( size > 0 && size <= 300*1024*1024 ))
             run_id=$candidate
@@ -68,6 +83,7 @@ jobs:
           # Download the exact artifact ID, not a mutable release URL.
           mkdir -p "$RUNNER_TEMP/core-request"
           gh api "repos/$SOURCE_REPO/actions/artifacts/$artifact_id/zip" > "$tmp/core.zip"
+          printf '%s  %s\n' "${digest#sha256:}" "$tmp/core.zip" | sha256sum --check --status
           python - "$tmp/core.zip" "$RUNNER_TEMP/core-request" <<'PY'
           import pathlib, stat, sys, zipfile
           expected = {"FlClashCore.exe": 256 * 1024 * 1024, "core-info.json": 16384}
@@ -100,6 +116,11 @@ jobs:
           jq -e --arg v "$version" '.product == "FlClashZ-core" and .mihomoVersion == ($v | split("-")[0]) and .ipcRevision == 1 and .os == "windows" and .arch == "amd64"' "$info" >/dev/null
           [[ "$(gh api "repos/$SOURCE_REPO/commits/$engine" --jq .sha)" == "$engine" ]]
           [[ "$(gh api "repos/geliopat/FlClashZ/commits/$host" --jq .sha)" == "$host" ]]
+          if [[ "$GITHUB_EVENT_NAME" == push ]]; then
+            [[ "$version" == v1.19.34-z.1 && "$engine" == 2732d34e4b32d5b5d1f8d36223d77b4813babaa7 && "$host" == d3899829a60962c0f1fe9d8d59017529b03b984a ]]
+            printf 'ready=true\nversion=%s\nengine=%s\nhost=%s\nrun=%s\n' "$version" "$engine" "$host" "$run_id" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           tag="flclashz-core-$version"
           # Skip the already published request; never overwrite a release or tag.
           gh api --paginate "repos/$SOURCE_REPO/releases?per_page=100" --jq '.[] | [.tag_name, .draft] | @tsv' > "$tmp/releases"
@@ -145,8 +166,33 @@ jobs:
         run: |
           set -euo pipefail
           go run ./.github/scripts/sign-core-manifest.go -dir "$RUNNER_TEMP/core-request" -version "$VERSION" -engine "$ENGINE" -host "$HOST"
+          # Independently verify the canonical manifest, file hash, and Ed25519
+          # signature with OpenSSL before any release can be written.
+          python - "$RUNNER_TEMP/core-request" <<'PY'
+          import base64, hashlib, json, os, pathlib, subprocess, sys
+          root = pathlib.Path(sys.argv[1])
+          m = json.loads((root / "core-manifest.json").read_text())
+          fields = "schema product version mihomoVersion engineRevision hostRevision ipcRevision os arch name size sha256".split()
+          message = ("flclashz-core-manifest-v1\n" + "\n".join(str(m[k]) for k in fields) + "\n").encode()
+          seed = base64.b64decode(os.environ["CORE_SIGNING_KEY"].strip(), validate=True)
+          public = subprocess.run(["openssl", "pkey", "-inform", "DER", "-pubout", "-outform", "DER"], input=bytes.fromhex("302e020100300506032b657004220420") + seed, capture_output=True, check=True).stdout
+          (root / "verify-public.der").write_bytes(public)
+          (root / "verify-message").write_bytes(message)
+          (root / "verify-signature").write_bytes(base64.b64decode(m["signature"], validate=True))
+          cmd = ["openssl", "pkeyutl", "-verify", "-pubin", "-keyform", "DER", "-inkey", str(root / "verify-public.der"), "-rawin", "-in", str(root / "verify-message"), "-sigfile", str(root / "verify-signature")]
+          subprocess.run(cmd, check=True)
+          with (root / "FlClashCore.exe").open("rb") as f:
+              if hashlib.file_digest(f, "sha256").hexdigest() != m["sha256"] or f.tell() != m["size"]:
+                  raise SystemExit("Signed binary hash or size mismatch")
+          (root / "verify-message").write_bytes(message + b"tampered")
+          if subprocess.run(cmd, capture_output=True).returncode == 0:
+              raise SystemExit("Modified signature message accepted")
+          for name in ("verify-public.der", "verify-message", "verify-signature"):
+              (root / name).unlink()
+          print("Independent Ed25519 verification, tamper rejection and binary hash passed.")
+          PY
       - name: Publish signed core in Clash.Meta, not in FlClashZ
-        if: steps.request.outputs.ready == 'true'
+        if: steps.request.outputs.ready == 'true' && github.event_name != 'push'
         env:
           GH_TOKEN: ${{ secrets.CORE_RELEASE_TOKEN }}
           VERSION: ${{ steps.request.outputs.version }}
