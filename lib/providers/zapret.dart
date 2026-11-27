@@ -5,6 +5,7 @@ import 'dart:io';
 
 import 'package:fl_clash/common/system.dart';
 import 'package:fl_clash/common/file_logger.dart';
+import 'package:fl_clash/common/recovery_journal.dart';
 import 'package:fl_clash/providers/zapret_list_updater.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/app.dart';
@@ -645,7 +646,7 @@ class ZapretController extends Notifier<ZapretState> {
     if (readiness == HelperReadiness.ready) {
       final stopped = await stopAlongsideMihomo();
       if (repairHelper) {
-        await windows!.ensureHelperReady(forceReinstall: true);
+        await _recoverHelper(forceReinstall: true);
         // Verify the new service is reachable and no local engine survived.
         await stopAlongsideMihomo();
       }
@@ -661,9 +662,21 @@ class ZapretController extends Notifier<ZapretState> {
     _lifecycleStopping = true;
     _cancelTrial = true;
     _desiredRunning = false;
-    await windows!.ensureHelperReady(forceReinstall: repairHelper);
+    await _recoverHelper(forceReinstall: repairHelper);
     await stopAlongsideMihomo();
     return restore;
+  }
+
+  Future<void> _recoverHelper({required bool forceReinstall}) async {
+    final action = forceReinstall ? 'reinstall' : 'restore-service';
+    final id = recoveryJournal.begin('Helper', action);
+    var outcome = RecoveryOutcome.failed;
+    try {
+      await windows!.ensureHelperReady(forceReinstall: forceReinstall);
+      outcome = RecoveryOutcome.succeeded;
+    } finally {
+      recoveryJournal.record(id, 'Helper', action, outcome);
+    }
   }
 
   void endCoreRestart() {
@@ -1223,6 +1236,8 @@ class ZapretController extends Notifier<ZapretState> {
   /// before it starts the selected winws.exe or winws2.exe profile.
   Future<void> restart({String reason = 'manual'}) async {
     if (!Platform.isWindows || state.busy || _launchBlocked) return;
+    final id = recoveryJournal.begin('Zapret', 'restart');
+    var outcome = RecoveryOutcome.interrupted;
     state = state.copyWith(busy: true, clearError: true);
     try {
       await _requireHelper();
@@ -1236,6 +1251,7 @@ class ZapretController extends Notifier<ZapretState> {
               watchdog: state.watchdog,
         mode: (state.supportsSplitMode ? _effectiveMode(state.mode) : ZapretMode.fullBypass).name,
       );
+      outcome = response.running ? RecoveryOutcome.succeeded : RecoveryOutcome.failed;
       if (!ref.mounted) return;
       _desiredRunning = response.running && !_launchBlocked;
       if (protection.fingerprint == _infrastructure?.fingerprint) {
@@ -1258,11 +1274,13 @@ class ZapretController extends Notifier<ZapretState> {
         processingLists: response.processingLists,
       );
     } catch (error) {
+      outcome = RecoveryOutcome.failed;
       if (ref.mounted) {
         state = state.copyWith(error: _errorMessage(error));
       }
       rethrow;
     } finally {
+      recoveryJournal.record(id, 'Zapret', 'restart', outcome);
       if (ref.mounted) {
         state = state.copyWith(busy: false);
       }
