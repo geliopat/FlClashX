@@ -42,11 +42,8 @@ func TestProxyOnlyTrafficLeavesOutADirectProxyOfAnyName(t *testing.T) {
 			0,
 			true,
 		)
-		// The accounting tunnel wraps the inbound side; here the tracker
-		// stands in for it, so the bytes count as sent back to the client.
-		inbound := &accountedConn{Conn: tracker, metadata: metadata}
-
-		if _, err := inbound.Write([]byte("hello")); err != nil {
+		// Native tracker writes account bytes uploaded to the outbound.
+		if _, err := tracker.Write([]byte("hello")); err != nil {
 			t.Fatalf("write through %s: %v", test.outbound.Name(), err)
 		}
 		_ = tracker.Close()
@@ -54,8 +51,8 @@ func TestProxyOnlyTrafficLeavesOutADirectProxyOfAnyName(t *testing.T) {
 
 		all := handleGetTotalTraffic(false)
 		proxied := handleGetTotalTraffic(true)
-		if all.Up != 5 || proxied.Down != test.proxied {
-			t.Errorf("%s: total %d, proxied %d; want 5 and %d", test.outbound.Name(), all.Up, proxied.Down, test.proxied)
+		if all.Up != 5 || all.Down != 0 || proxied.Up != test.proxied || proxied.Down != 0 {
+			t.Errorf("%s: total %d/%d, proxied %d/%d; want 5/0 and %d/0", test.outbound.Name(), all.Up, all.Down, proxied.Up, proxied.Down, test.proxied)
 		}
 	}
 	handleResetTraffic()
