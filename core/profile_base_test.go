@@ -543,6 +543,37 @@ func TestEncodeConfigMappingKeepsEveryKeyAfterAnOpenEndedScalar(t *testing.T) {
 	}
 }
 
+func TestUnknownProfileExtensionsSurviveWithoutRestoringManagedFields(t *testing.T) {
+	var source, destination yaml.Node
+	if err := yaml.Unmarshal([]byte("x-meta: &meta {future: true}\nx-extension: *meta\nlisteners: [{name: old}]\nexternal-controller: '0.0.0.0:9090'\nx-local: old\n"), &source); err != nil {
+		t.Fatal(err)
+	}
+	if err := yaml.Unmarshal([]byte("external-controller: ''\nx-local: new\n"), &destination); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := documentMapping(&source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	overlay, err := documentMapping(&destination)
+	if err != nil {
+		t.Fatal(err)
+	}
+	preserveUnknownProfileKeys(profile, overlay)
+	if mappingValue(overlay, "listeners") != nil {
+		t.Fatal("omitted known field was restored")
+	}
+	if mappingValue(overlay, "external-controller").Value != "" ||
+		mappingValue(overlay, "x-local").Value != "new" {
+		t.Fatal("overlay was overwritten")
+	}
+	var extension map[string]any
+	node := mappingValue(overlay, "x-extension")
+	if node == nil || node.Decode(&extension) != nil || extension["future"] != true {
+		t.Fatalf("unknown extension or alias lost: %v", extension)
+	}
+}
+
 func TestSourceSettingsDoNotInventDefaults(t *testing.T) {
 	path := writeBaseProfile(t, "dns:\n  respect-rules: false\n  ipv6-timeout: 0\n  fallback: []\ntun:\n  strict-route: false\nsniffer:\n  skip-domain: []\n")
 	base, err := handleGetProfileBase(path)
