@@ -80,44 +80,68 @@ class ManagedSetting extends ConsumerWidget {
     }
   }
 
-  Widget _withLock(Widget child, {required bool locked}) {
-    if (!showsLock) {
-      return child;
-    }
-    return TitleBadge(
-      badge: SettingLock(locked: locked),
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return ManagedSettingRegion(
+      locked: ref.watch(settingLockedProvider(settingKey)),
+      releasable: ref.watch(settingReleasableProvider(settingKey)),
+      dimsWhenLocked: dimsWhenLocked,
+      showsLock: showsLock,
+      onTakeOver: () => _takeOver(ref),
+      onRelease: () => ref
+          .read(managedSettingsActionProvider.notifier)
+          .release(settingKey),
       child: child,
     );
   }
+}
+
+/// The same ownership affordance also serves draft/profile-scoped settings.
+class ManagedSettingRegion extends StatelessWidget {
+  const ManagedSettingRegion({
+    super.key,
+    required this.locked,
+    required this.releasable,
+    required this.onTakeOver,
+    required this.onRelease,
+    required this.child,
+    this.dimsWhenLocked = true,
+    this.showsLock = true,
+  });
+
+  final bool locked;
+  final bool releasable;
+  final VoidCallback onTakeOver;
+  final VoidCallback onRelease;
+  final Widget child;
+  final bool dimsWhenLocked;
+  final bool showsLock;
+
+  Widget _withLock({required bool locked}) => showsLock
+      ? TitleBadge(badge: SettingLock(locked: locked), child: child)
+      : child;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final locked = ref.watch(settingLockedProvider(settingKey));
-    if (locked && !dimsWhenLocked) {
-      return child;
-    }
+  Widget build(BuildContext context) {
     if (locked) {
+      if (!dimsWhenLocked) return child;
       return _LockedSetting(
-        onTakeOver: () => _takeOver(ref),
-        child: _withLock(child, locked: true),
+        onTakeOver: onTakeOver,
+        child: _withLock(locked: true),
       );
     }
-    if (!ref.watch(settingReleasableProvider(settingKey))) {
-      return child;
-    }
+    if (!releasable) return child;
     return ContextMenuRegion(
       menuItems: [
         CommonPopupMenuItem(
           glyph: AppGlyphs.lock,
           label: context.appLocalizations.returnToProvider,
-          onPressed: () => ref
-              .read(managedSettingsActionProvider.notifier)
-              .release(settingKey),
+          onPressed: onRelease,
         ),
       ],
       child: Semantics(
         hint: context.appLocalizations.managedByYou,
-        child: _withLock(child, locked: false),
+        child: _withLock(locked: false),
       ),
     );
   }

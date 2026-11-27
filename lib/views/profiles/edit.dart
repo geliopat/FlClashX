@@ -9,6 +9,7 @@ import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/pages/editor.dart';
 import 'package:fl_clash/providers/action.dart';
 import 'package:fl_clash/providers/core.dart';
+import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/providers/database.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
@@ -34,6 +35,14 @@ class _EditProfileViewState extends ConsumerState<EditProfileView> {
   late final TextEditingController _autoUpdateDurationController;
   late bool _autoUpdate;
   late bool _sendDeviceHeaders;
+  late bool _intervalOwned;
+  bool _intervalOwnershipChanged = false;
+
+  String get _intervalKey => profileUpdateIntervalSetting(widget.profile.id);
+
+  Duration? get _providerInterval =>
+      (ref.read(profilesProvider).getProfile(widget.profile.id) ?? widget.profile)
+          .headers.updateInterval;
   bool _attempted = false;
   bool _saving = false;
   final _fileInfoNotifier = ValueNotifier<FileInfo?>(null);
@@ -50,8 +59,12 @@ class _EditProfileViewState extends ConsumerState<EditProfileView> {
     );
     _autoUpdate = widget.profile.autoUpdate;
     _sendDeviceHeaders = widget.profile.sendDeviceHeaders;
+    _intervalOwned = ref.read(appSettingProvider).ownedSettings.contains(_intervalKey);
     _autoUpdateDurationController = TextEditingController(
-      text: widget.profile.autoUpdateDuration.inMinutes.toString(),
+      text: (_intervalOwned
+              ? widget.profile.autoUpdateDuration
+              : _providerInterval ?? widget.profile.autoUpdateDuration)
+          .inMinutes.toString(),
     );
     _setupAction = ref.read(setupActionProvider.notifier);
     _updateFileInfo();
@@ -141,13 +154,16 @@ class _EditProfileViewState extends ConsumerState<EditProfileView> {
         ref.read(profilesProvider).getProfile(widget.profile.id) ??
         widget.profile;
     final interval = int.tryParse(_autoUpdateDurationController.text);
+    final providerInterval = current.headers.updateInterval;
     var profile = current.copyWith(
       url: _urlController.text,
       ageSecretKey: _ageSecretKeyController.text.trim(),
       label: _labelController.text,
       autoUpdate: _autoUpdate,
       sendDeviceHeaders: _sendDeviceHeaders,
-      autoUpdateDuration: interval != null && interval > 0
+      autoUpdateDuration: !_intervalOwned && providerInterval != null
+          ? providerInterval
+          : interval != null && interval > 0
           ? Duration(minutes: interval)
           : current.autoUpdateDuration,
     );
@@ -177,10 +193,13 @@ class _EditProfileViewState extends ConsumerState<EditProfileView> {
       if (savedProfile == null) {
         return;
       }
+      _saveIntervalOwnership();
       profilesAction.putProfile(savedProfile);
     } else if (!hasUpdate) {
+      _saveIntervalOwnership();
       profilesAction.putProfile(profile);
     } else {
+      _saveIntervalOwnership();
       unawaited(
         globalState.safeRun(() async {
           await Future.delayed(commonDuration);
@@ -193,6 +212,42 @@ class _EditProfileViewState extends ConsumerState<EditProfileView> {
     if (mounted) {
       Navigator.of(context).pop();
     }
+  }
+
+  void _saveIntervalOwnership() {
+    if (!_intervalOwnershipChanged || !mounted) return;
+    final action = ref.read(managedSettingsActionProvider.notifier);
+    if (_intervalOwned) {
+      action.takeOver(_intervalKey);
+    } else {
+      action.disown(_intervalKey);
+    }
+  }
+
+  Future<void> _takeOverInterval() async {
+    if (_saving || _intervalOwned || _providerInterval == null) return;
+    final l = context.appLocalizations;
+    final agreed = await dialogs.showMessage(
+      title: l.managedByProvider,
+      message: TextSpan(text: l.managedByProviderTip),
+      confirmText: l.takeOver,
+    );
+    if (agreed != true || !mounted || _saving) return;
+    setState(() {
+      _intervalOwned = true;
+      _intervalOwnershipChanged = true;
+    });
+  }
+
+  void _releaseInterval() {
+    final interval = _providerInterval;
+    if (_saving || interval == null) return;
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() {
+      _intervalOwned = false;
+      _intervalOwnershipChanged = true;
+      _autoUpdateDurationController.text = interval.inMinutes.toString();
+    });
   }
 
   void _setAutoUpdate(bool value) {
@@ -333,6 +388,10 @@ class _EditProfileViewState extends ConsumerState<EditProfileView> {
     final appLocalizations = context.appLocalizations;
     final isUrl = widget.profile.type == ProfileType.url;
     final issue = _attempted ? _issue(appLocalizations) : null;
+    final providerInterval = ref.watch(profilesProvider.select(
+      (profiles) => (profiles.getProfile(widget.profile.id) ?? widget.profile)
+          .headers.updateInterval,
+    ));
     final sections = [
       generateSection(
         items: [
@@ -363,10 +422,16 @@ class _EditProfileViewState extends ConsumerState<EditProfileView> {
               ),
             ),
             if (_autoUpdate)
-              _AutoUpdateIntervalField(
-                controller: _autoUpdateDurationController,
-                invalid: issue?.field == _ProfileField.autoUpdateInterval,
-                onChanged: _handleChanged,
+              ManagedSettingRegion(
+                locked: providerInterval != null && !_intervalOwned,
+                releasable: providerInterval != null && _intervalOwned,
+                onTakeOver: _takeOverInterval,
+                onRelease: _releaseInterval,
+                child: _AutoUpdateIntervalField(
+                  controller: _autoUpdateDurationController,
+                  invalid: issue?.field == _ProfileField.autoUpdateInterval,
+                  onChanged: _handleChanged,
+                ),
               ),
             FormRow(
               title: appLocalizations.sendDeviceHeaders,

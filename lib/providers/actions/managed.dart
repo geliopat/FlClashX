@@ -63,6 +63,16 @@ class ManagedSettingsAction extends _$ManagedSettingsAction {
   }
 
   void releaseAll() {
+    final owned = ref.read(appSettingProvider).ownedSettings;
+    for (final profile in ref.read(profilesProvider)) {
+      final interval = profile.headers.updateInterval;
+      if (interval != null &&
+          owned.contains(profileUpdateIntervalSetting(profile.id))) {
+        ref.read(profilesProvider.notifier).put(
+          profile.copyWith(autoUpdateDuration: interval),
+        );
+      }
+    }
     ref
         .read(appSettingProvider.notifier)
         .update((state) => state.copyWith(ownedSettings: const {}));

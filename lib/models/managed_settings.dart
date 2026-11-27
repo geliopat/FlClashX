@@ -22,6 +22,10 @@ const vibrationSetting = 'app.vibration';
 /// `denywidgets` remains a separate forced policy.
 const dashboardWidgetsSetting = 'app.dashboardWidgets';
 
+/// The profile-update-interval header belongs to a single subscription.
+String profileUpdateIntervalSetting(int profileId) =>
+    'profile.$profileId.updateInterval';
+
 // Each Zapret option has the same ownership semantics as other settings.
 const zapretStartSetting = 'zapret.autostart';
 const zapretFallbackSetting = 'zapret.autofallback';

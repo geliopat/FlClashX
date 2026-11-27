@@ -181,7 +181,7 @@ void main() {
       id: 5,
       label: 'Provider',
       type: ProfileType.url,
-      providerHeaders: {'flclashz-view': 'type:list,layout:tight'},
+      providerHeaders: {'flclashz-view': 'proxies.type:list;proxies.layout:tight'},
     );
     container = ProviderContainer(
       overrides: [

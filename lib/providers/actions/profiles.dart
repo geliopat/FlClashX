@@ -21,6 +21,8 @@ class ProfilesAction extends _$ProfilesAction {
 
   Future<void> deleteProfile(int id) async {
     await ref.read(profilesProvider.notifier).del(id);
+    ref.read(managedSettingsActionProvider.notifier)
+        .disown(profileUpdateIntervalSetting(id));
     if (system.isWindows) ref.read(resourcesActionProvider.notifier).profileRemoved(id);
     await clearEffect(id);
     await forgetProxyChains(ref, id);
@@ -347,8 +349,10 @@ class ProfilesAction extends _$ProfilesAction {
         subscriptionInfo: updated.subscriptionInfo,
         lastUpdateDate: updated.lastUpdateDate,
         providerHeaders: updated.providerHeaders,
-        autoUpdateDuration:
-            updated.headers.updateInterval ?? latest.autoUpdateDuration,
+        autoUpdateDuration: ref.read(appSettingProvider).ownedSettings.contains(
+            profileUpdateIntervalSetting(latest.id))
+            ? latest.autoUpdateDuration
+            : updated.headers.updateInterval ?? latest.autoUpdateDuration,
       );
       ref.read(profilesProvider.notifier).put(newProfile);
       noticeDeviceHeaders(newProfile, before: latest, manual: showLoading);

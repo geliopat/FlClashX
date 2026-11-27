@@ -7,6 +7,7 @@ import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/ui/ui.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/gestures.dart';
 
 import '../../helpers/app_paths.dart';
 import '../../helpers/test_profiles.dart';
@@ -82,6 +83,37 @@ void main() {
     );
 
     expect(row(), findsNothing);
+  });
+
+  testWidgets('provider interval can be handed back using its context menu', (
+    tester,
+  ) async {
+    final profile = Profile.normal(
+      label: 'test',
+      url: 'https://example.com/sub',
+    ).copyWith(
+      autoUpdateDuration: const Duration(hours: 12),
+      providerHeaders: {'profile-update-interval': '12'},
+    );
+    await pumpEditProfile(tester, profile: profile, overrides: [
+      profilesProvider.overrideWith(() => TestProfiles([profile])),
+    ]);
+    final interval = find.widgetWithText(
+      FormRow, currentAppLocalizations.autoUpdateInterval,
+    );
+    await tester.tap(interval);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(currentAppLocalizations.takeOver));
+    await tester.pumpAndSettle();
+    final field = find.descendant(
+      of: interval, matching: find.byType(TextFormField),
+    );
+    await tester.enterText(field, '60');
+    await tester.tap(interval, buttons: kSecondaryButton);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(currentAppLocalizations.returnToProvider));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextFormField>(field).controller!.text, '720');
   });
 
   testWidgets('turning it off saves the profile and fetches it again', (
