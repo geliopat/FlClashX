@@ -390,10 +390,10 @@ class _EmptyIllustrationState extends State<EmptyIllustration>
       MaterialShapes.cookie9Sided,
       AppGlyphs.logs,
     ),
-    NullStatusIllustration.proxies => (MaterialShapes.sunny, AppGlyphs.proxies),
+    NullStatusIllustration.proxies => (MaterialShapes.sunny, AppGlyphs.globe),
     NullStatusIllustration.profile => (
       MaterialShapes.cookie7Sided,
-      AppGlyphs.profiles,
+      AppGlyphs.files,
     ),
     NullStatusIllustration.scripts => (
       MaterialShapes.cookie6Sided,
@@ -405,7 +405,7 @@ class _EmptyIllustrationState extends State<EmptyIllustration>
     ),
     NullStatusIllustration.connections => (
       MaterialShapes.cookie4Sided,
-      AppGlyphs.connections,
+      AppGlyphs.network,
     ),
     NullStatusIllustration.requests => (
       MaterialShapes.softBurst,

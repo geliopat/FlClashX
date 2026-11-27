@@ -16,7 +16,7 @@ class CustomResourcesView extends StatelessWidget {
     final items = [
       ListItem.open(
         title: Text(appLocalizations.proxies),
-        leading: const GlyphIcon(AppGlyphs.proxies),
+        leading: const GlyphIcon(AppGlyphs.globe),
         widget: const CustomProxiesView(),
       ),
       ListItem.open(
