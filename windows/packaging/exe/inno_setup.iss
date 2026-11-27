@@ -150,6 +150,7 @@ end;
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   DriverPath: String;
+  DriverUnloadResult: Integer;
 begin
   Result := '';
   { Refuse a directory containing another client before changing any services. }
@@ -180,12 +181,13 @@ begin
   if FileExists(DriverPath) then
   begin
     try
+      DriverUnloadResult := RunUpdateScript('UnloadDriver');
       ExtractTemporaryFile('WinDivert64.sys');
       KeepWinDivert := CompareText(GetSHA256OfFile(DriverPath),
         GetSHA256OfFile(ExpandConstant('{tmp}\WinDivert64.sys'))) = 0;
       if KeepWinDivert then
         Log('WinDivert64.sys matches bundled SHA-256; keeping existing driver')
-      else if RunUpdateScript('CheckDriver') <> 0 then
+      else if (DriverUnloadResult <> 0) or (RunUpdateScript('CheckDriver') <> 0) then
       begin
         ReleaseUpdate;
         Result := CustomMessage('DriverInUse');

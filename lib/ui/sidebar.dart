@@ -14,6 +14,8 @@ import 'package:material_ui/material_ui.dart';
 
 const _compactWidth = 48.0;
 const _expandedWidth = 220.0;
+const _statisticsMinWidth = 164.0;
+const _statisticsMaxWidth = 260.0;
 const _itemSize = 40.0;
 const _itemGap = 4.0;
 const _toggleGap = 8.0;
@@ -292,10 +294,32 @@ class _SidebarPane extends StatelessWidget {
     final iconInset = (itemWidth - _iconSize) / 2;
     final itemHeight =
         _itemSize + MediaQuery.textScalerOf(context).scale(fontSize) - fontSize;
-    final rowWidth = _expandedWidth - sideInset * 2;
     final labelStyle = AppTextStyle.subheadline
         .of(context)
         .copyWith(color: colors.label);
+    // Fit the translated labels on the desktop statistics sidebar, but keep
+    // room for two traffic values. Other sidebar variants keep upstream width.
+    final labelInsets = sideInset * 2 + iconInset + _iconSize + _labelGap * 2;
+    final longestLabel = destinations.fold<double>(0, (width, destination) {
+      final painter = TextPainter(
+        text: TextSpan(text: destination.label, style: labelStyle),
+        maxLines: 1,
+        textDirection: Directionality.of(context),
+        textScaler: MediaQuery.textScalerOf(context),
+        locale: Localizations.maybeLocaleOf(context),
+      )..layout();
+      final measured = painter.width.ceilToDouble();
+      painter.dispose();
+      return math.max(width, measured);
+    });
+    final expandedWidth = math.max(
+      compactWidth,
+      footer == null
+          ? _expandedWidth
+          : (longestLabel + labelInsets)
+                .clamp(_statisticsMinWidth, _statisticsMaxWidth).toDouble(),
+    );
+    final rowWidth = expandedWidth - sideInset * 2;
     final labelWidth = rowWidth - iconInset - _iconSize - _labelGap * 2;
     String rowTooltip(String label) =>
         expanded &&
@@ -326,7 +350,7 @@ class _SidebarPane extends StatelessWidget {
       );
     }
     return SizedBox(
-      width: lerpDouble(compactWidth, _expandedWidth, progress),
+      width: lerpDouble(compactWidth, expandedWidth, progress),
       child: LayoutBuilder(
         builder: (context, constraints) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

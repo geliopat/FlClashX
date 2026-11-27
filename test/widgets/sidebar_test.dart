@@ -107,6 +107,28 @@ Finder _rowTooltip(String message) => find.byWidgetPredicate(
 );
 
 void main() {
+  testWidgets('statistics sidebar fits labels instead of a fixed width', (tester) async {
+    await tester.pumpWidget(_sidebar(
+      footer: const Text('Traffic'),
+      pinLastDestination: true,
+    ));
+    final shortWidth = tester.getSize(_sidebarFinder).width;
+    expect(shortWidth, inInclusiveRange(164.0, 219.0));
+    expect(_rowTooltip('Dashboard'), findsNothing);
+    await tester.pumpWidget(_sidebar(
+      destinations: const [
+        ..._destinations,
+        SidebarDestination(glyph: AppGlyphs.settings, label: 'Long translated settings label'),
+      ],
+      footer: const Text('Traffic'),
+      pinLastDestination: true,
+    ));
+    await tester.pumpAndSettle();
+    expect(tester.getSize(_sidebarFinder).width, greaterThan(shortWidth));
+    expect(tester.getSize(_sidebarFinder).width, lessThanOrEqualTo(260.0));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('pinned settings stay below the sidebar footer', (tester) async {
     int? selected;
     await tester.pumpWidget(_sidebar(

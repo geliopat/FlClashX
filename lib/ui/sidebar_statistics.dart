@@ -164,12 +164,21 @@ class _SidebarStatisticsState extends ConsumerState<SidebarStatistics> {
     padding: const EdgeInsets.symmetric(vertical: 1),
     child: Row(
       children: [
-        Expanded(child: Text(label, style: style, maxLines: 1,
-            overflow: TextOverflow.ellipsis)),
-        Flexible(child: Text(value, maxLines: 1, overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.end, style: style?.copyWith(
-            fontFeatures: const [FontFeature.tabularFigures()],
-          ))),
+        Expanded(
+          child: Text(label, style: style, maxLines: 1,
+            overflow: TextOverflow.ellipsis),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: AlignmentDirectional.centerEnd,
+            child: Text(value, maxLines: 1,
+              textAlign: TextAlign.end, style: style?.copyWith(
+                fontFeatures: const [FontFeature.tabularFigures()],
+              )),
+          ),
+        ),
       ],
     ),
   );
