@@ -16,13 +16,77 @@ $ZapretSourceBase = "https://raw.githubusercontent.com/geliopat/zapret2-gui/$Zap
 
 function Get-PinnedArchive {
     param([string]$Url, [string]$Path, [string]$ExpectedSha256, [string]$Label)
-    Write-Host "Downloading $Label..."
-    Invoke-WebRequest -Uri $Url -OutFile $Path
+    $CachePath = $null
+    if ($env:FLCLASHZ_ZAPRET_CACHE_DIR) {
+        New-Item -ItemType Directory -Path $env:FLCLASHZ_ZAPRET_CACHE_DIR -Force | Out-Null
+        $CachePath = Join-Path $env:FLCLASHZ_ZAPRET_CACHE_DIR "$ExpectedSha256.zip"
+    }
+    if ($CachePath -and (Test-Path -LiteralPath $CachePath -PathType Leaf) -and
+        (Get-FileHash -LiteralPath $CachePath -Algorithm SHA256).Hash -ieq $ExpectedSha256) {
+        Write-Host "Cache hit: $Label"
+        Copy-Item -LiteralPath $CachePath -Destination $Path -Force
+    } else {
+        Write-Host "Downloading $Label..."
+        Invoke-WebRequest -Uri $Url -OutFile $Path
+    }
     $Actual = (Get-FileHash -Path $Path -Algorithm SHA256).Hash.ToLowerInvariant()
     if ($Actual -ne $ExpectedSha256.ToLowerInvariant()) {
         throw "SHA256 mismatch for $Label. Expected $ExpectedSha256, got $Actual."
     }
+    if ($CachePath) { Copy-Item -LiteralPath $Path -Destination $CachePath -Force }
     Write-Host "Verified SHA256: $Label"
+}
+
+# Cache raw source files only when their Git blob identity is independently
+# obtained from the tree at the already pinned commit. Never trust a digest
+# stored next to a cached file as the source of truth.
+$SourceBlobIds = @{}
+if ($env:FLCLASHZ_ZAPRET_CACHE_DIR) {
+    try {
+        $Headers = @{ Accept = "application/vnd.github+json"; "User-Agent" = "FlClashZ-CI" }
+        if ($env:GH_TOKEN) { $Headers["Authorization"] = "Bearer $env:GH_TOKEN" }
+        $Commit = Invoke-RestMethod -Headers $Headers -Uri "https://api.github.com/repos/geliopat/zapret2-gui/git/commits/$ZapretSourceCommit"
+        if ($Commit.sha -cne $ZapretSourceCommit -or $Commit.tree.sha -cnotmatch '^[0-9a-f]{40}$') { throw "Unexpected pinned source commit" }
+        $TreeSha = $Commit.tree.sha
+        $Tree = Invoke-RestMethod -Headers $Headers -Uri "https://api.github.com/repos/geliopat/zapret2-gui/git/trees/${TreeSha}?recursive=1"
+        if ($Tree.truncated -or $Tree.sha -cne $TreeSha) { throw "Incomplete or unexpected pinned source tree" }
+        foreach ($Entry in $Tree.tree) {
+            if ($Entry.type -eq "blob" -and $Entry.sha -cmatch '^[0-9a-f]{40}$') {
+                $SourceBlobIds[$Entry.path] = $Entry.sha
+            }
+        }
+    } catch {
+        $SourceBlobIds.Clear()
+        Write-Warning "Pinned source tree unavailable; raw source cache disabled for this run."
+    }
+}
+
+function Get-SourceBlobId {
+    param([string]$Path)
+    $Hash = & git hash-object --no-filters -- "$Path"
+    if ($LASTEXITCODE -ne 0) { throw "Unable to hash pinned source file: $Path" }
+    return "$Hash".Trim()
+}
+
+function Get-PinnedSourceFile {
+    param([string]$Relative, [string]$Path)
+    $Expected = $SourceBlobIds[$Relative]
+    $Cached = $null
+    if ($Expected) {
+        $CacheDir = Join-Path $env:FLCLASHZ_ZAPRET_CACHE_DIR "blobs"
+        New-Item -ItemType Directory -Path $CacheDir -Force | Out-Null
+        $Cached = Join-Path $CacheDir $Expected
+        if ((Test-Path -LiteralPath $Cached -PathType Leaf) -and (Get-SourceBlobId $Cached) -ceq $Expected) {
+            Copy-Item -LiteralPath $Cached -Destination $Path -Force
+            Write-Host "Cache hit: $Relative"
+            return
+        }
+    }
+    Invoke-WebRequest -Uri "$ZapretSourceBase/$Relative" -OutFile $Path
+    if ($Expected) {
+        if ((Get-SourceBlobId $Path) -cne $Expected) { throw "Git blob identity mismatch: $Relative" }
+        Copy-Item -LiteralPath $Path -Destination $Cached -Force
+    }
 }
 
 try {
@@ -90,7 +154,7 @@ try {
     $BlobFiles = @("ACTIVE_DISCORD_UDP.bin","ACTIVE_GAME_UDP.bin","quic_initial_4pda_to.bin","quic_initial_5ka_ru.bin","quic_initial_lemana_pro.bin","quic_initial_rutube_ru.bin","quic_initial_steam_chat_com.bin","quic_initial_steamcommunity_com.bin","quic_initial_steamstatic_com.bin","quic_initial_tencent_com.bin","quic_initial_www_google_com.bin","stun.bin","stun2.bin","tls_clienthello_4pda_to.bin","tls_clienthello_5ka_ru.bin","tls_clienthello_awswaf_com.bin","tls_clienthello_max_ru.bin","tls_clienthello_retext_ai.bin","tls_clienthello_sochi_park.bin","tls_clienthello_steam_chat_com.bin","tls_clienthello_steamstatic_com.bin","tls_clienthello_teamspeak_com.bin","tls_clienthello_www_google_com.bin","tls_clienthello_www_sferum_ru.bin")
     foreach ($Name in $BlobFiles) {
         $Path = Join-Path $AssetDir $Name
-        Invoke-WebRequest -Uri "$ZapretSourceBase/bin/$Name" -OutFile $Path
+        Get-PinnedSourceFile -Relative "bin/$Name" -Path $Path
         if ((Get-Item $Path).Length -eq 0) { throw "Downloaded payload is empty: $Name" }
     }
 
@@ -98,9 +162,9 @@ try {
     foreach ($Name in $ListFiles) {
         $Path = Join-Path $ListsDir $Name
         try {
-            Invoke-WebRequest -Uri "$ZapretSourceBase/lists/$Name" -OutFile $Path
+            Get-PinnedSourceFile -Relative "lists/$Name" -Path $Path
         } catch {
-            if ($Name.EndsWith("-user.txt")) { [System.IO.File]::WriteAllText($Path, "") } else { throw }
+            if ($Name.EndsWith("-user.txt") -and -not $SourceBlobIds["lists/$Name"]) { [System.IO.File]::WriteAllText($Path, "") } else { throw }
         }
     }
 

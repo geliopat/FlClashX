@@ -72,6 +72,20 @@ void main() {
     expect(buildCount, 3);
   });
 
+  test('accepts restored output with changed mtime but identical bytes', () async {
+    await runBuild();
+    output.setLastModifiedSync(DateTime.utc(2020));
+    expect((await runBuild()).rebuilt, isFalse);
+  });
+
+  test('rejects changed bytes even with same size and mtime', () async {
+    await runBuild();
+    final modified = output.lastModifiedSync();
+    output.writeAsStringSync('evil-1');
+    output.setLastModifiedSync(modified);
+    expect((await runBuild()).rebuilt, isTrue);
+  });
+
   test('does not write a successful record after a failed build', () async {
     final failingBuild = cache.run(
       key: 'macos-arm64-core',

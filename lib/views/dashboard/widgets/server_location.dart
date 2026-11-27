@@ -186,7 +186,7 @@ class _ServerLocationCardState extends ConsumerState<ServerLocationCard>
                     // Keep this region independent of the surrounding card's
                     // picker even while a test is queued or the core is down.
                     onTap: () {
-                      if (canTest && proxy != null) _testDelay(proxy, testUrl);
+                      if (canTest) _testDelay(proxy, testUrl);
                     },
                     child: SizedBox(
                       width: 52,

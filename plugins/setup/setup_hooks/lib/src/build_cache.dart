@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:logging/logging.dart';
 import 'package:path/path.dart' as p;
 
@@ -37,10 +38,10 @@ class BuildCache {
         p.normalize(p.absolute(rootDir)),
         '.dart_tool',
         'setup_build_cache',
-        'v1',
+        'v2',
       );
 
-  static const int schemaVersion = 1;
+  static const int schemaVersion = 2;
   static final Map<String, _AsyncLock> _processLocks = {};
 
   final String rootDir;
@@ -186,15 +187,15 @@ class BuildCache {
     return {
       'path': _storedPath(outputPath),
       'size': stat.size,
-      'modified': stat.modified.millisecondsSinceEpoch,
+      'sha256': sha256.convert(file.readAsBytesSync()).toString(),
     };
   }
 
   String? _validateOutput(Map<String, dynamic> metadata) {
     final storedPath = metadata['path'];
     final size = metadata['size'];
-    final modified = metadata['modified'];
-    if (storedPath is! String || size is! int || modified is! int) {
+    final digest = metadata['sha256'];
+    if (storedPath is! String || size is! int || digest is! String) {
       return 'invalid output metadata';
     }
 
@@ -204,7 +205,8 @@ class BuildCache {
     if (stat.type != FileSystemEntityType.file || stat.size <= 0) {
       return 'output is invalid: $storedPath';
     }
-    if (stat.size != size || stat.modified.millisecondsSinceEpoch != modified) {
+    if (stat.size != size ||
+        sha256.convert(file.readAsBytesSync()).toString() != digest) {
       return 'output changed: $storedPath';
     }
     return null;

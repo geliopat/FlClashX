@@ -138,6 +138,7 @@ jobs:
     with:
       candidate_ref: ${{ needs.prepare.outputs.sha }}
       update_public_key: ${{ needs.prepare.outputs.public_key }}
+      build_mode: clean
 
   publish:
     needs: [prepare, validate]
@@ -153,7 +154,8 @@ jobs:
         with:
           channel: stable
           flutter-version: '3.47.6'
-          cache: true
+          cache: false
+          pub-cache: false
       - name: Install signer dependencies
         run: flutter pub get
       - uses: actions/download-artifact@v7
