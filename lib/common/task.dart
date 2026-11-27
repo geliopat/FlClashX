@@ -251,6 +251,9 @@ Future<RealProfile> _makeRealProfileTask(MakeRealProfileState data) async {
         overrides.tun.dnsHijack.isEmpty) 'dns-hijack': defaultDnsHijack,
     ...realPatchConfig.tun.coreJson,
     'auto-detect-interface': true,
+    // The Windows application owns resolver interception, including the OS
+    // DNS mode introduced by the pinned sing-tun implementation.
+    if (Platform.isWindows) 'dns-mode': 'hijack',
   };
   if (data.bypassPrivateRoute) {
     tun['route-exclude-address'] = [
