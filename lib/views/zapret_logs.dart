@@ -1,3 +1,4 @@
+import 'package:fl_clash/ui/icons/icons.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -155,7 +156,7 @@ class _ZapretLogsViewState extends State<ZapretLogsView>
         if (_tab != 0)
           ListItem(
             title: Text(l.update),
-            trailing: const Icon(Icons.refresh),
+            trailing: const GlyphIcon(AppGlyphs.refresh),
             onTap: _reloadArchive,
           ),
         if (error != null)

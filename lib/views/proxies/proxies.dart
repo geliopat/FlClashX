@@ -161,7 +161,7 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> {
       if (!picker) ...[
         if (ref.watch(globalModeAllowedProvider))
           IconButtonData(
-            glyph: mode == Mode.global ? AppGlyphs.proxies : AppGlyphs.rules,
+            glyph: mode == Mode.global ? AppGlyphs.globe : AppGlyphs.rules,
             tooltip:
                 '${appLocalizations.outboundMode}: '
                 '${mode == Mode.global ? appLocalizations.global : appLocalizations.rule}',

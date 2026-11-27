@@ -31,12 +31,12 @@ extension DashboardWidgetView on DashboardWidget {
     DashboardWidget.vpnButton => AppGlyphs.vpn,
     DashboardWidget.networkTakeover => AppGlyphs.shuffle,
     DashboardWidget.serviceStatus => AppGlyphs.verified,
-    DashboardWidget.profiles => AppGlyphs.profiles,
+    DashboardWidget.profiles => AppGlyphs.files,
     DashboardWidget.proxyGroups => AppGlyphs.layers,
-    DashboardWidget.connectionStats => AppGlyphs.connections,
+    DashboardWidget.connectionStats => AppGlyphs.network,
     DashboardWidget.intranetIp => AppGlyphs.devices,
     DashboardWidget.memoryInfo => AppGlyphs.memory,
-    DashboardWidget.zapret => AppGlyphs.filter,
+    DashboardWidget.zapret => AppGlyphs.shieldOff,
   };
 
   String label(BuildContext context) {

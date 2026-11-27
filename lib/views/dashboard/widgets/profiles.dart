@@ -127,7 +127,7 @@ class ProfilesCard extends ConsumerWidget {
           SizedBox(
             height: name.leading,
             child: DashboardIconButton(
-              glyph: AppGlyphs.swap,
+              glyph: AppGlyphs.listChecks,
               tooltip: appLocalizations.switchProfile,
               onPressed: () => showProfilesSheet(context),
             ),
@@ -144,7 +144,7 @@ class ProfilesCard extends ConsumerWidget {
         mainAxisSize: mobile ? MainAxisSize.min : MainAxisSize.max,
         children: [
           DashboardCardHeader(
-            glyph: AppGlyphs.profiles,
+            glyph: AppGlyphs.files,
             title: appLocalizations.profile,
             trailing: [?webPage, ?support, ?sync],
           ),

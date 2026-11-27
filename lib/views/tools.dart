@@ -261,7 +261,7 @@ class _DiagnosticsItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ListItem.open(
-    leading: const Icon(Icons.health_and_safety_outlined),
+    leading: const GlyphIcon(AppGlyphs.status),
     title: Text(AppLocalizations.of(context).forkDiagnostics),
     widget: const DiagnosticsView(),
   );

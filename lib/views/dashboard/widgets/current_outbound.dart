@@ -625,7 +625,7 @@ class _CountryBadgeState extends State<CountryBadge>
       child: flag != null
           ? null
           : code == null || code.isEmpty
-          ? GlyphIcon(AppGlyphs.proxies, size: size * 0.42, color: foreground)
+          ? GlyphIcon(AppGlyphs.globe, size: size * 0.42, color: foreground)
           : Text(code.toUpperCase(), maxLines: 1, style: codeStyle),
     );
     if (onRefresh == null) {

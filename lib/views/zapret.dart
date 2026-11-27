@@ -90,10 +90,10 @@ class ZapretView extends ConsumerWidget {
                     message: zapret.running
                         ? AppLocalizations.of(context).forkStopZapret
                         : AppLocalizations.of(context).forkStartZapret,
-                    child: Icon(
+                    child: GlyphIcon(
                       zapret.running
-                          ? Icons.stop_circle_outlined
-                          : Icons.play_circle_outline,
+                          ? AppGlyphs.stopCircle
+                          : AppGlyphs.playCircle,
                       color: zapret.running
                           ? context.colorScheme.primary
                           : context.colorScheme.onSurfaceVariant,
@@ -122,6 +122,7 @@ class ZapretView extends ConsumerWidget {
               onTap: zapret.busy ? null : () => ref.read(zapretControllerProvider.notifier).restart(),
             ),
           ListItem(
+            leading: const GlyphIcon(AppGlyphs.listChecks),
             title: Text(AppLocalizations.of(context).forkStrategy),
             onTap: zapret.busy ? null : () => showZapretStrategiesSheet(context),
             subtitle: Text(
@@ -154,7 +155,7 @@ class ZapretView extends ConsumerWidget {
           ],
           if (zapret.error != null)
             ListItem(
-              leading: Icon(Icons.error_outline, color: context.colorScheme.error),
+              leading: GlyphIcon(AppGlyphs.error, color: context.colorScheme.error),
               title: Text(AppLocalizations.of(context).forkHelperError),
               subtitle: Text(
                 zapret.error!,
@@ -162,7 +163,7 @@ class ZapretView extends ConsumerWidget {
               ),
             ),
           ListItem(
-            leading: const Icon(Icons.refresh),
+            leading: const GlyphIcon(AppGlyphs.refresh),
             title: Text(AppLocalizations.of(context).forkRefreshStatus),
             onTap: zapret.busy
                 ? null
@@ -193,14 +194,14 @@ class ZapretView extends ConsumerWidget {
                 '${AppLocalizations.of(context).forkScreenOnly}: $screened · ${AppLocalizations.of(context).forkNoVerifiedResult}: ${(zapret.strategies.length - zapret.trials.length).clamp(0, zapret.strategies.length)}',
                 AppLocalizations.of(context).forkTuneResults,
               ].join('\n'), maxLines: 8),
-              trailing: const Icon(Icons.chevron_right),
+              trailing: const GlyphIcon(AppGlyphs.chevronForward),
               onTap: showAllTrials,
             ),
           ListItem(
-            leading: const Icon(Icons.history),
+            leading: const GlyphIcon(AppGlyphs.clock),
             title: Text(AppLocalizations.of(context).forkAutoTuneHistory),
             subtitle: Text(AppLocalizations.of(context).forkLastThirtyRuns),
-            trailing: const Icon(Icons.chevron_right),
+            trailing: const GlyphIcon(AppGlyphs.chevronForward),
             onTap: () => BaseNavigator.push<void>(context, const _ZapretHistoryView()),
           ),
           ManagedSetting(
@@ -326,7 +327,7 @@ class _ZapretHistoryViewState extends State<_ZapretHistoryView> {
             if (runs.isEmpty) Center(child: Text(AppLocalizations.of(context).forkEmptyHistory)),
             for (final run in runs)
               ListItem(
-                leading: const Icon(Icons.history),
+                leading: const GlyphIcon(AppGlyphs.clock),
                 title: Text(_runDate(run.at)),
                 subtitle: Text([
                   run.tuneMode?.localizedLabel(AppLocalizations.of(context)) ?? AppLocalizations.of(context).forkPreviousRun,
@@ -334,7 +335,7 @@ class _ZapretHistoryViewState extends State<_ZapretHistoryView> {
                   '${AppLocalizations.of(context).forkResults}: ${run.trials.length}${run.totalStrategies == null ? '' : '/${run.totalStrategies}'} · ${AppLocalizations.of(context).forkSuccess}: ${run.trials.where((trial) => trial.confirmed).length}',
                   if (run.failure != null) AppLocalizations.of(context).forkCompletedWithError,
                 ].join('\n')),
-                trailing: const Icon(Icons.chevron_right),
+                trailing: const GlyphIcon(AppGlyphs.chevronForward),
                 onTap: () => BaseNavigator.push<void>(context, ZapretResultsView(run: run)),
               ),
           ],
@@ -417,7 +418,7 @@ class ZapretResultsView extends ConsumerWidget {
                         style: Theme.of(context).textTheme.titleMedium,
                       )),
                       if (run == null && zapret.activeStrategyId == trial.id)
-                        const Icon(Icons.check_circle_outline),
+                        const GlyphIcon(AppGlyphs.checkCircle),
                       if (run == null && trial.confirmed)
                         TextButton(onPressed: zapret.busy ? null : () => apply(trial), child: Text(AppLocalizations.of(context).submit)),
                     ]),

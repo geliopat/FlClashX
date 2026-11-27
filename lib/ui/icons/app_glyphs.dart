@@ -513,6 +513,20 @@ abstract final class AppGlyphs {
     ], role: GlyphRole.detail),
   ]);
 
+  static const playCircle = Glyph([
+    GlyphCircle(12, 12, 8.8),
+    GlyphPolyline([
+      GlyphVertex(10, 8, 0.4),
+      GlyphVertex(16, 12, 0.4),
+      GlyphVertex(10, 16, 0.4),
+    ], closed: true, role: GlyphRole.detail),
+  ]);
+
+  static const stopCircle = Glyph([
+    GlyphCircle(12, 12, 8.8),
+    GlyphBox(8.5, 8.5, 15.5, 15.5, 1, role: GlyphRole.detail),
+  ]);
+
   static const stop = Glyph([GlyphBox(6, 6, 18, 18, 2.5)]);
 
   /// A headset: the band, two cups and a mic boom.

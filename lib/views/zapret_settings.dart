@@ -1,3 +1,4 @@
+import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/l10n/l10n.dart';
 import 'package:fl_clash/models/managed_settings.dart';
 import 'dart:async';
@@ -276,7 +277,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
             ),
           ),
             ListItem(
-              leading: const Icon(Icons.admin_panel_settings_outlined),
+              leading: const GlyphIcon(AppGlyphs.vpn),
               title: Text(AppLocalizations.of(context).forkReinstallHelper),
               subtitle: Text(AppLocalizations.of(context).forkReinstallHelperDesc),
               trailing: _updatingHelper
@@ -310,7 +311,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
             ),
           ),
           ListItem(
-            leading: const Icon(Icons.refresh),
+            leading: const GlyphIcon(AppGlyphs.refresh),
             title: Text(AppLocalizations.of(context).forkRefreshExclusions),
             onTap: zapret.busy ? null : () async {
               try {
@@ -329,7 +330,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
         items: [
           if (_error != null)
             ListItem(
-              leading: Icon(Icons.error_outline, color: context.colorScheme.error),
+              leading: GlyphIcon(AppGlyphs.error, color: context.colorScheme.error),
               title: Text(AppLocalizations.of(context).error),
               subtitle: Text(
                 _error!,
@@ -338,7 +339,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
             ),
           if (_notice != null)
             ListItem(
-              leading: Icon(Icons.info_outline, color: context.colorScheme.primary),
+              leading: GlyphIcon(AppGlyphs.info, color: context.colorScheme.primary),
               title: Text(AppLocalizations.of(context).forkResults),
               subtitle: Text(_notice!),
             ),
@@ -368,10 +369,10 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
             ),
           if (_selected != null)
             ListItem(
-              leading: const Icon(Icons.edit_outlined),
+              leading: const GlyphIcon(AppGlyphs.edit),
               title: Text(AppLocalizations.of(context).forkEditList),
               subtitle: Text(_selected!),
-              trailing: const Icon(Icons.chevron_right),
+              trailing: const GlyphIcon(AppGlyphs.chevronForward),
               onTap: !_listLoaded || listsBusy
                   ? null
                   : () async {
@@ -401,7 +402,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
                     },
             ),
           ListItem(
-            leading: const Icon(Icons.cloud_download_outlined),
+            leading: const GlyphIcon(AppGlyphs.cloudDownload),
             title: Text(AppLocalizations.of(context).forkUpdateLists),
             subtitle: Text('${AppLocalizations.of(context).forkUpdateListsHint} · 12 h'),
             trailing: _updating
@@ -413,7 +414,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
             onTap: _lists.isEmpty || listsBusy ? null : _updateLists,
           ),
           ListItem(
-            leading: const Icon(Icons.refresh),
+            leading: const GlyphIcon(AppGlyphs.refresh),
             title: Text(AppLocalizations.of(context).forkReloadLists),
             subtitle: Text(AppLocalizations.of(context).forkReloadListsHint),
             trailing: _loading && _lists.isNotEmpty
@@ -426,7 +427,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
           ),
           if (_selected != null)
             ListItem(
-              leading: const Icon(Icons.restore),
+              leading: const GlyphIcon(AppGlyphs.reset),
               title: Text(AppLocalizations.of(context).forkRestoreBackup),
               subtitle: Text('${_selected!}.bak'),
               trailing: _saving

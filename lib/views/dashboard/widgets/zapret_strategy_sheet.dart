@@ -1,3 +1,4 @@
+import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/l10n/l10n.dart';
 import 'package:fl_clash/models/managed_settings.dart';
 import 'package:fl_clash/common/common.dart';
@@ -83,9 +84,9 @@ class ZapretStrategySheet extends ConsumerWidget {
                       title: Text(strategy.name),
                       subtitle: Text(strategy.description),
                       trailing: strategy.id == state.activeStrategyId
-                          ? Icon(Icons.play_circle_fill_rounded, color: context.colorScheme.success)
+                          ? GlyphIcon(AppGlyphs.playCircle, color: context.colorScheme.success)
                           : strategy.id == state.selectedStrategyId
-                              ? Icon(Icons.check_circle_rounded, color: context.colorScheme.primary)
+                              ? GlyphIcon(AppGlyphs.checkCircle, color: context.colorScheme.primary)
                               : null,
                       onTap: state.busy ? null : () async {
                         try {

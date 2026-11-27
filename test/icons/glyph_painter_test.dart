@@ -22,6 +22,8 @@ final _glyphs = {
   'fileText': AppGlyphs.fileText,
   'clipboardList': AppGlyphs.clipboardList,
   'shieldOff': AppGlyphs.shieldOff,
+  'playCircle': AppGlyphs.playCircle,
+  'stopCircle': AppGlyphs.stopCircle,
   'proxies': AppGlyphs.proxies,
   'profiles': AppGlyphs.profiles,
   'requests': AppGlyphs.requests,

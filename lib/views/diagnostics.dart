@@ -1,3 +1,4 @@
+import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/l10n/l10n.dart';
 import 'dart:convert';
 import 'dart:io';
@@ -139,7 +140,7 @@ class _DiagnosticsViewState extends ConsumerState<DiagnosticsView> {
         generateSection(items: [
           ListItem(title: Text(AppLocalizations.of(context).forkRunDiagnostics),
             onTap: _busy ? null : _run,
-            trailing: _busy ? const CircularProgressIndicator() : const Icon(Icons.play_arrow)),
+            trailing: _busy ? const CircularProgressIndicator() : GlyphIcon(AppGlyphs.playPause(0))),
           ListItem(title: Text(AppLocalizations.of(context).forkCopyReport),
             onTap: _busy || _results.isEmpty ? null : () async {
               await Clipboard.setData(ClipboardData(text: _results.entries.map((entry) => '${entry.key}: ${entry.value}').join('\n')));
