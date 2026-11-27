@@ -145,43 +145,43 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('the selected row carries a centered indicator', (tester) async {
+  testWidgets('selection changes only text and glyph accent', (tester) async {
     await tester.pumpWidget(_sidebar(selectedIndex: 1));
-
-    final indicator = tester.getRect(_indicator(tester));
-    expect(indicator.width, 3);
-    expect(indicator.height, 16);
-    expect(
-      indicator.center.dy,
-      moreOrLessEquals(tester.getCenter(_glyph(AppGlyphs.proxies)).dy),
-    );
-    expect(tester.getSize(_sidebarFinder).width, 220);
-    expect(_labelOpacities(tester, 'Proxies'), [1]);
-    expect(
-      tester.getSemantics(find.text('Proxies')),
-      isSemantics(isSelected: true, isButton: true),
-    );
-  });
-
-  testWidgets('the indicator stretches toward the new row and settles on it', (
-    tester,
-  ) async {
-    await tester.pumpWidget(_sidebar());
-    final start = tester.getRect(_indicator(tester));
+    final scheme = Theme.of(tester.element(_sidebarFinder)).colorScheme;
+    expect(_indicator(tester), findsNothing);
+    expect(tester.widget<Text>(find.text('Proxies')).style?.color, scheme.primary);
+    expect(tester.widget<Text>(find.text('Dashboard')).style?.color, scheme.onSurface);
+    final glyph = tester.widget<CustomPaint>(
+      find.descendant(of: _glyph(AppGlyphs.proxies), matching: find.byType(CustomPaint)),
+    ).painter! as GlyphPainter;
+    expect(glyph.color, scheme.primary);
+    final material = tester.widget<Material>(find.ancestor(
+      of: _glyph(AppGlyphs.proxies), matching: find.byType(Material),
+    ).first);
+    expect(material.color, Colors.transparent);
+    expect(tester.getSemantics(find.text('Proxies')),
+        isSemantics(isSelected: true, isButton: true));
 
     await tester.pumpWidget(_sidebar(selectedIndex: 2));
-    await tester.pump(const Duration(milliseconds: 160));
-    final middle = tester.getRect(_indicator(tester));
-    expect(middle.top, greaterThanOrEqualTo(start.top));
-    expect(middle.height, greaterThan(16));
-
     await tester.pumpAndSettle();
-    final end = tester.getRect(_indicator(tester));
-    expect(end.height, 16);
-    expect(
-      end.center.dy,
-      moreOrLessEquals(tester.getCenter(_glyph(AppGlyphs.profiles)).dy),
-    );
+    expect(_indicator(tester), findsNothing);
+    expect(tester.widget<Text>(find.text('Profiles')).style?.color, scheme.primary);
+  });
+
+  testWidgets('glyph glow appears only while hovering a row', (tester) async {
+    await tester.pumpWidget(_sidebar());
+    GlyphPainter painter() => tester.widget<CustomPaint>(
+      find.descendant(of: _glyph(AppGlyphs.proxies), matching: find.byType(CustomPaint)),
+    ).painter! as GlyphPainter;
+    expect(painter().shadows, isEmpty);
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    addTearDown(mouse.removePointer);
+    await mouse.addPointer(location: tester.getCenter(_glyph(AppGlyphs.proxies)));
+    await tester.pump();
+    expect(painter().shadows, isNotEmpty);
+    await mouse.moveTo(const Offset(600, 300));
+    await tester.pump();
+    expect(painter().shadows, isEmpty);
   });
 
   testWidgets('only the selected row fills its icon', (tester) async {
