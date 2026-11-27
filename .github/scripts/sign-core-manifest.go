@@ -90,13 +90,17 @@ func main() {
 	if err != nil || len(seed) != ed25519.SeedSize {
 		fail(fmt.Errorf("UPDATE_SIGNING_KEY must be a base64 Ed25519 seed"))
 	}
-	public, err := base64.StdEncoding.DecodeString(strings.TrimSpace(os.Getenv("CORE_PUBLIC_KEY")))
-	if err != nil || len(public) != ed25519.PublicKeySize {
-		fail(fmt.Errorf("FLCLASHZ_UPDATE_PUBLIC_KEY is missing or invalid"))
-	}
 	key := ed25519.NewKeyFromSeed(seed)
-	if !key.Public().(ed25519.PublicKey).Equal(ed25519.PublicKey(public)) {
-		fail(fmt.Errorf("signing seed does not match pinned public key"))
+	// Match the existing application release workflow: derive the public
+	// key from the existing seed, and enforce a configured pin if present.
+	if pin := strings.TrimSpace(os.Getenv("CORE_PUBLIC_KEY")); pin != "" {
+		public, err := base64.StdEncoding.DecodeString(pin)
+		if err != nil || len(public) != ed25519.PublicKeySize {
+			fail(fmt.Errorf("FLCLASHZ_UPDATE_PUBLIC_KEY is invalid"))
+		}
+		if !key.Public().(ed25519.PublicKey).Equal(ed25519.PublicKey(public)) {
+			fail(fmt.Errorf("signing seed does not match pinned public key"))
+		}
 	}
 	// Canonical ASCII/UTF-8 lines with a final newline. The URL is intentionally
 	// not signed: trusted manifests may be mirrored, but bytes cannot change.
