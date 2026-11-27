@@ -7,6 +7,8 @@ import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/providers/action.dart';
 import 'package:fl_clash/providers/state.dart';
+import 'package:fl_clash/providers/window_material.dart';
+import 'package:window/window.dart' show WindowEffect;
 import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/views/font_family.dart';
 import 'package:fl_clash/views/theme_preview.dart';
@@ -31,6 +33,10 @@ class ThemeView extends StatelessWidget {
           const ThemeLivePreview(),
           const SizedBox(height: 16),
           const ManagedSettingsHint(keys: themePageKeys),
+          if (system.isWindows && !safeModeBuild) ...const [
+            _WindowMaterialItem(),
+            SizedBox(height: 16),
+          ],
           const ManagedSetting(
             settingKey: 'view.app.theme',
             child: _ThemeModeItem(),
@@ -74,6 +80,46 @@ class ThemeView extends StatelessWidget {
           const SizedBox(height: 16),
           const _TextScaleFactorItem(),
         ],
+      ),
+    );
+  }
+}
+
+class _WindowMaterialItem extends ConsumerWidget {
+  const _WindowMaterialItem();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final preference = ref.watch(windowMaterialPreferenceProvider);
+    final actual = ref.watch(windowMaterialProvider);
+    final ru = Localizations.localeOf(context).languageCode == 'ru';
+    final selected = preference.value ?? WindowEffect.none;
+    String label(WindowEffect effect) => switch (effect) {
+      WindowEffect.mica => 'Mica',
+      WindowEffect.acrylic => 'Acrylic',
+      _ => ru ? 'Без прозрачности' : 'Opaque',
+    };
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: ListItem<WindowEffect>.options(
+        leading: const GlyphIcon(AppGlyphs.liquidGlass),
+        title: Text(ru ? 'Материал окна' : 'Window material'),
+        subtitle: actual.hasValue && actual.value != selected
+            ? Text(ru ? 'Эффект недоступен: непрозрачный фон' :
+                'Effect unavailable: opaque fallback')
+            : null,
+        options: windowMaterials,
+        value: selected,
+        textBuilder: label,
+        onChanged: (value) async {
+          try {
+            await saveWindowMaterial(ref, value);
+          } catch (error) {
+            if (context.mounted) {
+              dialogs.showNotifier(error.toString(), level: MessageLevel.error);
+            }
+          }
+        },
       ),
     );
   }

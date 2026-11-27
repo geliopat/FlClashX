@@ -31,6 +31,7 @@ enum WindowCornerPreference {
 enum SystemBackdropType {
   kDwmsbtNone = 1,
   kDwmsbtMainWindow = 2,
+  kDwmsbtTransientWindow = 3,
 };
 
 enum AccentState {
@@ -140,7 +141,8 @@ bool IsEffectSupported(Effect effect) {
     case Effect::kBlur:
       return has_accent;
     case Effect::kAcrylic:
-      return has_accent && WindowsBuildNumber() >= 17134;
+      return WindowsBuildNumber() >= kSystemBackdropBuild ||
+             (has_accent && WindowsBuildNumber() >= 17134);
     case Effect::kMica:
       return WindowsBuildNumber() >= 22000;
     case Effect::kGlass:
@@ -191,8 +193,12 @@ void WindowStyle::Apply(HWND hwnd) const {
       accent_color = ToAccentColor(effect_tint);
       break;
     case Effect::kAcrylic:
-      accent_state = kAccentEnableAcrylicBlurBehind;
-      accent_color = ToAccentColor(effect_tint);
+      if (WindowsBuildNumber() >= kSystemBackdropBuild) {
+        backdrop_type = kDwmsbtTransientWindow;
+      } else {
+        accent_state = kAccentEnableAcrylicBlurBehind;
+        accent_color = ToAccentColor(effect_tint);
+      }
       break;
     case Effect::kMica:
       backdrop_type = kDwmsbtMainWindow;
@@ -201,7 +207,8 @@ void WindowStyle::Apply(HWND hwnd) const {
 
   // Windows fills an extended frame opaque, which would cover an accent effect.
   MARGINS margins{};
-  if (effect == Effect::kMica) {
+  if (effect == Effect::kMica ||
+      (effect == Effect::kAcrylic && WindowsBuildNumber() >= kSystemBackdropBuild)) {
     margins = {-1, -1, -1, -1};
   } else if (ExtendsTopFrame(*this)) {
     RECT frame{};

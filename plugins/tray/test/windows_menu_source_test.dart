@@ -76,8 +76,8 @@ void main() {
     expect(start, isNonNegative);
     expect(end, greaterThan(start));
     final glyph = source.substring(start, end);
-    expect(glyph, contains('point(13.196f, 5.0f)'));
-    expect(glyph, contains('line(13.196f, 5)'));
+    expect(glyph, contains('point(13, 5.67f)'));
+    expect(glyph, contains('line(13, 5.67f)'));
     expect(glyph, contains('D2D1_SWEEP_DIRECTION_CLOCKWISE'));
     expect(glyph, contains('D2D1_ARC_SIZE_LARGE'));
   });

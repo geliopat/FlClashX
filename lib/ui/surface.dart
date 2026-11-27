@@ -63,7 +63,9 @@ extension SurfaceContext on BuildContext {
 }
 
 extension ChromeSurfaceExt on ColorScheme {
-  Color get chromeSurface => brightness == Brightness.dark
+  Color get chromeSurface => surface.a < 1
+      ? SurfaceLevel.page.colorOf(this)
+      : brightness == Brightness.dark
       ? surfaceContainerLow
       : surfaceContainerHighest;
 }

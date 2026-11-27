@@ -6,6 +6,8 @@ import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/action.dart';
 import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/providers/config.dart';
+import 'package:fl_clash/providers/window_material.dart';
+import 'package:window/window.dart' show WindowEffect;
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/ui/ui.dart';
@@ -45,7 +47,19 @@ ThemeData watchAppTheme(WidgetRef ref, Brightness brightness) {
   final fontFamily = ref.watch(
     themeSettingProvider.select((state) => state.fontFamily),
   );
-  final colorScheme = ref.watch(genColorSchemeProvider(brightness));
+  final baseScheme = ref.watch(genColorSchemeProvider(brightness));
+  final material = system.isWindows && !safeModeBuild
+      ? ref.watch(windowMaterialProvider).value ?? WindowEffect.none
+      : WindowEffect.none;
+  final alpha = material == WindowEffect.mica ? 0.20 : 0.32;
+  final colorScheme = material == WindowEffect.none
+      ? baseScheme
+      : baseScheme.copyWith(
+          surface: baseScheme.surface.withValues(alpha: alpha),
+          surfaceContainer: brightness == Brightness.light
+              ? baseScheme.surfaceContainer.withValues(alpha: alpha)
+              : baseScheme.surfaceContainer,
+        );
   final locales = [
     ?getLocaleForString(locale),
     ...WidgetsBinding.instance.platformDispatcher.locales,
@@ -75,7 +89,7 @@ ThemeData watchAppTheme(WidgetRef ref, Brightness brightness) {
     ),
     extensions: [
       if (brightness == Brightness.dark)
-        ElevatedColorScheme(colorScheme.elevated),
+        ElevatedColorScheme(baseScheme.elevated),
     ],
   ).withAppShapes.withAppSurfaces.withAppTypography.withPointerCursor;
   _appThemes[brightness] = (inputs: inputs, theme: theme);
