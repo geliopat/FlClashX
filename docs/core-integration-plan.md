@@ -1,6 +1,6 @@
 # Native Mihomo integration: v1.1.5
 
-Status: staged core candidate, client integration pending. No build or validation workflow may run until agreed implementation and static review are complete.
+Status: pinned core candidate, client integration in progress. No build or validation workflow may run until agreed implementation and static review are complete.
 
 Checkpoint: `archive/v1.1.5-before-core-integration` at `64b3a6a1f8285f32822eceb5eac192eb0e9a381f`. Keep this branch unchanged for rollback.
 
@@ -19,4 +19,4 @@ Core repository: https://github.com/geliopat/Clash.Meta
 5. Merge optional general overrides with the existing per-key ownership, inheritance, explicit values, resource URLs/paths, protected TUN settings and managed Remnawave locks. Retain old migration and recovery compatibility.
 6. Complete the rest of docs/next-release-acceptance.md, static review, and only then user-authorized Windows testing. No stable release without explicit approval.
 
-Preserve all existing FlClashZ features, UI, Helper security, Zapret2 strategy and recovery behavior. Source-code work is not equivalent to acceptance. No client dependency change has been made yet.
+Preserve all existing FlClashZ features, UI, Helper security, Zapret2 strategy and recovery behavior. Source-code work is not equivalent to acceptance. Client now pins the candidate as a Git submodule at core/third_party/mihomo. Run git submodule update --init after checkout. Existing sing-tun replacement remains authoritative. Native integration and acceptance are not complete.

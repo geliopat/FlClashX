@@ -56,6 +56,7 @@ jobs:
           fetch-depth: 0
           ref: ${{ inputs.candidate_ref || github.sha }}
           persist-credentials: false
+          submodules: true
 
       - name: Validate build mode
         shell: pwsh
