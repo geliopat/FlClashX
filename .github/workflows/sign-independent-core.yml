@@ -1,0 +1,173 @@
+name: Sign and publish independent FlClashZ core
+on:
+  schedule:
+    - cron: '8,38 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+concurrency:
+  group: flclashz-independent-core-signing
+  cancel-in-progress: false
+
+env:
+  SOURCE_REPO: geliopat/Clash.Meta
+  GO_VERSION: '1.27.1'
+  GOWORK: 'off'
+  GO111MODULE: 'off'
+
+jobs:
+  release:
+    if: github.repository == 'geliopat/FlClashZ' && github.ref == 'refs/heads/fix/zapret2-stability'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Locate latest successful trusted core release request
+        id: request
+        env:
+          GH_TOKEN: ${{ secrets.CORE_RELEASE_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "ready=false" >> "$GITHUB_OUTPUT"
+          if [[ -z "$GH_TOKEN" ]]; then
+            echo "::warning::Configure CORE_RELEASE_TOKEN to enable cross-repository core publication."
+            exit 0
+          fi
+          tmp=$(mktemp -d)
+          for workflow in flclashz-core-auto.yml flclashz-core-release.yml; do
+            gh api "repos/$SOURCE_REPO/actions/workflows/$workflow/runs?branch=FlClashZ&status=success&per_page=30" \
+              --jq '.workflow_runs[] | select(.conclusion == "success" and .head_branch == "FlClashZ" and .head_repository.full_name == "geliopat/Clash.Meta" and (.event == "schedule" or .event == "workflow_dispatch")) | .id' > "$tmp/$workflow"
+          done
+          sort -urn "$tmp/"*.yml > "$tmp/runs"
+          run_id=""
+          artifact_id=""
+          while IFS= read -r candidate; do
+            [[ "$candidate" =~ ^[0-9]+$ ]]
+            response=$(gh api "repos/$SOURCE_REPO/actions/runs/$candidate/artifacts?per_page=100")
+            matches=$(jq '[.artifacts[] | select(.name == "core-release-request" and .expired == false)]' <<< "$response")
+            if [[ "$(jq length <<< "$matches")" == 0 ]]; then
+              continue
+            fi
+            [[ "$(jq length <<< "$matches")" == 1 ]]
+            artifact_id=$(jq -er '.[0].id' <<< "$matches")
+            size=$(jq -er '.[0].size_in_bytes' <<< "$matches")
+            [[ "$artifact_id" =~ ^[0-9]+$ && "$size" =~ ^[0-9]+$ ]]
+            (( size > 0 && size <= 300*1024*1024 ))
+            run_id=$candidate
+            break
+          done < "$tmp/runs"
+          if [[ -z "$run_id" ]]; then
+            echo "No successful core release request." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          # Download the exact artifact ID, not a mutable release URL.
+          mkdir -p "$RUNNER_TEMP/core-request"
+          gh api "repos/$SOURCE_REPO/actions/artifacts/$artifact_id/zip" > "$tmp/core.zip"
+          python - "$tmp/core.zip" "$RUNNER_TEMP/core-request" <<'PY'
+          import pathlib, stat, sys, zipfile
+          expected = {"FlClashCore.exe": 256 * 1024 * 1024, "core-info.json": 16384}
+          dest = pathlib.Path(sys.argv[2])
+          with zipfile.ZipFile(sys.argv[1]) as z:
+              entries = z.infolist()
+              if len(entries) != 2 or {e.filename for e in entries} != set(expected):
+                  raise SystemExit("Unexpected core artifact entries")
+              for e in entries:
+                  mode = (e.external_attr >> 16) & 0xffff
+                  if stat.S_ISLNK(mode) or e.is_dir() or not 0 < e.file_size <= expected[e.filename]:
+                      raise SystemExit("Invalid core artifact file")
+                  with z.open(e) as src, (dest / e.filename).open("xb") as out:
+                      remaining = e.file_size
+                      while remaining:
+                          chunk = src.read(min(1024 * 1024, remaining))
+                          if not chunk:
+                              raise SystemExit("Truncated artifact")
+                          out.write(chunk)
+                          remaining -= len(chunk)
+                      if src.read(1):
+                          raise SystemExit("Oversized artifact")
+          PY
+          info="$RUNNER_TEMP/core-request/core-info.json"
+          version=$(jq -er '.version | strings' "$info")
+          engine=$(jq -er '.engineRevision | strings' "$info")
+          host=$(jq -er '.hostRevision | strings' "$info")
+          [[ "$version" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-z\.[1-9][0-9]*$ ]]
+          [[ "$engine" =~ ^[0-9a-f]{40}$ && "$host" =~ ^[0-9a-f]{40}$ ]]
+          jq -e --arg v "$version" '.product == "FlClashZ-core" and .mihomoVersion == ($v | split("-")[0]) and .ipcRevision == 1 and .os == "windows" and .arch == "amd64"' "$info" >/dev/null
+          [[ "$(gh api "repos/$SOURCE_REPO/commits/$engine" --jq .sha)" == "$engine" ]]
+          [[ "$(gh api "repos/geliopat/FlClashZ/commits/$host" --jq .sha)" == "$host" ]]
+          tag="flclashz-core-$version"
+          # Skip the already published request; never overwrite a release or tag.
+          gh api --paginate "repos/$SOURCE_REPO/releases?per_page=100" --jq '.[] | [.tag_name, .draft] | @tsv' > "$tmp/releases"
+          decision=$(python - "$tag" "$tmp/releases" <<'PY'
+          import re, sys
+          from pathlib import Path
+          pattern = r"flclashz-core-v(\d+)\.(\d+)\.(\d+)-z\.(\d+)"
+          requested = tuple(map(int, re.fullmatch(pattern, sys.argv[1]).groups()))
+          for line in Path(sys.argv[2]).read_text().splitlines():
+              tag, draft = line.split("\t")
+              m = re.fullmatch(pattern, tag)
+              if not m:
+                  continue
+              other = tuple(map(int, m.groups()))
+              if other == requested and draft == "true":
+                  raise SystemExit("Existing draft requires operator inspection")
+              if other >= requested and draft == "false":
+                  print("skip")
+                  break
+          else:
+              print("publish")
+          PY
+          )
+          if [[ "$decision" == skip ]]; then
+            echo "This version or a newer version is already published." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          printf 'ready=true\nversion=%s\nengine=%s\nhost=%s\nrun=%s\n' "$version" "$engine" "$host" "$run_id" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-go@v6
+        if: steps.request.outputs.ready == 'true'
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+      - name: Sign core manifest using existing FlClashZ update key
+        if: steps.request.outputs.ready == 'true'
+        env:
+          CORE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+          CORE_PUBLIC_KEY: ${{ vars.FLCLASHZ_UPDATE_PUBLIC_KEY }}
+          VERSION: ${{ steps.request.outputs.version }}
+          ENGINE: ${{ steps.request.outputs.engine }}
+          HOST: ${{ steps.request.outputs.host }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          go run ./.github/scripts/sign-core-manifest.go -dir "$RUNNER_TEMP/core-request" -version "$VERSION" -engine "$ENGINE" -host "$HOST"
+      - name: Publish signed core in Clash.Meta, not in FlClashZ
+        if: steps.request.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.CORE_RELEASE_TOKEN }}
+          VERSION: ${{ steps.request.outputs.version }}
+          ENGINE: ${{ steps.request.outputs.engine }}
+          HOST: ${{ steps.request.outputs.host }}
+          SOURCE_RUN: ${{ steps.request.outputs.run }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="flclashz-core-$VERSION"
+          if git ls-remote --exit-code --tags "https://github.com/$SOURCE_REPO.git" "refs/tags/$tag" >/dev/null; then
+            echo "::error::Core tag already exists"
+            exit 1
+          else
+            status=$?
+            [[ "$status" == 2 ]]
+          fi
+          cd "$RUNNER_TEMP/core-request"
+          # Draft first: a failed upload must not become the latest release.
+          gh release create "$tag" FlClashCore.exe core-manifest.json --repo "$SOURCE_REPO" --target "$ENGINE" --draft \
+            --title "FlClashZ core $VERSION" \
+            --notes "Mihomo revision: $ENGINE; host adapter revision: $HOST; IPC revision: 1; Windows amd64. Build: https://github.com/$SOURCE_REPO/actions/runs/$SOURCE_RUN"
+          gh release edit "$tag" --repo "$SOURCE_REPO" --draft=false --latest
+          echo "Published https://github.com/$SOURCE_REPO/releases/tag/$tag" >> "$GITHUB_STEP_SUMMARY"
