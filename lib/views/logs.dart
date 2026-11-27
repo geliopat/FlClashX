@@ -8,6 +8,7 @@ import 'package:fl_clash/state.dart';
 import 'package:fl_clash/common/file_logger.dart';
 import 'package:flutter/services.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
+import 'package:fl_clash/ui/title_tabs.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -56,6 +57,11 @@ class _LogsViewState extends ConsumerState<LogsView>
   final _listController = LogListController();
   bool _pageActive = true;
   bool? _sectionActive;
+  LogLevel? _level;
+  static const _levels = <LogLevel?>[null, LogLevel.info, LogLevel.warning, LogLevel.error, LogLevel.debug];
+
+  List<Log> _visibleLogs(LogsState state) => _level == null
+      ? state.list : state.list.where((log) => log.logLevel == _level).toList(growable: false);
   late final ScrollController _scrollController;
   late final _physics = FollowEndScrollPhysics(
     isFollowing: () => _listController.value.autoScrollToEnd,
@@ -83,6 +89,7 @@ class _LogsViewState extends ConsumerState<LogsView>
     final section = SectionActivityScope.isActiveOf(context);
     final left = _sectionActive == true && !section;
     _sectionActive = section;
+    if (left) _level = null;
     if (left) WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _listController.resumeAutoScrollToEnd(ref.read(logsProvider).list);
     });
@@ -119,7 +126,7 @@ class _LogsViewState extends ConsumerState<LogsView>
         glyph: AppGlyphs.copy,
         tooltip: ru ? 'Копировать видимые записи' : 'Copy visible entries',
         onPressed: () async => Clipboard.setData(ClipboardData(
-          text: _listController.value.list.reversed.map((log) => log.toString()).join('\n'),
+          text: _visibleLogs(_listController.value).reversed.map((log) => '[${log.dateTime}] [${log.logLevel.name.toUpperCase()}] ${log.payload}').join('\n'),
         )),
       ),
     ];
@@ -167,10 +174,17 @@ class _LogsViewState extends ConsumerState<LogsView>
       onKeywordsUpdate: _listController.updateKeywords,
       searchState: AppBarSearchState(onSearch: _listController.search),
       title: '${appLocalizations.logs} Mihomo',
+      titleWidget: system.isWindows ? PageTitleTabs(
+        labels: [appLocalizations.forkAllEvents, appLocalizations.forkInfo,
+          Localizations.localeOf(context).languageCode == 'ru' ? 'Предупреждения' : 'Warnings',
+          appLocalizations.forkErrors, appLocalizations.forkDebug],
+        selectedIndex: _levels.indexOf(_level),
+        onSelected: (index) => setState(() => _level = _levels[index]),
+      ) : null,
       body: ValueListenableBuilder<LogsState>(
         valueListenable: _listController,
         builder: (context, state, _) {
-          final logs = state.list;
+          final logs = _visibleLogs(state);
           return NullStatusSwitcher(
             isEmpty: logs.isEmpty,
             isSearching: state.isSearching,
@@ -200,7 +214,7 @@ class _LogsViewState extends ConsumerState<LogsView>
                   child: SuperListView.separated(
                     physics: _physics,
                     reverse: true,
-                    shrinkWrap: true,
+                    shrinkWrap: false,
                     controller: _scrollController,
                     padding: EdgeInsets.only(
                       top: context.contentTopPadding,
