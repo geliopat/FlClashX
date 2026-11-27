@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/common/flclashz_upstream_versions.dart';
 import 'package:fl_clash/core/desktop/core_release_selection.dart';
 import 'package:fl_clash/core/desktop/helper_client.dart';
 import 'package:fl_clash/features/update/core_release_manifest.dart';
