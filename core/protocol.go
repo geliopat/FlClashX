@@ -129,6 +129,8 @@ type ProfileBase struct {
 	// config fills every other one with a default the host must not take
 	// for the profile's word.
 	Present []string `json:"present"`
+	// Explicit source settings, separate from the normalized RawConfig defaults.
+	SourceSettings map[string]any `json:"source-settings"`
 	// The profile's own GLOBAL group carries `flclashx-override: true`.
 	GlobalOverride bool `json:"global-override"`
 }

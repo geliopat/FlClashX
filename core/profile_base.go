@@ -40,6 +40,7 @@ func handleGetProfileBase(path string) (*ProfileBase, error) {
 		ProxyGroups:    len(raw.ProxyGroup),
 		Rules:          len(raw.Rule),
 		Present:        presentKeys(buf),
+		SourceSettings: sourceSettings(buf),
 		GlobalOverride: globalOverride(raw.ProxyGroup),
 	}
 	for _, rule := range raw.Rule {
@@ -112,6 +113,32 @@ func handleBuildProfile(base *SetupBase) (string, error) {
 }
 
 var nestedPresentSections = []string{"tun"}
+
+// Only settings sections, never bulk proxies/rules or credentials unrelated to
+// these editors. Decode directly from the document: RawConfig omitempty and
+// DefaultRawConfig otherwise erase explicit zero/false and invent absent keys.
+func sourceSettings(buf []byte) map[string]any {
+	result := map[string]any{}
+	var document yaml.Node
+	if yaml.Unmarshal(buf, &document) != nil {
+		return result
+	}
+	root, err := documentMapping(&document)
+	if err != nil {
+		return result
+	}
+	for _, key := range []string{"dns", "tun", "sniffer", "ntp", "experimental", "profile", "inbound-tfo", "inbound-mptcp", "lan-allowed-ips", "lan-disallowed-ips", "bind-address", "geodata-mode", "geosite-matcher", "global-client-fingerprint", "etag-support"} {
+		node := mappingValue(root, key)
+		if node == nil {
+			continue
+		}
+		var value any
+		if node.Decode(&value) == nil {
+			result[key] = value
+		}
+	}
+	return result
+}
 
 func presentKeys(buf []byte) []string {
 	keys := []string{}
@@ -195,12 +222,12 @@ func loadConfigWithBase(base *SetupBase, configPath string) (*config.Config, err
 	if err := document.Decode(raw); err != nil {
 		return nil, err
 	}
-	if err := writeConfigDocument(configPath, document); err != nil {
-		return nil, err
-	}
 	captureProfileExtras(raw)
 	cfg, err := config.ParseRawConfig(raw)
 	if err != nil {
+		return nil, err
+	}
+	if err := writeConfigDocument(configPath, document); err != nil {
 		return nil, err
 	}
 	return withPlatformLimits(cfg), nil

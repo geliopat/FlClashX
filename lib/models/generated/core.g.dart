@@ -50,6 +50,7 @@ _ProfileBase _$ProfileBaseFromJson(Map<String, dynamic> json) => _ProfileBase(
   present:
       (json['present'] as List<dynamic>?)?.map((e) => e as String).toList() ??
       const [],
+  sourceSettings: json['source-settings'] as Map<String, dynamic>? ?? const {},
   globalOverride: json['global-override'] as bool? ?? false,
 );
 
@@ -62,6 +63,7 @@ Map<String, dynamic> _$ProfileBaseToJson(_ProfileBase instance) =>
       'proxy-groups': instance.proxyGroups,
       'rules': instance.rules,
       'present': instance.present,
+      'source-settings': instance.sourceSettings,
       'global-override': instance.globalOverride,
     };
 

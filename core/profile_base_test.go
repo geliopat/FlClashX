@@ -542,3 +542,22 @@ func TestEncodeConfigMappingKeepsEveryKeyAfterAnOpenEndedScalar(t *testing.T) {
 		t.Errorf("decoded %d rules, want all %d in order", len(decoded.Rules), len(rules))
 	}
 }
+
+func TestSourceSettingsDoNotInventDefaults(t *testing.T) {
+	path := writeBaseProfile(t, "dns:\n  respect-rules: false\n  ipv6-timeout: 0\n  fallback: []\ntun:\n  strict-route: false\nsniffer:\n  skip-domain: []\n")
+	base, err := handleGetProfileBase(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dns := base.SourceSettings["dns"].(map[string]any)
+	if len(dns) != 3 || dns["respect-rules"] != false || dns["ipv6-timeout"] != 0 {
+		t.Fatalf("explicit DNS settings: %#v", dns)
+	}
+	if fallback, ok := dns["fallback"].([]any); !ok || len(fallback) != 0 {
+		t.Fatalf("empty fallback not preserved: %#v", dns["fallback"])
+	}
+	tun := base.SourceSettings["tun"].(map[string]any)
+	if len(tun) != 1 || tun["strict-route"] != false {
+		t.Fatalf("explicit TUN settings: %#v", tun)
+	}
+}

@@ -147,7 +147,7 @@ class ProfileSettingsAction extends _$ProfileSettingsAction {
     ref.read(yamlSettingReferencesProvider.notifier).set(
       yamlSettingReferences(inherited, inheritedAuthentication, named),
     );
-    ref.read(yamlSectionSourcesProvider.notifier).set(yamlSectionSourcesOf(id, base.config));
+    ref.read(yamlSectionSourcesProvider.notifier).set(yamlSectionSourcesOf(id, base.sourceSettings));
     _released.removeAll(released);
   }
 }

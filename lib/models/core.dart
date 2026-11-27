@@ -42,6 +42,7 @@ abstract class ProfileBase with _$ProfileBase {
 
     /// The keys the file names itself, top level and `tun.*`.
     @Default([]) List<String> present,
+    @Default({}) @JsonKey(name: 'source-settings') Map<String, dynamic> sourceSettings,
     @Default(false) @JsonKey(name: 'global-override') bool globalOverride,
   }) = _ProfileBase;
 

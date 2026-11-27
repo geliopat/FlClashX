@@ -602,7 +602,7 @@ as String?,
 mixin _$ProfileBase {
 
  Map<String, dynamic> get config; String get digest;@JsonKey(name: 'match-rules') List<String> get matchRules; int get proxies;@JsonKey(name: 'proxy-groups') int get proxyGroups; int get rules;/// The keys the file names itself, top level and `tun.*`.
- List<String> get present;@JsonKey(name: 'global-override') bool get globalOverride;
+ List<String> get present;@JsonKey(name: 'source-settings') Map<String, dynamic> get sourceSettings;@JsonKey(name: 'global-override') bool get globalOverride;
 /// Create a copy of ProfileBase
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -616,14 +616,14 @@ $ProfileBaseCopyWith<ProfileBase> get copyWith => _$ProfileBaseCopyWithImpl<Prof
 @override
 bool operator ==(Object other) {
   final _this = this as ProfileBase;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is ProfileBase&&const DeepCollectionEquality().equals(other.config, _this.config)&&(identical(other.digest, _this.digest) || other.digest == _this.digest)&&const DeepCollectionEquality().equals(other.matchRules, _this.matchRules)&&(identical(other.proxies, _this.proxies) || other.proxies == _this.proxies)&&(identical(other.proxyGroups, _this.proxyGroups) || other.proxyGroups == _this.proxyGroups)&&(identical(other.rules, _this.rules) || other.rules == _this.rules)&&const DeepCollectionEquality().equals(other.present, _this.present)&&(identical(other.globalOverride, _this.globalOverride) || other.globalOverride == _this.globalOverride));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is ProfileBase&&const DeepCollectionEquality().equals(other.config, _this.config)&&(identical(other.digest, _this.digest) || other.digest == _this.digest)&&const DeepCollectionEquality().equals(other.matchRules, _this.matchRules)&&(identical(other.proxies, _this.proxies) || other.proxies == _this.proxies)&&(identical(other.proxyGroups, _this.proxyGroups) || other.proxyGroups == _this.proxyGroups)&&(identical(other.rules, _this.rules) || other.rules == _this.rules)&&const DeepCollectionEquality().equals(other.present, _this.present)&&const DeepCollectionEquality().equals(other.sourceSettings, _this.sourceSettings)&&(identical(other.globalOverride, _this.globalOverride) || other.globalOverride == _this.globalOverride));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
   final _this = this as ProfileBase;
-  return Object.hash(runtimeType,const DeepCollectionEquality().hash(_this.config),_this.digest,const DeepCollectionEquality().hash(_this.matchRules),_this.proxies,_this.proxyGroups,_this.rules,const DeepCollectionEquality().hash(_this.present),_this.globalOverride);
+  return Object.hash(runtimeType,const DeepCollectionEquality().hash(_this.config),_this.digest,const DeepCollectionEquality().hash(_this.matchRules),_this.proxies,_this.proxyGroups,_this.rules,const DeepCollectionEquality().hash(_this.present),const DeepCollectionEquality().hash(_this.sourceSettings),_this.globalOverride);
 }
 
 @override
@@ -640,7 +640,7 @@ abstract mixin class $ProfileBaseCopyWith<$Res>  {
   factory $ProfileBaseCopyWith(ProfileBase value, $Res Function(ProfileBase) _then) = _$ProfileBaseCopyWithImpl;
 @useResult
 $Res call({
- Map<String, dynamic> config, String digest,@JsonKey(name: 'match-rules') List<String> matchRules, int proxies,@JsonKey(name: 'proxy-groups') int proxyGroups, int rules, List<String> present,@JsonKey(name: 'global-override') bool globalOverride
+ Map<String, dynamic> config, String digest,@JsonKey(name: 'match-rules') List<String> matchRules, int proxies,@JsonKey(name: 'proxy-groups') int proxyGroups, int rules, List<String> present,@JsonKey(name: 'source-settings') Map<String, dynamic> sourceSettings,@JsonKey(name: 'global-override') bool globalOverride
 });
 
 
@@ -657,7 +657,7 @@ class _$ProfileBaseCopyWithImpl<$Res>
 
 /// Create a copy of ProfileBase
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? config = null,Object? digest = null,Object? matchRules = null,Object? proxies = null,Object? proxyGroups = null,Object? rules = null,Object? present = null,Object? globalOverride = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? config = null,Object? digest = null,Object? matchRules = null,Object? proxies = null,Object? proxyGroups = null,Object? rules = null,Object? present = null,Object? sourceSettings = null,Object? globalOverride = null,}) {
   return _then(ProfileBase(
 config: null == config ? _self.config : config // ignore: cast_nullable_to_non_nullable
 as Map<String, dynamic>,digest: null == digest ? _self.digest : digest // ignore: cast_nullable_to_non_nullable
@@ -666,7 +666,7 @@ as List<String>,proxies: null == proxies ? _self.proxies : proxies // ignore: ca
 as int,proxyGroups: null == proxyGroups ? _self.proxyGroups : proxyGroups // ignore: cast_nullable_to_non_nullable
 as int,rules: null == rules ? _self.rules : rules // ignore: cast_nullable_to_non_nullable
 as int,present: null == present ? _self.present : present // ignore: cast_nullable_to_non_nullable
-as List<String>,globalOverride: null == globalOverride ? _self.globalOverride : globalOverride // ignore: cast_nullable_to_non_nullable
+as List<String>,sourceSettings: null == sourceSettings ? _self.sourceSettings : sourceSettings as Map<String, dynamic>,globalOverride: null == globalOverride ? _self.globalOverride : globalOverride // ignore: cast_nullable_to_non_nullable
 as bool,
   ));
 }
@@ -752,10 +752,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( Map<String, dynamic> config,  String digest, @JsonKey(name: 'match-rules')  List<String> matchRules,  int proxies, @JsonKey(name: 'proxy-groups')  int proxyGroups,  int rules,  List<String> present, @JsonKey(name: 'global-override')  bool globalOverride)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( Map<String, dynamic> config,  String digest, @JsonKey(name: 'match-rules')  List<String> matchRules,  int proxies, @JsonKey(name: 'proxy-groups')  int proxyGroups,  int rules,  List<String> present, @JsonKey(name: 'source-settings') Map<String, dynamic> sourceSettings, @JsonKey(name: 'global-override')  bool globalOverride)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _ProfileBase() when $default != null:
-return $default(_that.config,_that.digest,_that.matchRules,_that.proxies,_that.proxyGroups,_that.rules,_that.present,_that.globalOverride);case _:
+return $default(_that.config,_that.digest,_that.matchRules,_that.proxies,_that.proxyGroups,_that.rules,_that.present,_that.sourceSettings,_that.globalOverride);case _:
   return orElse();
 
 }
@@ -773,10 +773,10 @@ return $default(_that.config,_that.digest,_that.matchRules,_that.proxies,_that.p
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( Map<String, dynamic> config,  String digest, @JsonKey(name: 'match-rules')  List<String> matchRules,  int proxies, @JsonKey(name: 'proxy-groups')  int proxyGroups,  int rules,  List<String> present, @JsonKey(name: 'global-override')  bool globalOverride)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( Map<String, dynamic> config,  String digest, @JsonKey(name: 'match-rules')  List<String> matchRules,  int proxies, @JsonKey(name: 'proxy-groups')  int proxyGroups,  int rules,  List<String> present, @JsonKey(name: 'source-settings') Map<String, dynamic> sourceSettings, @JsonKey(name: 'global-override')  bool globalOverride)  $default,) {final _that = this;
 switch (_that) {
 case _ProfileBase():
-return $default(_that.config,_that.digest,_that.matchRules,_that.proxies,_that.proxyGroups,_that.rules,_that.present,_that.globalOverride);case _:
+return $default(_that.config,_that.digest,_that.matchRules,_that.proxies,_that.proxyGroups,_that.rules,_that.present,_that.sourceSettings,_that.globalOverride);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -793,10 +793,10 @@ return $default(_that.config,_that.digest,_that.matchRules,_that.proxies,_that.p
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( Map<String, dynamic> config,  String digest, @JsonKey(name: 'match-rules')  List<String> matchRules,  int proxies, @JsonKey(name: 'proxy-groups')  int proxyGroups,  int rules,  List<String> present, @JsonKey(name: 'global-override')  bool globalOverride)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( Map<String, dynamic> config,  String digest, @JsonKey(name: 'match-rules')  List<String> matchRules,  int proxies, @JsonKey(name: 'proxy-groups')  int proxyGroups,  int rules,  List<String> present, @JsonKey(name: 'source-settings') Map<String, dynamic> sourceSettings, @JsonKey(name: 'global-override')  bool globalOverride)?  $default,) {final _that = this;
 switch (_that) {
 case _ProfileBase() when $default != null:
-return $default(_that.config,_that.digest,_that.matchRules,_that.proxies,_that.proxyGroups,_that.rules,_that.present,_that.globalOverride);case _:
+return $default(_that.config,_that.digest,_that.matchRules,_that.proxies,_that.proxyGroups,_that.rules,_that.present,_that.sourceSettings,_that.globalOverride);case _:
   return null;
 
 }
@@ -808,7 +808,7 @@ return $default(_that.config,_that.digest,_that.matchRules,_that.proxies,_that.p
 @JsonSerializable()
 
 class _ProfileBase implements ProfileBase {
-  const _ProfileBase({required  Map<String, dynamic> config, required this.digest, @JsonKey(name: 'match-rules')  List<String> matchRules = const [], this.proxies = 0, @JsonKey(name: 'proxy-groups') this.proxyGroups = 0, this.rules = 0,  List<String> present = const [], @JsonKey(name: 'global-override') this.globalOverride = false}): _config = config,_matchRules = matchRules,_present = present;
+  const _ProfileBase({required  Map<String, dynamic> config, required this.digest, @JsonKey(name: 'match-rules')  List<String> matchRules = const [], this.proxies = 0, @JsonKey(name: 'proxy-groups') this.proxyGroups = 0, this.rules = 0,  List<String> present = const [], @JsonKey(name: 'source-settings') Map<String, dynamic> sourceSettings = const {}, @JsonKey(name: 'global-override') this.globalOverride = false}): _config = config,_matchRules = matchRules,_present = present,_sourceSettings = sourceSettings;
   factory _ProfileBase.fromJson(Map<String, dynamic> json) => _$ProfileBaseFromJson(json);
 
  final  Map<String, dynamic> _config;
@@ -838,6 +838,8 @@ class _ProfileBase implements ProfileBase {
   return EqualUnmodifiableListView(_present);
 }
 
+final Map<String, dynamic> _sourceSettings;
+@override @JsonKey(name: 'source-settings') Map<String, dynamic> get sourceSettings => EqualUnmodifiableMapView(_sourceSettings);
 @override@JsonKey(name: 'global-override') final  bool globalOverride;
 
 /// Create a copy of ProfileBase
@@ -853,13 +855,13 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _ProfileBase&&const DeepCollectionEquality().equals(other.config, _config)&&(identical(other.digest, digest) || other.digest == digest)&&const DeepCollectionEquality().equals(other.matchRules, _matchRules)&&(identical(other.proxies, proxies) || other.proxies == proxies)&&(identical(other.proxyGroups, proxyGroups) || other.proxyGroups == proxyGroups)&&(identical(other.rules, rules) || other.rules == rules)&&const DeepCollectionEquality().equals(other.present, _present)&&(identical(other.globalOverride, globalOverride) || other.globalOverride == globalOverride));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _ProfileBase&&const DeepCollectionEquality().equals(other.config, _config)&&(identical(other.digest, digest) || other.digest == digest)&&const DeepCollectionEquality().equals(other.matchRules, _matchRules)&&(identical(other.proxies, proxies) || other.proxies == proxies)&&(identical(other.proxyGroups, proxyGroups) || other.proxyGroups == proxyGroups)&&(identical(other.rules, rules) || other.rules == rules)&&const DeepCollectionEquality().equals(other.present, _present)&&const DeepCollectionEquality().equals(other.sourceSettings, _sourceSettings)&&(identical(other.globalOverride, globalOverride) || other.globalOverride == globalOverride));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
-    return Object.hash(runtimeType,const DeepCollectionEquality().hash(_config),digest,const DeepCollectionEquality().hash(_matchRules),proxies,proxyGroups,rules,const DeepCollectionEquality().hash(_present),globalOverride);
+    return Object.hash(runtimeType,const DeepCollectionEquality().hash(_config),digest,const DeepCollectionEquality().hash(_matchRules),proxies,proxyGroups,rules,const DeepCollectionEquality().hash(_present),const DeepCollectionEquality().hash(_sourceSettings),globalOverride);
 }
 
 @override
@@ -875,7 +877,7 @@ abstract mixin class _$ProfileBaseCopyWith<$Res> implements $ProfileBaseCopyWith
   factory _$ProfileBaseCopyWith(_ProfileBase value, $Res Function(_ProfileBase) _then) = __$ProfileBaseCopyWithImpl;
 @override @useResult
 $Res call({
- Map<String, dynamic> config, String digest,@JsonKey(name: 'match-rules') List<String> matchRules, int proxies,@JsonKey(name: 'proxy-groups') int proxyGroups, int rules, List<String> present,@JsonKey(name: 'global-override') bool globalOverride
+ Map<String, dynamic> config, String digest,@JsonKey(name: 'match-rules') List<String> matchRules, int proxies,@JsonKey(name: 'proxy-groups') int proxyGroups, int rules, List<String> present,@JsonKey(name: 'source-settings') Map<String, dynamic> sourceSettings,@JsonKey(name: 'global-override') bool globalOverride
 });
 
 
@@ -892,7 +894,7 @@ class __$ProfileBaseCopyWithImpl<$Res>
 
 /// Create a copy of ProfileBase
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? config = null,Object? digest = null,Object? matchRules = null,Object? proxies = null,Object? proxyGroups = null,Object? rules = null,Object? present = null,Object? globalOverride = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? config = null,Object? digest = null,Object? matchRules = null,Object? proxies = null,Object? proxyGroups = null,Object? rules = null,Object? present = null,Object? sourceSettings = null,Object? globalOverride = null,}) {
   return _then(_ProfileBase(
 config: null == config ? _self._config : config // ignore: cast_nullable_to_non_nullable
 as Map<String, dynamic>,digest: null == digest ? _self.digest : digest // ignore: cast_nullable_to_non_nullable
@@ -901,7 +903,7 @@ as List<String>,proxies: null == proxies ? _self.proxies : proxies // ignore: ca
 as int,proxyGroups: null == proxyGroups ? _self.proxyGroups : proxyGroups // ignore: cast_nullable_to_non_nullable
 as int,rules: null == rules ? _self.rules : rules // ignore: cast_nullable_to_non_nullable
 as int,present: null == present ? _self._present : present // ignore: cast_nullable_to_non_nullable
-as List<String>,globalOverride: null == globalOverride ? _self.globalOverride : globalOverride // ignore: cast_nullable_to_non_nullable
+as List<String>,sourceSettings: null == sourceSettings ? _self.sourceSettings : sourceSettings as Map<String, dynamic>,globalOverride: null == globalOverride ? _self.globalOverride : globalOverride // ignore: cast_nullable_to_non_nullable
 as bool,
   ));
 }
