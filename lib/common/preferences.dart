@@ -205,8 +205,19 @@ class Preferences {
     final operation = _configWrite.catchError((_) => false).then((_) async {
       final store = await _store.value;
       if (store == null) return false;
-      final encoded = jsonEncode(config);
-      _validateConfig(jsonDecode(encoded) as Map<String, Object?>);
+      var next = jsonDecode(jsonEncode(config)) as Map<String, Object?>;
+      if (store.getInt('version') == 1) {
+        // Use only a structurally validated snapshot of the current schema.
+        // Legacy migration must not copy old ownership/credential aliases.
+        final previous = await getConfigMap();
+        if (previous != null && !previous.containsKey('proxiesStyle')) {
+          var valid = false;
+          try { _validateConfig(previous); valid = true; } catch (_) {}
+          if (valid) next = preserveUnknownSettings(previous, next);
+        }
+      }
+      _validateConfig(next);
+      final encoded = jsonEncode(next);
       // Keep an independent copy of the prior valid state before touching
       // the preferences file on first migration. Never write corrupt data.
       final recovery = await _recoveryFile();
