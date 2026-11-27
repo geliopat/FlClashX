@@ -61,12 +61,14 @@ class IntegratedWindowHeaderScope extends InheritedWidget {
   const IntegratedWindowHeaderScope({
     super.key,
     required this.clearance,
+    this.hasStatusActions = false,
     this.onDragStart,
     this.onDoubleTap,
     required super.child,
   });
 
   final double clearance;
+  final bool hasStatusActions;
   final VoidCallback? onDragStart;
   final VoidCallback? onDoubleTap;
 
@@ -76,6 +78,7 @@ class IntegratedWindowHeaderScope extends InheritedWidget {
   @override
   bool updateShouldNotify(IntegratedWindowHeaderScope oldWidget) =>
       clearance != oldWidget.clearance ||
+      hasStatusActions != oldWidget.hasStatusActions ||
       onDragStart != oldWidget.onDragStart ||
       onDoubleTap != oldWidget.onDoubleTap;
 }

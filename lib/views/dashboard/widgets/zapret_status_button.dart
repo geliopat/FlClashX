@@ -3,12 +3,14 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/core/desktop/helper_client.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/views/dashboard/style.dart';
+import 'package:fl_clash/views/dashboard/widgets/core_status_button.dart' show compactEngineButtonStyle;
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class ZapretStatusButton extends ConsumerWidget {
-  const ZapretStatusButton({super.key});
+  const ZapretStatusButton({super.key, this.compact = false});
+  final bool compact;
 
   Future<void> _restart(BuildContext context, WidgetRef ref) async {
     final status = ref.read(zapretControllerProvider);
@@ -37,16 +39,26 @@ class ZapretStatusButton extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(zapretControllerProvider);
-    final busy = state.busy || state.dashboardRestarting;
     final safeMode = ref.watch(safeModeProvider);
     final initialized = ref.watch(initProvider);
+    final state = compact && (!initialized || safeMode) ? const ZapretState() : ref.watch(zapretControllerProvider);
+    final busy = state.busy || state.dashboardRestarting;
     final icon = busy
         ? const SizedBox.square(
             dimension: 18,
             child: CircularProgressIndicator(strokeWidth: 2),
           )
         : ZapretMark(running: state.running);
+    if (compact) {
+      final ru = Localizations.localeOf(context).languageCode == 'ru';
+      return IconButton(
+        key: const ValueKey('window-zapret-restart'),
+        tooltip: state.error ?? (ru ? 'Перезапуск Zapret' : 'Restart Zapret'),
+        style: compactEngineButtonStyle,
+        onPressed: busy || safeMode || !initialized ? null : () => _restart(context, ref),
+        icon: icon,
+      );
+    }
     final iconOnly = state.running || ViewScope.isMobileOf(context);
     const style = ElasticPress.buttonStyle;
     return Tooltip(

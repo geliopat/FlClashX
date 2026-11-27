@@ -82,7 +82,8 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
           ? appLocalizations.editDashboard
           : appLocalizations.dashboard,
       actions: [
-        if (!editing) const CoreStatusButton(),
+        if (!editing && IntegratedWindowHeaderScope.maybeOf(context)?.hasStatusActions != true)
+          const CoreStatusButton(),
         if (editable && !editing && widgetsReleasable)
           ManagedSetting(
             settingKey: dashboardWidgetsSetting,

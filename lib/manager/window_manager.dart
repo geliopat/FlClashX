@@ -9,6 +9,9 @@ import 'package:fl_clash/models/config.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/ui/ui.dart';
+import 'package:fl_clash/views/dashboard/widgets/core_status_button.dart';
+import 'package:fl_clash/views/dashboard/widgets/zapret_status_button.dart';
+import 'package:fl_clash/ui/hover_glow.dart';
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -254,6 +257,7 @@ class WindowHeaderContainer extends StatelessWidget {
           onDragStart: desktopWindow.startDragging,
           onDoubleTap: _toggleWindowMaximized,
           header: WindowHeader(integrated: integrated),
+          statusActions: system.isWindows ? const WindowEngineActions() : null,
           child: child!,
         );
       },
@@ -271,10 +275,12 @@ class WindowHeaderLayout extends StatelessWidget {
     this.integrated = false,
     this.onDragStart,
     this.onDoubleTap,
+    this.statusActions,
   });
 
   final double height;
   final Widget header;
+  final Widget? statusActions;
   final Widget child;
   final bool integrated;
   final VoidCallback? onDragStart;
@@ -291,6 +297,7 @@ class WindowHeaderLayout extends StatelessWidget {
               Expanded(
                 child: IntegratedWindowHeaderScope(
                   clearance: integrated ? integratedCaptionWidth(height) : 0,
+                  hasStatusActions: statusActions != null,
                   onDragStart: integrated ? onDragStart : null,
                   onDoubleTap: integrated ? onDoubleTap : null,
                   child: child,
@@ -299,14 +306,50 @@ class WindowHeaderLayout extends StatelessWidget {
             ],
           ),
           Positioned(
-            top: integrated ? (pageToolbarHeight - height) / 2 : 0,
+            top: integrated && statusActions == null ? (pageToolbarHeight - height) / 2 : 0,
             left: integrated ? null : 0,
             right: 0,
             width: integrated ? integratedCaptionWidth(height) : null,
             child: header,
           ),
+          if (integrated && statusActions != null)
+            Positioned(
+              top: 0, left: 0, right: integratedCaptionWidth(height),
+              height: 12,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onPanStart: (_) => onDragStart?.call(),
+                onDoubleTap: onDoubleTap,
+              ),
+            ),
+          if (statusActions != null)
+            Positioned(
+              key: const ValueKey('window-engine-actions'),
+              top: integrated ? height : 0,
+              right: integrated ? 8 : null,
+              left: integrated ? null : 8,
+              height: height,
+              child: statusActions!,
+            ),
         ],
       ),
+    );
+  }
+}
+
+/// The engine controls are owned by the window, not a retained dashboard.
+class WindowEngineActions extends ConsumerWidget {
+  const WindowEngineActions({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final safeMode = ref.watch(safeModeProvider);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const CoreStatusButton(compact: true, restartAll: false),
+        if (!safeMode) const ZapretStatusButton(compact: true),
+      ],
     );
   }
 }
@@ -492,8 +535,8 @@ class WindowHeaderBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = context.colorScheme;
     return Material(
-      type: integrated ? MaterialType.transparency : MaterialType.canvas,
-      shape: integrated ? null : Border(bottom: Divider.createBorderSide(context)),
+      type: integrated || system.isWindows ? MaterialType.transparency : MaterialType.canvas,
+      shape: integrated || system.isWindows ? null : Border(bottom: Divider.createBorderSide(context)),
       child: SizedBox(
         height: height,
         child: Stack(
@@ -506,7 +549,7 @@ class WindowHeaderBar extends StatelessWidget {
                   onDragStart();
                 },
                 onDoubleTap: onDoubleTap,
-                child: ColoredBox(color: colorScheme.chromeSurface),
+                child: ColoredBox(color: system.isWindows ? Colors.transparent : colorScheme.chromeSurface),
               ),
             ),
             if (title != null)
@@ -533,6 +576,16 @@ class WindowHeaderBar extends StatelessWidget {
                       foregroundColor: WidgetStatePropertyAll(
                         context.colorScheme.onSurface,
                       ),
+                      overlayColor: system.isWindows ? const WidgetStatePropertyAll(Colors.transparent) : null,
+                      splashFactory: system.isWindows ? NoSplash.splashFactory : null,
+                      foregroundBuilder: system.isWindows ? (context, states, child) {
+                        final shadows = HoverGlowTheme.of(context).shadows(
+                          context.colorScheme.primary,
+                          hovered: states.contains(WidgetState.hovered),
+                        );
+                        return IconTheme.merge(data: IconThemeData(shadows: shadows),
+                          child: child ?? const SizedBox.shrink());
+                      } : null,
                     ),
                   ),
                   child: actions!,
@@ -617,16 +670,16 @@ class WindowHeaderActions extends StatelessWidget {
                   final active =
                       states.contains(WidgetState.hovered) ||
                       states.contains(WidgetState.pressed);
-                  return active ? context.colorScheme.error : null;
+                  return active && !system.isWindows ? context.colorScheme.error : null;
                 }),
                 foregroundColor: WidgetStateProperty.resolveWith((states) {
                   final active =
                       states.contains(WidgetState.hovered) ||
                       states.contains(WidgetState.pressed);
-                  return active ? context.colorScheme.onError : null;
+                  return active ? (system.isWindows ? context.colorScheme.error : context.colorScheme.onError) : null;
                 }),
                 overlayColor: WidgetStateProperty.resolveWith((states) {
-                  return states.contains(WidgetState.pressed)
+                  return !system.isWindows && states.contains(WidgetState.pressed)
                       ? context.colorScheme.onError.opacity12
                       : Colors.transparent;
                 }),

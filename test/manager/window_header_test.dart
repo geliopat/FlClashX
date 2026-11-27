@@ -711,6 +711,31 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('window caption is above engine controls and drag strip excludes them', (tester) async {
+    var maximized = 0;
+    var pressed = 0;
+    await tester.pumpWidget(TestApp(child: WindowHeaderLayout(
+      height: 32,
+      integrated: true,
+      onDoubleTap: () => maximized++,
+      header: const SizedBox(height: 32, key: Key('caption-top')),
+      statusActions: TextButton(onPressed: () => pressed++, child: const Text('Engines')),
+      child: const ColoredBox(key: _contentKey, color: Color(0xFF00FF00)),
+    )));
+    final caption = tester.getRect(find.byKey(const Key('caption-top')));
+    final engines = tester.getRect(find.byKey(const ValueKey('window-engine-actions')));
+    expect(caption.top, 0);
+    expect(engines.top, caption.bottom);
+    expect(engines.bottom, lessThanOrEqualTo(pageToolbarHeight));
+    await tester.tap(find.text('Engines'));
+    expect(pressed, 1);
+    await tester.tapAt(const Offset(100, 6));
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tapAt(const Offset(100, 6));
+    await tester.pumpAndSettle();
+    expect(maximized, 1);
+  });
+
   group('WindowHeaderContainer', () {
     late ProviderContainer container;
 
