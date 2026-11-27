@@ -42,6 +42,7 @@ class FileLogger {
   Future<void> _drain = Future.value();
   Future<void> _archiving = Future.value();
   bool _enabled = false;
+  bool _scheduled = false;
   String? _day;
   File? _file;
   int _size = 0;
@@ -77,10 +78,21 @@ class FileLogger {
   }
 
   void _schedule() {
-    if (!_enabled) {
-      return;
-    }
-    _drain = _drain.then((_) => _flush()).catchError((_) {});
+    if (!_enabled || _scheduled || _pending.isEmpty) return;
+    _scheduled = true;
+    _drain = Future<void>.microtask(() async {
+      try {
+        // One writer owns the bounded queue; bursts do not create a future
+        // per log line. Entries arriving during an append form the next batch.
+        while (_pending.isNotEmpty) {
+          await _flush();
+        }
+      } catch (_) {
+        // Retain the pending batch and retry on the next explicit flush/write.
+      } finally {
+        _scheduled = false;
+      }
+    });
   }
 
   Future<void> flush() {
