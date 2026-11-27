@@ -47,7 +47,7 @@ class _ColoredLabel extends StatelessWidget {
         textStyle: style,
       ).copyWith(
         textStyle: WidgetStateProperty.resolveWith((states) => style.copyWith(
-          shadows: states.contains(WidgetState.hovered) || states.contains(WidgetState.focused)
+          shadows: states.contains(WidgetState.hovered)
               ? [Shadow(color: color, blurRadius: 6)]
               : const [],
         )),
@@ -202,10 +202,12 @@ class RuleLabel extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       spacing: 6,
       children: [
-        _ColoredLabel(
-          trackerInfo.rule,
-          NetworkTone.rule.of(context),
-          onPressed: onPressed,
+        Flexible(
+          child: _ColoredLabel(
+            trackerInfo.rule,
+            NetworkTone.rule.of(context),
+            onPressed: onPressed,
+          ),
         ),
         if (payload.isNotEmpty)
           Flexible(
