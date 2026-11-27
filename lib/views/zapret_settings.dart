@@ -262,6 +262,9 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
           ),
           ManagedSetting(
             settingKey: zapretStartSetting,
+            onTakenOver: zapret.busy ? null : () => ref
+                .read(zapretControllerProvider.notifier)
+                .setStartWithMihomo(!zapret.startWithMihomo),
             child: ListItem(
               title: Text(AppLocalizations.of(context).forkStartWithMihomo),
               subtitle: Text(AppLocalizations.of(context).forkStopWithMihomo),

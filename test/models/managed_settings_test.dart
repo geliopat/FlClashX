@@ -16,6 +16,11 @@ void main() {
     expect(mixed.tunemode, 'veryfast');
     expect(mixed.mode, 'strictsplit');
     expect(effectiveZapretSettings(null, personal, {}), personal);
+    final updated = parseZapretHeader('autofallback,mode:fullbypass,tunemode:fast')!;
+    final owned = {zapretStartSetting, zapretTuneModeSetting};
+    expect(effectiveZapretSettings(updated, personal, owned).tunemode, 'veryfast');
+    expect(effectiveZapretSettings(updated, personal, {}).tunemode, 'fast');
+    expect(effectiveZapretSettings(updated, personal, owned).autofallback, isTrue);
     expect(managedZapretKeysOf(parseZapretHeader('')), {
       zapretStartSetting, zapretFallbackSetting, zapretAutoTuneSetting, zapretTuneOnFailSetting,
     });

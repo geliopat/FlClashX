@@ -182,6 +182,9 @@ class ZapretView extends ConsumerWidget {
           ),
           ManagedSetting(
             settingKey: zapretFallbackSetting,
+            onTakenOver: zapret.busy ? null : () => ref
+                .read(zapretControllerProvider.notifier)
+                .setAutoFallback(!zapret.autoFallback),
             child: ListItem(
               title: Text(AppLocalizations.of(context).forkAutoFallback),
               subtitle: Text(AppLocalizations.of(context).forkFallbackHint),
@@ -191,6 +194,9 @@ class ZapretView extends ConsumerWidget {
           ),
           ManagedSetting(
             settingKey: zapretAutoTuneSetting,
+            onTakenOver: zapret.busy ? null : () => ref
+                .read(zapretControllerProvider.notifier)
+                .setAutoTune(!zapret.autoTune),
             child: ListItem(
               title: Text(AppLocalizations.of(context).forkAutoTuneOnFailureWithoutResults),
               trailing: Switch(value: zapret.autoTune,
@@ -199,6 +205,9 @@ class ZapretView extends ConsumerWidget {
           ),
           ManagedSetting(
             settingKey: zapretTuneOnFailSetting,
+            onTakenOver: zapret.busy ? null : () => ref
+                .read(zapretControllerProvider.notifier)
+                .setTuneOnFail(!zapret.tuneOnFail),
             child: ListItem(
               title: Text(AppLocalizations.of(context).forkRetuneOnFailure),
               trailing: Switch(value: zapret.tuneOnFail,
