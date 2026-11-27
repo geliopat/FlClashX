@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:fl_clash/common/file_logger.dart';
 import 'package:fl_clash/enum/enum.dart';
@@ -30,6 +32,12 @@ class CommonPrint {
     final payload = '[APP] $text';
     debugPrint(payload);
     final log = Log.app(payload).copyWith(logLevel: logLevel);
+    if (Platform.isWindows) {
+      // Application diagnostics are not Mihomo engine events.
+      appFileLogger.enable();
+      appFileLogger.write(log);
+      return;
+    }
     if (!globalState.isAttach) {
       fileLogger.write(log);
       return;
