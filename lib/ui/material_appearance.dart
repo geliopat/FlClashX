@@ -19,14 +19,14 @@ typedef MaterialAppearance = ({
   PaneAppearance? button,
 });
 
-const defaultMaterialAppearance = (
-  windowOpacity: null as double?,
+const MaterialAppearance defaultMaterialAppearance = (
+  windowOpacity: null,
   windowTint: 0.0,
-  card: null as PaneAppearance?,
-  button: null as PaneAppearance?,
+  card: null,
+  button: null,
 );
 
-const defaultPaneAppearance = (
+const PaneAppearance defaultPaneAppearance = (
   effect: WindowEffect.none,
   opacity: .85,
   blur: 12.0,
@@ -116,6 +116,19 @@ class MaterialAppearanceTheme extends ThemeExtension<MaterialAppearanceTheme> {
   int get hashCode => settings.hashCode;
 }
 
+/// Estimated effective pane color for semantic labels. DWM pixels are
+/// deliberately not represented as measured values.
+class PaneBackdropEstimate extends InheritedWidget {
+  const PaneBackdropEstimate({super.key, required this.color, required super.child});
+  final Color color;
+
+  static Color? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<PaneBackdropEstimate>()?.color;
+
+  @override
+  bool updateShouldNotify(PaneBackdropEstimate oldWidget) => oldWidget.color != color;
+}
+
 /// Use a single implementation for settings samples and real controls.
 class LocalMaterialPane extends StatelessWidget {
   const LocalMaterialPane({
@@ -130,10 +143,18 @@ class LocalMaterialPane extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fill = paneColor(color, Theme.of(context).colorScheme, appearance);
+    final scheme = Theme.of(context).colorScheme;
+    final fill = paneColor(color, scheme, appearance);
+    final reference = scheme.brightness == Brightness.dark
+        ? const Color(0xFF181818) : const Color(0xFFF5F5F5);
+    final behind = PaneBackdropEstimate.maybeOf(context) ??
+        Color.alphaBlend(scheme.surface, reference);
     final content = DecoratedBox(
       decoration: ShapeDecoration(color: fill, shape: shape),
-      child: child,
+      child: PaneBackdropEstimate(
+        color: Color.alphaBlend(fill, behind),
+        child: child,
+      ),
     );
     // Avoid a backdrop filter for Mica-like layers, fully opaque panes or
     // zero blur. BackdropFilter is clipped to the pane, not the whole window.

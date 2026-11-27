@@ -1,4 +1,5 @@
 import 'package:fl_clash/ui/context.dart';
+import 'package:fl_clash/ui/material_appearance.dart';
 import 'package:fl_clash/ui/surface.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -53,7 +54,7 @@ enum NetworkTone {
     final rawSurface = context.surfaceLevel.colorOf(context.colorScheme);
     // Resolve alpha against a theme-matched backdrop estimate rather than
     // treating a translucent RGB value as a measured desktop pixel.
-    final surface = Color.alphaBlend(rawSurface, context.colorScheme.brightness == Brightness.dark
+    final surface = PaneBackdropEstimate.maybeOf(context) ?? Color.alphaBlend(rawSurface, context.colorScheme.brightness == Brightness.dark
         ? const Color(0xFF181818) : const Color(0xFFF5F5F5));
     if (!_cache.containsKey(surface) && _cache.length >= 32) {
       _cache.remove(_cache.keys.first);

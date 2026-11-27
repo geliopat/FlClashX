@@ -68,6 +68,8 @@ class DashboardCard extends StatelessWidget {
                   child: InkWell(
                     mouseCursor: clickableCursor,
                     customBorder: shape,
+                    splashFactory: appearance == null ? null : NoSplash.splashFactory,
+                    overlayColor: appearance == null ? null : const WidgetStatePropertyAll(Colors.transparent),
                     onTap: onTap,
                     child: content,
                   ),

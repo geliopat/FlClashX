@@ -525,11 +525,13 @@ class TonalButtonTheme extends StatelessWidget {
               backgroundColor: grouped || appearance != null ? fill : null,
               foregroundColor: grouped
                   ? foreground
+                  : appearance != null
+                  ? colorScheme.onPrimaryContainer
                   : paned
                   ? colorScheme.onPrimary
                   : null,
               disabledBackgroundColor: grouped || appearance != null ? fill : null,
-              disabledForegroundColor: grouped ? disabledForeground : null,
+              disabledForegroundColor: grouped || appearance != null ? disabledForeground : null,
               minimumSize: Size.square(size.button),
               padding: const EdgeInsets.symmetric(horizontal: 14),
               shape: AppShape.full,

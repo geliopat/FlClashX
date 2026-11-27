@@ -24,6 +24,22 @@ void main() {
     expect(value.button!.tint, 0);
     expect(decodeMaterialAppearance(encodeMaterialAppearance(value)), value);
   });
+  testWidgets('local pane supplies a composited estimate to labels', (tester) async {
+    Color? estimate;
+    await tester.pumpWidget(MaterialApp(
+      home: LocalMaterialPane(
+        appearance: decodePane({'effect': 'mica', 'opacity': .5, 'tint': 0})!,
+        color: const Color(0xFFFFFFFF),
+        shape: const RoundedRectangleBorder(),
+        child: Builder(builder: (context) {
+          estimate = PaneBackdropEstimate.maybeOf(context);
+          return const SizedBox(width: 20, height: 20);
+        }),
+      ),
+    ));
+    expect(estimate, isNotNull);
+    expect(estimate!.a, 1);
+  });
   test('opaque stays opaque and acrylic respects local opacity', () {
     final scheme = ColorScheme.fromSeed(seedColor: Colors.blue);
     final opaque = paneColor(scheme.surface, scheme, defaultPaneAppearance);
