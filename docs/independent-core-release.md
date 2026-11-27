@@ -47,7 +47,8 @@ installation; manual check and confirmation. No arbitrary URL executable.
 ## Progress
 
 - Core metadata command and contract test implemented; not compiled.
-- Independent workflow and signing format to be added in core repository.
-- Trust validation, transaction, Helper verification and update integration
+- Independent workflow, signer and guarded patch replay are implemented in the core repository (`FlClashZ` branch). The default branch still needs explicit configuration before workflow_dispatch. No build was dispatched.
+- Client-side signed manifest parsing, compatibility checks, numeric version ordering and staged binary hashing are implemented with regression fixtures. Not yet wired to downloads or lifecycle. The signing key must be provisioned before publication.
+- Trusted-key provisioning, transaction, privileged Helper verification and update integration
   remain open; do not mark independent updates ready until implemented and
   accepted.
