@@ -266,19 +266,19 @@ List<RecordColumn<DnsQuery>> _dnsQueryColumns(
       sortKey: (query) => query.summary.toLowerCase(),
     ),
     RecordColumn(
-      const TableColumn('resolver', 'Резолвер', flex: 1.0),
+      TableColumn('resolver', appLocalizations.source, flex: 1.0),
       cell: (_, query) => RecordCellText(
-        query.resolverName.isEmpty ? 'Не определён' : query.resolverName,
+        query.resolverName.isEmpty ? appLocalizations.unknown : query.resolverName,
         muted: true,
       ),
       sortKey: (query) => query.resolverName.toLowerCase(),
     ),
     if (wide)
       RecordColumn(
-        const TableColumn('upstream', 'DNS-сервер', flex: 0.8),
+        const TableColumn('upstream', 'DNS', flex: 0.8),
         cell: (_, query) => RecordCellText(
-          query.cached ? appLocalizations.cache :
-              query.upstream.isEmpty ? 'Не сообщён' : query.upstream,
+          query.upstream.isNotEmpty ? query.upstream :
+              query.cached ? appLocalizations.cache : appLocalizations.unknown,
           muted: true,
         ),
         sortKey: (query) => query.upstream.toLowerCase(),
@@ -491,9 +491,9 @@ class DnsQueryDetailView extends StatelessWidget {
       (appLocalizations.domain, dnsQuery.domain),
       (appLocalizations.recordType, dnsQuery.type),
       (appLocalizations.initiator, dnsQuery.initiator?.label ?? ''),
-      ('Резолвер', dnsQuery.resolverName.isEmpty ? 'Не определён' : dnsQuery.resolverName),
-      ('DNS-сервер', dnsQuery.cached ? appLocalizations.cache :
-          dnsQuery.upstream.isEmpty ? 'Ядро не сообщает адрес' : dnsQuery.upstream),
+      (appLocalizations.source, dnsQuery.resolverName.isEmpty ? appLocalizations.unknown : dnsQuery.resolverName),
+      ('DNS', dnsQuery.upstream.isNotEmpty ? dnsQuery.upstream :
+          dnsQuery.cached ? appLocalizations.cache : appLocalizations.unknown),
       (
         appLocalizations.cache,
         dnsQuery.cached ? appLocalizations.yes : appLocalizations.no,
