@@ -159,11 +159,14 @@ class _ZapretLogsViewState extends State<ZapretLogsView>
 
   Widget _filterSection(BuildContext context, List<_JournalEntry> filtered, {String? error}) {
     final l = AppLocalizations.of(context);
-    if (_tab == 0 && error == null) {
-      return Text(l.forkLogFooter, style: context.listCaptionStyle);
-    }
     return generateSection(
       items: [
+        if (_tab == 0)
+          ListItem(
+            title: Text(l.openLogsFolder),
+            leading: const GlyphIcon(AppGlyphs.openExternal),
+            onTap: () async => system.openDirectory(await zapretFileLogger.directoryPath),
+          ),
         if (widget.embedded) ...[
           if (widget.crashOnly)
             ListItem(
@@ -178,13 +181,13 @@ class _ZapretLogsViewState extends State<ZapretLogsView>
             textBuilder: (level) => level == 'all' ? l.forkAllEvents : _levelLabel(l, level),
             onChanged: (level) => setState(() => _filter = level),
           ),
+        ],
           ListItem(
             title: Text(Localizations.localeOf(context).languageCode == 'ru' ? 'Копировать видимые записи' : 'Copy visible entries'),
             onTap: filtered.isEmpty ? null : () async => Clipboard.setData(ClipboardData(
               text: filtered.map((entry) => '[${entry.log.time.toLocal()}] [${entry.component}] [${entry.log.level}] ${entry.log.message}').join('\n'),
             )),
           ),
-        ],
         if (_tab != 0)
           ListItem(
             title: Text(l.update),
@@ -245,7 +248,9 @@ class _ZapretLogsViewState extends State<ZapretLogsView>
     if (widget.embedded) return _journal(context);
     return CommonScaffold(
       title: widget.journalOnly ? l.forkServiceJournal
-          : widget.crashOnly ? l.forkCrashHistory : l.forkZapretLogs,
+          : widget.crashOnly ? l.forkCrashHistory
+          : widget.recoveryOnly ? (Localizations.localeOf(context).languageCode == 'ru' ? 'Восстановления Helper / Zapret' : 'Helper / Zapret recoveries')
+          : l.forkZapretLogs,
       titleWidget: PageTitleTabs(
         labels: [
           for (final level in _filters)
