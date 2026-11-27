@@ -79,6 +79,19 @@ void main() {
     ), throwsFormatException);
   });
 
+  test('authenticates actual published core with the shared release key', () async {
+    final directory = Platform.environment['FLCLASHZ_TEST_SIGNED_CORE_DIR'];
+    if (directory == null) return;
+    final bytes = await File('$directory/core-manifest.json').readAsBytes();
+    final verified = await CoreReleaseManifest.verify(bytes);
+    expect(verified.version.value, 'v1.19.34-z.1');
+    expect(verified.engineRevision, '53d2f4fc1cb56aaeba947a1a557eeafd48050737');
+    await verified.verifyBinary(File('$directory/FlClashCore.exe'));
+    final modified = jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
+    modified['version'] = 'v1.19.34-z.2';
+    await expectLater(CoreReleaseManifest.verify(utf8.encode(jsonEncode(modified))), throwsFormatException);
+  });
+
   test('orders independent revisions numerically', () {
     final a = CoreReleaseVersion.parse('v1.19.34-z.9');
     final b = CoreReleaseVersion.parse('v1.19.34-z.10');
