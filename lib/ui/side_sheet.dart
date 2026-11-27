@@ -380,7 +380,8 @@ class ModalSideSheetRoute<T> extends PopupRoute<T>
       ),
     );
 
-    return ElevatedSurfaceTheme(child: content);
+    return Theme.of(context).platform == TargetPlatform.windows
+        ? content : ElevatedSurfaceTheme(child: content);
   }
 
   @override
@@ -433,7 +434,8 @@ Future<T?> showModalSideSheet<T>({
       ),
       backgroundColor: backgroundColor,
       modalBarrierColor:
-          barrierColor ?? Theme.of(context).bottomSheetTheme.modalBarrierColor,
+          barrierColor ?? (Theme.of(context).platform == TargetPlatform.windows
+              ? panelScrimOf(context) : Theme.of(context).bottomSheetTheme.modalBarrierColor),
     ),
   );
 }

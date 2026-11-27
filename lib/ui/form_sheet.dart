@@ -56,13 +56,13 @@ class FormSheetRoute<T> extends PopupRoute<T>
     Animation<double> animation,
     Animation<double> secondaryAnimation,
   ) {
-    return ElevatedSurfaceTheme(
-      child: _FormSheet(
-        backgroundColor: backgroundColor,
-        dismissHandler: _dismissHandler,
-        builder: builder,
-      ),
+    final content = _FormSheet(
+      backgroundColor: backgroundColor,
+      dismissHandler: _dismissHandler,
+      builder: builder,
     );
+    return Theme.of(context).platform == TargetPlatform.windows
+        ? content : ElevatedSurfaceTheme(child: content);
   }
 
   @override

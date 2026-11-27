@@ -86,6 +86,20 @@ class FrostedSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final glass = LiquidGlassScope.of(context);
     final clip = radius == BorderRadius.zero ? Clip.none : Clip.antiAlias;
+    if (Theme.of(context).platform == TargetPlatform.windows) {
+      return Material(
+        color: color.withValues(alpha: 1),
+        shape: RoundedSuperellipseBorder(borderRadius: radius),
+        clipBehavior: clip,
+        elevation: 0,
+        shadowColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        child: Theme(
+          data: Theme.of(context).copyWith(scaffoldBackgroundColor: Colors.transparent),
+          child: child,
+        ),
+      );
+    }
     final material = Material(
       color: glass ? Colors.transparent : color,
       shape: RoundedSuperellipseBorder(borderRadius: radius),

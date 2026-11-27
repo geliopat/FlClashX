@@ -223,12 +223,22 @@ class _SidebarOverlay extends StatelessWidget {
   Widget build(BuildContext context) {
     final isLtr = Directionality.of(context) == TextDirection.ltr;
     final colorScheme = context.colorScheme;
+    final windows = Theme.of(context).platform == TargetPlatform.windows;
     return Stack(
       children: [
         Positioned.fill(
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: onDismiss,
+            child: windows ? AnimatedBuilder(
+              animation: progress,
+              builder: (context, _) => ColoredBox(
+                key: const ValueKey('sidebar-panel-scrim'),
+                color: panelScrimOf(context).withValues(
+                  alpha: windowsPanelDim * progress.value.clamp(0.0, 1.0).toDouble(),
+                ),
+              ),
+            ) : null,
           ),
         ),
         Positioned(
@@ -252,9 +262,11 @@ class _SidebarOverlay extends StatelessWidget {
               child: FocusScope(
                 autofocus: true,
                 child: Material(
-                  color: colorScheme.chromeSurface.withValues(alpha: 1),
-                  elevation: Theme.of(context).platform == TargetPlatform.windows ? 0 : 8,
-                  shadowColor: colorScheme.shadow,
+                  key: const ValueKey('sidebar-overlay-surface'),
+                  color: windows ? panelSurfaceOf(colorScheme) : colorScheme.chromeSurface,
+                  elevation: windows ? 0 : 8,
+                  shadowColor: windows ? Colors.transparent : colorScheme.shadow,
+                  surfaceTintColor: windows ? Colors.transparent : null,
                   child: AnimatedBuilder(
                     animation: progress,
                     builder: (_, _) => builder(progress.value),

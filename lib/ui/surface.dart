@@ -1,6 +1,22 @@
 import 'package:fl_clash/ui/color.dart';
 import 'package:material_ui/material_ui.dart';
 
+/// Windows modal panels separate themselves by dimming the uncovered area,
+/// rather than drawing a border, elevation shadow or contrasting chrome.
+const windowsPanelDim = .15;
+
+Color panelScrimOf(BuildContext context) {
+  final theme = Theme.of(context);
+  return theme.platform == TargetPlatform.windows
+      ? const Color(0xFF000000).withValues(alpha: windowsPanelDim)
+      : theme.colorScheme.modalScrim;
+}
+
+/// Use the same theme RGB as the workspace. A modal layer must conceal the
+/// controls behind it; native DWM cannot be sampled independently per pane.
+Color panelSurfaceOf(ColorScheme scheme) =>
+    SurfaceLevel.page.colorOf(scheme).withValues(alpha: 1);
+
 /// `.agents/surfaces.md` explains the levels and why dark mode never steps
 /// back down.
 enum SurfaceLevel {

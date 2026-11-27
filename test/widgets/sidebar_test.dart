@@ -8,9 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../helpers/test_app.dart';
 
-final _paneFinder = find
-    .byWidgetPredicate((widget) => widget is Material && widget.elevation > 0)
-    .first;
+final _paneFinder = find.byKey(const ValueKey('sidebar-overlay-surface'));
 
 const _destinations = [
   SidebarDestination(glyph: AppGlyphs.dashboard, label: 'Dashboard'),
@@ -40,9 +38,11 @@ Widget _sidebar({
   Widget? footer,
   Set<int> footerDestinations = const {},
   double height = 400,
+  ThemeData? theme,
   EdgeInsets safePadding = EdgeInsets.zero,
 }) {
   return TestApp(
+    theme: theme ?? ThemeData(platform: TargetPlatform.android),
     child: Scaffold(
       body: Row(
         children: [
@@ -326,6 +326,25 @@ void main() {
   });
 
   group('without room to widen', () {
+    testWidgets('Windows overlay dims the rest without a border or shadow', (tester) async {
+      final theme = ThemeData(platform: TargetPlatform.windows);
+      final scrim = find.byKey(const ValueKey('sidebar-panel-scrim'));
+      await tester.pumpWidget(_sidebar(expanded: false, theme: theme));
+      expect(scrim, findsNothing);
+      await tester.tap(find.byTooltip('Expand'));
+      await tester.pumpAndSettle();
+      final pane = tester.widget<Material>(_paneFinder);
+      expect(pane.color, panelSurfaceOf(theme.colorScheme));
+      expect(pane.elevation, 0);
+      expect(pane.shape, isNull);
+      expect(pane.shadowColor, Colors.transparent);
+      expect(tester.widget<ColoredBox>(scrim).color.a, closeTo(windowsPanelDim, .001));
+      await tester.tap(find.byTooltip('Collapse'));
+      await tester.pump(const Duration(milliseconds: 80));
+      await tester.pumpAndSettle();
+      expect(scrim, findsNothing);
+      expect(_paneFinder, findsNothing);
+    });
     Future<void> openOverlay(WidgetTester tester) async {
       await tester.tap(find.byTooltip('Expand'));
       await tester.pumpAndSettle();
