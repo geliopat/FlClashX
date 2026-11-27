@@ -5,6 +5,17 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fl_clash/views/proxies/common.dart';
 
 void main() {
+  test('speed options are transmitted to core without changing route name', () {
+    const request = ProxySpeedRequest(proxyName: 'Balance', service: 'cachefly',
+      streams: 8, seconds: 15, maxMB: 50, direction: 'download');
+    expect(request.toJson()['proxy-name'], 'Balance');
+    expect(request.toJson()['streams'], 8);
+    expect(request.toJson()['max-mb'], 50);
+    expect(request.toJson()['direction'], 'download');
+    final result = ProxySpeedResult.fromJson({'download': 15.2, 'download-bytes': 1000000});
+    expect(result.downloadBytes, 1000000);
+    expect(result.upload, isNull);
+  });
   test('legacy Yandex VPN selection migrates to Cloudflare', () {
     expect(vpnSpeedService(SpeedTestService.yandex), SpeedTestService.cloudflare);
     expect(vpnSpeedService(SpeedTestService.custom), SpeedTestService.custom);

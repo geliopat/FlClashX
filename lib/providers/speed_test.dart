@@ -74,6 +74,7 @@ final speedTestSettingsProvider =
 
 class SpeedTestSettingsController extends Notifier<SpeedTestSettings> {
   int _revision = 0;
+  Future<void> _writes = Future.value();
   @override
   SpeedTestSettings build() {
     unawaited(_load());
@@ -102,9 +103,10 @@ class SpeedTestSettingsController extends Notifier<SpeedTestSettings> {
         !validTestEndpoint(settings.uploadUrl)) return;
     _revision++;
     state = settings.copyWith(service: vpnSpeedService(settings.service));
-    final prefs = await SharedPreferences.getInstance();
-    if (!ref.mounted) return;
     final latest = state;
+    _writes = _writes.then((_) async {
+      try {
+    final prefs = await SharedPreferences.getInstance();
     await prefs.setString('speedTest.service', latest.service.name);
     await prefs.setString('speedTest.download', latest.downloadUrl);
     await prefs.setString('speedTest.upload', latest.uploadUrl);
@@ -112,6 +114,9 @@ class SpeedTestSettingsController extends Notifier<SpeedTestSettings> {
     await prefs.setInt('speedTest.seconds', latest.seconds);
     await prefs.setInt('speedTest.maxMB', latest.maxMB);
     await prefs.setString('speedTest.direction', latest.direction);
+      } catch (_) {}
+    });
+    await _writes;
   }
 }
 
@@ -171,6 +176,11 @@ class SpeedTestController extends Notifier<SpeedTestState> {
     final group = ref.read(groupsProvider).getGroup(proxy.name);
     if (!speedTestableProxy(proxy) && group == null) return;
     await _run({proxy.name});
+  }
+
+  Future<void> testGroup(String name) async {
+    if (ref.read(groupsProvider).getGroup(name) == null) return;
+    await _run({name});
   }
 
   Future<void> testGroupMembers(String name) async {

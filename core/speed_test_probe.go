@@ -116,7 +116,7 @@ func handleSpeedTest(params *ProxySpeedRequest) *ProxySpeedResult {
 	default:
 		return failed("unsupported")
 	}
-	if service != "yandex" && (validYandexSpeedURL(down) || validYandexSpeedURL(up)) {
+	if service != "yandex" && (isYandexSpeedHost(down) || isYandexSpeedHost(up)) {
 		return failed("unsupported")
 	}
 	options := normalizedSpeedOptions(params)
@@ -147,9 +147,15 @@ func validYandexSpeedURL(raw string) bool {
 		return false
 	}
 	u, _ := url.Parse(raw)
-	host := strings.ToLower(u.Hostname())
-	return u.Scheme == "https" && (host == "yandex.ru" || host == "yandex.net" ||
-		strings.HasSuffix(host, ".yandex.ru") || strings.HasSuffix(host, ".yandex.net"))
+	return u.Scheme == "https" && isYandexSpeedHost(raw)
+}
+
+func isYandexSpeedHost(raw string) bool {
+	u, err := url.Parse(raw)
+	if err != nil { return false }
+	host := strings.TrimSuffix(strings.ToLower(u.Hostname()), ".")
+	return host == "yandex.ru" || host == "yandex.net" ||
+		strings.HasSuffix(host, ".yandex.ru") || strings.HasSuffix(host, ".yandex.net")
 }
 
 type yandexSpeedProbe struct {

@@ -34,7 +34,25 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> {
 
   List<CommonPopupMenuItem> _buildMenuItems(BuildContext context) {
     final appLocalizations = context.appLocalizations;
+    final group = ref.watch(proxiesTabControllerStateProvider.select((s) => s.currentGroupName));
+    final speedReady = system.isWindows && !ref.watch(speedTestProvider.select((s) => s.busy)) &&
+        ref.watch(coreStatusProvider) == CoreStatus.connected;
+    final ru = Localizations.localeOf(context).languageCode == 'ru';
+    final result = system.isWindows && group != null
+        ? ref.watch(speedTestProvider.select((s) => s.results[group])) : null;
+    String groupSpeed(double? rate, String error) =>
+        rate != null ? '${rate.toStringAsFixed(1)} ${appLocalizations.forkSpeedMbps}'
+            : error.isNotEmpty ? error : '—';
     return [
+      if (system.isWindows && _isTab && group != null && !widget.picker) ...[
+        CommonPopupMenuItem(glyph: AppGlyphs.speed,
+          label: ru ? 'Скорость текущей группы' : 'Current group speed',
+          subtitle: result == null ? null : '↓ ${groupSpeed(result.download, result.downloadError)} · ↑ ${groupSpeed(result.upload, result.uploadError)}',
+          onPressed: speedReady ? () => ref.read(speedTestProvider.notifier).testGroup(group) : null),
+        CommonPopupMenuItem(glyph: AppGlyphs.speed,
+          label: ru ? 'Проверить серверы группы' : 'Test group members',
+          onPressed: speedReady ? () => ref.read(speedTestProvider.notifier).testGroupMembers(group) : null),
+      ],
       if (_isTab && !ref.watch(oneGroupProvider))
         CommonPopupMenuItem(
           glyph: AppGlyphs.locate,

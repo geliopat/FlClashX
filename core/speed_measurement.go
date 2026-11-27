@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
+	"bufio"
 	"time"
 
 	"github.com/metacubex/http"
@@ -37,11 +39,14 @@ type speedSample struct {
 type timedSpeedReader struct {
 	reader io.Reader
 	sample *speedSample
+	mu *sync.Mutex
 }
 
 func (r timedSpeedReader) Read(p []byte) (int,error) {
 	n, err := r.reader.Read(p)
 	if n > 0 {
+		r.mu.Lock()
+		defer r.mu.Unlock()
 		now := time.Now()
 		if r.sample.first.IsZero() { r.sample.first = now }
 		r.sample.last = now
@@ -73,7 +78,7 @@ func measureSpeedPhase(client *http.Client, service, endpoint string, upload, mu
 	remaining := options.maxBytes
 	var measured int64
 	var elapsed time.Duration
-	size := int64(1000000)
+	size := int64(256000)
 	failure := "timeout"
 	// A wave has independent connections. Increase the chunk size only after
 	// successful waves; never retry failed streams or count incomplete uploads.
@@ -113,6 +118,7 @@ func measureSpeedPhase(client *http.Client, service, endpoint string, upload, mu
 		if failed || elapsed >= time.Duration(options.seconds)*time.Second { break }
 		// Ramp based on completed body duration, not TCP/TLS setup latency.
 		switch {
+		case size < 1000000: size=1000000
 		case size < 10000000: size=10000000
 		case size < 50000000: size=50000000
 		default: size=99999999
@@ -125,6 +131,7 @@ func measureSpeedPhase(client *http.Client, service, endpoint string, upload, mu
 
 func runSpeedSample(ctx context.Context, client *http.Client, service, endpoint string, limit int64, payload []byte, upload,multipart bool) speedSample {
 	s := speedSample{}
+	var mu sync.Mutex
 	fail := func(reason string) speedSample { return speedSample{err:reason} }
 	method := http.MethodGet
 	var body io.Reader
@@ -132,7 +139,7 @@ func runSpeedSample(ctx context.Context, client *http.Client, service, endpoint 
 	contentType := "application/octet-stream"
 	if upload {
 		method=http.MethodPost
-		body=timedSpeedReader{bytes.NewReader(payload),&s}
+		body=timedSpeedReader{bytes.NewReader(payload),&s,&mu}
 		bodyLength=int64(len(payload))
 		if multipart {
 			const boundary="FlClashZSpeedSample"
@@ -157,12 +164,26 @@ func runSpeedSample(ctx context.Context, client *http.Client, service, endpoint 
 		// Only a complete, acknowledged body is counted. The receipt excludes
 		// the multipart envelope and does not claim wire-level byte counts.
 		if _,err:=io.Copy(io.Discard,io.LimitReader(resp.Body,65536));err!=nil { return fail(probeErrorKind(err)) }
+		mu.Lock()
+		defer mu.Unlock()
 		if s.bytes!=int64(len(payload)) { return fail("incomplete-upload") }
+		// Include the final acknowledgement to avoid measuring only a
+		// fast local transport buffer rather than accepted payload.
+		s.last = time.Now()
 		if !s.last.After(s.first) { return fail("invalid-body") }
 		return s
 	}
+	reader := bufio.NewReaderSize(resp.Body, 1024)
+	// Start the measurement before reading any payload, including the
+	// small peek used to detect disguised HTML error pages.
+	s.first = time.Now()
+	prefix, _ := reader.Peek(512)
+	head := strings.ToLower(strings.TrimSpace(string(prefix)))
+	if strings.HasPrefix(head, "<html") || strings.HasPrefix(head, "<!doctype html") {
+		return fail("invalid-body")
+	}
 	buffer:=make([]byte,64*1024)
-	n,err:=io.CopyBuffer(io.Discard,timedSpeedReader{io.LimitReader(resp.Body,limit),&s},buffer)
+	n,err:=io.CopyBuffer(io.Discard,timedSpeedReader{io.LimitReader(reader,limit),&s,&mu},buffer)
 	if err!=nil { return fail(probeErrorKind(err)) }
 	if n<65536 || (service=="cloudflare" && n!=limit) ||
 		(resp.ContentLength>=0 && n<min(resp.ContentLength,limit)) { return fail("invalid-body") }
