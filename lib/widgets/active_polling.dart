@@ -13,6 +13,7 @@ mixin ActivePollingMixin<T extends StatefulWidget>
   bool _isForeground = false;
   bool _isPageActive = true;
   bool _isPolling = false;
+  bool _inFlight = false;
   int _pollGeneration = 0;
 
   Duration get pollInterval;
@@ -77,6 +78,9 @@ mixin ActivePollingMixin<T extends StatefulWidget>
     }
     _isPolling = true;
     final generation = ++_pollGeneration;
+    // A hidden page may become visible before its old IPC request returns.
+    // Wait for that request instead of creating overlapping reads.
+    if (_inFlight) return;
     if (pollOnStart) {
       unawaited(_runPoll(generation));
       return;
@@ -117,6 +121,8 @@ mixin ActivePollingMixin<T extends StatefulWidget>
   }
 
   Future<void> _runPoll(int generation) async {
+    if (_inFlight || !_isCurrentPoll(generation)) return;
+    _inFlight = true;
     try {
       await poll(() => _isCurrentPoll(generation));
     } catch (error) {
@@ -125,8 +131,16 @@ mixin ActivePollingMixin<T extends StatefulWidget>
         logLevel: LogLevel.warning,
       );
     } finally {
+      _inFlight = false;
       if (_isCurrentPoll(generation)) {
         _schedulePoll(generation);
+      } else if (canPoll && _isPolling) {
+        final current = _pollGeneration;
+        if (pollOnStart) {
+          unawaited(_runPoll(current));
+        } else {
+          _schedulePoll(current);
+        }
       }
     }
   }
