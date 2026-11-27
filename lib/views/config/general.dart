@@ -615,13 +615,14 @@ class GeneralView extends ConsumerWidget {
         select: (state) => state.ipv6,
         update: (state, value) => state.copyWith(ipv6: value),
       ),
-      const HostsItem(),
-      if (system.isWindows) const MihomoWatchdogItem(),
       if (system.isWindows)
         ListItem.open(
-          title: Text(AppLocalizations.of(context).forkSmartHosts),
+          title: const Text('Hosts'),
           widget: const SmartHostsView(),
-        ),
+        )
+      else
+        const HostsItem(),
+      if (system.isWindows) const MihomoWatchdogItem(),
       ConfigToggleItem(
         title: (l) => l.appendSystemDns,
         selector: networkSettingProvider.select(
