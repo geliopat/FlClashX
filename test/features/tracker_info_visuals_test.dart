@@ -11,6 +11,8 @@ TrackerInfo _tracker({
   String host = 'example.com',
   List<String> geoIp = const [],
   String process = '',
+  String rule = 'MATCH',
+  String rulePayload = '',
 }) => TrackerInfo(
   id: '1',
   start: DateTime(2026, 1, 1),
@@ -21,8 +23,8 @@ TrackerInfo _tracker({
     destinationGeoIP: geoIp,
   ),
   chains: const [],
-  rule: 'MATCH',
-  rulePayload: '',
+  rule: rule,
+  rulePayload: rulePayload,
 );
 
 Future<void> _pump(WidgetTester tester, Widget child) async {
@@ -72,6 +74,18 @@ void main() {
     expect(color('REJECT'), NetworkTone.reject.of(context));
     expect(color('HK 01'), NetworkTone.proxy.of(context));
     expect(color('Auto'), NetworkTone.inactive.of(context));
+  });
+
+  testWidgets('long rule and payload fit a narrow table cell', (tester) async {
+    const rule = 'LONG-CUSTOM-RULE-PROVIDER-NAME';
+    const payload = 'very-long-domain-name.example.com';
+    await _pump(tester, SizedBox(
+      width: 120,
+      child: RuleLabel(_tracker(rule: rule, rulePayload: payload)),
+    ));
+    expect(find.text(rule), findsOneWidget);
+    expect(find.text(payload), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('speeds are coloured only while traffic flows', (tester) async {
