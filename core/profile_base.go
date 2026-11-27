@@ -29,6 +29,12 @@ func handleGetProfileBase(path string) (*ProfileBase, error) {
 		return nil, err
 	}
 	digest := sha256.Sum256(buf)
+	// Keep the digest tied to the file on disk but inspect the plaintext
+	// for source ownership, exactly as the profile merge does.
+	buf, err = age.DecryptBytes(buf)
+	if err != nil {
+		return nil, fmt.Errorf("decrypt config error: %w", err)
+	}
 	raw, err := unmarshalRawConfig(buf)
 	if err != nil {
 		return nil, err
