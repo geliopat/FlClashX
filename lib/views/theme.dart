@@ -1,3 +1,4 @@
+import 'package:fl_clash/ui/material_appearance.dart';
 import 'dart:async';
 import 'dart:math';
 
@@ -9,6 +10,7 @@ import 'package:fl_clash/providers/action.dart';
 import 'package:fl_clash/providers/state.dart';
 import 'package:fl_clash/providers/window_material.dart';
 import 'package:fl_clash/providers/appearance.dart';
+import 'package:fl_clash/providers/material_appearance.dart';
 import 'package:fl_clash/ui/hover_glow.dart';
 import 'package:fl_clash/ui/network_palette.dart';
 import 'package:window/window.dart' show WindowEffect;
@@ -38,6 +40,9 @@ class ThemeView extends StatelessWidget {
           const ManagedSettingsHint(keys: themePageKeys),
           if (system.isWindows && !safeModeBuild) ...const [
             _WindowMaterialItem(),
+            _SurfaceAppearanceItem(AppearanceSurface.window),
+            _SurfaceAppearanceItem(AppearanceSurface.card),
+            _SurfaceAppearanceItem(AppearanceSurface.button),
             SizedBox(height: 8),
             _WindowMaterialPreview(),
             SizedBox(height: 16),
@@ -133,6 +138,103 @@ class _WindowMaterialItem extends ConsumerWidget {
   }
 }
 
+class _SurfaceAppearanceItem extends ConsumerWidget {
+  const _SurfaceAppearanceItem(this.surface);
+  final AppearanceSurface surface;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(materialAppearanceProvider);
+    final controller = ref.read(materialAppearanceProvider.notifier);
+    final window = surface == AppearanceSurface.window;
+    final ru = Localizations.localeOf(context).languageCode == 'ru';
+    final stored = surface == AppearanceSurface.card ? settings.card : settings.button;
+    final pane = stored ?? defaultPaneAppearance;
+    final native = window ? ref.watch(windowMaterialPreferenceProvider).value ?? WindowEffect.none : pane.effect;
+    String label(WindowEffect e) => switch (e) {
+      WindowEffect.mica => 'Mica',
+      WindowEffect.micaAlt => 'Mica Alt',
+      WindowEffect.acrylic => 'Acrylic',
+      _ => ru ? 'Без прозрачности' : 'Opaque',
+    };
+    MaterialAppearance updatePane(PaneAppearance? value) => (
+      windowOpacity: settings.windowOpacity,
+      windowTint: settings.windowTint,
+      card: surface == AppearanceSurface.card ? value : settings.card,
+      button: surface == AppearanceSurface.button ? value : settings.button,
+    );
+    MaterialAppearance updateWindow({double? opacity, double? tint, bool reset = false}) => (
+      windowOpacity: reset ? null : opacity ?? settings.windowOpacity,
+      windowTint: reset ? 0.0 : tint ?? settings.windowTint,
+      card: settings.card, button: settings.button,
+    );
+    Future<void> save(MaterialAppearance value) async {
+      try {
+        await controller.save(value);
+      } catch (error) {
+        if (context.mounted) dialogs.showNotifier(error.toString(), level: MessageLevel.error);
+      }
+    }
+    Widget control(String name, double value, double max, MaterialAppearance Function(double) change) =>
+      Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text('$name: ${max == 1 ? '${(value * 100).round()}%' : value.round()}'),
+        SliderTheme(
+          data: SliderDefaultsM3(context),
+          child: Slider(
+            value: value, max: max, divisions: max == 1 ? 20 : 24,
+            onChanged: (value) => controller.preview(change(value)),
+            onChangeEnd: (value) => unawaited(save(change(value))),
+          ),
+        ),
+      ]);
+    final heading = switch (surface) {
+      AppearanceSurface.window => ru ? 'Параметры окна' : 'Window parameters',
+      AppearanceSurface.card => ru ? 'Материал карточек' : 'Card material',
+      AppearanceSurface.button => ru ? 'Материал кнопок' : 'Button material',
+    };
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          Expanded(child: Text(heading)),
+          _ResetButton(onPressed: () => unawaited(save(
+            window ? updateWindow(reset: true) : updatePane(null),
+          ))),
+        ]),
+        if (!window)
+          ListItem<WindowEffect>.options(
+            title: Text(ru ? 'Материал' : 'Material'),
+            subtitle: stored == null ? Text(ru ? 'Исходное оформление' : 'Original appearance') : null,
+            options: windowMaterials, value: pane.effect, textBuilder: label,
+            onChanged: (effect) => unawaited(save(updatePane((
+              effect: effect, opacity: pane.opacity, blur: pane.blur, tint: pane.tint,
+            )))),
+          ),
+        if (native != WindowEffect.none) ...[
+          control(ru ? 'Непрозрачность' : 'Opacity',
+            window ? windowOverlayOpacity(native, settings) : pane.opacity, 1,
+            (v) => window ? updateWindow(opacity: v) : updatePane((
+              effect: pane.effect, opacity: v, blur: pane.blur, tint: pane.tint,
+            ))),
+          control(ru ? 'Оттенок' : 'Tint',
+            window ? settings.windowTint : pane.tint, 1,
+            (v) => window ? updateWindow(tint: v) : updatePane((
+              effect: pane.effect, opacity: pane.opacity, blur: pane.blur, tint: v,
+            ))),
+          if (!window && native == WindowEffect.acrylic)
+            control(ru ? 'Размытие' : 'Blur', pane.blur, 24,
+              (v) => updatePane((
+                effect: pane.effect, opacity: pane.opacity, blur: v, tint: pane.tint,
+              ))),
+        ],
+        if (window)
+          Text(ru ? 'Размытие системного материала задаёт Windows.'
+              : 'Windows controls the native material blur.', style: context.listCaptionStyle),
+      ]),
+    );
+  }
+}
+
 class _WindowMaterialPreview extends ConsumerWidget {
   const _WindowMaterialPreview();
 
@@ -160,7 +262,9 @@ class _WindowMaterialPreview extends ConsumerWidget {
           // example uses its actual Flutter theme, not a simulated DWM panel.
           SurfaceScope(
             level: SurfaceLevel.card,
-            child: Builder(builder: (context) => Material(
+            child: Builder(builder: (context) => LocalMaterialPane(
+              appearance: MaterialAppearanceTheme.of(context)?.pane(AppearanceSurface.card)
+                  ?? defaultPaneAppearance,
               color: SurfaceLevel.card.colorOf(scheme),
               shape: AppShape.xl,
               child: Padding(
@@ -201,8 +305,8 @@ class _WindowMaterialPreview extends ConsumerWidget {
               ),
             )),
           ),
-          Text(ru ? 'Образец использует текущую тему окна. Независимые материалы карточек и кнопок пока не применяются.'
-              : 'The sample uses the current window theme. Independent card and button materials are not yet applied.',
+          Text(ru ? 'Окно использует DWM; карточки и кнопки воспроизводят эффект внутри Flutter.'
+              : 'The window uses DWM; cards and buttons reproduce the effect within Flutter.',
               style: context.listCaptionStyle),
         ],
       ),

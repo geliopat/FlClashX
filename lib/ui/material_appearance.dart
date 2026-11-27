@@ -1,0 +1,150 @@
+import 'dart:ui' show ImageFilter;
+
+import 'package:material_ui/material_ui.dart';
+import 'package:window/window.dart' show WindowEffect;
+
+enum AppearanceSurface { window, card, button }
+
+typedef PaneAppearance = ({
+  WindowEffect effect,
+  double opacity,
+  double blur,
+  double tint,
+});
+
+typedef MaterialAppearance = ({
+  double? windowOpacity,
+  double windowTint,
+  PaneAppearance? card,
+  PaneAppearance? button,
+});
+
+const defaultMaterialAppearance = (
+  windowOpacity: null as double?,
+  windowTint: 0.0,
+  card: null as PaneAppearance?,
+  button: null as PaneAppearance?,
+);
+
+const defaultPaneAppearance = (
+  effect: WindowEffect.none,
+  opacity: .85,
+  blur: 12.0,
+  tint: .12,
+);
+
+double appearanceNumber(Object? raw, double fallback, double max) =>
+    raw is num && raw.isFinite ? raw.toDouble().clamp(0.0, max).toDouble() : fallback;
+
+WindowEffect paneEffect(Object? raw) => switch (raw) {
+  'mica' => WindowEffect.mica,
+  'micaAlt' => WindowEffect.micaAlt,
+  'acrylic' => WindowEffect.acrylic,
+  _ => WindowEffect.none,
+};
+
+PaneAppearance? decodePane(Object? raw) {
+  if (raw is! Map) return null;
+  return (
+    effect: paneEffect(raw['effect']),
+    opacity: appearanceNumber(raw['opacity'], .85, 1),
+    blur: appearanceNumber(raw['blur'], 12, 24),
+    tint: appearanceNumber(raw['tint'], .12, 1),
+  );
+}
+
+MaterialAppearance decodeMaterialAppearance(Map<String, Object?> raw) => (
+  windowOpacity: raw['windowOpacity'] is num
+      ? appearanceNumber(raw['windowOpacity'], .2, 1)
+      : null,
+  windowTint: appearanceNumber(raw['windowTint'], 0, 1),
+  card: decodePane(raw['card']),
+  button: decodePane(raw['button']),
+);
+
+Map<String, Object?> encodeMaterialAppearance(MaterialAppearance value) {
+  Object? pane(PaneAppearance? p) => p == null ? null : {
+    'effect': p.effect.name, 'opacity': p.opacity, 'blur': p.blur, 'tint': p.tint,
+  };
+  return {
+    'windowOpacity': value.windowOpacity,
+    'windowTint': value.windowTint,
+    'card': pane(value.card), 'button': pane(value.button),
+  };
+}
+
+double windowOverlayOpacity(WindowEffect effect, MaterialAppearance settings) =>
+    effect == WindowEffect.none ? 1 : settings.windowOpacity ??
+        (effect == WindowEffect.acrylic ? .32 : .20);
+
+/// Local panes emulate the selected material within the Flutter scene. They
+/// are not separate DWM backdrops and cannot sample the desktop independently.
+Color paneColor(Color base, ColorScheme scheme, PaneAppearance appearance) {
+  if (appearance.effect == WindowEffect.none) return base.withValues(alpha: 1);
+  final tintStrength = appearance.tint *
+      (appearance.effect == WindowEffect.micaAlt ? .30 : .15);
+  return Color.lerp(base.withValues(alpha: 1), scheme.primary, tintStrength)!
+      .withValues(alpha: appearance.opacity);
+}
+
+class MaterialAppearanceTheme extends ThemeExtension<MaterialAppearanceTheme> {
+  const MaterialAppearanceTheme(this.settings);
+  final MaterialAppearance settings;
+
+  static MaterialAppearanceTheme? of(BuildContext context) =>
+      Theme.of(context).extension<MaterialAppearanceTheme>();
+
+  PaneAppearance? pane(AppearanceSurface surface) => switch (surface) {
+    AppearanceSurface.window => null,
+    AppearanceSurface.card => settings.card,
+    AppearanceSurface.button => settings.button,
+  };
+
+  @override
+  MaterialAppearanceTheme copyWith({MaterialAppearance? settings}) =>
+      MaterialAppearanceTheme(settings ?? this.settings);
+
+  @override
+  MaterialAppearanceTheme lerp(MaterialAppearanceTheme? other, double t) =>
+      other == null || t < .5 ? this : other;
+
+  @override
+  bool operator ==(Object other) =>
+      other is MaterialAppearanceTheme && settings == other.settings;
+
+  @override
+  int get hashCode => settings.hashCode;
+}
+
+/// Use a single implementation for settings samples and real controls.
+class LocalMaterialPane extends StatelessWidget {
+  const LocalMaterialPane({
+    super.key, required this.appearance, required this.color,
+    required this.shape, required this.child,
+  });
+
+  final PaneAppearance appearance;
+  final Color color;
+  final OutlinedBorder shape;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final fill = paneColor(color, Theme.of(context).colorScheme, appearance);
+    final content = DecoratedBox(
+      decoration: ShapeDecoration(color: fill, shape: shape),
+      child: child,
+    );
+    // Avoid a backdrop filter for Mica-like layers, fully opaque panes or
+    // zero blur. BackdropFilter is clipped to the pane, not the whole window.
+    if (appearance.effect != WindowEffect.acrylic ||
+        appearance.blur == 0 || fill.a == 1) return content;
+    return ClipPath(
+      clipper: ShapeBorderClipper(shape: shape, textDirection: Directionality.of(context)),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: appearance.blur, sigmaY: appearance.blur),
+        child: content,
+      ),
+    );
+  }
+}

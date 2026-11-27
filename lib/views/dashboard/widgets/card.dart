@@ -1,3 +1,4 @@
+import 'package:fl_clash/ui/material_appearance.dart';
 import 'dart:math' as math;
 import 'dart:ui' show ImageFilter, lerpDouble;
 
@@ -57,15 +58,8 @@ class DashboardCard extends StatelessWidget {
       padding: padding ?? dashboardCardPadding(density),
       child: child,
     );
-    return Semantics(
-      container: true,
-      label: semanticLabel,
-      child: FrostedSurface(
-        clipBehavior: clipBehavior,
-        color: DashboardColors.of(context).card,
-        radius: AppRadius.all(radius),
-        shadows: DashboardShadows.e1(context),
-        child: Material(
+    final appearance = MaterialAppearanceTheme.of(context)?.pane(AppearanceSurface.card);
+    final material = Material(
           type: MaterialType.transparency,
           child: onTap == null
               ? content
@@ -78,7 +72,30 @@ class DashboardCard extends StatelessWidget {
                     child: content,
                   ),
                 ),
-        ),
+        );
+    return Semantics(
+      container: true,
+      label: semanticLabel,
+      child: SurfaceScope(
+        level: SurfaceLevel.card,
+        child: appearance == null
+            ? FrostedSurface(
+                clipBehavior: clipBehavior,
+                color: DashboardColors.of(context).card,
+                radius: AppRadius.all(radius),
+                shadows: DashboardShadows.e1(context),
+                child: material,
+              )
+            : LocalMaterialPane(
+                appearance: appearance,
+                color: DashboardColors.of(context).card,
+                shape: shape,
+                child: clipBehavior == Clip.none ? material : ClipPath(
+                  clipper: ShapeBorderClipper(shape: shape),
+                  clipBehavior: clipBehavior,
+                  child: material,
+                ),
+              ),
       ),
     );
   }

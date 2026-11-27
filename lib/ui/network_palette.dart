@@ -50,7 +50,11 @@ enum NetworkTone {
   static final _cache = <Color, Map<NetworkTone, Color>>{};
 
   Color of(BuildContext context) {
-    final surface = context.surfaceLevel.colorOf(context.colorScheme);
+    final rawSurface = context.surfaceLevel.colorOf(context.colorScheme);
+    // Resolve alpha against a theme-matched backdrop estimate rather than
+    // treating a translucent RGB value as a measured desktop pixel.
+    final surface = Color.alphaBlend(rawSurface, context.colorScheme.brightness == Brightness.dark
+        ? const Color(0xFF181818) : const Color(0xFFF5F5F5));
     if (!_cache.containsKey(surface) && _cache.length >= 32) {
       _cache.remove(_cache.keys.first);
     }

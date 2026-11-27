@@ -8,6 +8,8 @@ import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/providers/window_material.dart';
 import 'package:fl_clash/providers/appearance.dart';
+import 'package:fl_clash/providers/material_appearance.dart';
+import 'package:fl_clash/ui/material_appearance.dart';
 import 'package:fl_clash/ui/hover_glow.dart';
 import 'package:window/window.dart' show WindowEffect;
 import 'package:fl_clash/state.dart';
@@ -54,15 +56,17 @@ ThemeData watchAppTheme(WidgetRef ref, Brightness brightness) {
   final material = system.isWindows && !safeModeBuild
       ? ref.watch(windowMaterialProvider).value ?? WindowEffect.none
       : WindowEffect.none;
-  final alpha = material == WindowEffect.mica || material == WindowEffect.micaAlt
-      ? 0.20
-      : 0.32;
+  final appearance = system.isWindows && !safeModeBuild
+      ? ref.watch(materialAppearanceProvider) : defaultMaterialAppearance;
+  final alpha = windowOverlayOpacity(material, appearance);
+  Color overlay(Color base) => Color.lerp(base, baseScheme.primary,
+      appearance.windowTint * .15)!.withValues(alpha: alpha);
   final colorScheme = material == WindowEffect.none
       ? baseScheme
       : baseScheme.copyWith(
-          surface: baseScheme.surface.withValues(alpha: alpha),
+          surface: overlay(baseScheme.surface),
           surfaceContainer: brightness == Brightness.light
-              ? baseScheme.surfaceContainer.withValues(alpha: alpha)
+              ? overlay(baseScheme.surfaceContainer)
               : baseScheme.surfaceContainer,
         );
   final locales = [
@@ -74,6 +78,7 @@ ThemeData watchAppTheme(WidgetRef ref, Brightness brightness) {
     fontFamily: fontFamily,
     colorScheme: colorScheme,
     glowIntensity: glowIntensity,
+    appearance: appearance,
     locales: locales.join(','),
   );
   if (_appThemes[brightness] case (
@@ -95,6 +100,7 @@ ThemeData watchAppTheme(WidgetRef ref, Brightness brightness) {
     ),
     extensions: [
       HoverGlowTheme(glowIntensity),
+      if (system.isWindows && !safeModeBuild) MaterialAppearanceTheme(appearance),
       if (brightness == Brightness.dark)
         ElevatedColorScheme(baseScheme.elevated),
     ],

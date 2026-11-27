@@ -1,3 +1,4 @@
+import 'package:fl_clash/ui/material_appearance.dart';
 import 'dart:math' as math;
 
 import 'package:fl_clash/ui/context.dart';
@@ -196,6 +197,18 @@ class CommonCard extends StatelessWidget {
     Color background,
     OutlinedBorder shape,
   ) {
+    final appearance = MaterialAppearanceTheme.of(context)?.pane(AppearanceSurface.card);
+    if (appearance != null && !isError && !_filled && frosts) {
+      return (
+        fill: Colors.transparent,
+        builder: (context, states, child) => LocalMaterialPane(
+          appearance: appearance,
+          color: background,
+          shape: shape,
+          child: child ?? const SizedBox.shrink(),
+        ),
+      );
+    }
     if (!LiquidGlassScope.of(context) || isError || _filled) {
       return (fill: background, builder: null);
     }

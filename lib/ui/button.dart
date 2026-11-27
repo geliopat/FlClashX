@@ -1,3 +1,4 @@
+import 'package:fl_clash/ui/material_appearance.dart';
 import 'package:fl_clash/ui/hover_glow.dart';
 import 'dart:math' as math;
 
@@ -425,14 +426,27 @@ class TonalButtonTheme extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = context.colorScheme;
-    final goo = !grouped && GooSurface.of(context);
-    final paned = glass && !grouped && !goo;
-    final fill = grouped || paned || goo
+    final appearance = grouped ? null : MaterialAppearanceTheme.of(context)?.pane(AppearanceSurface.button);
+    final goo = appearance == null && !grouped && GooSurface.of(context);
+    final paned = appearance == null && glass && !grouped && !goo;
+    final fill = grouped || paned || goo || appearance != null
         ? Colors.transparent
         : context.raisedSurfaceLevel.colorOf(colorScheme);
     final foreground = colorScheme.onSurface;
     final disabledForeground = foreground.withValues(alpha: 0.38);
     ButtonStyle? paneOf(bool Function(Set<WidgetState> states) tinted) {
+      if (appearance != null) {
+        return ButtonStyle(
+          backgroundColor: const WidgetStatePropertyAll(Colors.transparent),
+          backgroundBuilder: (context, states, child) => LocalMaterialPane(
+            appearance: appearance,
+            color: tinted(states) ? colorScheme.primaryContainer
+                : context.raisedSurfaceLevel.colorOf(colorScheme),
+            shape: AppShape.full,
+            child: child ?? const SizedBox.shrink(),
+          ),
+        );
+      }
       if (!paned) {
         return null;
       }
@@ -508,13 +522,13 @@ class TonalButtonTheme extends StatelessWidget {
         data: FilledButtonThemeData(
           style: filledFeedback.merge(
             FilledButton.styleFrom(
-              backgroundColor: grouped ? fill : null,
+              backgroundColor: grouped || appearance != null ? fill : null,
               foregroundColor: grouped
                   ? foreground
                   : paned
                   ? colorScheme.onPrimary
                   : null,
-              disabledBackgroundColor: grouped ? fill : null,
+              disabledBackgroundColor: grouped || appearance != null ? fill : null,
               disabledForegroundColor: grouped ? disabledForeground : null,
               minimumSize: Size.square(size.button),
               padding: const EdgeInsets.symmetric(horizontal: 14),
