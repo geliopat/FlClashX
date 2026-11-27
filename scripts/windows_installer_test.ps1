@@ -14,6 +14,7 @@ $uninstaller = $null
 $liveApp = $null
 $ownCore = $null
 $foreignCore = $null
+$driverLock = $null
 function Assert([bool]$condition, [string]$message) {
   if (!$condition) { throw $message }
 }
@@ -65,9 +66,18 @@ try {
   $foreignCore = Start-Process (Join-Path $foreign 'FlClashCore.exe') -ArgumentList '-t','127.0.0.1' -WindowStyle Hidden -PassThru
   Start-Sleep -Seconds 1
   Assert (!$ownCore.HasExited -and !$foreignCore.HasExited) 'Process probes must be running'
+  # Reproduce the in-use identical driver case: reads are allowed, delete
+  # and writes are denied. The upgrade must leave the exact file untouched.
+  $driverPath = Join-Path $target 'zapret\WinDivert64.sys'
+  $driverHash = (Get-FileHash -LiteralPath $driverPath -Algorithm SHA256).Hash
+  $driverLock = [IO.File]::Open($driverPath, [IO.FileMode]::Open,
+    [IO.FileAccess]::Read, [IO.FileShare]::Read)
   $upgradeLog = Join-Path $root 'upgrade.log'
   $process = Start-Process -FilePath $Installer -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=""$target""","/LOG=""$upgradeLog""") -Wait -PassThru
   if ($process.ExitCode -ne 0) { Get-Content $upgradeLog -ErrorAction SilentlyContinue; throw "Upgrade exit code: $($process.ExitCode)" }
+  $driverLock.Dispose(); $driverLock = $null
+  Assert ((Get-FileHash -LiteralPath $driverPath -Algorithm SHA256).Hash -eq $driverHash) 'Identical driver changed'
+  Assert ((Get-Content -LiteralPath $upgradeLog -Raw).Contains('WinDivert64.sys matches bundled SHA-256')) 'Driver preservation was not exercised'
   $liveApp.Refresh(); $ownCore.Refresh(); $foreignCore.Refresh()
   Assert ($liveApp.HasExited) 'Running application survived upgrade'
   Assert ($ownCore.HasExited) 'Owned orphan Core survived upgrade'
@@ -85,6 +95,7 @@ try {
   CheckForeign
   Write-Host 'Installer and uninstaller passed; FlClashX sentinels preserved.'
 } finally {
+  if ($driverLock) { $driverLock.Dispose() }
   foreach ($probe in @($liveApp, $ownCore, $foreignCore)) {
     if ($probe) {
       $probe.Refresh()

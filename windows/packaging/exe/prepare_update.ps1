@@ -1,5 +1,5 @@
 param(
-  [Parameter(Mandatory=$true)][ValidateSet('Stop','Release')][string]$Phase,
+  [Parameter(Mandatory=$true)][ValidateSet('Stop','Release','CheckDriver')][string]$Phase,
   [Parameter(Mandatory=$true)][string]$InstallDir,
   [Parameter(Mandatory=$true)][string]$AppExe,
   [Parameter(Mandatory=$true)][string]$ServiceName,
@@ -75,6 +75,21 @@ function AskAppToExit {
   finally { if ($client) { $client.Dispose() } }
 }
 try {
+  if ($Phase -eq 'CheckDriver') {
+    # Never stop/delete a global WinDivert service: other clients may share it.
+    # An in-use or inaccessible changed driver must block setup before copying.
+    $driver = Join-Path $prefix 'zapret\WinDivert64.sys'
+    if (!(Test-Path -LiteralPath $driver)) { exit 0 }
+    if (!(WaitUntil {
+      try {
+        $handle = [IO.File]::Open($driver, [IO.FileMode]::Open,
+          [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+        $handle.Dispose()
+        return $true
+      } catch { return $false }
+    } 10)) { throw 'WinDivert64.sys cannot be safely replaced; restart Windows' }
+    exit 0
+  }
   if ($Phase -eq 'Release') {
     if (!(Test-Path -LiteralPath $StateFile)) { exit 0 }
     $saved = Get-Content -LiteralPath $StateFile -Raw | ConvertFrom-Json
