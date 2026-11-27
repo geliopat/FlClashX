@@ -1,6 +1,8 @@
 import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/views/zapret_logs.dart';
 import 'package:fl_clash/views/resources.dart';
+import 'package:fl_clash/ui/title_tabs.dart';
+import 'package:fl_clash/views/config/general.dart' show MihomoWatchdogItem;
 import 'package:fl_clash/l10n/l10n.dart';
 import 'dart:convert';
 import 'dart:io';
@@ -27,6 +29,7 @@ class DiagnosticsView extends ConsumerStatefulWidget {
 
 class _DiagnosticsViewState extends ConsumerState<DiagnosticsView> {
   bool _busy = false;
+  int _tab = 0;
   final _results = <String, String>{};
   Future<String> _windowsStatus(String command) async {
     final root = Platform.environment['SystemRoot'];
@@ -130,10 +133,45 @@ class _DiagnosticsViewState extends ConsumerState<DiagnosticsView> {
     }
   }
 
+  Widget _watchdog(BuildContext context) {
+    final zapret = ref.watch(zapretControllerProvider);
+    return ListView(
+      padding: EdgeInsets.fromLTRB(16, context.sectionsTopPadding, 16, 16 + context.bottomInset),
+      children: [
+        generateSection(items: [
+          const MihomoWatchdogItem(),
+          ListItem(
+            title: const Text('Watchdog Zapret'),
+            subtitle: Text(AppLocalizations.of(context).forkWatchdogHint),
+            trailing: Switch(
+              value: zapret.watchdog,
+              onChanged: zapret.busy ? null : ref.read(zapretControllerProvider.notifier).setWatchdog,
+            ),
+          ),
+        ]),
+      ],
+    );
+  }
+
   @override
-  Widget build(BuildContext context) => CommonScaffold(
-    title: AppLocalizations.of(context).forkDiagnostics,
-    body: ListView(
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return CommonScaffold(
+      title: l.forkDiagnostics,
+      titleWidget: PageTitleTabs(
+        labels: [l.forkDiagnostics, 'Watchdog', l.forkCrashHistory],
+        selectedIndex: _tab,
+        onSelected: (index) => setState(() => _tab = index),
+      ),
+      body: Builder(builder: (context) => switch (_tab) {
+        1 => _watchdog(context),
+        2 => const ZapretLogsView(crashOnly: true, embedded: true),
+        _ => _diagnostics(context),
+      }),
+    );
+  }
+
+  Widget _diagnostics(BuildContext context) => ListView(
       padding: const EdgeInsets.symmetric(horizontal: 16).copyWith(
         top: context.sectionsTopPadding,
         bottom: 16 + context.bottomInset,
@@ -144,11 +182,6 @@ class _DiagnosticsViewState extends ConsumerState<DiagnosticsView> {
             title: Text(context.appLocalizations.resources),
             leading: const GlyphIcon(AppGlyphs.resources),
             widget: const ResourcesView(),
-          ),
-          ListItem.open(
-            title: Text(AppLocalizations.of(context).forkCrashHistory),
-            leading: const GlyphIcon(AppGlyphs.warning),
-            widget: const ZapretLogsView(crashOnly: true),
           ),
           ListItem(title: Text(AppLocalizations.of(context).forkRunDiagnostics),
             onTap: _busy ? null : _run,
@@ -176,6 +209,5 @@ class _DiagnosticsViewState extends ConsumerState<DiagnosticsView> {
             ListItem(title: Text(entry.key), subtitle: Text(entry.value)),
         ]),
       ],
-    ),
   );
 }
