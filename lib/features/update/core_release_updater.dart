@@ -6,6 +6,14 @@ import 'package:fl_clash/features/update/asset.dart';
 import 'package:fl_clash/features/update/core_release_manifest.dart';
 import 'package:fl_clash/features/update/download.dart';
 
+final class CoreReleaseOffer {
+  final CoreReleaseManifest manifest;
+  final List<int> manifestBytes;
+
+  CoreReleaseOffer._(this.manifest, List<int> bytes)
+      : manifestBytes = List.unmodifiable(bytes);
+}
+
 final class PreparedCoreRelease {
   final CoreReleaseManifest manifest;
   final List<int> manifestBytes;
@@ -32,10 +40,9 @@ final class CoreReleaseUpdater {
 
   Set<String> _hosts(Uri uri) => {...updateHosts, uri.host.toLowerCase()};
 
-  Future<PreparedCoreRelease> download({
+  Future<CoreReleaseOffer> check({
     String url = defaultCoreManifestUrl,
     CancelToken? cancelToken,
-    UpdateProgress? onProgress,
   }) async {
     final uri = Uri.tryParse(url);
     if (uri == null || !isAllowedUpdateUri(uri, hosts: _hosts(uri))) {
@@ -45,6 +52,27 @@ final class CoreReleaseUpdater {
       uri, limit: coreManifestMaxBytes, hosts: _hosts(uri),
       cancelToken: cancelToken,
     );
+    final manifest = await CoreReleaseManifest.verify(bytes);
+    return CoreReleaseOffer._(manifest, bytes);
+  }
+
+  Future<PreparedCoreRelease> download({
+    String url = defaultCoreManifestUrl,
+    CancelToken? cancelToken,
+    UpdateProgress? onProgress,
+  }) async => downloadOffer(
+    await check(url: url, cancelToken: cancelToken),
+    cancelToken: cancelToken, onProgress: onProgress,
+  );
+
+  Future<PreparedCoreRelease> downloadOffer(
+    CoreReleaseOffer offer, {
+    CancelToken? cancelToken,
+    UpdateProgress? onProgress,
+  }) async {
+    // Download the exact verified offer the user approved, not a second
+    // potentially changed /latest manifest.
+    final bytes = offer.manifestBytes;
     final manifest = await CoreReleaseManifest.verify(bytes);
     final file = await downloader.download(
       UpdateAsset(
