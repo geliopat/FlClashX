@@ -1,6 +1,8 @@
 import 'package:fl_clash/ui/icons/icons.dart';
 import 'dart:async';
 import 'dart:convert';
+import 'dart:collection';
+import 'package:flutter/foundation.dart' show compute;
 
 import 'package:fl_clash/core/desktop/helper_client.dart';
 import 'package:fl_clash/common/common.dart';
@@ -29,6 +31,37 @@ bool isRecoveryJournalMessage(String message) {
 
 typedef _JournalEntry = ({HelperZapretLog log, String component});
 
+const journalViewLimit = 10000;
+
+bool sameZapretLogs(List<HelperZapretLog> a, List<HelperZapretLog> b) {
+  if (identical(a, b)) return true;
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i].time != b[i].time || a[i].level != b[i].level ||
+        a[i].message != b[i].message) return false;
+  }
+  return true;
+}
+
+List<_JournalEntry> _parseArchive(String archive) {
+  final events = Queue<_JournalEntry>();
+  for (final line in const LineSplitter().convert(archive)) {
+    if (line.isEmpty) continue;
+    try {
+      final decoded = jsonDecode(line);
+      final log = HelperZapretLog.fromJson(decoded);
+      final component = decoded is Map
+          ? decoded['component']?.toString() ?? 'Zapret'
+          : 'Zapret';
+      events.addLast((log: log, component: component));
+      if (events.length > journalViewLimit) events.removeFirst();
+    } catch (_) {
+      // Keep complete entries when the last line is torn.
+    }
+  }
+  return events.toList().reversed.toList(growable: false);
+}
+
 class ZapretLogsView extends StatefulWidget {
   const ZapretLogsView({super.key, this.journalOnly = false, this.crashOnly = false, this.recoveryOnly = false, this.embedded = false})
       : assert(!(journalOnly && crashOnly) && !(journalOnly && recoveryOnly) && !(crashOnly && recoveryOnly));
@@ -47,6 +80,8 @@ class _ZapretLogsViewState extends State<ZapretLogsView>
   late final int _tab = widget.recoveryOnly ? 3 : widget.journalOnly ? 2 : widget.crashOnly ? 1 : 0;
   static const _filters = ['all', 'info', 'error', 'stderr', 'debug'];
   bool _loading = false;
+  bool _clearing = false;
+  int _logGeneration = 0;
   bool? _sectionActive;
 
   @override
@@ -76,15 +111,17 @@ class _ZapretLogsViewState extends State<ZapretLogsView>
       if (isCurrent()) _reloadArchive();
       return;
     }
-    if (_loading || !isCurrent()) return;
+    if (_loading || _clearing || !isCurrent()) return;
+    final generation = _logGeneration;
     _loading = true;
     try {
       final logs = await helperClient.zapretLogs();
-      if (isCurrent() && _tab == 0) {
+      if (isCurrent() && _tab == 0 && generation == _logGeneration &&
+          (_error != null || !sameZapretLogs(_logs, logs))) {
         setState(() { _logs = logs; _error = null; });
       }
     } catch (error) {
-      if (isCurrent() && _tab == 0) {
+      if (isCurrent() && _tab == 0 && generation == _logGeneration && _error != error.toString()) {
         setState(() => _error = error.toString());
       }
     } finally {
@@ -105,23 +142,22 @@ class _ZapretLogsViewState extends State<ZapretLogsView>
         .whenComplete(() => _readingArchive = false));
   }
 
-  Future<List<_JournalEntry>> _loadArchive() async {
-    final archive = await helperClient.zapretLogArchive();
-    final events = <_JournalEntry>[];
-    for (final line in const LineSplitter().convert(archive)) {
-      if (line.isEmpty) continue;
-      try {
-        final decoded = jsonDecode(line);
-        final log = HelperZapretLog.fromJson(decoded);
-        final component = decoded is Map
-            ? decoded['component']?.toString() ?? 'Zapret'
-            : 'Zapret';
-        events.add((log: log, component: component));
-      } catch (_) {
-        // An interrupted final write cannot hide other events.
-      }
+  Future<List<_JournalEntry>> _loadArchive() async =>
+      compute(_parseArchive, await helperClient.zapretLogArchive());
+
+  Future<void> _clearLive() async {
+    if (_clearing || _tab != 0) return;
+    setState(() => _clearing = true);
+    _logGeneration++;
+    try {
+      // Helper clears only ZAPRET_LOGS (the live ring), not the disk journal.
+      await helperClient.clearZapretLogs();
+      if (mounted) setState(() { _logs = const []; _error = null; });
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _clearing = false);
     }
-    return events.reversed.toList(growable: false);
   }
 
   bool _matches(_JournalEntry entry) {
@@ -167,6 +203,12 @@ class _ZapretLogsViewState extends State<ZapretLogsView>
             leading: const GlyphIcon(AppGlyphs.openExternal),
             onTap: () async => system.openDirectory(await zapretFileLogger.directoryPath),
           ),
+        if (_tab == 0)
+          ListItem(
+            leading: const GlyphIcon(AppGlyphs.clearAll),
+            title: Text(Localizations.localeOf(context).languageCode == 'ru' ? 'Очистить отображаемый журнал' : 'Clear displayed log'),
+            onTap: _clearing ? null : _clearLive,
+          ),
         if (widget.embedded) ...[
           if (widget.crashOnly)
             ListItem(
@@ -197,7 +239,8 @@ class _ZapretLogsViewState extends State<ZapretLogsView>
         if (error != null)
           ListItem(title: Text(l.forkLogReadError), subtitle: Text(error)),
       ],
-      footer: _tab == 0 ? l.forkLogFooter : null,
+      footer: _tab == 0 ? l.forkLogFooter :
+          (Localizations.localeOf(context).languageCode == 'ru' ? 'До $journalViewLimit последних записей. Архив на диске не изменяется.' : 'Up to $journalViewLimit recent entries. Disk archives are unchanged.'),
     );
   }
 
