@@ -212,7 +212,7 @@ jobs:
 
       - name: Run FlClashZ UI regression tests
         timeout-minutes: 15
-        run: flutter test test/icons/glyph_painter_test.dart test/providers/window_material_test.dart test/views/about_test.dart test/views/dashboard/provider_mode_test.dart test/views/dashboard/widget_registry_test.dart test/views/dashboard/wide_test.dart test/widgets/core_status_button_test.dart test/views/connection_feeds_test.dart test/widgets/sidebar_test.dart test/features/tracker_info_visuals_test.dart test/ui/network_palette_test.dart test/ui/hover_glow_test.dart test/ui/material_appearance_test.dart test/providers/material_appearance_test.dart test/providers/appearance_test.dart
+        run: flutter test test/icons/glyph_painter_test.dart test/providers/window_material_test.dart test/views/about_test.dart test/views/dashboard/provider_mode_test.dart test/views/dashboard/widget_registry_test.dart test/views/dashboard/wide_test.dart test/widgets/core_status_button_test.dart test/views/connection_feeds_test.dart test/widgets/sidebar_test.dart test/features/tracker_info_visuals_test.dart test/ui/network_palette_test.dart test/ui/title_content_mask_test.dart test/ui/hover_glow_test.dart test/ui/material_appearance_test.dart test/providers/material_appearance_test.dart test/providers/appearance_test.dart
 
       - name: Run window restoration navigation regression
         timeout-minutes: 5

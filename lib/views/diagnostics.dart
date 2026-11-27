@@ -1,5 +1,6 @@
 import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/views/zapret_logs.dart';
+import 'package:fl_clash/views/resources.dart';
 import 'package:fl_clash/l10n/l10n.dart';
 import 'dart:convert';
 import 'dart:io';
@@ -139,6 +140,11 @@ class _DiagnosticsViewState extends ConsumerState<DiagnosticsView> {
       ),
       children: [
         generateSection(items: [
+          ListItem.open(
+            title: Text(context.appLocalizations.resources),
+            leading: const GlyphIcon(AppGlyphs.resources),
+            widget: const ResourcesView(),
+          ),
           ListItem.open(
             title: Text(AppLocalizations.of(context).forkCrashHistory),
             leading: const GlyphIcon(AppGlyphs.warning),

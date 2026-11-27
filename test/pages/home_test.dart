@@ -250,10 +250,14 @@ void main() {
     await tester.pumpAndSettle();
 
     Future<void> select(Glyph glyph, PageLabel label) async {
-      await tester.tap(find.descendant(
+      final icon = find.descendant(
         of: find.byType(NavigationSidebar),
         matching: _glyph(glyph),
-      ));
+      ).hitTestable();
+      final target = label == PageLabel.connections && icon.evaluate().isEmpty
+          ? find.byKey(const ValueKey('sidebar-traffic')).hitTestable()
+          : icon;
+      await tester.tap(target);
       await tester.pumpAndSettle();
       expect(container.read(currentPageLabelProvider), label);
       expect(find.text('restored:${label.name}').hitTestable(), findsOneWidget);

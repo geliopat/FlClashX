@@ -38,6 +38,8 @@ Widget _sidebar({
   Size windowControls = Size.zero,
   bool pinLastDestination = false,
   Widget? footer,
+  Set<int> footerDestinations = const {},
+  double height = 400,
   EdgeInsets safePadding = EdgeInsets.zero,
 }) {
   return TestApp(
@@ -45,7 +47,7 @@ Widget _sidebar({
       body: Row(
         children: [
           SizedBox(
-            height: 400,
+            height: height,
             child: Builder(
               builder: (context) => MediaQuery(
                 data: MediaQuery.of(context).copyWith(padding: safePadding),
@@ -58,6 +60,7 @@ Widget _sidebar({
                   windowControls: windowControls,
                   pinLastDestination: pinLastDestination,
                   footer: footer,
+                  footerDestinations: footerDestinations,
                 ),
               ),
             ),
@@ -107,6 +110,14 @@ Finder _rowTooltip(String message) => find.byWidgetPredicate(
 );
 
 void main() {
+  testWidgets('expanded statistics replace the duplicate destination but compact keeps it', (tester) async {
+    await tester.pumpWidget(_sidebar(height: 550, footer: const Text('Traffic'), footerDestinations: {1}));
+    await tester.pumpAndSettle();
+    expect(find.text(_destinations[1].label), findsNothing);
+    await tester.pumpWidget(_sidebar(height: 550, expanded: false, footer: const Text('Traffic'), footerDestinations: {1}));
+    await tester.pumpAndSettle();
+    expect(_glyph(_destinations[1].glyph), findsOneWidget);
+  });
   testWidgets('statistics sidebar fits labels instead of a fixed width', (tester) async {
     await tester.pumpWidget(_sidebar(
       footer: const Text('Traffic'),

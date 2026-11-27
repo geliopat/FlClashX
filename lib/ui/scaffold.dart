@@ -14,6 +14,7 @@ import 'package:fl_clash/ui/pop_scope.dart';
 import 'package:fl_clash/ui/shape.dart';
 import 'package:fl_clash/ui/surface.dart';
 import 'package:fl_clash/ui/typography.dart';
+import 'package:fl_clash/ui/title_content_mask.dart';
 import 'package:fl_clash/ui/view_scope.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/foundation.dart';
@@ -141,6 +142,31 @@ class CommonScaffoldState extends State<CommonScaffold>
   final _searchLeadingKey = GlobalKey();
   final _searchFieldKey = GlobalKey();
   final _barKey = GlobalKey();
+  final _titleAnchorKey = GlobalKey();
+  final _bodyMaskKey = GlobalKey();
+  final _titleBounds = ValueNotifier<Rect?>(null);
+  bool _titleMeasureQueued = false;
+
+  bool get _desktopTitleMask => Theme.of(context).platform == TargetPlatform.windows &&
+      !ViewScope.isMobileOf(context);
+
+  void _queueTitleMeasure() {
+    if (_titleMeasureQueued) return;
+    _titleMeasureQueued = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _titleMeasureQueued = false;
+      if (!mounted) return;
+      final anchor = _titleAnchorKey.currentContext?.findRenderObject();
+      final body = _bodyMaskKey.currentContext?.findRenderObject();
+      Rect? next;
+      if (!_isSearch && !_sorting && anchor is RenderBox && body is RenderBox &&
+          anchor.attached && body.attached && anchor.hasSize && body.hasSize) {
+        final origin = body.globalToLocal(anchor.localToGlobal(Offset.zero));
+        next = origin & anchor.size;
+      }
+      if (_titleBounds.value != next) _titleBounds.value = next;
+    });
+  }
   var _searchFillsBar = true;
   var _searchDocked = false;
   var _sorting = false;
@@ -352,6 +378,7 @@ class CommonScaffoldState extends State<CommonScaffold>
     _searchCovered.dispose();
     _loadingNotifier.dispose();
     _keywordsNotifier.dispose();
+    _titleBounds.dispose();
     super.dispose();
   }
 
@@ -553,7 +580,7 @@ class CommonScaffoldState extends State<CommonScaffold>
   }
 
   Widget _buildTitle({required bool compact}) {
-    final title = widget.titleWidget ??
+    final rawTitle = widget.titleWidget ??
         (widget.titleMenuItems.isEmpty
             ? Text(widget.title!)
             : CommonPopupBox(
@@ -566,6 +593,12 @@ class CommonScaffoldState extends State<CommonScaffold>
                 popupBuilder: (_) =>
                     CommonPopupMenu(items: widget.titleMenuItems),
               ));
+    final title = !compact && _desktopTitleMask
+        ? NotificationListener<SizeChangedLayoutNotification>(
+            onNotification: (_) { _queueTitleMeasure(); return false; },
+            child: SizeChangedLayoutNotifier(key: _titleAnchorKey, child: rawTitle),
+          )
+        : rawTitle;
     final caption = IntegratedWindowHeaderScope.maybeOf(context);
     if (compact || caption == null || caption.clearance == 0) return title;
     Widget drag(Widget child) => GestureDetector(
@@ -774,6 +807,10 @@ class CommonScaffoldState extends State<CommonScaffold>
       widget.backgroundColor ?? SurfaceLevel.page.colorOf(context.colorScheme);
 
   Widget _buildFloatingHeader(Widget appBar) {
+    if (_desktopTitleMask) {
+      _queueTitleMeasure();
+      if (!_isSearch && !_sorting) return appBar;
+    }
     final top = MediaQuery.paddingOf(context).top;
     final backdrop = PageBackdropScope.of(context);
     return FloatingHeader(
@@ -1001,16 +1038,28 @@ class CommonScaffoldState extends State<CommonScaffold>
     if (!isCompact) {
       final docked = form.dockedSearch;
       final backdrop = PageBackdropScope.of(context);
+      final maskTitle = _desktopTitleMask;
+      if (maskTitle) _queueTitleMeasure();
+      final scrollContent = maskTitle
+          ? SizedBox.expand(
+              key: _bodyMaskKey,
+              child: ValueListenableBuilder<Rect?>(
+                valueListenable: _titleBounds,
+                child: content,
+                builder: (_, bounds, child) => TitleContentMask(title: bounds, child: child!),
+              ),
+            )
+          : content;
       final scaffold = Scaffold(
         appBar: appBar,
         extendBodyBehindAppBar: barFloats,
         body: _BodyScope(
           child: docked == null
-              ? content
+              ? scrollContent
               : Stack(
                   fit: StackFit.expand,
                   children: [
-                    content,
+                    scrollContent,
                     if (!_sorting)
                       Align(
                         alignment: Alignment.bottomCenter,
@@ -1021,7 +1070,7 @@ class CommonScaffoldState extends State<CommonScaffold>
         ),
         resizeToAvoidBottomInset: widget.resizeToAvoidBottomInset,
         backgroundColor: backdrop == null
-            ? widget.backgroundColor
+            ? widget.backgroundColor ?? (maskTitle ? Colors.transparent : null)
             : Colors.transparent,
       );
       return AppBarInsetScope(

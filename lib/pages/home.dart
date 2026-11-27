@@ -70,7 +70,7 @@ class _HomeShell extends ConsumerWidget {
       appSettingProvider.select((state) => state.floatingNavigationBar),
     );
     return Material(
-      color: SurfaceLevel.page.colorOf(context.colorScheme),
+      color: system.isWindows ? Colors.transparent : SurfaceLevel.page.colorOf(context.colorScheme),
       child: Column(
         children: [
           Expanded(

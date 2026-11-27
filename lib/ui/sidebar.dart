@@ -50,6 +50,7 @@ class NavigationSidebar extends StatefulWidget {
     this.windowControls = Size.zero,
     this.pinLastDestination = false,
     this.footer,
+    this.footerDestinations = const {},
   });
 
   final List<SidebarDestination> destinations;
@@ -60,6 +61,7 @@ class NavigationSidebar extends StatefulWidget {
   final Size windowControls;
   final bool pinLastDestination;
   final Widget? footer;
+  final Set<int> footerDestinations;
 
   @override
   State<NavigationSidebar> createState() => _NavigationSidebarState();
@@ -106,6 +108,9 @@ class _NavigationSidebarState extends State<NavigationSidebar>
   @override
   void didUpdateWidget(covariant NavigationSidebar oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.selectedIndex != widget.selectedIndex && _overlayController.isShowing) {
+      _closeOverlay();
+    }
     if (widget.onToggle != null && _overlayController.isShowing) {
       _overlayExpansion.value = 0;
       WidgetsBinding.instance.addPostFrameCallback((_) => _hideIfDismissed());
@@ -166,6 +171,7 @@ class _NavigationSidebarState extends State<NavigationSidebar>
               selectedIndex: widget.selectedIndex,
               pinLastDestination: widget.pinLastDestination,
               footer: widget.footer,
+              footerDestinations: widget.footerDestinations,
               onSelected: (index) {
                 widget.onSelected(index);
                 _closeOverlay();
@@ -188,6 +194,7 @@ class _NavigationSidebarState extends State<NavigationSidebar>
             selectedIndex: widget.selectedIndex,
             pinLastDestination: widget.pinLastDestination,
             footer: widget.footer,
+            footerDestinations: widget.footerDestinations,
             onSelected: widget.onSelected,
             onToggle: _handleToggle,
           ),
@@ -284,6 +291,7 @@ class _SidebarPane extends StatelessWidget {
     required this.onToggle,
     required this.pinLastDestination,
     required this.footer,
+    required this.footerDestinations,
   });
 
   final double progress;
@@ -295,6 +303,7 @@ class _SidebarPane extends StatelessWidget {
   final VoidCallback onToggle;
   final bool pinLastDestination;
   final Widget? footer;
+  final Set<int> footerDestinations;
 
   @override
   Widget build(BuildContext context) {
@@ -399,7 +408,9 @@ class _SidebarPane extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     for (var index = 0; index < menuCount; index++)
-                      destinationRow(index),
+                      if (!(footer != null && expanded && progress >= .999 &&
+                          constraints.maxHeight >= 420 && footerDestinations.contains(index)))
+                        destinationRow(index),
                   ],
                 ),
               ),

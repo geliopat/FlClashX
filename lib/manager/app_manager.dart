@@ -172,12 +172,21 @@ class _Sidebar extends ConsumerWidget {
       appSettingProvider.select((state) => state.sidebarExpanded),
     );
     final version = ref.watch(versionProvider);
+    final trafficIndex = items.indexWhere((item) => item.label == PageLabel.connections);
+    final resourcesIndex = items.indexWhere((item) => item.label == PageLabel.resources);
     return NavigationSidebar(
       destinations: [
         for (final item in items)
           SidebarDestination(glyph: item.glyph, label: item.label.label),
       ],
-      footer: system.isWindows ? const SidebarStatistics() : null,
+      footer: system.isWindows ? SidebarStatistics(
+        onTraffic: trafficIndex < 0 ? null : () => onSelected(trafficIndex),
+        onResources: resourcesIndex < 0 ? null : () => onSelected(resourcesIndex),
+        trafficSelected: trafficIndex >= 0 && currentIndex == trafficIndex,
+        resourcesSelected: resourcesIndex >= 0 && currentIndex == resourcesIndex,
+      ) : null,
+      footerDestinations: system.isWindows ? {if (trafficIndex >= 0) trafficIndex,
+        if (resourcesIndex >= 0) resourcesIndex} : const {},
       pinLastDestination: system.isWindows && items.isNotEmpty &&
           items.last.label == PageLabel.tools,
       selectedIndex: currentIndex,
@@ -258,8 +267,8 @@ class AppSidebarContainer extends ConsumerWidget {
           AnimatedVisibility.sidebar(
             visible: hasSidebar,
             child: Material(
-              color: chrome,
-              shape: BorderDirectional(end: Divider.createBorderSide(context)),
+              color: system.isWindows ? Colors.transparent : chrome,
+              shape: system.isWindows ? null : BorderDirectional(end: Divider.createBorderSide(context)),
               child: MediaQuery.removePadding(
                 context: context,
                 removeLeft: !isLtr,

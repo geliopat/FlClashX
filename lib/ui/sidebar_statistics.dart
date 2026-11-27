@@ -1,4 +1,7 @@
 import 'package:fl_clash/ui/network_palette.dart';
+import 'package:fl_clash/ui/hover_glow.dart';
+import 'package:fl_clash/ui/surface.dart';
+import 'package:fl_clash/ui/shape.dart';
 import 'dart:async';
 import 'dart:ffi';
 import 'dart:io';
@@ -64,7 +67,13 @@ _Sample _guiSample() {
 }
 
 class SidebarStatistics extends ConsumerStatefulWidget {
-  const SidebarStatistics({super.key});
+  const SidebarStatistics({super.key, this.onTraffic, this.onResources,
+    this.trafficSelected = false, this.resourcesSelected = false});
+
+  final VoidCallback? onTraffic;
+  final VoidCallback? onResources;
+  final bool trafficSelected;
+  final bool resourcesSelected;
 
   @override
   ConsumerState<SidebarStatistics> createState() => _SidebarStatisticsState();
@@ -255,12 +264,22 @@ class _SidebarStatisticsState extends ConsumerState<SidebarStatistics> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(l.resources, style: heading),
-          _line('CPU', _cpu == null ? '—' : '${_cpu!.toStringAsFixed(1)}%', style),
-          _line('RAM', _bytes(ram), style),
-          for (final name in _names) _line(name, _bytes(_samples[name]?.rss), style),
+          _StatisticsSection(
+            key: const ValueKey('sidebar-resources'),
+            title: l.resources, heading: heading,
+            onTap: widget.onResources, selected: widget.resourcesSelected,
+            children: [
+              _line('CPU', _cpu == null ? '—' : '${_cpu!.toStringAsFixed(1)}%', style),
+              _line('RAM', _bytes(ram), style),
+              for (final name in _names) _line(name, _bytes(_samples[name]?.rss), style),
+            ],
+          ),
           const SizedBox(height: 12),
-          Text(l.traffic, style: heading),
+          _StatisticsSection(
+            key: const ValueKey('sidebar-traffic'),
+            title: l.traffic, heading: heading,
+            onTap: widget.onTraffic, selected: widget.trafficSelected,
+            children: [
           Row(children: [
             Expanded(child: Text('TCP ${connected ? _tcp ?? '—' : 0}',
               style: style?.copyWith(color: NetworkTone.tcp.of(context)))),
@@ -280,7 +299,58 @@ class _SidebarStatisticsState extends ConsumerState<SidebarStatistics> {
               style,
             ),
           ),
+            ],
+          ),
         ],
+      ),
+    );
+  }
+}
+
+class _StatisticsSection extends StatefulWidget {
+  const _StatisticsSection({super.key, required this.title, required this.heading,
+    required this.children, this.onTap, required this.selected});
+  final String title;
+  final TextStyle? heading;
+  final List<Widget> children;
+  final VoidCallback? onTap;
+  final bool selected;
+
+  @override
+  State<_StatisticsSection> createState() => _StatisticsSectionState();
+}
+
+class _StatisticsSectionState extends State<_StatisticsSection> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = Theme.of(context).colorScheme.primary;
+    final shadows = HoverGlowTheme.of(context).shadows(accent, hovered: _hovered);
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(widget.title, style: widget.heading?.copyWith(
+          color: widget.selected ? accent : null, shadows: shadows)),
+        ...widget.children,
+      ],
+    );
+    if (widget.onTap == null) return content;
+    return Semantics(
+      button: true, selected: widget.selected, label: widget.title,
+      child: FocusRing(
+        shape: AppShape.sm,
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            onTap: widget.onTap,
+            onHover: (hovered) => setState(() => _hovered = hovered),
+            mouseCursor: SystemMouseCursors.click,
+            splashFactory: NoSplash.splashFactory,
+            overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+            child: content,
+          ),
+        ),
       ),
     );
   }
