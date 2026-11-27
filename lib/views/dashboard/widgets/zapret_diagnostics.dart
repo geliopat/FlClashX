@@ -64,7 +64,7 @@ class ZapretDiagnosticsCard extends ConsumerWidget {
             title: AppLocalizations.of(context).forkHttpsLatency,
             trailing: [
               DashboardIconButton(
-                glyph: AppGlyphs.filter,
+                glyph: AppGlyphs.listChecks,
                 tooltip: AppLocalizations.of(context).forkChooseStrategy,
                 onPressed: () => showZapretStrategiesSheet(context),
               ),

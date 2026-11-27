@@ -122,6 +122,7 @@ final _glyphs = {
   'split': AppGlyphs.split,
   'speed': AppGlyphs.speed,
   'latency': AppGlyphs.latency,
+  'listChecks': AppGlyphs.listChecks,
   'dataUsage': AppGlyphs.dataUsage,
   'memory': AppGlyphs.memory,
   'cpu': AppGlyphs.cpu,
@@ -193,6 +194,11 @@ void main() {
       GlyphVertex(12, 20),
     ], role: GlyphRole.detail),
   ]);
+
+  test('strategy checklist is distinct from the filter glyph', () async {
+    final checklist = await _render(AppGlyphs.listChecks, 0);
+    expect(checklist, isNot(await _render(AppGlyphs.filter, 0)));
+  });
 
   test('latency clock and speed gauge are distinct from history and bolt', () async {
     final latency = await _render(AppGlyphs.latency, 0);

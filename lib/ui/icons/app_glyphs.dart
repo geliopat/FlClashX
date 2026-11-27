@@ -599,6 +599,28 @@ abstract final class AppGlyphs {
     ], role: GlyphRole.line),
   ], matchTextDirection: true);
 
+  // A checklist denotes choosing a strategy rather than filtering the list.
+  static const listChecks = Glyph([
+    GlyphPolyline([
+      GlyphVertex(3.5, 6),
+      GlyphVertex(5.5, 8),
+      GlyphVertex(9, 4.5),
+    ], role: GlyphRole.line),
+    GlyphPolyline([
+      GlyphVertex(3.5, 15),
+      GlyphVertex(5.5, 17),
+      GlyphVertex(9, 13.5),
+    ], role: GlyphRole.line),
+    GlyphPolyline([
+      GlyphVertex(13, 6.5),
+      GlyphVertex(20.5, 6.5),
+    ], role: GlyphRole.line),
+    GlyphPolyline([
+      GlyphVertex(13, 15.5),
+      GlyphVertex(20.5, 15.5),
+    ], role: GlyphRole.line),
+  ]);
+
   static const listAdd = Glyph([
     GlyphPolyline([
       GlyphVertex(4, 4.4),
