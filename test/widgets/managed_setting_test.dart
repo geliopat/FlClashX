@@ -174,48 +174,45 @@ void main() {
     expect(setting().minimizeOnExit, isTrue);
   });
 
-  testWidgets('the visible page reset preserves unrelated overrides', (
+  testWidgets('proxy options restore the provider from the row context menu', (
     tester,
   ) async {
-    await pumpGeneral(tester);
-    container.read(appSettingProvider.notifier).update(
-      (state) => state.copyWith(
-        ownedSettings: {'app.minimizeOnExit', 'zapret.mode'},
-        minimizeOnExit: false,
-      ),
+    final styled = Profile(
+      id: 5,
+      label: 'Provider',
+      type: ProfileType.url,
+      providerHeaders: {'flclashz-view': 'type:list,layout:tight'},
     );
-    await tester.pumpAndSettle();
-    final reset = find.descendant(
-      of: find.byType(ManagedSettingsHint),
-      matching: find.byType(TextButton),
+    container = ProviderContainer(
+      overrides: [
+        profilesProvider.overrideWith(() => TestProfiles([styled])),
+        currentProfileIdProvider.overrideWithBuild((_, _) => styled.id),
+        noCore(),
+      ],
     );
-    expect(reset, findsOneWidget);
-    await tester.tap(reset);
+    addTearDown(container.dispose);
+    globalState.container = container;
+    container.listen(profileHeadersActionProvider, (_, _) {});
+    container.read(appSettingProvider.notifier).update((state) =>
+        state.copyWith(ownedSettings: {'view.proxies.layout'}));
+    container.read(proxiesStyleSettingProvider.notifier).update((state) =>
+        state.copyWith(layout: ProxiesLayout.standard));
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: const TestApp(child: ProxiesSetting()),
+    ));
     await tester.pumpAndSettle();
-    expect(setting().ownedSettings, {'zapret.mode'});
-    expect(setting().minimizeOnExit, isTrue);
-  });
 
-  testWidgets('the open lock restores the provider setting directly', (
-    tester,
-  ) async {
-    await pumpGeneral(tester);
-    container.read(appSettingProvider.notifier).update(
-      (state) => state.copyWith(
-        ownedSettings: {'app.minimizeOnExit'},
-        minimizeOnExit: false,
-      ),
-    );
+    final layout = find.widgetWithText(ListTile, 'Layout');
+    expect(layout, findsOneWidget);
+    expect(container.read(settingReleasableProvider('view.proxies.layout')), isTrue);
+    await tester.tap(layout, buttons: kSecondaryButton);
     await tester.pumpAndSettle();
-    final button = find.descendant(
-      of: row(),
-      matching: find.byTooltip('Hand back to provider'),
-    );
-    expect(button, findsOneWidget);
-    await tester.tap(button);
+    await tester.tap(find.text('Hand back to provider'));
     await tester.pumpAndSettle();
+    expect(container.read(proxiesStyleSettingProvider).layout, ProxiesLayout.tight);
+    expect(container.read(settingLockedProvider('view.proxies.layout')), isTrue);
     expect(setting().ownedSettings, isEmpty);
-    expect(setting().minimizeOnExit, isTrue);
   });
 
   testWidgets('one row in diagnostics hands every setting back', (

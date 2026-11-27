@@ -18,8 +18,8 @@ const hideIpSetting = 'app.hideIp';
 /// Driven by `flclashz-special: novibrate`.
 const vibrationSetting = 'app.vibration';
 
-/// Cards the user arranged; `flclashz-widgets` replaces them only under
-/// `denywidgets`.
+/// Cards supplied by `flclashz-widgets` can be returned to the provider.
+/// `denywidgets` remains a separate forced policy.
 const dashboardWidgetsSetting = 'app.dashboardWidgets';
 
 // Each Zapret option has the same ownership semantics as other settings.
@@ -147,6 +147,7 @@ const themePageKeys = {
   'view.app.color',
   'view.app.black',
   vibrationSetting,
+  hideIpSetting,
 };
 
 const proxiesPageKeys = {

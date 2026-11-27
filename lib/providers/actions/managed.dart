@@ -62,21 +62,6 @@ class ManagedSettingsAction extends _$ManagedSettingsAction {
     if (!zapretPageKeys.contains(key)) _reapply();
   }
 
-  /// Restore only the currently managed, personally overridden settings on
-  /// the requesting page. Do not discard overrides belonging to other pages.
-  void releaseKeys(Set<String> keys) {
-    final managed = ref.read(managedSettingsProvider);
-    final owned = ref.read(appSettingProvider).ownedSettings;
-    final released = keys.intersection(managed).intersection(owned);
-    if (released.isEmpty) return;
-    ref.read(appSettingProvider.notifier).update(
-      (state) => state.copyWith(
-        ownedSettings: state.ownedSettings.difference(released),
-      ),
-    );
-    if (released.any((key) => !zapretPageKeys.contains(key))) _reapply();
-  }
-
   void releaseAll() {
     ref
         .read(appSettingProvider.notifier)

@@ -31,7 +31,13 @@ Set<String> managedSettings(Ref ref) {
       (profile) => profile?.headers.noVibration ?? false,
     ),
   );
+  final widgetsManaged = ref.watch(
+    currentProfileProvider.select((profile) =>
+        profile?.headers.dashboardWidgets != null &&
+        !(profile?.headers.widgetEditingDenied ?? false)),
+  );
   return {
+    if (widgetsManaged) dashboardWidgetsSetting,
     if (switches != null) ...appSwitchSettings.values,
     if (hideIp) hideIpSetting,
     if (noVibration) vibrationSetting,

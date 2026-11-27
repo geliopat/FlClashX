@@ -5,6 +5,7 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/config.dart';
+import 'package:fl_clash/providers/action.dart';
 import 'package:fl_clash/providers/state.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/views/font_family.dart';
@@ -350,6 +351,7 @@ class _ColorSwatches extends ConsumerWidget {
     final appLocalizations = context.appLocalizations;
     final colorScheme = context.colorScheme;
     final level = context.raisedSurfaceLevel;
+    final releasable = ref.watch(settingReleasableProvider('view.app.color'));
     final systemColor = ref
         .watch(dynamicColorProvider)
         .seedOf(Theme.of(context).brightness);
@@ -385,9 +387,8 @@ class _ColorSwatches extends ConsumerWidget {
                         ? appLocalizations.followSystem
                         : Color(color).hex,
                     onPressed: () => onSelect(color),
-                    menuItems: color == null
-                        ? null
-                        : [
+                    menuItems: [
+                      if (color != null) ...[
                             CommonPopupMenuItem(
                               glyph: AppGlyphs.edit,
                               label: appLocalizations.edit,
@@ -399,7 +400,16 @@ class _ColorSwatches extends ConsumerWidget {
                               label: appLocalizations.delete,
                               onPressed: () => onDelete(color),
                             ),
-                          ],
+                      ],
+                      if (releasable)
+                        CommonPopupMenuItem(
+                          glyph: AppGlyphs.lock,
+                          label: appLocalizations.returnToProvider,
+                          onPressed: () => ref
+                              .read(managedSettingsActionProvider.notifier)
+                              .release('view.app.color'),
+                        ),
+                    ],
                   ),
                 _AddColorButton(onPressed: onAdd),
               ],

@@ -64,6 +64,9 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
       ),
     );
     final editable = !ref.watch(widgetEditingDeniedProvider);
+    final widgetsReleasable = ref.watch(
+      settingReleasableProvider(dashboardWidgetsSetting),
+    );
     final chosen = ref.watch(
       appSettingProvider.select((state) => state.dashboardWidgetsChosen),
     );
@@ -80,6 +83,19 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
           : appLocalizations.dashboard,
       actions: [
         if (!editing) const CoreStatusButton(),
+        if (editable && !editing && widgetsReleasable)
+          ManagedSetting(
+            settingKey: dashboardWidgetsSetting,
+            dimsWhenLocked: false,
+            showsLock: false,
+            child: AppBarActionButton(
+              data: IconButtonData(
+                glyph: AppGlyphs.edit,
+                tooltip: appLocalizations.editDashboard,
+                onPressed: () => _setEditing(true, platform),
+              ),
+            ),
+          ),
       ],
       confirmationAction: editing
           ? IconButtonData(
@@ -89,7 +105,7 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
             )
           : null,
       iconActions: [
-        if (editable && !editing)
+        if (editable && !editing && !widgetsReleasable)
           IconButtonData(
             glyph: AppGlyphs.edit,
             tooltip: appLocalizations.editDashboard,
