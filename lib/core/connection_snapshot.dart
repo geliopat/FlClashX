@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:fl_clash/models/models.dart';
 import 'package:flutter/foundation.dart' show listEquals;
 
@@ -24,7 +22,7 @@ class ConnectionSnapshotReader {
     Duration maxAge = const Duration(milliseconds: 900),
     Duration Function()? elapsed,
   }) : _maxAge = maxAge,
-       _elapsed = elapsed ?? (Stopwatch()..start()).elapsedReader;
+       _elapsed = elapsed ?? _monotonicClock();
 
   final Future<List<TrackerInfo>> Function() _read;
   final Duration _maxAge;
@@ -69,6 +67,7 @@ class ConnectionSnapshotReader {
   }
 }
 
-extension on Stopwatch {
-  Duration Function() get elapsedReader => () => elapsed;
+Duration Function() _monotonicClock() {
+  final clock = Stopwatch()..start();
+  return () => clock.elapsed;
 }

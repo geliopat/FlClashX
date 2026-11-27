@@ -47,6 +47,8 @@ class CoreController {
 
   Future<ConnectionSnapshot> getConnectionSnapshot() => _connectionSnapshots.read();
 
+  void invalidateConnectionSnapshot() => _connectionSnapshots.invalidate();
+
   Future<T> _invalidateConnectionsDuring<T>(Future<T> Function() operation) async {
     _connectionSnapshots.invalidate();
     try {

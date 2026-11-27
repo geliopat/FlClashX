@@ -100,6 +100,7 @@ class Preferences {
   }
 
   Future<Map<String, Object?>?> getConfigMap() async {
+    Map<String, Object?>? primary;
     try {
       final preferences = await _store.value;
       final configString = preferences?.getString(configKey);
@@ -109,6 +110,7 @@ class Preferences {
       }
       final decoded = json.decode(configString);
       if (decoded is! Map<String, Object?>) throw const FormatException('config');
+      primary = decoded;
       _validateConfig(decoded);
       return decoded;
     } catch (_) {
@@ -116,13 +118,19 @@ class Preferences {
       try {
         final store = await _store.value;
         final raw = store?.getString(_lastGoodConfigKey);
-        if (raw == null) return null;
+        if (raw == null) return primary;
         final map = jsonDecode(raw) as Map<String, Object?>;
         _validateConfig(map);
         commonPrint.log('Recovered last known good settings', logLevel: LogLevel.warning);
         return map;
       } catch (_) {
-        return null;
+        // Older partially valid maps must still reach the existing salvage
+        // decoder when neither a valid primary nor a backup is available.
+        if (primary != null) {
+          commonPrint.log('No valid settings backup; using legacy field recovery',
+              logLevel: LogLevel.warning);
+        }
+        return primary;
       }
     }
   }
@@ -159,7 +167,7 @@ class Preferences {
   static void _validateConfig(Map<String, Object?> map) {
     // Config.strictFromJson still salvages the nested app/theme settings.
     // Validate those explicitly before trusting a recovery copy.
-    if (map.containsKey('appSettingProps')) {
+    if (map['appSettingProps'] != null) {
       AppSettingProps.fromJson(Map<String, Object?>.from(map['appSettingProps'] as Map));
     }
     ThemeProps.fromJson(Map<String, Object?>.from(map['themeProps'] as Map));

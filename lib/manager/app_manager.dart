@@ -58,6 +58,11 @@ class _AppStateManagerState extends ConsumerState<AppStateManager>
       }
     });
     // A provider nobody listens to is paused and would miss the updates.
+    ref.listenManual(coreStatusProvider, (previous, next) {
+      if (previous != next) {
+        ref.read(coreHandlerProvider).invalidateConnectionSnapshot();
+      }
+    });
     ref.listenManual(appVisibleProvider, (_, visible) {
       ref.read(coreHandlerProvider).setHostActive(visible);
     });

@@ -204,7 +204,7 @@ jobs:
 
       - name: Run core IPC and desktop transport contract tests
         timeout-minutes: 15
-        run: flutter test test/core/protocol_contract_test.dart test/core/desktop/rpc_client_test.dart test/core/desktop/lifecycle_test.dart test/common/preferences_store_test.dart
+        run: flutter test test/core/connection_snapshot_test.dart test/core/protocol_contract_test.dart test/core/desktop/rpc_client_test.dart test/core/desktop/lifecycle_test.dart test/common/preferences_store_test.dart
 
       - name: Run linked Windows lifecycle regression tests
         timeout-minutes: 15

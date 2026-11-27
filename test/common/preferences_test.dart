@@ -162,6 +162,12 @@ void main() {
       expect(Config.strictFromJson((await preferences.getConfigMap())!), config);
     });
 
+    test('a partially valid legacy map remains available for salvage', () async {
+      final raw = {'currentProfileId': 42, 'themeProps': 123};
+      await store.setString(configKey, jsonEncode(raw));
+      expect(await preferences.getConfigMap(), raw);
+    });
+
     test('missing primary settings recover from an existing backup', () async {
       const config = Config(themeProps: defaultThemeProps, currentProfileId: 42);
       expect(await preferences.saveConfig(config), isTrue);
