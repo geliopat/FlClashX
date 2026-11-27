@@ -49,6 +49,7 @@ jobs:
     timeout-minutes: 90
     env:
       FLCLASHZ_UPDATE_PUBLIC_KEY: ${{ inputs.update_public_key || vars.FLCLASHZ_UPDATE_PUBLIC_KEY }}
+      FLCLASHZ_CORE_UPDATE_PUBLIC_KEY: ${{ vars.FLCLASHZ_CORE_UPDATE_PUBLIC_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -116,7 +117,7 @@ jobs:
           }
           $image = "$env:ImageOS-$env:ImageVersion-$env:RUNNER_ARCH"
           $core = Hash-Text "$image|$go|$env:CORE_INPUTS"
-          $helper = Hash-Text "$core|$rust|$env:HELPER_INPUTS"
+          $helper = Hash-Text "$core|$rust|$env:HELPER_INPUTS|$env:FLCLASHZ_CORE_UPDATE_PUBLIC_KEY"
           $compiler = Hash-Text "$image|$rust|sccache-0.16.0"
           "core=$core" >> $env:GITHUB_OUTPUT
           "helper=$helper" >> $env:GITHUB_OUTPUT

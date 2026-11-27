@@ -41,6 +41,7 @@ class RustBuilder {
     final env = {
       'CORE_SHA256': coreSha256,
       'CORE_NAME': '${config.coreName}${target.executableExtension}',
+      'FLCLASHZ_CORE_UPDATE_PUBLIC_KEY': Platform.environment['FLCLASHZ_CORE_UPDATE_PUBLIC_KEY'] ?? '',
     };
 
     final srcPath = p.join(
@@ -125,6 +126,7 @@ class RustBuilder {
       'RUSTUP_TOOLCHAIN',
       'RUSTC_WRAPPER',
       'RUSTC_WORKSPACE_WRAPPER',
+      'FLCLASHZ_CORE_UPDATE_PUBLIC_KEY',
     };
     final values = <String, String>{};
     final entries = Platform.environment.entries.toList()

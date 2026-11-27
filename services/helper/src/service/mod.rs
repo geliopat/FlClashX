@@ -13,3 +13,6 @@ pub mod zapret_lists;
 
 #[cfg(all(feature = "windows-service", target_os = "windows"))]
 mod journal;
+
+#[cfg(any(windows, test))]
+mod core_release;
