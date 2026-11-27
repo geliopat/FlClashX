@@ -36,7 +36,7 @@ void main() {
     sink.write(log('core down', LogLevel.error));
     await sink.flush();
 
-    final file = File(join(root.path, 'logs', 'FlClashX_2026-10-20.log'));
+    final file = File(join(root.path, 'logs', 'FlClashZ_2026-10-20.log'));
     expect(file.readAsLinesSync(), [
       '[12:00:00] [INFO] started',
       '[12:00:00] [ERROR] core down',
@@ -55,9 +55,9 @@ void main() {
       join(root.path, 'logs'),
     ).listSync().map((entity) => basename(entity.path)).toList()..sort();
     expect(names, [
-      'FlClashX_2026-10-20.log',
-      'FlClashX_2026-10-20_1.log',
-      'FlClashX_2026-10-20_2.log',
+      'FlClashZ_2026-10-20.log',
+      'FlClashZ_2026-10-20_1.log',
+      'FlClashZ_2026-10-20_2.log',
     ]);
     for (final name in names) {
       expect(File(join(root.path, 'logs', name)).lengthSync(), lessThan(91));
@@ -70,10 +70,10 @@ void main() {
       final logs = Directory(join(root.path, 'logs'))
         ..createSync(recursive: true);
       for (final name in [
-        'FlClashX_2026-10-10.log',
-        'FlClashX_2026-10-10_1.log',
-        'FlClashX_2026-10-11.log',
-        'FlClashX_2026-10-19.log',
+        'FlClashZ_2026-10-10.log',
+        'FlClashZ_2026-10-10_1.log',
+        'FlClashZ_2026-10-11.log',
+        'FlClashZ_2026-10-19.log',
         'notes.txt',
       ]) {
         File(join(logs.path, name)).writeAsStringSync('x');
@@ -86,13 +86,38 @@ void main() {
       final names = logs.listSync().map((e) => basename(e.path)).toList()
         ..sort();
       expect(names, [
-        'FlClashX_2026-10-11.log',
-        'FlClashX_2026-10-19.log',
-        'FlClashX_2026-10-20.log',
+        'FlClashZ_2026-10-11.log',
+        'FlClashZ_2026-10-19.log',
+        'FlClashZ_2026-10-20.log',
         'notes.txt',
       ]);
     },
   );
+
+  test('rotation uses UTF-8 byte length rather than Dart code units', () async {
+    final sink = logger(maxFileBytes: 65);
+    for (var i = 0; i < 3; i++) {
+      sink.write(log('проверка'));
+      await sink.flush();
+    }
+    final files = Directory(join(root.path, 'logs')).listSync().whereType<File>().toList();
+    expect(files, hasLength(3));
+    for (final file in files) {
+      expect(file.lengthSync(), lessThanOrEqualTo(65));
+      expect(file.readAsLinesSync().single, contains('проверка'));
+    }
+  });
+
+  test('failed write retains pending lines until the path becomes available', () async {
+    final blocked = File(join(root.path, 'logs'))..writeAsStringSync('blocked');
+    final sink = logger();
+    sink.write(log('retain this line'));
+    await sink.flush();
+    await blocked.delete();
+    await sink.flush();
+    expect(File(join(root.path, 'logs', 'FlClashZ_2026-10-20.log')).readAsLinesSync(),
+        ['[12:00:00] [INFO] retain this line']);
+  });
 
   test('nothing touches the disk until the logger is enabled', () async {
     final sink = FileLogger(
@@ -105,7 +130,7 @@ void main() {
 
     sink.enable();
     await sink.flush();
-    final file = File(join(root.path, 'logs', 'FlClashX_2026-10-20.log'));
+    final file = File(join(root.path, 'logs', 'FlClashZ_2026-10-20.log'));
     expect(file.readAsLinesSync(), ['[12:00:00] [INFO] early']);
   });
 
@@ -116,7 +141,7 @@ void main() {
     sink.write(log('two'));
     await sink.flush();
 
-    final file = File(join(root.path, 'logs', 'FlClashX_2026-10-20.log'));
+    final file = File(join(root.path, 'logs', 'FlClashZ_2026-10-20.log'));
     expect(file.readAsLinesSync(), [
       '[12:00:00] [INFO] one',
       '[12:00:00] [INFO] two',
@@ -127,8 +152,8 @@ void main() {
     final logs = Directory(join(root.path, 'logs'))
       ..createSync(recursive: true);
     for (final name in [
-      'FlClashX_2026-10-19.log',
-      'FlClashX_2026-10-20_1.log',
+      'FlClashZ_2026-10-19.log',
+      'FlClashZ_2026-10-20_1.log',
       'notes.txt',
     ]) {
       File(join(logs.path, name)).writeAsStringSync(name);
@@ -138,7 +163,7 @@ void main() {
 
     final path = await sink.archiveToday(root.path);
 
-    expect(basename(path!), 'FlClashX_logs_2026-10-20_15-00-00.zip');
+    expect(basename(path!), 'FlClashZ_logs_2026-10-20_15-00-00.zip');
     final archive = ZipDecoder().decodeBytes(File(path).readAsBytesSync());
     expect(
       {
@@ -146,19 +171,19 @@ void main() {
           file.name: String.fromCharCodes(file.content),
       },
       {
-        'FlClashX_2026-10-20.log': '[12:00:00] [INFO] just now\n',
-        'FlClashX_2026-10-20_1.log': 'FlClashX_2026-10-20_1.log',
+        'FlClashZ_2026-10-20.log': '[12:00:00] [INFO] just now\n',
+        'FlClashZ_2026-10-20_1.log': 'FlClashZ_2026-10-20_1.log',
       },
     );
   });
 
   test('a share keeps the archives an earlier one handed out', () async {
-    File(join(root.path, 'logs', 'FlClashX_2026-10-20.log'))
+    File(join(root.path, 'logs', 'FlClashZ_2026-10-20.log'))
       ..createSync(recursive: true)
       ..writeAsStringSync('line');
     final shares = Directory(join(root.path, 'share'))..createSync();
     final stale =
-        File(join(shares.path, 'FlClashX_logs_2026-10-18_09-00-00.zip'))
+        File(join(shares.path, 'FlClashZ_logs_2026-10-18_09-00-00.zip'))
           ..writeAsStringSync('old')
           ..setLastModifiedSync(DateTime(2026, 10, 19, 14));
     final unrelated = File(join(shares.path, 'notes.zip'))
@@ -170,14 +195,14 @@ void main() {
     File(first!).setLastModifiedSync(DateTime(2026, 10, 20, 15));
     final second = await sink.archiveToday(shares.path);
 
-    expect(basename(second!), 'FlClashX_logs_2026-10-20_15-00-00_2.zip');
+    expect(basename(second!), 'FlClashZ_logs_2026-10-20_15-00-00_2.zip');
     expect(File(first).existsSync(), isTrue);
     expect(stale.existsSync(), isFalse);
     expect(unrelated.existsSync(), isTrue);
   });
 
   test('a second export waits until the first has its archive', () async {
-    File(join(root.path, 'logs', 'FlClashX_2026-10-20.log'))
+    File(join(root.path, 'logs', 'FlClashZ_2026-10-20.log'))
       ..createSync(recursive: true)
       ..writeAsStringSync('line');
     final shares = Directory(join(root.path, 'share'))..createSync();
@@ -202,20 +227,20 @@ void main() {
     await firstEntered.future;
     // Real time for an unserialized second export to reach its writer.
     await Future<void>.delayed(const Duration(milliseconds: 200));
-    expect(written, ['FlClashX_logs_2026-10-20_15-00-00.zip']);
+    expect(written, ['FlClashZ_logs_2026-10-20_15-00-00.zip']);
 
     firstHeld.complete();
     await Future.wait([first, second]);
     expect(written, [
-      'FlClashX_logs_2026-10-20_15-00-00.zip',
-      'FlClashX_logs_2026-10-20_15-00-00_2.zip',
+      'FlClashZ_logs_2026-10-20_15-00-00.zip',
+      'FlClashZ_logs_2026-10-20_15-00-00_2.zip',
     ]);
   });
 
   test('a day without logs has no archive', () async {
     final logs = Directory(join(root.path, 'logs'))
       ..createSync(recursive: true);
-    File(join(logs.path, 'FlClashX_2026-10-19.log')).writeAsStringSync('x');
+    File(join(logs.path, 'FlClashZ_2026-10-19.log')).writeAsStringSync('x');
 
     expect(await logger().archiveToday(root.path), isNull);
     expect(Directory(root.path).listSync().whereType<File>(), isEmpty);
