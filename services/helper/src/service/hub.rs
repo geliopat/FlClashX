@@ -3050,6 +3050,31 @@ mod tests {
         assert_eq!(body["code"], "invalidRequest");
     }
 
+    #[cfg(windows)]
+    #[test]
+    fn pending_driver_update_blocks_zapret_until_expected_bytes_arrive() {
+        let path = std::env::temp_dir().join(format!(
+            "flclashz-pending-driver-{}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&path).unwrap();
+        let marker = path.join("driver-restart.sha256");
+        let driver = path.join("WinDivert64.sys");
+        assert!(check_pending_zapret_driver(&path).is_ok());
+        fs::write(
+            &marker,
+            "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+        )
+        .unwrap();
+        fs::write(&driver, b"old").unwrap();
+        assert!(check_pending_zapret_driver(&path).is_err());
+        assert!(marker.exists());
+        fs::write(&driver, b"test").unwrap();
+        assert!(check_pending_zapret_driver(&path).is_ok());
+        assert!(!marker.exists());
+        fs::remove_dir_all(path).unwrap();
+    }
+
     #[test]
     fn verifies_core_sha256_in_all_build_modes() {
         let path = std::env::temp_dir().join(format!(

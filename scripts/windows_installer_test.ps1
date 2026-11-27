@@ -15,6 +15,7 @@ $liveApp = $null
 $ownCore = $null
 $foreignCore = $null
 $driverLock = $null
+$deferredFixture = $false
 function Assert([bool]$condition, [string]$message) {
   if (!$condition) { throw $message }
 }
@@ -95,6 +96,35 @@ try {
   Assert (!(Test-Path 'HKLM:\Software\Classes\clashz')) 'ClashZ handler survived'
   CheckForeign
   Write-Host 'Installer and uninstaller passed; FlClashX sentinels preserved.'
+
+  # A real pending rename persists until reboot. Exercise it only on a
+  # disposable hosted runner, never on a developer or self-hosted machine.
+  if ($env:GITHUB_ACTIONS -eq 'true' -and $env:RUNNER_ENVIRONMENT -eq 'github-hosted') {
+    $deferredTarget = Join-Path $root 'DeferredUpgrade'
+    $deferredLog = Join-Path $root 'deferred.log'
+    $args = @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',
+      '/RESTARTEXITCODE=3010',"/DIR=""$deferredTarget""")
+    $process = Start-Process -FilePath $Installer -ArgumentList $args -Wait -PassThru
+    Assert ($process.ExitCode -eq 0) 'Deferred fixture installation failed'
+    $driver = Join-Path $deferredTarget 'zapret\WinDivert64.sys'
+    $expected = (Get-FileHash -LiteralPath $driver -Algorithm SHA256).Hash
+    # Do not load or register a fake kernel driver; only simulate its file lock.
+    [IO.File]::WriteAllText($driver, 'old test driver')
+    $driverLock = [IO.File]::Open($driver, [IO.FileMode]::Open,
+      [IO.FileAccess]::Read, [IO.FileShare]::Read)
+    $deferredFixture = $true
+    $process = Start-Process -FilePath $Installer -ArgumentList ($args + "/LOG=""$deferredLog""") -Wait -PassThru
+    if ($process.ExitCode -ne 3010) { Get-Content $deferredLog -ErrorAction SilentlyContinue }
+    Assert ($process.ExitCode -eq 3010) 'Locked changed driver must finish setup with restart requested'
+    $driverLock.Dispose(); $driverLock = $null
+    $marker = Join-Path $deferredTarget 'zapret\driver-restart.sha256'
+    Assert ((Get-Content -LiteralPath $marker -Raw).Trim() -eq $expected) 'Wrong pending driver SHA-256'
+    Assert ((Get-Content -LiteralPath $driver -Raw) -eq 'old test driver') 'Locked driver changed before reboot'
+    $pending = (Get-ItemProperty -LiteralPath 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager' -Name PendingFileRenameOperations).PendingFileRenameOperations
+    Assert (@($pending | Where-Object { $_ -and $_.EndsWith($driver, [StringComparison]::OrdinalIgnoreCase) }).Count -gt 0) 'No queued replacement for the driver'
+    CheckForeign
+    Write-Host 'Deferred driver replacement queued; fixture retained until hosted runner disposal.'
+  }
 } finally {
   if ($driverLock) { $driverLock.Dispose() }
   foreach ($probe in @($liveApp, $ownCore, $foreignCore)) {
@@ -111,5 +141,5 @@ try {
   if ('protocol' -in $created) { Remove-Item -LiteralPath $oldKey -Recurse -Force -ErrorAction SilentlyContinue }
   if ('run' -in $created) { Remove-ItemProperty -LiteralPath $runKey -Name FlClashX -ErrorAction SilentlyContinue }
   if ('uninstall' -in $created) { Remove-Item -LiteralPath $oldUninstall -Recurse -Force -ErrorAction SilentlyContinue }
-  if (Test-Path -LiteralPath $root) { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
+  if (!$deferredFixture -and (Test-Path -LiteralPath $root)) { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
 }
