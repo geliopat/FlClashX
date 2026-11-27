@@ -1,5 +1,6 @@
 import 'package:fl_clash/common/app_localizations.dart';
 import 'package:fl_clash/common/app_ports.dart';
+import 'package:fl_clash/common/traffic_history.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/l10n/l10n.dart';
 import 'package:fl_clash/manager/app_manager.dart';
@@ -211,6 +212,9 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     final container = ProviderContainer(
       overrides: [
+        // Keep native process polling and disk IO out of this widget test.
+        appVisibleProvider.overrideWithBuild((_, _) => false),
+        trafficHistoryProvider.overrideWithValue(TrafficHistory(persist: false)),
         navigationItemsStateProvider.overrideWithValue(
           NavigationItemsState(
             value: [
@@ -267,6 +271,8 @@ void main() {
     await select(AppGlyphs.settings, PageLabel.tools);
     await select(AppGlyphs.dashboard, PageLabel.dashboard);
     await select(AppGlyphs.connections, PageLabel.connections);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
   });
 
   testWidgets('the sidebar widens in place only at desktop width', (

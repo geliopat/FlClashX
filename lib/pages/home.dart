@@ -475,7 +475,10 @@ class _FadeTabPage extends StatelessWidget {
   final Widget child;
 
   double get _delta {
-    if (!controller.hasClients || !controller.position.hasContentDimensions) {
+    if (!controller.hasClients ||
+        !controller.position.hasViewportDimension ||
+        controller.position.viewportDimension <= 0 ||
+        !controller.position.hasContentDimensions) {
       return 0;
     }
     final page = controller.page ?? position.toDouble();
