@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/metacubex/mihomo/adapter/outboundgroup"
-	"github.com/metacubex/mihomo/component/resolver"
 	"github.com/metacubex/mihomo/constant"
 	"github.com/metacubex/mihomo/tunnel"
 )
@@ -232,66 +231,10 @@ func handleCheckRoutes(params *CheckRoutesParams) *RouteCheck {
 	return &RouteCheck{CoreEpoch: epoch, RouteVersion: version, Held: held}
 }
 
-// Stock mihomo keeps its matcher private, so this follows it; a rule into a
-// sub-rule set cannot be followed from outside and reads as unresolved.
+// Use the same matcher as a real inbound connection, including sub-rules
+// and rematch. The caller still checks the route epoch before using a result.
 func resolveRoute(metadata *constant.Metadata) (constant.Proxy, error) {
-	proxies := tunnel.Proxies()
-	switch tunnel.Mode() {
-	case tunnel.Direct:
-		return proxies["DIRECT"], nil
-	case tunnel.Global:
-		return proxies["GLOBAL"], nil
-	}
-	resolved := false
-	if node, ok := resolver.DefaultHosts.Search(metadata.Host, false); ok {
-		metadata.DstIP, _ = node.RandIP()
-		resolved = true
-	}
-	helper := constant.RuleMatchHelper{
-		ResolveIP: func() {
-			if resolved || metadata.Host == "" || metadata.Resolved() {
-				return
-			}
-			resolved = true
-			ctx, cancel := context.WithTimeout(
-				context.Background(),
-				resolver.DefaultDNSTimeout,
-			)
-			defer cancel()
-			if ip, err := resolver.ResolveIP(ctx, metadata.Host); err == nil {
-				metadata.DstIP = ip
-			}
-		},
-		FindProcess: func() {},
-		CheckPassRule: func(name string) bool {
-			adapter, ok := proxies[name]
-			return ok && adapter.Type() == constant.Pass
-		},
-	}
-rules:
-	for _, rule := range tunnel.Rules() {
-		matched, name := rule.Match(metadata, helper)
-		if !matched {
-			continue
-		}
-		if rule.RuleType() == constant.SubRules {
-			return nil, fmt.Errorf("%s routes through sub-rules", metadata.Host)
-		}
-		adapter, ok := proxies[name]
-		if !ok {
-			continue
-		}
-		for hop := adapter; hop != nil; hop = hop.Unwrap(metadata, false) {
-			switch hop.Type() {
-			case constant.Pass:
-				continue rules
-			case constant.Rematch:
-				return nil, fmt.Errorf("%s rematches", metadata.Host)
-			}
-		}
-		return adapter, nil
-	}
-	return proxies["DIRECT"], nil
+	return tunnel.ResolveRoute(metadata)
 }
 
 func resolveExit(host string, proxyName string) string {

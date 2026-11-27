@@ -3,6 +3,7 @@ package core
 import (
 	"github.com/metacubex/mihomo/component/resolver"
 	"github.com/metacubex/mihomo/dns"
+	"github.com/metacubex/mihomo/tunnel"
 	"github.com/metacubex/mihomo/tunnel/statistic"
 )
 
@@ -57,10 +58,15 @@ func handleClearDnsCache() {
 // A connection that went out over a network the device has left hangs until
 // TCP gives up on it, and so do the DNS clients' pooled connections.
 func handleResetNetwork() {
-	handleCloseConnections()
 	configMu.Lock()
 	defer configMu.Unlock()
+	handleCloseConnections()
 	dns.ClearAll()
+	for _, proxy := range tunnel.AllProxies() {
+		if resetter, ok := adapterAs[interface{ ResetNetwork() }](proxy); ok {
+			resetter.ResetNetwork()
+		}
+	}
 }
 
 func handleCloseConnection(connectionId string) bool {

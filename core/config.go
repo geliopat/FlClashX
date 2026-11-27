@@ -324,11 +324,9 @@ func applyConfig(params *SetupParams) error {
 	return err
 }
 
-// mihomo loads the providers inside its apply and installs fresh
-// resolvers; the host hears of the loads, and the resolvers are watched.
+// Mihomo loads providers inside apply. Native hooks observe DNS directly.
 func afterApply(cfg *config.Config) {
 	invalidateAllProxies()
-	watchResolvers()
 	for name := range cfg.Providers {
 		sendMessage(LoadedMessage, name)
 	}
