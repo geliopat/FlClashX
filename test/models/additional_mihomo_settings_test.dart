@@ -12,6 +12,35 @@ void main() {
     expect(raw['tun'], {'auto-route': true, 'icmp-timeout': 0, 'loopback-address': []});
     expect(raw['profile'], {'store-selected': false, 'store-fake-ip': false});
   });
+  test('source recovery retains explicit values and ordered DNS policies', () {
+    final policy = <String, Object>{
+      'geosite:private': 'https://dns.example/dns-query#DIRECT',
+      'example.com': ['https://dns.example/dns-query#Москва'],
+    };
+    final parsed = <String, dynamic>{
+      'dns': {'nameserver-policy': policy, 'fallback': ['default'], 'ipv6': true,
+        'fallback-filter': {'geoip': true, 'geoip-code': 'CN'}},
+      'tun': {'icmp-timeout': 30, 'loopback-address': ['127.0.0.1']},
+      'sniffer': {'enable': true},
+    };
+    final result = restoreExplicitMihomoSettings(parsed, {
+      'dns': {'nameserver-policy': {'example.com': policy['example.com'],
+        'geosite:private': policy['geosite:private']},
+        'fallback': [], 'ipv6': false, 'fallback-filter': {'geoip': false}},
+      'tun': {'icmp-timeout': 0, 'loopback-address': []},
+      'sniffer': {'enable': false, 'future-field': 'retained'},
+      'geodata-mode': false,
+    });
+    expect((result['dns']['nameserver-policy'] as Map).keys.toList(), policy.keys.toList());
+    expect(result['dns']['nameserver-policy'], policy);
+    expect(result['dns']['fallback'], isEmpty);
+    expect(result['dns']['ipv6'], isFalse);
+    expect(result['dns']['fallback-filter'], {'geoip': false, 'geoip-code': 'CN'});
+    expect(result['tun'], {'icmp-timeout': 0, 'loopback-address': []});
+    expect(result['sniffer']['future-field'], 'retained');
+    expect(result['geodata-mode'], isFalse);
+    expect(parsed['dns']['fallback'], ['default']);
+  });
   test('app owned and arbitrary paths are refused', () {
     for (final path in ['tun.auto-route', 'tun.file-descriptor', 'external-controller-pipe', 'authentication', 'listeners', 'proxy-providers']) {
       expect(() => decodeAdditionalSettings('$path: false'), throwsFormatException);
