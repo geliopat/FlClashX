@@ -3,8 +3,29 @@ import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/auto_delay.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:riverpod/riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('automatic delay intervals load and persist in preferences', () async {
+    SharedPreferences.setMockInitialValues({
+      'delay.activeInterval': 10,
+      'delay.otherInterval': 120,
+    });
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    expect(container.read(autoDelayProvider), (active: 15, others: 60));
+    await Future<void>.delayed(Duration.zero);
+    expect(container.read(autoDelayProvider), (active: 10, others: 120));
+    await container.read(autoDelayProvider.notifier).set(active: 0, others: 30);
+    expect(container.read(autoDelayProvider), (active: 0, others: 30));
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getInt('delay.activeInterval'), 0);
+    expect(prefs.getInt('delay.otherInterval'), 30);
+  });
+
   test('automatic ping includes DIRECT, provider nodes and all group types', () {
     const server = Proxy(name: 'node', type: 'Vless', providerName: 'remote');
     const other = Proxy(name: 'other', type: 'Vless');

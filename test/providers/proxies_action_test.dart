@@ -19,6 +19,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:riverpod/riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../helpers/test_profiles.dart';
 
@@ -38,7 +39,7 @@ class _AppliedSetupAction extends SetupAction {
 const _testUrl = 'http://delay.test';
 
 Group _group(String name, List<Proxy> all) =>
-    Group(type: GroupType.Selector, name: name, all: all);
+    Group(type: GroupType.Selector, name: name, all: all, hidden: false);
 
 const _proxy = Proxy(name: 'HK-01', type: 'ss');
 
@@ -108,6 +109,11 @@ void main() {
   });
 
   setUp(() {
+    // These tests exercise manual checks, not the background scheduler.
+    SharedPreferences.setMockInitialValues({
+      'delay.activeInterval': 0,
+      'delay.otherInterval': 0,
+    });
     reset(core);
     _AppliedSetupAction.applied = true;
     _AppliedSetupAction.pushCount = 0;
@@ -1178,7 +1184,7 @@ void main() {
           ));
       container.read(groupsProvider.notifier).update((_) => [
         _group('A', const [_proxy]),
-        const Group(type: GroupType.Selector, name: 'B', testUrl: otherUrl,
+        const Group(type: GroupType.Selector, name: 'B', hidden: false, testUrl: otherUrl,
           all: [_proxy, Proxy(name: 'HK-02', type: 'ss')]),
       ]);
       final action = actionOf(container);
