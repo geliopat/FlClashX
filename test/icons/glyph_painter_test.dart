@@ -1,8 +1,11 @@
+import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
+import 'package:fl_clash/views/navigation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -13,6 +16,12 @@ const _edgeTolerance = 12;
 
 final _glyphs = {
   'dashboard': AppGlyphs.dashboard,
+  'home': AppGlyphs.home,
+  'files': AppGlyphs.files,
+  'network': AppGlyphs.network,
+  'fileText': AppGlyphs.fileText,
+  'clipboardList': AppGlyphs.clipboardList,
+  'shieldOff': AppGlyphs.shieldOff,
   'proxies': AppGlyphs.proxies,
   'profiles': AppGlyphs.profiles,
   'requests': AppGlyphs.requests,
@@ -194,6 +203,22 @@ void main() {
       GlyphVertex(12, 20),
     ], role: GlyphRole.detail),
   ]);
+
+  test('navigation uses the approved sidebar glyphs', () {
+    final items = navigation.getItems(hasProxies: true, openLogs: true);
+    final glyphs = {for (final item in items) item.label: item.glyph};
+    expect(glyphs[PageLabel.dashboard], AppGlyphs.home);
+    expect(glyphs[PageLabel.proxies], AppGlyphs.globe);
+    expect(glyphs[PageLabel.profiles], AppGlyphs.files);
+    expect(glyphs[PageLabel.connections], AppGlyphs.network);
+    expect(glyphs[PageLabel.logs], AppGlyphs.fileText);
+    expect(glyphs[PageLabel.tools], AppGlyphs.settings);
+    if (Platform.isWindows) {
+      expect(glyphs[PageLabel.zapret], AppGlyphs.shieldOff);
+      expect(glyphs[PageLabel.zapretLogs], AppGlyphs.fileText);
+      expect(glyphs[PageLabel.serviceJournal], AppGlyphs.clipboardList);
+    }
+  });
 
   test('strategy checklist is distinct from the filter glyph', () async {
     final checklist = await _render(AppGlyphs.listChecks, 0);

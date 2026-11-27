@@ -6,6 +6,54 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:material_ui/material_ui.dart';
 
 abstract final class AppGlyphs {
+  // Approved sidebar contours. Keep the older functional glyphs available
+  // elsewhere; navigation uses these dedicated symbols.
+  static const home = Glyph([
+    GlyphPath('M3 11L12 3L21 11', role: GlyphRole.line),
+    GlyphPath('M5 10V20H19V10', role: GlyphRole.line),
+    GlyphPath('M10 20V14H14V20', role: GlyphRole.line),
+  ]);
+
+  static const files = Glyph([
+    GlyphPath('M9 3H17L21 7V16Q21 18 19 18',
+        role: GlyphRole.line),
+    GlyphPath('M17 3V7H21', role: GlyphRole.line),
+    GlyphPath('M5 7H11L15 11V20Q15 21 14 21H5Q3 21 3 19V9Q3 7 5 7Z'),
+    GlyphPath('M11 7V11H15', role: GlyphRole.detail),
+  ]);
+
+  static const network = Glyph([
+    GlyphBox(9, 3, 15, 9, 1),
+    GlyphBox(3, 15, 9, 21, 1),
+    GlyphBox(15, 15, 21, 21, 1),
+    GlyphPath('M12 9V12M6 15V12H18V15', role: GlyphRole.line),
+  ]);
+
+  static const fileText = Glyph([
+    GlyphPath('M6 3H14L20 9V19Q20 21 18 21H6Q4 21 4 19V5Q4 3 6 3Z'),
+    GlyphPath('M14 3V9H20', role: GlyphRole.detail),
+    GlyphPath('M8 13H16M8 17H16', role: GlyphRole.detail),
+  ]);
+
+  static const clipboardList = Glyph([
+    GlyphPath('M8 5H6Q4 5 4 7V19Q4 21 6 21H18Q20 21 20 19V7Q20 5 18 5H16',
+        role: GlyphRole.line),
+    GlyphBox(8, 3, 16, 7, 1.5),
+    GlyphPath('M11 11H16M11 15H16', role: GlyphRole.line),
+    GlyphCircle(8, 11, 0.7, role: GlyphRole.line, solid: true),
+    GlyphCircle(8, 15, 0.7, role: GlyphRole.line, solid: true),
+  ]);
+
+  // Open shield outline with a diagonal strike: retain the strike at every
+  // selection fill rather than filling over the slash.
+  static const shieldOff = Glyph([
+    GlyphPath('M8.1 4.1L12 2.8Q15.4 5 20 6V11.5Q20 14 18.6 16.1',
+        role: GlyphRole.line),
+    GlyphPath('M4 7.5V11.5Q4 17 12 21Q14.1 20 15.9 18.5',
+        role: GlyphRole.line),
+    GlyphPath('M3 3L21 21', role: GlyphRole.line),
+  ]);
+
   static const dashboard = Glyph([
     GlyphBox(3.5, 3.5, 10.5, 11.5, 2),
     GlyphBox(13.5, 3.5, 20.5, 9.5, 2),
@@ -1991,18 +2039,13 @@ abstract final class AppGlyphs {
   ]);
 
   static Glyph sidebar(double progress) {
-    final divider = lerpDouble(8.5, 11.5, progress)!;
+    final divider = lerpDouble(9, 11.5, progress)!;
     return Glyph([
-      const GlyphBox(3, 4.5, 21, 19.5, 3.5),
+      const GlyphBox(3, 3.5, 21, 20.5, 2.5),
       GlyphPolyline([
-        GlyphVertex(divider, 4.5),
-        GlyphVertex(divider, 19.5),
+        GlyphVertex(divider, 3.5),
+        GlyphVertex(divider, 20.5),
       ], role: GlyphRole.detail),
-      for (final y in const [8.5, 11.0, 13.5])
-        GlyphPolyline([
-          GlyphVertex(5.5, y),
-          GlyphVertex(divider - 2.5, y),
-        ], role: GlyphRole.detail),
     ], matchTextDirection: true);
   }
 

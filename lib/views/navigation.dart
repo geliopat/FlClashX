@@ -20,13 +20,13 @@ class Navigation implements NavigationPort {
   }) {
     return [
       NavigationItem(
-        glyph: AppGlyphs.dashboard,
+        glyph: AppGlyphs.home,
         label: PageLabel.dashboard,
         builder: (_) =>
             const DashboardView(key: GlobalObjectKey(PageLabel.dashboard)),
       ),
       NavigationItem(
-        glyph: AppGlyphs.proxies,
+        glyph: AppGlyphs.globe,
         label: PageLabel.proxies,
         builder: (_) =>
             const ProxiesView(key: GlobalObjectKey(PageLabel.proxies)),
@@ -35,13 +35,13 @@ class Navigation implements NavigationPort {
             : [],
       ),
       NavigationItem(
-        glyph: AppGlyphs.profiles,
+        glyph: AppGlyphs.files,
         label: PageLabel.profiles,
         builder: (_) =>
             const ProfilesView(key: GlobalObjectKey(PageLabel.profiles)),
       ),
       NavigationItem(
-        glyph: AppGlyphs.connections,
+        glyph: AppGlyphs.network,
         label: PageLabel.connections,
         builder: (_) => const ConnectionFeedsView(
           key: GlobalObjectKey(PageLabel.connections),
@@ -65,7 +65,7 @@ class Navigation implements NavigationPort {
         modes: simple ? [] : [NavigationItemMode.more],
       ),
       NavigationItem(
-        glyph: AppGlyphs.logs,
+        glyph: AppGlyphs.fileText,
         label: PageLabel.logs,
         builder: (_) => const LogsView(key: GlobalObjectKey(PageLabel.logs)),
         modes: openLogs
@@ -74,21 +74,21 @@ class Navigation implements NavigationPort {
       ),
       if (Platform.isWindows)
         NavigationItem(
-          glyph: AppGlyphs.resources,
+          glyph: AppGlyphs.shieldOff,
           label: PageLabel.zapret,
           builder: (_) => const ZapretView(key: GlobalObjectKey(PageLabel.zapret)),
           modes: [NavigationItemMode.desktop],
         ),
       if (Platform.isWindows)
         NavigationItem(
-          glyph: AppGlyphs.logs,
+          glyph: AppGlyphs.fileText,
           label: PageLabel.zapretLogs,
           builder: (_) => const ZapretLogsView(key: GlobalObjectKey(PageLabel.zapretLogs)),
           modes: [NavigationItemMode.desktop],
         ),
       if (Platform.isWindows)
         NavigationItem(
-          glyph: AppGlyphs.logs,
+          glyph: AppGlyphs.clipboardList,
           label: PageLabel.serviceJournal,
           builder: (_) => const ZapretLogsView(
             key: GlobalObjectKey(PageLabel.serviceJournal), journalOnly: true),
