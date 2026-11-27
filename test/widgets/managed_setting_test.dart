@@ -259,12 +259,17 @@ void main() {
         );
     await tester.pumpAndSettle();
 
+    final handBack = find.text('Hand settings back to provider');
+    // A built list item can still be outside the visible viewport.
+    // Scroll until its center actually receives pointer events.
     await tester.scrollUntilVisible(
-      find.text('Hand settings back to provider'),
+      handBack.hitTestable(),
       300,
       scrollable: find.byType(Scrollable).first,
     );
-    await tester.tap(find.text('Hand settings back to provider'));
+    await tester.pumpAndSettle();
+    expect(handBack.hitTestable(), findsOneWidget);
+    await tester.tap(handBack.hitTestable());
     await tester.pumpAndSettle();
     await tester.tap(find.text('Confirm'));
     await tester.pumpAndSettle();
