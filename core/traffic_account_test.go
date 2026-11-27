@@ -3,9 +3,7 @@ package core
 import (
 	"io"
 	"net"
-	"net/netip"
 	"testing"
-	"time"
 
 	"github.com/metacubex/mihomo/adapter/outbound"
 	"github.com/metacubex/mihomo/component/proxydialer"
@@ -50,55 +48,33 @@ func registerTracker(t *testing.T, metadata *constant.Metadata) statistic.Tracke
 	return tracker
 }
 
-func TestTrafficAccountKeepsLookingForATrackerRegisteredAfterTheBurst(t *testing.T) {
+func TestNativeTrackerPublishesBeforeFirstPayload(t *testing.T) {
 	metadata := &constant.Metadata{}
-	account := trafficAccount{metadata: metadata}
-	for packet := 0; packet <= routeLookupBurst; packet++ {
-		account.add(1, 0)
-	}
-	if account.route != routeUnknown || account.up != routeLookupBurst+1 {
-		t.Fatalf("before the tracker: route %d, waiting %d bytes", account.route, account.up)
-	}
-
+	probe := &routedConn{}
+	pendingProbeRoutes.Store(metadata, probe)
+	t.Cleanup(func() { pendingProbeRoutes.Delete(metadata) })
 	tracker := registerTracker(t, metadata)
-	account.lookedUp = time.Now().Add(time.Hour)
-	account.add(1, 0)
-	if account.route != routeUnknown {
-		t.Fatal("looked the tracker up again inside the gap")
+	if statistic.DefaultManager.Get(tracker.ID()) == nil {
+		t.Fatal("tracker must be registered before callback")
 	}
-
-	account.lookedUp = time.Now().Add(-routeLookupGap)
-	account.add(1, 0)
-	if account.route != routeDirect || account.trackerID != tracker.ID() {
-		t.Fatalf("after the gap: route %d, tracker %q; want direct and %q", account.route, account.trackerID, tracker.ID())
-	}
-	if account.up != 0 {
-		t.Fatalf("%d bytes still waiting after the session was attributed", account.up)
+	probe.mu.Lock()
+	defer probe.mu.Unlock()
+	if probe.route == nil || len(probe.route.chains) == 0 {
+		t.Fatal("native connection callback did not settle probe route")
 	}
 }
 
-func TestAUdpSourceMovesToTheSessionThatReplacedAClosedOne(t *testing.T) {
-	metadata := &constant.Metadata{
-		NetWork: constant.UDP,
-		SrcIP:   netip.MustParseAddr("198.18.0.1"),
-		SrcPort: 40000,
+func TestNativeTrafficTotalsDoNotDependOnPolling(t *testing.T) {
+	handleResetTraffic()
+	t.Cleanup(handleResetTraffic)
+	statistic.DefaultManager.PushUploaded(false, 31)
+	statistic.DefaultManager.PushUploaded(true, 7)
+	statistic.DefaultManager.PushDownloaded(false, 42)
+	want := Traffic{Up: 31, Down: 42}
+	if got := handleGetTotalTraffic(true); got != want {
+		t.Fatalf("proxy totals: %+v, want %+v", got, want)
 	}
-	t.Cleanup(func() {
-		udpRoutes.mu.Lock()
-		delete(udpRoutes.routes, metadata.SourceAddrPort())
-		udpRoutes.mu.Unlock()
-	})
-	first := registerTracker(t, metadata)
-	udpRoutes.routeFor(metadata).add(1, 0)
-
-	_ = first.Close()
-	if account := udpRoutes.routeFor(metadata); account.route != routeUnknown {
-		t.Fatalf("route %d kept for a closed session with nothing in its place", account.route)
-	}
-	second := registerTracker(t, metadata)
-	account := udpRoutes.routeFor(metadata)
-	account.add(1, 0)
-	if account.trackerID != second.ID() {
-		t.Fatalf("tracker %q, want the replacing session %q", account.trackerID, second.ID())
+	if got := handleGetTotalTraffic(false); got != (Traffic{Up: 38, Down: 42}) {
+		t.Fatalf("all totals: %+v", got)
 	}
 }

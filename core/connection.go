@@ -2,29 +2,22 @@ package core
 
 import (
 	"github.com/metacubex/mihomo/component/resolver"
+	"github.com/metacubex/mihomo/dns"
 	"github.com/metacubex/mihomo/tunnel/statistic"
 )
 
 func handleGetTraffic(onlyStatisticsProxy bool) Traffic {
-	if onlyStatisticsProxy {
-		up, down := proxiedTrafficNow()
-		return Traffic{Up: up, Down: down}
-	}
-	up, down := statistic.DefaultManager.Now()
+	up, down := statistic.DefaultManager.NowTraffic(onlyStatisticsProxy)
 	return Traffic{Up: up, Down: down}
 }
 
 func handleGetTotalTraffic(onlyStatisticsProxy bool) Traffic {
-	if onlyStatisticsProxy {
-		return Traffic{Up: proxiedTraffic.up.Load(), Down: proxiedTraffic.down.Load()}
-	}
-	up, down := statistic.DefaultManager.Total()
+	up, down := statistic.DefaultManager.TotalTraffic(onlyStatisticsProxy)
 	return Traffic{Up: up, Down: down}
 }
 
 func handleResetTraffic() {
 	statistic.DefaultManager.ResetStatistic()
-	resetProxiedTraffic()
 }
 
 func handleGetConnections() *statistic.Snapshot {
@@ -58,15 +51,16 @@ func handleResetConnections() bool {
 func handleClearDnsCache() {
 	configMu.Lock()
 	defer configMu.Unlock()
-	resolver.ClearCache()
-	resolver.ResetConnection()
+	dns.ClearAll()
 }
 
 // A connection that went out over a network the device has left hangs until
 // TCP gives up on it, and so do the DNS clients' pooled connections.
 func handleResetNetwork() {
 	handleCloseConnections()
-	handleClearDnsCache()
+	configMu.Lock()
+	defer configMu.Unlock()
+	dns.ClearAll()
 }
 
 func handleCloseConnection(connectionId string) bool {
