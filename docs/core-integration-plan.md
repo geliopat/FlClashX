@@ -7,7 +7,7 @@ Checkpoint: `archive/v1.1.5-before-core-integration` at `64b3a6a1f8285f32822eceb
 Core repository: https://github.com/geliopat/Clash.Meta
 - Clean Mihomo v1.19.34: `mihomo-upstream`, `0455d0d28c4526937380505153e65a843d8612e8`
 - Original FlClash fork reference: `FlClash`, `fea29264f541cba170bb8b7dda84697aa1dbcc3b`
-- FlClashZ candidate: `FlClashZ`, `5a55a1bb96d9b62a73c5463f333c5afb1f8b3762`
+- FlClashZ candidate: `FlClashZ`, `2732d34e4b32d5b5d1f8d36223d77b4813babaa7`
 - Provenance and replay guide: https://github.com/geliopat/Clash.Meta/blob/5a55a1bb96d9b62a73c5463f333c5afb1f8b3762/docs/flclashz-patch-stack.md
 
 ## Implementation order
@@ -20,3 +20,13 @@ Core repository: https://github.com/geliopat/Clash.Meta
 6. Complete the rest of docs/next-release-acceptance.md, static review, and only then user-authorized Windows testing. No stable release without explicit approval.
 
 Preserve all existing FlClashZ features, UI, Helper security, Zapret2 strategy and recovery behavior. Source-code work is not equivalent to acceptance. Client now pins the candidate as a Git submodule at core/third_party/mihomo. Run git submodule update --init after checkout. Existing sing-tun replacement remains authoritative. Native integration and acceptance are not complete.
+
+## Client integration progress
+
+- Pinned local Mihomo module, with original sing-tun replacement and manual validation submodule checkout.
+- Native tracker counters, new-request hook, early pending inbound ownership, native DNS record and ClearAll, route matcher and synchronized proxy/provider snapshots. Native provider mapping replaces approximate override replay while retaining path/membership checks.
+- Native delay events include proxy identity and history timestamp; old results are rejected, bounded overflow reconciles histories. No periodic full-history scan remains.
+- Native failed dials use the existing request message with optional failure and closedAt fields. Old payloads remain readable. UI marks the failure and avoids claiming a successful egress. Generated model files were updated alongside source; code-generation and compatibility still need verification.
+- Actual connection leaf type distinguishes same-name DIRECT and proxied outbounds. Network-change resets include provider-owned transports.
+- Native regression packages are included in the manual-only validation workflow. No build, test execution or workflow dispatch yet.
+- Still open: host-wide configurable health-check timeout, end-to-end IPC/load and race review, indexed connection/history storage and typed samples, shared statistics publisher, compound filtering and DNS-to-connection association, general override ownership and remaining release acceptance.

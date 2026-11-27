@@ -187,6 +187,13 @@ jobs:
           CGO_ENABLED: '0'
         run: go test -count=1 -tags with_gvisor -timeout 10m ./...
 
+      - name: Run pinned Mihomo native regression packages
+        timeout-minutes: 15
+        working-directory: core
+        env:
+          CGO_ENABLED: '0'
+        run: go test -count=1 -tags with_gvisor -timeout 10m github.com/metacubex/mihomo/adapter/provider github.com/metacubex/mihomo/adapter/outboundgroup github.com/metacubex/mihomo/component/proxydialer github.com/metacubex/mihomo/dns github.com/metacubex/mihomo/tunnel/statistic
+
       - name: Install Flutter dependencies
         run: flutter pub get
 

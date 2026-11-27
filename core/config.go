@@ -3,18 +3,15 @@ package core
 import (
 	"encoding/json"
 	"errors"
-	"maps"
 	"os"
 	"path/filepath"
 	"runtime"
-	"slices"
 	"strings"
 	"sync"
 
 	"github.com/metacubex/mihomo/adapter"
 	"github.com/metacubex/mihomo/adapter/inbound"
-	"github.com/metacubex/mihomo/common/convert"
-	"github.com/metacubex/mihomo/common/yaml"
+	"github.com/metacubex/mihomo/adapter/provider"
 	"github.com/metacubex/mihomo/component/age"
 	"github.com/metacubex/mihomo/component/auth"
 	"github.com/metacubex/mihomo/component/dialer"
@@ -107,12 +104,20 @@ func handleGetProxyDefinition(name string) (map[string]any, error) {
 	}
 	if proxy := lookupProxy(name); proxy != nil {
 		if pdName := proxy.ProxyInfo().ProviderName; pdName != "" {
-			pd, running := tunnel.Providers()[pdName]
+			pd, running := providersSnapshot()[pdName]
 			mapping, declared := raw.ProxyProvider[pdName]
 			if !running || !declared {
 				return nil, nil
 			}
-			return providerProxyMapping(pd.Proxies(), mapping, name)
+			if set, ok := pd.(*provider.ProxySetProvider); ok && !constant.Path.IsSafePath(set.Vehicle().Path()) {
+				return nil, nil
+			}
+			for _, built := range pd.Proxies() {
+				if built.Name() == name {
+					return provider.ProxyMapping(pd, mapping, name)
+				}
+			}
+			return nil, nil
 		}
 	}
 	for _, mapping := range raw.Proxy {
@@ -167,107 +172,6 @@ func withPlatformLimits(cfg *config.Config) *config.Config {
 		cfg.NTP.WriteToSystem = false
 	}
 	return cfg
-}
-
-// Replays adapter/provider's override: its field writes, then the name's prefix
-// and suffix. A proxy-name rewrite or override-expr cannot be replayed, so such
-// a provider yields no definition; its filters hold through the built proxies.
-var overriddenProxyKeys = []string{
-	"tfo",
-	"mptcp",
-	"udp",
-	"udp-over-tcp",
-	"up",
-	"down",
-	"dialer-proxy",
-	"skip-cert-verify",
-	"name-cert-verify",
-	"interface-name",
-	"routing-mark",
-	"ip-version",
-}
-
-func providerProxyMapping(
-	built []constant.Proxy,
-	mapping map[string]any,
-	name string,
-) (map[string]any, error) {
-	if !slices.ContainsFunc(built, func(proxy constant.Proxy) bool {
-		return proxy.Name() == name
-	}) {
-		return nil, nil
-	}
-	override, _ := mapping["override"].(map[string]any)
-	if override["proxy-name"] != nil || override["override-expr"] != nil {
-		return nil, nil
-	}
-	sources, err := providerRawProxies(mapping)
-	if err != nil {
-		return nil, err
-	}
-	prefix, _ := override["additional-prefix"].(string)
-	suffix, _ := override["additional-suffix"].(string)
-	for _, item := range sources {
-		source, ok := item.(map[string]any)
-		if !ok {
-			continue
-		}
-		rawName, _ := source["name"].(string)
-		if prefix+rawName+suffix != name {
-			continue
-		}
-		definition := maps.Clone(source)
-		for _, key := range overriddenProxyKeys {
-			if value, set := override[key]; set {
-				definition[key] = value
-			}
-		}
-		definition["name"] = name
-		return definition, nil
-	}
-	return nil, nil
-}
-
-// A provider's proxies sit in its inline payload or the file mihomo keeps for
-// it, found as adapter/provider does: the declared path, else the URL's hash.
-func providerRawProxies(mapping map[string]any) ([]any, error) {
-	if mapping["type"] == "inline" {
-		payload, _ := mapping["payload"].([]any)
-		return payload, nil
-	}
-	var path string
-	if declared, _ := mapping["path"].(string); declared != "" {
-		path = constant.Path.Resolve(declared)
-	} else if url, _ := mapping["url"].(string); url != "" {
-		path = constant.Path.GetPathByHash("proxies", url)
-	}
-	if path == "" || !constant.Path.IsSafePath(path) {
-		return nil, nil
-	}
-	buf, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	if secretKey, _ := mapping["age-secret-key"].(string); secretKey != "" {
-		if buf, err = age.DecryptBytes(buf, secretKey); err != nil {
-			return nil, err
-		}
-	}
-	var file struct {
-		Proxies []any `yaml:"proxies"`
-	}
-	if err := yaml.Unmarshal(buf, &file); err == nil {
-		return file.Proxies, nil
-	}
-	converted, err := convert.ConvertsV2Ray(buf)
-	if err != nil {
-		return nil, err
-	}
-	proxies := make([]any, len(converted))
-	for index, proxy := range converted {
-		proxies[index] = proxy
-	}
-	return proxies, nil
 }
 
 func runningConfigPath() string {

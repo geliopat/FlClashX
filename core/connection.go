@@ -3,6 +3,7 @@ package core
 import (
 	"github.com/metacubex/mihomo/component/resolver"
 	"github.com/metacubex/mihomo/dns"
+	"github.com/metacubex/mihomo/constant"
 	"github.com/metacubex/mihomo/tunnel"
 	"github.com/metacubex/mihomo/tunnel/statistic"
 )
@@ -62,9 +63,23 @@ func handleResetNetwork() {
 	defer configMu.Unlock()
 	handleCloseConnections()
 	dns.ClearAll()
-	for _, proxy := range tunnel.AllProxies() {
+	seen := make(map[constant.Proxy]struct{})
+	reset := func(proxy constant.Proxy) {
+		if _, exists := seen[proxy]; exists {
+			return
+		}
+		seen[proxy] = struct{}{}
 		if resetter, ok := adapterAs[interface{ ResetNetwork() }](proxy); ok {
 			resetter.ResetNetwork()
+		}
+	}
+	for _, proxy := range tunnel.AllProxies() {
+		reset(proxy)
+	}
+	// A name may be shared across providers; reset every actual instance.
+	for _, provider := range providersSnapshot() {
+		for _, proxy := range provider.Proxies() {
+			reset(proxy)
 		}
 	}
 }
