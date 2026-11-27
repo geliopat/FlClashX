@@ -101,6 +101,12 @@ class _PortFormState extends ConsumerState<_PortForm> {
     }
     bool locked(String key) => ref.read(settingLockedProvider(key));
     const defaults = PatchClashConfig();
+    final current = ref.read(patchClashConfigProvider);
+    for (final field in _fields) {
+      if (!locked(field.settingKey) && field.select(current) != field.select(defaults)) {
+        ref.read(managedSettingsActionProvider.notifier).takeOver(field.settingKey);
+      }
+    }
     ref
         .read(patchClashConfigProvider.notifier)
         .update(

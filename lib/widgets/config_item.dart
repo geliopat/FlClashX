@@ -282,6 +282,7 @@ class ConfigListEditItem extends _ConfigItem<List<String>> {
     this.itemValidator,
     super.subtitle,
     super.leading,
+    super.managedKey,
   });
 
   final int? itemMaxLength;

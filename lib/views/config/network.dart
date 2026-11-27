@@ -407,9 +407,8 @@ List<Widget> tunItems({required bool isMipsStack}) {
       ),
     const BypassPrivateRouteItem(),
     const RouteAddressItem(),
-    ManagedSetting(
-      settingKey: 'clash.tun.route-exclude-address',
-      child: ConfigListEditItem(
+    ConfigListEditItem(
+        managedKey: 'clash.tun.route-exclude-address',
         title: (l) => l.routeExcludeAddress,
         itemMaxLength: TextInputLimits.cidr,
         itemValidator: validateCidr,
@@ -419,7 +418,6 @@ List<Widget> tunItems({required bool isMipsStack}) {
         onChanged: _tunWriter(
           (state, value) => state.copyWith.tun(routeExcludeAddress: value),
         ),
-      ),
     ),
   ];
 }
