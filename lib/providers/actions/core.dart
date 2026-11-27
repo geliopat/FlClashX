@@ -102,6 +102,8 @@ class CoreAction extends _$CoreAction {
     crashFileLogger.enable();
     crashFileLogger.write(Log.app('[Mihomo] $reason').copyWith(logLevel: LogLevel.error));
     if (system.isWindows && !ref.read(mihomoWatchdogProvider)) {
+      final id = recoveryJournal.begin('Mihomo', 'watchdog');
+      recoveryJournal.record(id, 'Mihomo', 'watchdog', RecoveryOutcome.skipped);
       return;
     }
     final restartedAt = _crashRestartedAt;
@@ -123,6 +125,10 @@ class CoreAction extends _$CoreAction {
       ) {
         _unansweredCrash = null;
         if (_failedRestarts >= crashRestartLimit) {
+          if (system.isWindows) {
+            final id = recoveryJournal.begin('Mihomo', 'watchdog-limit');
+            recoveryJournal.record(id, 'Mihomo', 'watchdog-limit', RecoveryOutcome.skipped);
+          }
           commonPrint.log(
             '$crashRestartLimit restarts in a row did not keep the Core up for '
             '${crashRestartWindow.inSeconds}s, leaving it down: $crash',
@@ -189,6 +195,9 @@ class CoreAction extends _$CoreAction {
   bool get coreIsEmbedded => coreLib != null;
 
   Future<bool> _runRestartWorker({bool? running, required bool repairHelper}) async {
+    final action = _restartingAfterCrash ? 'watchdog' : 'restart';
+    final recoveryId = system.isWindows ? recoveryJournal.begin('Mihomo', action) : null;
+    var outcome = RecoveryOutcome.interrupted;
     final setupAction = ref.read(setupActionProvider.notifier);
     final bool wasRunning = running ?? ref.read(isStartProvider);
     var restartZapret = false;
@@ -239,11 +248,14 @@ class CoreAction extends _$CoreAction {
           commonPrint.log('Linked Zapret restart failed: $error', logLevel: LogLevel.warning);
         });
       }
+      outcome = applied ? RecoveryOutcome.succeeded : RecoveryOutcome.failed;
       return applied;
     } catch (_) {
+      outcome = RecoveryOutcome.failed;
       ref.read(coreStatusProvider.notifier).value = CoreStatus.disconnected;
       rethrow;
     } finally {
+      if (recoveryId != null) recoveryJournal.record(recoveryId, 'Mihomo', action, outcome);
       zapret?.endCoreRestart();
       _relaunchRequested = false;
       _restartOperation = null;
