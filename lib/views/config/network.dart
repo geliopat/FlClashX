@@ -452,6 +452,7 @@ class TunSection extends ConsumerWidget {
     }
     final spec = appTunOverrideSpec(isLinux: isLinux, isWindows: isWindows);
     final picked = spec.listedKeys(ref, watch: true);
+    final sourcePending = spec.sourcePending(ref, watch: true);
     final listed = [
       for (final key in spec.values)
         if (picked.contains(key)) key,
@@ -469,7 +470,7 @@ class TunSection extends ConsumerWidget {
         ],
         for (final key in listed)
           OverrideEntry(key: ValueKey(key), spec: spec, overrideKey: key),
-        if (listed.length < spec.values.length)
+        if (!sourcePending && listed.length < spec.values.length)
           FormRow(
             key: const ValueKey(#add),
             leading: EntryButton.add(onPressed: handleAdd),
@@ -481,6 +482,8 @@ class TunSection extends ConsumerWidget {
       footer: [
         appLocalizations.bypassPrivateRouteDesc,
         appLocalizations.tunOverrideDesc,
+        if (sourcePending) Localizations.localeOf(context).languageCode == 'ru'
+            ? 'Параметры подписки пока недоступны.' : 'Subscription settings are not available yet.',
         ?spec.footerOf(listed, appLocalizations),
       ].join('\n'),
     );
