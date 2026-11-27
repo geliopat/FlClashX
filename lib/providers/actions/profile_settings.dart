@@ -56,8 +56,16 @@ class ProfileSettingsAction extends _$ProfileSettingsAction {
     final id = source.id;
     final generation = ++_generation;
     _unread = false;
-    ref.read(yamlSettingReferencesProvider.notifier).set(null);
-    ref.read(yamlSectionSourcesProvider.notifier).set(null);
+    final hasSource = id != null &&
+        source.type != ProfileType.custom && source.extendType != ExtendType.script;
+    final previousSource = ref.read(yamlSectionSourcesProvider);
+    // Retain the last successful source on refresh of the same profile.
+    // An in-flight or failed update must not temporarily expose inherited
+    // keys as absent or allow an accidental duplicate override.
+    if (!hasSource || previousSource?.profileId != id) {
+      ref.read(yamlSettingReferencesProvider.notifier).set(null);
+      ref.read(yamlSectionSourcesProvider.notifier).set(null);
+    }
     if (id == null ||
         source.type == ProfileType.custom ||
         source.extendType == ExtendType.script) {
