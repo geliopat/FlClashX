@@ -6,6 +6,7 @@ const _defaultDuration = Duration(milliseconds: 300);
 
 // Rows sized towards zero all fit the viewport, so each one is laid out.
 const _maxAnimatedChanges = 50;
+const _largeFeedThreshold = 1000;
 
 /// A lazily built vertical list that diffs [items] by key: removed items
 /// collapse out, inserted items grow in, and items whose key survives slide
@@ -112,6 +113,27 @@ class _KeyedAnimatedListState<T> extends State<KeyedAnimatedList<T>>
       _transition.stop();
       _settle();
     }
+    // Stable order with only new counters does not require a move animation
+    // or a new key index. Preserve each row's existing identity.
+    if (_entries.length == items.length) {
+      var sameOrder = true;
+      for (var index = 0; index < items.length; index++) {
+        if (_entries[index].key != widget.keyOf(items[index])) {
+          sameOrder = false;
+          break;
+        }
+      }
+      if (sameOrder) {
+        for (var index = 0; index < items.length; index++) {
+          _entries[index].item = items[index];
+        }
+        return;
+      }
+    }
+    if (items.length >= _largeFeedThreshold || _entries.length >= _largeFeedThreshold) {
+      _replaceItems(items);
+      return;
+    }
     final oldByKey = {for (final entry in _entries) entry.key: entry};
     final newKeys = {for (final item in items) widget.keyOf(item)};
     final inserted = newKeys.where((key) => !oldByKey.containsKey(key));
@@ -176,6 +198,9 @@ class _KeyedAnimatedListState<T> extends State<KeyedAnimatedList<T>>
         alignment: Alignment.topCenter,
         child: FadeTransition(opacity: animation, child: row),
       );
+    }
+    if (_entries.length >= _largeFeedThreshold) {
+      return KeyedSubtree(key: ValueKey(entry.key), child: RepaintBoundary(child: row));
     }
     return _SlideOnMove(
       key: ValueKey(entry.key),
