@@ -3,7 +3,7 @@ name: Zapret Windows validation
 on:
   # Temporary opt-in validation of the cache integration branch; no publication.
   push:
-    branches: [ci/windows-build-cache]
+    branches: [ci/windows-build-cache-clean]
   workflow_dispatch:
     inputs:
       candidate_ref:
@@ -42,7 +42,7 @@ env:
   FLUTTER_VERSION: '3.47.6'
   GO_VERSION: '1.27.1'
   # Do not read or populate shared caches while executing a different candidate.
-  BUILD_MODE: ${{ (inputs.candidate_ref != '' && inputs.candidate_ref != github.sha && 'clean') || inputs.build_mode || 'fast' }}
+  BUILD_MODE: ${{ (inputs.candidate_ref != '' && inputs.candidate_ref != github.sha && 'clean') || inputs.build_mode || 'clean' }}
   CARGO_INCREMENTAL: '0'
 
 jobs:
