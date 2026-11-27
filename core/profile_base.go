@@ -10,6 +10,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
+	"runtime"
 	"slices"
 	"strings"
 
@@ -268,6 +270,9 @@ func mergeProfileBase(base *SetupBase) (*yaml.Node, error) {
 	if err != nil {
 		return nil, err
 	}
+	if runtime.GOOS == "windows" {
+		preserveUnknownProfileKeys(profile, root)
+	}
 	for _, key := range profileBaseSections {
 		if value := mappingValue(profile, key); value != nil {
 			setMappingValue(root, key, value)
@@ -285,6 +290,31 @@ func mergeProfileBase(base *SetupBase) (*yaml.Node, error) {
 		setMappingValue(root, "rules", rules)
 	}
 	return &yaml.Node{Kind: yaml.DocumentNode, Content: []*yaml.Node{root}}, nil
+}
+
+// Unknown top-level metadata and extension fields must survive a Windows
+// subscription apply. A known RawConfig field omitted by the overlay is
+// deliberately not restored: that could undo app safety or a user removal.
+func preserveUnknownProfileKeys(profile, overlay *yaml.Node) {
+	typ := reflect.TypeFor[config.RawConfig]()
+	known := make(map[string]struct{}, typ.NumField())
+	for i := 0; i < typ.NumField(); i++ {
+		field := typ.Field(i)
+		for _, tag := range []string{"yaml", "json"} {
+			name, _, _ := strings.Cut(field.Tag.Get(tag), ",")
+			if name != "" && name != "-" {
+				known[name] = struct{}{}
+			}
+		}
+	}
+	for _, key := range mappingKeys(profile) {
+		if _, managed := known[key]; managed || mappingValue(overlay, key) != nil {
+			continue
+		}
+		if value := mappingValue(profile, key); value != nil {
+			setMappingValue(overlay, key, value)
+		}
+	}
 }
 
 func documentMapping(document *yaml.Node) (*yaml.Node, error) {
