@@ -155,6 +155,8 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> {
       delayTestingGroupsProvider.select((state) => state.isNotEmpty),
     );
     final appLocalizations = context.appLocalizations;
+    final speedBusy = system.isWindows && ref.watch(speedTestProvider.select((state) => state.busy));
+    final speedAvailable = system.isWindows && ref.watch(coreStatusProvider) == CoreStatus.connected;
     final barActions = [
       if (!picker) ...[
         if (ref.watch(globalModeAllowedProvider))
@@ -177,6 +179,14 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> {
                     .read(proxiesActionProvider.notifier)
                     .delayTestAllGroups(),
         ),
+        if (system.isWindows)
+          IconButtonData(
+            glyph: AppGlyphs.speed,
+            tooltip: appLocalizations.forkSpeedTestAll,
+            isLoading: speedBusy,
+            onPressed: speedBusy || !speedAvailable ? null : () =>
+                ref.read(speedTestProvider.notifier).testAll(),
+          ),
       ],
     ];
     return CommonScaffold(

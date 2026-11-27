@@ -1,4 +1,5 @@
 import 'package:fl_clash/enum/enum.dart';
+import 'package:fl_clash/common/system.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/ui/typography.dart';
@@ -23,14 +24,16 @@ double getItemHeight(ProxyCardType proxyCardType) {
       measure.textHeight(AppTextStyle.footnote) +
       8 +
       4;
-  return switch (proxyCardType) {
+  final speedHeight = system.isWindows
+      ? measure.textHeight(AppTextStyle.caption2) + 10 : 0.0;
+  return speedHeight + (switch (proxyCardType) {
     ProxyCardType.loose =>
       baseHeight + measure.textHeight(AppTextStyle.caption2) + 6,
     ProxyCardType.standard => baseHeight,
     ProxyCardType.compact =>
       baseHeight - measure.textHeight(AppTextStyle.subheadline),
     ProxyCardType.oneline => 20 + measure.textHeight(AppTextStyle.subheadline),
-  };
+  });
 }
 
 double getRowExtent(ProxyCardType proxyCardType) =>

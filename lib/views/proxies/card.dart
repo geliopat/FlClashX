@@ -119,6 +119,14 @@ class ProxyCard extends ConsumerWidget {
           checked: pinned,
           onPressed: () => _handleSelect(ref),
         ),
+      if (system.isWindows && speedTestableProxy(proxy) &&
+          !ref.watch(speedTestProvider.select((state) => state.busy)) &&
+          ref.watch(coreStatusProvider) == CoreStatus.connected)
+        CommonPopupMenuItem(
+          glyph: AppGlyphs.speed,
+          label: appLocalizations.forkSpeedTest,
+          onPressed: () => ref.read(speedTestProvider.notifier).testProxy(proxy),
+        ),
       if (addable)
         CommonPopupMenuItem(
           glyph: AppGlyphs.listAdd,
@@ -212,12 +220,21 @@ class ProxyCard extends ConsumerWidget {
               alignment: Alignment.centerLeft,
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: isOneline
-                  ? Row(
+                  ? Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
                       spacing: 8,
                       children: [
                         Expanded(child: proxyNameText),
                         delayText,
                         ?badge,
+                      ],
+                        ),
+                        if (system.isWindows && speedTestableProxy(proxy)) ...[
+                          const SizedBox(height: 4),
+                          _ProxySpeedText(proxyName: proxy.name),
+                        ],
                       ],
                     )
                   : Column(
@@ -234,6 +251,10 @@ class ProxyCard extends ConsumerWidget {
                         ),
                         const SizedBox(height: 8),
                         details,
+                        if (system.isWindows && speedTestableProxy(proxy)) ...[
+                          const SizedBox(height: 6),
+                          _ProxySpeedText(proxyName: proxy.name),
+                        ],
                       ],
                     ),
             ),
@@ -428,6 +449,53 @@ class _DelayTextState extends ConsumerState<_DelayText> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _ProxySpeedText extends ConsumerWidget {
+  const _ProxySpeedText({required this.proxyName});
+  final String proxyName;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final result = ref.watch(speedTestProvider.select((state) => state.results[proxyName]));
+    final pending = ref.watch(speedTestProvider.select((state) => state.pending.contains(proxyName)));
+    final running = ref.watch(speedTestProvider.select((state) => state.running == proxyName));
+    final l = context.appLocalizations;
+    final style = AppTextStyle.caption2.of(context).copyWith(
+      color: context.colorScheme.onSurfaceVariant,
+    );
+    String format(double? value) => value == null ? '—'
+        : '${value.toStringAsFixed(value >= 100 ? 0 : 1)} ${l.forkSpeedMbps}';
+    Widget metric(String arrow, String label, double? value, String error) =>
+        Expanded(
+          child: Tooltip(
+            message: error.isEmpty ? label : '$label: ${l.forkSpeedFailed} ($error)',
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text('$arrow ${format(value)}', style: style, maxLines: 1),
+              ),
+            ),
+          ),
+        );
+    return SizedBox(
+      height: globalState.measure.textHeight(AppTextStyle.caption2) + 2,
+      child: pending
+          ? Row(children: [
+              if (running) CommonCircleLoading(size: 12)
+              else const GlyphIcon(AppGlyphs.clock, size: 12),
+              const SizedBox(width: 6),
+              Expanded(child: Text(l.forkSpeedTest, style: style,
+                  maxLines: 1, overflow: TextOverflow.ellipsis)),
+            ])
+          : Row(spacing: 6, children: [
+              metric('↓', l.download, result?.download, result?.downloadError ?? ''),
+              metric('↑', l.upload, result?.upload, result?.uploadError ?? ''),
+            ]),
     );
   }
 }

@@ -107,6 +107,10 @@ jobs:
         timeout-minutes: 5
         run: flutter test test/providers/proxies_action_test.dart --plain-name "delayTest"
 
+      - name: Run speed test target and card layout regressions
+        timeout-minutes: 5
+        run: flutter test test/providers/speed_test_test.dart test/widgets/proxy_card_oneline_test.dart
+
       - name: Run provider ownership and context menu regression tests
         timeout-minutes: 15
         run: flutter test test/widgets/managed_setting_test.dart test/providers/profile_headers_action_test.dart test/views/profiles/edit_profile_device_headers_test.dart

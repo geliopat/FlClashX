@@ -70,11 +70,12 @@ Size windowControlsOverPage({
 
 int getProxiesColumns(double viewWidth, ProxiesLayout proxiesLayout) {
   final columns = max((viewWidth / 250).ceil(), 2);
-  return switch (proxiesLayout) {
+  final preferred = switch (proxiesLayout) {
     ProxiesLayout.tight => columns + 1,
     ProxiesLayout.standard => columns,
     ProxiesLayout.loose => columns - 1,
   };
+  return max(1, min(preferred, ((viewWidth + 8) / 178).floor()));
 }
 
 double cardSpacingOf(BuildContext context, ViewMode viewMode) =>

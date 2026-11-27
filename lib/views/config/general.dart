@@ -42,34 +42,102 @@ class TestUrlItem extends ConsumerWidget {
   const TestUrlItem({super.key});
 
   @override
-  Widget build(BuildContext context, ref) {
-    final appLocalizations = context.appLocalizations;
-    final testUrl = ref.watch(
-      appSettingProvider.select((state) => state.testUrl),
-    );
-    return ListItem.input(
-      title: Text(appLocalizations.testUrl),
-      subtitle: Text(testUrl),
-      resetValue: defaultTestUrl,
-      dialogTitle: appLocalizations.testUrl,
-      value: testUrl,
-      maxLength: TextInputLimits.url,
-      validator: (String? value) {
-        if (value == null || value.isEmpty) {
-          return appLocalizations.emptyTip(appLocalizations.testUrl);
-        }
-        if (!value.isUrl) {
-          return appLocalizations.urlTip(appLocalizations.testUrl);
-        }
-        return null;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l = context.appLocalizations;
+    final url = ref.watch(appSettingProvider.select((state) => state.testUrl));
+    final choices = [...delayTestPresets.keys, 'custom'];
+    final chosen = delayTestPresets.entries
+        .where((entry) => entry.value == url).firstOrNull?.key ?? 'custom';
+    return ListItem<String>.options(
+      title: Text(l.testUrl),
+      subtitle: Text(url),
+      options: choices,
+      value: chosen,
+      textBuilder: (value) => value == 'custom' ? l.custom : value,
+      onChanged: (value) {
+        if (value == 'custom') return;
+        ref.read(appSettingProvider.notifier)
+            .update((state) => state.copyWith(testUrl: delayTestPresets[value]!));
       },
-      onChanged: (String? value) {
-        if (value == null) {
-          return;
+    );
+  }
+}
+
+class CustomDelayUrlItem extends ConsumerWidget {
+  const CustomDelayUrlItem({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l = context.appLocalizations;
+    final url = ref.watch(appSettingProvider.select((state) => state.testUrl));
+    return ListItem.input(
+      title: Text('${l.testUrl} · ${l.custom}'),
+      subtitle: Text(url),
+      resetValue: defaultTestUrl,
+      dialogTitle: l.testUrl,
+      value: url,
+      maxLength: TextInputLimits.url,
+      validator: (value) => validTestEndpoint(value?.trim() ?? '')
+          ? null : l.urlTip(l.testUrl),
+      onChanged: (value) {
+        if (value != null && validTestEndpoint(value.trim())) {
+          ref.read(appSettingProvider.notifier)
+              .update((state) => state.copyWith(testUrl: value.trim()));
         }
-        ref
-            .read(appSettingProvider.notifier)
-            .update((state) => state.copyWith(testUrl: value));
+      },
+    );
+  }
+}
+
+class SpeedTestUrlItem extends ConsumerWidget {
+  const SpeedTestUrlItem({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l = context.appLocalizations;
+    final settings = ref.watch(speedTestSettingsProvider);
+    final action = ref.read(speedTestSettingsProvider.notifier);
+    return ListItem<SpeedTestService>.options(
+      title: Text(l.forkSpeedTestUrl),
+      subtitle: Text(l.forkDirectYandex),
+      options: SpeedTestService.values,
+      value: settings.service,
+      textBuilder: (value) => switch (value) {
+        SpeedTestService.cloudflare => 'Cloudflare',
+        SpeedTestService.yandex => 'Yandex Internetometer',
+        SpeedTestService.custom => l.custom,
+      },
+      onChanged: (value) => action.set(settings.copyWith(service: value)),
+    );
+  }
+}
+
+class CustomSpeedUrlItem extends ConsumerWidget {
+  const CustomSpeedUrlItem({super.key, required this.upload});
+  final bool upload;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l = context.appLocalizations;
+    final settings = ref.watch(speedTestSettingsProvider);
+    final value = upload ? settings.uploadUrl : settings.downloadUrl;
+    final title = upload ? l.forkSpeedUploadUrl : l.forkSpeedDownloadUrl;
+    return ListItem.input(
+      title: Text(title),
+      subtitle: Text(value),
+      dialogTitle: title,
+      value: value,
+      resetValue: upload ? speedTestDefaultUpload : speedTestDefaultDownload,
+      maxLength: TextInputLimits.url,
+      validator: (text) => validTestEndpoint(text?.trim() ?? '')
+          ? null : l.urlTip(title),
+      onChanged: (text) {
+        if (text == null || !validTestEndpoint(text.trim())) return;
+        final controller = ref.read(speedTestSettingsProvider.notifier);
+        final latest = ref.read(speedTestSettingsProvider);
+        controller.set(upload
+            ? latest.copyWith(uploadUrl: text.trim(), service: SpeedTestService.custom)
+            : latest.copyWith(downloadUrl: text.trim(), service: SpeedTestService.custom));
       },
     );
   }
@@ -486,6 +554,12 @@ class GeneralView extends ConsumerWidget {
   List<Widget> _connectionItems() {
     return [
       const TestUrlItem(),
+      const CustomDelayUrlItem(),
+      if (system.isWindows) ...const [
+        SpeedTestUrlItem(),
+        CustomSpeedUrlItem(upload: false),
+        CustomSpeedUrlItem(upload: true),
+      ],
       const DelayTestTimeoutItem(),
       if (system.isWindows) ...const [AutoDelayIntervalItem(active: true), AutoDelayIntervalItem(active: false), ZapretProbeIntervalItem()],
       _clashToggle(
