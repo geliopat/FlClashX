@@ -75,6 +75,7 @@ int getProxiesColumns(double viewWidth, ProxiesLayout proxiesLayout) {
     ProxiesLayout.standard => columns,
     ProxiesLayout.loose => columns - 1,
   };
+  if (proxiesLayout == ProxiesLayout.tight) return preferred;
   return max(1, min(preferred, ((viewWidth + 8) / 178).floor()));
 }
 

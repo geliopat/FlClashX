@@ -59,7 +59,8 @@ class _ProxiesListViewState extends ConsumerState<ProxiesListView> {
   GroupOffsets _getGroupOffsets() {
     final state = ref.read(proxiesListStateProvider);
     final offsets = <double>[];
-    final rowExtent = getRowExtent(state.proxyCardType);
+    final rowExtent = getRowExtent(state.proxyCardType,
+      layout: ref.read(proxiesStyleSettingProvider).layout);
     final columnOffsets = List.filled(_groupColumns, 0.0);
     for (final (index, group) in state.groups.indexed) {
       final column = index % _groupColumns;
@@ -361,7 +362,8 @@ class _GroupSliverState extends ConsumerState<_GroupSliver>
         .map<Widget>(
           (keyed) => Flexible(
             child: SizedBox(
-              height: getItemHeight(cardType),
+              height: getItemHeight(cardType,
+                layout: ref.read(proxiesStyleSettingProvider).layout),
               child: _buildCard(keyed.$1, keyed.$2),
             ),
           ),
@@ -460,6 +462,7 @@ class _GroupSliverState extends ConsumerState<_GroupSliver>
 
   @override
   Widget build(BuildContext context) {
+    final layout = ref.watch(proxiesStyleSettingProvider.select((state) => state.layout));
     final groupName = widget.group.name;
     final isExpand = ref.watch(
       unfoldSetProvider.select((state) => state.contains(groupName)),
@@ -467,7 +470,7 @@ class _GroupSliverState extends ConsumerState<_GroupSliver>
     final unfolded = _controller.isCompleted;
     Widget? rows;
     if (!_controller.isDismissed && widget.group.all.isNotEmpty) {
-      final extent = getRowExtent(widget.cardType);
+      final extent = getRowExtent(widget.cardType, layout: layout);
       final decoration = ShapeDecoration(
         color: context.raisedSurfaceLevel.colorOf(context.colorScheme),
         shape: AppShape.vertical(
@@ -542,7 +545,8 @@ class _GroupSliverState extends ConsumerState<_GroupSliver>
         listHeaderHeight +
         (_controller.isDismissed
             ? 0.0
-            : _rowsExtent(rowCount, getRowExtent(widget.cardType)));
+            : _rowsExtent(rowCount, getRowExtent(widget.cardType,
+                layout: ref.read(proxiesStyleSettingProvider).layout)));
     (double, double, double, Color)? headerState;
     Widget? header;
     return SliverLayoutBuilder(

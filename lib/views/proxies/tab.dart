@@ -95,7 +95,8 @@ class ProxiesTabViewState extends ConsumerState<ProxiesTabView>
       proxies: group.all,
       selectedProxyName: ref.read(selectedProxyNameProvider(group.name)),
       columns: _columns,
-      rowExtent: getRowExtent(cardType),
+      rowExtent: getRowExtent(cardType,
+        layout: ref.read(proxiesStyleSettingProvider).layout),
     );
     if (rowOffset == null) {
       return;
@@ -260,6 +261,7 @@ class ProxyGroupView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final layout = ref.watch(proxiesStyleSettingProvider.select((state) => state.layout));
     final proxies = group.all;
     // A card keeps its focus and state across a reorder, such as a delay sort,
     // instead of handing them to whichever proxy lands in its slot. mihomo
@@ -288,7 +290,7 @@ class ProxyGroupView extends ConsumerWidget {
           crossAxisCount: columns,
           mainAxisSpacing: proxyGridSpacing,
           crossAxisSpacing: 8,
-          mainAxisExtent: getItemHeight(cardType),
+          mainAxisExtent: getItemHeight(cardType, layout: layout),
         ),
         itemCount: proxies.length,
         addAutomaticKeepAlives: false,

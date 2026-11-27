@@ -16,7 +16,14 @@ double get listHeaderHeight {
       2;
 }
 
-double getItemHeight(ProxyCardType proxyCardType) {
+/// Dense layout keeps its original dimensions, regardless of card size.
+bool showProxySpeedMetrics(ProxiesLayout layout, {required bool isWindows}) =>
+    isWindows && layout != ProxiesLayout.tight;
+
+double getItemHeight(
+  ProxyCardType proxyCardType, {
+  ProxiesLayout layout = ProxiesLayout.standard,
+}) {
   final measure = globalState.measure;
   final baseHeight =
       16 +
@@ -24,7 +31,7 @@ double getItemHeight(ProxyCardType proxyCardType) {
       measure.textHeight(AppTextStyle.footnote) +
       8 +
       4;
-  final speedHeight = system.isWindows
+  final speedHeight = showProxySpeedMetrics(layout, isWindows: system.isWindows)
       ? measure.textHeight(AppTextStyle.caption2) + 10 : 0.0;
   return speedHeight + (switch (proxyCardType) {
     ProxyCardType.loose =>
@@ -36,8 +43,10 @@ double getItemHeight(ProxyCardType proxyCardType) {
   });
 }
 
-double getRowExtent(ProxyCardType proxyCardType) =>
-    getItemHeight(proxyCardType) + proxyGridSpacing;
+double getRowExtent(
+  ProxyCardType proxyCardType, {
+  ProxiesLayout layout = ProxiesLayout.standard,
+}) => getItemHeight(proxyCardType, layout: layout) + proxyGridSpacing;
 
 class GroupOffsets {
   const GroupOffsets(this.groups, this.offsets);

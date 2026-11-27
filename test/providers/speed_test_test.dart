@@ -2,8 +2,15 @@ import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/speed_test.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fl_clash/views/proxies/common.dart';
 
 void main() {
+  test('dense layout never shows speed measurements', () {
+    expect(showProxySpeedMetrics(ProxiesLayout.tight, isWindows: true), isFalse);
+    expect(showProxySpeedMetrics(ProxiesLayout.standard, isWindows: true), isTrue);
+    expect(showProxySpeedMetrics(ProxiesLayout.loose, isWindows: true), isTrue);
+    expect(showProxySpeedMetrics(ProxiesLayout.standard, isWindows: false), isFalse);
+  });
   test('global speed target list contains each concrete node once and DIRECT', () {
     const a = Proxy(name: 'A', type: 'Vless');
     const b = Proxy(name: 'B', type: 'Vless');

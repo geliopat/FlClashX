@@ -8,6 +8,8 @@ import 'package:fl_clash/widgets/widgets.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'common.dart';
+
 void selectGroupProxy(
   WidgetRef ref, {
   required String groupName,
@@ -141,6 +143,10 @@ class ProxyCard extends ConsumerWidget {
     final measure = globalState.measure;
     final isLoose = type == ProxyCardType.loose;
     final isOneline = type == ProxyCardType.oneline;
+    final showSpeed = showProxySpeedMetrics(
+      ref.watch(proxiesStyleSettingProvider.select((state) => state.layout)),
+      isWindows: system.isWindows,
+    ) && speedTestableProxy(proxy);
     final delayText = _DelayText(
       proxy: proxy,
       testUrl: testUrl,
@@ -231,7 +237,7 @@ class ProxyCard extends ConsumerWidget {
                         ?badge,
                       ],
                         ),
-                        if (system.isWindows && speedTestableProxy(proxy)) ...[
+                        if (showSpeed) ...[
                           const SizedBox(height: 4),
                           _ProxySpeedText(proxyName: proxy.name),
                         ],
@@ -251,7 +257,7 @@ class ProxyCard extends ConsumerWidget {
                         ),
                         const SizedBox(height: 8),
                         details,
-                        if (system.isWindows && speedTestableProxy(proxy)) ...[
+                        if (showSpeed) ...[
                           const SizedBox(height: 6),
                           _ProxySpeedText(proxyName: proxy.name),
                         ],
