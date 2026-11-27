@@ -38,6 +38,8 @@ var
   HelperHeld: Boolean;
   UpdatePrepared: Boolean;
   KeepWinDivert: Boolean;
+  ExpectedDriverHash: String;
+  DriverRestartPending: Boolean;
 
 procedure SHChangeNotify(wEventId: Integer; uFlags: Integer; dwItem1: Integer; dwItem2: Integer); external 'SHChangeNotify@shell32.dll stdcall';
 
@@ -150,7 +152,6 @@ end;
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   DriverPath: String;
-  DriverUnloadResult: Integer;
 begin
   Result := '';
   { Refuse a directory containing another client before changing any services. }
@@ -174,28 +175,24 @@ begin
     Exit;
   end;
 
-  { WinDivert can stay mapped by Windows even after its owning processes exit.
-    Preserve it only when its exact bytes match the bundled signed driver. }
+  { Attempt unloading even if the driver is unchanged. A loaded driver is
+    not a reason to abort setup; restartreplace handles deferred replacement. }
   KeepWinDivert := False;
+  DriverRestartPending := False;
   DriverPath := ExpandConstant('{app}\zapret\WinDivert64.sys');
+  ExtractTemporaryFile('WinDivert64.sys');
+  ExpectedDriverHash := GetSHA256OfFile(ExpandConstant('{tmp}\WinDivert64.sys'));
   if FileExists(DriverPath) then
   begin
+    if RunUpdateScript('UnloadDriver') <> 0 then
+      Log('WinDivert could not be unloaded; replacement may require a restart');
     try
-      DriverUnloadResult := RunUpdateScript('UnloadDriver');
-      ExtractTemporaryFile('WinDivert64.sys');
-      KeepWinDivert := CompareText(GetSHA256OfFile(DriverPath),
-        GetSHA256OfFile(ExpandConstant('{tmp}\WinDivert64.sys'))) = 0;
-      if KeepWinDivert then
-        Log('WinDivert64.sys matches bundled SHA-256; keeping existing driver')
-      else if (DriverUnloadResult <> 0) or (RunUpdateScript('CheckDriver') <> 0) then
-      begin
-        ReleaseUpdate;
-        Result := CustomMessage('DriverInUse');
-      end;
+      KeepWinDivert := CompareText(GetSHA256OfFile(DriverPath), ExpectedDriverHash) = 0;
     except
-      ReleaseUpdate;
-      Result := CustomMessage('DriverInUse');
+      KeepWinDivert := False;
     end;
+    if KeepWinDivert then
+      Log('WinDivert64.sys matches bundled SHA-256; keeping existing driver');
   end;
 end;
 
@@ -243,10 +240,46 @@ begin
     Result := Result + MemoTasksInfo + NewLine;
 end;
 
+{ The Helper must not launch a new engine with an old driver while Windows
+  is waiting to process the queued file replacement. }
+procedure RecordDriverRestart;
+var
+  DriverPath, Marker: String;
+  Matches: Boolean;
+begin
+  DriverPath := ExpandConstant('{app}\zapret\WinDivert64.sys');
+  Marker := ExpandConstant('{app}\zapret\driver-restart.sha256');
+  Matches := False;
+  try
+    if FileExists(DriverPath) then
+      Matches := CompareText(GetSHA256OfFile(DriverPath), ExpectedDriverHash) = 0;
+  except
+    Matches := False;
+  end;
+  DriverRestartPending := not Matches;
+  if DriverRestartPending then
+  begin
+    if not SaveStringToFile(Marker, ExpectedDriverHash, False) then
+      RaiseException('Unable to record pending WinDivert replacement');
+    Log('WinDivert replacement pending until Windows restarts');
+  end
+  else if FileExists(Marker) then
+  begin
+    if not DeleteFile(Marker) then
+      RaiseException('Unable to clear WinDivert restart marker');
+  end;
+end;
+
+function NeedRestart(): Boolean;
+begin
+  Result := DriverRestartPending;
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssPostInstall then
   begin
+    RecordDriverRestart;
     SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, 0, 0);
     ReleaseUpdate;
     ReleaseHelper;
@@ -316,7 +349,6 @@ english.CurrentVersion=Current version: %1
 english.NewVersion=New version: %1
 english.RemoveUserData=Remove the application's user data?
 english.UpdateShutdownFailed=Could not safely stop FlClashZ. Close it and retry the update.
-english.DriverInUse=WinDivert is in use or cannot be replaced. Restart Windows and run Setup before starting FlClashZ or other WinDivert applications.
 english.ForeignInstallDir=Choose a separate folder. This folder belongs to another FlClash application.
 russian.Upgrade=Обновление
 russian.FreshInstall=Новая установка
@@ -328,7 +360,6 @@ russian.CurrentVersion=Текущая версия: %1
 russian.NewVersion=Новая версия: %1
 russian.RemoveUserData=Удалить пользовательские данные программы?
 russian.UpdateShutdownFailed=Не удалось безопасно завершить FlClashZ. Закройте программу и повторите обновление.
-russian.DriverInUse=Драйвер WinDivert занят или недоступен для замены. Перезагрузите Windows и запустите установщик до запуска FlClashZ и других приложений WinDivert.
 russian.ForeignInstallDir=Выберите отдельную папку. Эта папка принадлежит другому приложению FlClash.
 chineseSimplified.Upgrade=升级
 chineseSimplified.FreshInstall=全新安装
@@ -340,7 +371,6 @@ chineseSimplified.CurrentVersion=当前版本：%1
 chineseSimplified.NewVersion=新版本：%1
 chineseSimplified.RemoveUserData=是否删除应用程序的用户数据？
 chineseSimplified.UpdateShutdownFailed=无法安全关闭 FlClashZ。请退出程序后重试更新。
-chineseSimplified.DriverInUse=WinDivert 正在使用或无法替换。请重启 Windows，并在启动 FlClashZ 或其他 WinDivert 应用前运行安装程序。
 chineseSimplified.ForeignInstallDir=请选择单独的目录。此目录属于其他 FlClash 应用。
 
 [Tasks]
@@ -349,8 +379,11 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 [Files]
 Source: "{{UPDATE_SCRIPT}}"; Flags: dontcopy
 Source: "{{SOURCE_DIR}}\zapret\WinDivert64.sys"; Flags: dontcopy
-Source: "{{SOURCE_DIR}}\zapret\WinDivert64.sys"; DestDir: "{app}\zapret"; Flags: ignoreversion; Check: ShouldInstallWinDivert
+Source: "{{SOURCE_DIR}}\zapret\WinDivert64.sys"; DestDir: "{app}\zapret"; Flags: ignoreversion restartreplace uninsrestartdelete; Check: ShouldInstallWinDivert
 Source: "{{SOURCE_DIR}}\*"; DestDir: "{app}"; Excludes: "\zapret\WinDivert64.sys"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+[UninstallDelete]
+Type: files; Name: "{app}\zapret\driver-restart.sha256"
 
 [Registry]
 Root: HKLM; Subkey: "Software\Classes\flclashz"; ValueType: string; ValueName: ""; ValueData: "URL:FlClashZ"

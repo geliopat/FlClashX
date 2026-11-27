@@ -78,6 +78,7 @@ try {
   $driverLock.Dispose(); $driverLock = $null
   Assert ((Get-FileHash -LiteralPath $driverPath -Algorithm SHA256).Hash -eq $driverHash) 'Identical driver changed'
   Assert ((Get-Content -LiteralPath $upgradeLog -Raw).Contains('WinDivert64.sys matches bundled SHA-256')) 'Driver preservation was not exercised'
+  Assert (!(Test-Path -LiteralPath (Join-Path $target 'zapret\driver-restart.sha256'))) 'Identical driver must not request a restart'
   $liveApp.Refresh(); $ownCore.Refresh(); $foreignCore.Refresh()
   Assert ($liveApp.HasExited) 'Running application survived upgrade'
   Assert ($ownCore.HasExited) 'Owned orphan Core survived upgrade'

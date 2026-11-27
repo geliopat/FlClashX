@@ -1,5 +1,5 @@
 param(
-  [Parameter(Mandatory=$true)][ValidateSet('Stop','Release','CheckDriver','UnloadDriver')][string]$Phase,
+  [Parameter(Mandatory=$true)][ValidateSet('Stop','Release','UnloadDriver')][string]$Phase,
   [Parameter(Mandatory=$true)][string]$InstallDir,
   [Parameter(Mandatory=$true)][string]$AppExe,
   [Parameter(Mandatory=$true)][string]$ServiceName,
@@ -9,7 +9,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $prefix = [IO.Path]::GetFullPath($InstallDir).TrimEnd('\') + '\'
 $comparison = [StringComparison]::OrdinalIgnoreCase
-$names = @($AppExe, ($ServiceName + '.exe'), 'FlClashCore.exe', 'winws.exe', 'winws2.exe')
+$names = @($AppExe, ($ServiceName + '.exe'), 'FlClashCore.exe', 'winws.exe', 'winws2.exe', 'winws2-split.exe')
 function InInstall([string]$Path) {
   return ($Path -and $Path.StartsWith($prefix, $comparison))
 }
@@ -79,7 +79,7 @@ function UnloadOwnedWinDivert {
   if (!$drivers.Count) { return }
   # WinDivert uses global services; do not interfere with known foreign engines.
   $foreignEngines = @(Get-CimInstance Win32_Process | Where-Object {
-    $_.Name -in @('winws.exe','winws2.exe') -and !(InInstall $_.ExecutablePath)
+    $_.Name -in @('winws.exe','winws2.exe','winws2-split.exe') -and !(InInstall $_.ExecutablePath)
   })
   if ($foreignEngines.Count) { throw 'Other Zapret engines are running; shared WinDivert will not be stopped' }
   foreach ($driver in $drivers) {
@@ -125,21 +125,6 @@ try {
   if ($Phase -eq 'UnloadDriver') {
     if (@(OwnedProcesses).Count) { throw 'Owned processes still running' }
     UnloadOwnedWinDivert
-    exit 0
-  }
-  if ($Phase -eq 'CheckDriver') {
-    # Only a verified owned service may have been stopped by UnloadDriver.
-    # An inaccessible changed driver still blocks setup before copying.
-    $driver = Join-Path $prefix 'zapret\WinDivert64.sys'
-    if (!(Test-Path -LiteralPath $driver)) { exit 0 }
-    if (!(WaitUntil {
-      try {
-        $handle = [IO.File]::Open($driver, [IO.FileMode]::Open,
-          [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
-        $handle.Dispose()
-        return $true
-      } catch { return $false }
-    } 10)) { throw 'WinDivert64.sys cannot be safely replaced; restart Windows' }
     exit 0
   }
   if ($Phase -eq 'Release') {

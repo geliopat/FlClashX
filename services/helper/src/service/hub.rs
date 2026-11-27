@@ -1150,6 +1150,27 @@ fn zapret_reason(reason: Option<&str>, restart: bool) -> &'static str {
     }
 }
 
+// The installer writes this marker only when the driver bytes are not yet
+// the ones shipped in the update. Mihomo and the Helper remain usable.
+#[cfg(windows)]
+fn check_pending_zapret_driver(bin_dir: &Path) -> Result<(), Error> {
+    let marker = bin_dir.join("driver-restart.sha256");
+    let expected = match fs::read_to_string(&marker) {
+        Ok(value) => value,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error),
+    };
+    let mut driver = File::open(bin_dir.join("WinDivert64.sys"))?;
+    if !sha256_file(&mut driver)?.eq_ignore_ascii_case(expected.trim()) {
+        return Err(Error::other(
+            "WinDivert update pending. Restart Windows before starting Zapret.",
+        ));
+    }
+    // After Windows replaces the driver, allow ordinary component updates.
+    fs::remove_file(marker)?;
+    Ok(())
+}
+
 #[cfg(windows)]
 fn launch_zapret(
     restart: bool,
@@ -1208,6 +1229,13 @@ fn launch_zapret(
             )
         }
     };
+    if let Err(error) = check_pending_zapret_driver(&bin_dir) {
+        return error_response(
+            "zapretDriverRestartPending",
+            error.to_string(),
+            StatusCode::CONFLICT,
+        );
+    }
     let launch = match super::zapret::build_launch(&bin_dir, &strategy_id, mode) {
         Ok(launch) => launch,
         Err(error) if error.kind() == std::io::ErrorKind::InvalidInput => {
