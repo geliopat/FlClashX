@@ -135,6 +135,11 @@ func measureSpeedPhase(client *http.Client, service, endpoint string, upload, mu
 		if total > 0 && last.After(first) {
 			measured += total
 			elapsed += last.Sub(first)
+		} else if total > 0 {
+			// Very small local transfers may fit inside one clock tick.
+			// The body is valid, but the interval cannot support a rate.
+			// Increase the next chunk instead of inventing a duration.
+			failure = "insufficient-duration"
 		}
 		if elapsed >= time.Duration(options.seconds)*time.Second { break }
 		// Ramp based on completed body duration, not TCP/TLS setup latency.
@@ -193,7 +198,6 @@ func runSpeedSample(ctx context.Context, client *http.Client, service, endpoint 
 		// Include the final acknowledgement to avoid measuring only a
 		// fast local transport buffer rather than accepted payload.
 		s.last = time.Now()
-		if !s.last.After(s.first) { return fail("invalid-body") }
 		return s
 	}
 	reader := bufio.NewReaderSize(resp.Body, 1024)
@@ -210,6 +214,6 @@ func runSpeedSample(ctx context.Context, client *http.Client, service, endpoint 
 	if err!=nil { return fail(probeErrorKind(err)) }
 	if n<65536 || (service=="cloudflare" && n!=limit) ||
 		(resp.ContentLength>=0 && n<min(resp.ContentLength,limit)) { return fail("invalid-body") }
-	if !s.last.After(s.first) { return fail("invalid-body") }
+	// Payload integrity is independent of clock granularity.
 	return s
 }
