@@ -108,3 +108,54 @@ func TestSpeedGroupResolvesSelectedLeafAndRejectsMixed(t *testing.T) {
     route,isDirect,err:=resolveSpeedRoute(balance)
     if err!=nil || isDirect || route.Name()!="VPNs" { t.Fatal(route,isDirect,err) }
 }
+
+
+func TestSpeedPhaseRetriesTransientWaveWithinBudget(t *testing.T) {
+    var calls atomic.Int64
+    server := httptest.NewServer(stdhttp.HandlerFunc(func(w stdhttp.ResponseWriter, r *stdhttp.Request) {
+        if calls.Add(1) == 1 {
+            w.WriteHeader(503)
+            return
+        }
+        w.Header().Set("Content-Type", "application/octet-stream")
+        _, _ = io.WriteString(w, strings.Repeat("x", 256000))
+    }))
+    defer server.Close()
+    rate, n, err := measureSpeedPhase(&http.Client{}, "custom", server.URL, false, false,
+        speedOptions{streams: 1, seconds: 5, maxBytes: 512000})
+    if rate == nil || n != 256000 || err != "" || calls.Load() != 2 {
+        t.Fatalf("retry: rate=%v bytes=%d error=%q calls=%d", rate, n, err, calls.Load())
+    }
+}
+
+func TestSpeedPhaseRejectsPartiallyFailedWave(t *testing.T) {
+    var calls atomic.Int64
+    server := httptest.NewServer(stdhttp.HandlerFunc(func(w stdhttp.ResponseWriter, r *stdhttp.Request) {
+        if calls.Add(1) == 1 {
+            w.WriteHeader(503)
+            return
+        }
+        w.Header().Set("Content-Type", "application/octet-stream")
+        _, _ = io.WriteString(w, strings.Repeat("x", 256000))
+    }))
+    defer server.Close()
+    rate, n, err := measureSpeedPhase(&http.Client{}, "custom", server.URL, false, false,
+        speedOptions{streams: 2, seconds: 5, maxBytes: 1024000})
+    if rate != nil || n != 0 || err != "http" || calls.Load() != 2 {
+        t.Fatalf("partial wave: rate=%v bytes=%d error=%q calls=%d", rate, n, err, calls.Load())
+    }
+}
+
+func TestSpeedPhaseRetryCannotExceedTrafficBudget(t *testing.T) {
+    var calls atomic.Int64
+    server := httptest.NewServer(stdhttp.HandlerFunc(func(w stdhttp.ResponseWriter, r *stdhttp.Request) {
+        calls.Add(1)
+        w.WriteHeader(503)
+    }))
+    defer server.Close()
+    rate, n, err := measureSpeedPhase(&http.Client{}, "custom", server.URL, false, false,
+        speedOptions{streams: 1, seconds: 5, maxBytes: 256000})
+    if rate != nil || n != 0 || err != "http" || calls.Load() != 1 {
+        t.Fatalf("budget: rate=%v bytes=%d error=%q calls=%d", rate, n, err, calls.Load())
+    }
+}
