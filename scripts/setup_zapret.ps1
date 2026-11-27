@@ -37,6 +37,152 @@ function Get-PinnedArchive {
     Write-Host "Verified SHA256: $Label"
 }
 
+# Cache raw source files only when their Git blob identity is independently
+# obtained from the tree at the already pinned commit. Never trust a digest
+# stored next to a cached file as the source of truth.
+$SourceBlobIds = @{}
+if ($env:FLCLASHZ_ZAPRET_CACHE_DIR) {
+    try {
+        $Headers = @{ Accept = "application/vnd.github+json"; "User-Agent" = "FlClashZ-CI" }
+        if ($env:GH_TOKEN) { $Headers["Authorization"] = "Bearer $env:GH_TOKEN" }
+        $Tree = Invoke-RestMethod -Headers $Headers -Uri "https://api.github.com/repos/geliopat/zapret2-gui/git/trees/${ZapretSourceCommit}?recursive=1"
+        if ($Tree.truncated -or $Tree.sha -ne $ZapretSourceCommit) { throw "Incomplete or unexpected pinned source tree" }
+        foreach ($Entry in $Tree.tree) {
+            if ($Entry.type -eq "blob" -and $Entry.sha -cmatch '^[0-9a-f]{40} -Force | Out-Null
+    New-Item -ItemType Directory -Path $AssetDir -Force | Out-Null
+    Get-ChildItem -Path $AssetDir -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force
+
+    Get-PinnedArchive -Url $Zapret2Url -Path $Zapret2Zip -ExpectedSha256 $Zapret2Sha256 -Label "bol-van/zapret2 v1.0.8"
+    Expand-Archive -Path $Zapret2Zip -DestinationPath $Zapret2Extract -Force
+    $Zapret2Bin = Get-ChildItem -Path $Zapret2Extract -Recurse -Directory | Where-Object { $_.Name -ieq "windows-x86_64" } | Select-Object -First 1
+    if (-not $Zapret2Bin) { throw "The zapret2 archive has no windows-x86_64 binary directory." }
+    Get-ChildItem -Path $Zapret2Bin.FullName -File | ForEach-Object { Copy-Item -Path $_.FullName -Destination $AssetDir -Force }
+
+    Get-PinnedArchive -Url $FlowsealUrl -Path $FlowsealZip -ExpectedSha256 $FlowsealSha256 -Label "Flowseal/zapret-discord-youtube 1.10.4"
+    Expand-Archive -Path $FlowsealZip -DestinationPath $FlowsealExtract -Force
+    $FlowsealEngine = Get-ChildItem -Path $FlowsealExtract -Recurse -File -Filter "winws.exe" | Select-Object -First 1
+    if (-not $FlowsealEngine) { throw "The Flowseal archive has no winws.exe." }
+    Copy-Item -Path $FlowsealEngine.FullName -Destination (Join-Path $AssetDir "winws.exe") -Force
+
+    $ListsDir = Join-Path $AssetDir "lists"
+    New-Item -ItemType Directory -Path $ListsDir -Force | Out-Null
+    $FlowsealLists = Get-ChildItem -Path $FlowsealExtract -Recurse -Directory -Filter "lists" | Select-Object -First 1
+    if ($FlowsealLists) {
+        Get-ChildItem -Path $FlowsealLists.FullName -File | ForEach-Object { Copy-Item -Path $_.FullName -Destination $ListsDir -Force }
+    }
+
+    $StrategySource = Join-Path $Root "services\helper\strategies"
+    $StrategyDir = Join-Path $AssetDir "strategies"
+    New-Item -ItemType Directory -Path $StrategyDir -Force | Out-Null
+
+    # Keep the original zapret2-gui directory structure in the installed bundle.
+    # The root copies are retained because the flagship and imported profiles
+    # load the shared Lua libraries from the engine working directory.
+    $LuaFiles = @(Get-ChildItem -LiteralPath $StrategySource -File -Filter "zapret-*.lua" | Sort-Object Name | ForEach-Object { $_.Name })
+    if ($LuaFiles.Count -eq 0) { throw "No bundled Lua strategies found." }
+    foreach ($Name in $LuaFiles) {
+        $SourcePath = Join-Path $StrategySource $Name
+        if (-not (Test-Path $SourcePath -PathType Leaf)) { throw "Bundled Lua strategy is missing: $SourcePath" }
+        Copy-Item -Path $SourcePath -Destination (Join-Path $AssetDir $Name) -Force
+        Copy-Item -Path $SourcePath -Destination (Join-Path $StrategyDir $Name) -Force
+        if ((Get-Item (Join-Path $StrategyDir $Name)).Length -eq 0) { throw "Bundled Lua strategy is empty: $Name" }
+    }
+
+    $ImportedSource = Join-Path $StrategySource "imported"
+    if (-not (Test-Path (Join-Path $ImportedSource "kinlay0") -PathType Container)) {
+        throw "The pinned kinlay0 strategy folder is missing."
+    }
+    Copy-Item -Path $ImportedSource -Destination $StrategyDir -Recurse -Force
+    $ImportedBatFiles = @(Get-ChildItem -Path (Join-Path $StrategyDir "imported\kinlay0") -File -Filter "*.bat")
+    $SourceBatFiles = @(Get-ChildItem -LiteralPath (Join-Path $ImportedSource "kinlay0") -File -Filter "*.bat")
+    if ($SourceBatFiles.Count -eq 0 -or $ImportedBatFiles.Count -ne $SourceBatFiles.Count) {
+        throw "Expected $($SourceBatFiles.Count) pinned kinlay0 BAT strategies, found $($ImportedBatFiles.Count)."
+    }
+    foreach ($RequiredStrategy in @("zapret-antidpi.lua","zapret-discord-light.lua","zapret-extsplit.lua","zapret-firstbyte.lua","zapret-ipfrag.lua","zapret-sites-light.lua","zapret-syndata.lua","zapret-tspu-max.lua","zapret-yt4k.lua")) {
+        if (-not (Test-Path (Join-Path $StrategyDir $RequiredStrategy) -PathType Leaf)) {
+            throw "Required built-in Lua strategy is missing: $RequiredStrategy"
+        }
+    }
+    foreach ($RequiredSource in @("translate.py","README.md","LICENSE")) {
+        if (-not (Test-Path (Join-Path (Join-Path $StrategyDir "imported\kinlay0") $RequiredSource) -PathType Leaf)) {
+            throw "Required kinlay0 source file is missing: $RequiredSource"
+        }
+    }
+
+    $BlobFiles = @("ACTIVE_DISCORD_UDP.bin","ACTIVE_GAME_UDP.bin","quic_initial_4pda_to.bin","quic_initial_5ka_ru.bin","quic_initial_lemana_pro.bin","quic_initial_rutube_ru.bin","quic_initial_steam_chat_com.bin","quic_initial_steamcommunity_com.bin","quic_initial_steamstatic_com.bin","quic_initial_tencent_com.bin","quic_initial_www_google_com.bin","stun.bin","stun2.bin","tls_clienthello_4pda_to.bin","tls_clienthello_5ka_ru.bin","tls_clienthello_awswaf_com.bin","tls_clienthello_max_ru.bin","tls_clienthello_retext_ai.bin","tls_clienthello_sochi_park.bin","tls_clienthello_steam_chat_com.bin","tls_clienthello_steamstatic_com.bin","tls_clienthello_teamspeak_com.bin","tls_clienthello_www_google_com.bin","tls_clienthello_www_sferum_ru.bin")
+    foreach ($Name in $BlobFiles) {
+        $Path = Join-Path $AssetDir $Name
+        Get-PinnedSourceFile -Relative "bin/$Name" -Path $Path
+        if ((Get-Item $Path).Length -eq 0) { throw "Downloaded payload is empty: $Name" }
+    }
+
+    $ListFiles = @("ipset-all.txt","ipset-exclude.txt","ipset-exclude-user.txt","list-exclude.txt","list-exclude-user.txt","list-general.txt","list-general-user.txt","list-google.txt")
+    foreach ($Name in $ListFiles) {
+        $Path = Join-Path $ListsDir $Name
+        try {
+            Get-PinnedSourceFile -Relative "lists/$Name" -Path $Path
+        } catch {
+            if ($Name.EndsWith("-user.txt")) { [System.IO.File]::WriteAllText($Path, "") } else { throw }
+        }
+    }
+
+    $Required = @("winws2.exe","winws.exe","WinDivert.dll","WinDivert64.sys","cygwin1.dll","zapret-lib.lua","zapret-antidpi.lua","ACTIVE_DISCORD_UDP.bin","quic_initial_www_google_com.bin","tls_clienthello_www_google_com.bin","tls_clienthello_max_ru.bin","stun2.bin")
+    foreach ($Name in $Required) {
+        $Path = Join-Path $AssetDir $Name
+        if (-not (Test-Path $Path -PathType Leaf) -or (Get-Item $Path).Length -eq 0) { throw "Required Zapret asset is missing or empty: $Name" }
+    }
+    # Only immutable binaries, payloads and packaged strategies are hashed.
+    # User-editable lists remain outside the manifest.
+    $Hashes = [ordered]@{}
+    Get-ChildItem -Path $AssetDir -Recurse -File | Where-Object {
+        $_.Extension -in @('.exe','.dll','.sys','.bin','.lua','.bat','.cmd')
+    } | Sort-Object FullName | ForEach-Object {
+        $Relative = [System.IO.Path]::GetRelativePath($AssetDir, $_.FullName).Replace('\','/')
+        $Hashes[$Relative] = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+    }
+    $Hashes | ConvertTo-Json -Depth 3 | Set-Content -Path (Join-Path $AssetDir 'integrity.json') -Encoding utf8
+    Write-Host "Zapret2 and Flowseal Windows assets staged in $AssetDir"
+} finally {
+    if (Test-Path $TempRoot) { Remove-Item -Path $TempRoot -Recurse -Force -ErrorAction SilentlyContinue }
+}
+) {
+                $SourceBlobIds[$Entry.path] = $Entry.sha
+            }
+        }
+    } catch {
+        $SourceBlobIds.Clear()
+        Write-Warning "Pinned source tree unavailable; raw source cache disabled for this run."
+    }
+}
+
+function Get-SourceBlobId {
+    param([string]$Path)
+    $Hash = & git hash-object --no-filters -- "$Path"
+    if ($LASTEXITCODE -ne 0) { throw "Unable to hash pinned source file: $Path" }
+    return "$Hash".Trim()
+}
+
+function Get-PinnedSourceFile {
+    param([string]$Relative, [string]$Path)
+    $Expected = $SourceBlobIds[$Relative]
+    $Cached = $null
+    if ($Expected) {
+        $CacheDir = Join-Path $env:FLCLASHZ_ZAPRET_CACHE_DIR "blobs"
+        New-Item -ItemType Directory -Path $CacheDir -Force | Out-Null
+        $Cached = Join-Path $CacheDir $Expected
+        if ((Test-Path -LiteralPath $Cached -PathType Leaf) -and (Get-SourceBlobId $Cached) -ceq $Expected) {
+            Copy-Item -LiteralPath $Cached -Destination $Path -Force
+            Write-Host "Cache hit: $Relative"
+            return
+        }
+    }
+    Invoke-WebRequest -Uri "$ZapretSourceBase/$Relative" -OutFile $Path
+    if ($Expected) {
+        if ((Get-SourceBlobId $Path) -cne $Expected) { throw "Git blob identity mismatch: $Relative" }
+        Copy-Item -LiteralPath $Path -Destination $Cached -Force
+    }
+}
+
 try {
     New-Item -ItemType Directory -Path $TempRoot -Force | Out-Null
     New-Item -ItemType Directory -Path $AssetDir -Force | Out-Null

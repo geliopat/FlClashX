@@ -239,6 +239,7 @@ jobs:
       - name: Stage pinned Zapret2 and Flowseal assets
         shell: pwsh
         env:
+          GH_TOKEN: ${{ github.token }}
           FLCLASHZ_ZAPRET_CACHE_DIR: ${{ env.BUILD_MODE != 'clean' && format('{0}/flclashz-zapret-downloads', runner.temp) || '' }}
         run: ./scripts/setup_zapret.ps1
 
@@ -334,6 +335,10 @@ jobs:
             '|---|---|---|---|---|'
             "| $env:BUILD_MODE | $env:CORE_HIT | $env:HELPER_HIT | $env:COMPILER_HIT | $env:ZAPRET_HIT |"
           ) >> $env:GITHUB_STEP_SUMMARY
+          if (Test-Path ".dart_tool/setup_build_cache/hook.log") {
+            '### Native build decisions' >> $env:GITHUB_STEP_SUMMARY
+            Get-Content ".dart_tool/setup_build_cache/hook.log" | Select-String -Pattern 'Cache hit:|Rebuilding |Building Go core:|Building Rust helper:' | ForEach-Object { "    $_" } >> $env:GITHUB_STEP_SUMMARY
+          }
           if (Test-Path "$env:RUNNER_TEMP/sccache-stats.txt") {
             Get-Content "$env:RUNNER_TEMP/sccache-stats.txt" | ForEach-Object { "    $_" } >> $env:GITHUB_STEP_SUMMARY
           }
