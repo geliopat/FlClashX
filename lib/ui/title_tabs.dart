@@ -36,7 +36,9 @@ class PageTitleTabs extends StatelessWidget {
                     overlayColor: Colors.transparent,
                     foregroundColor: index == selectedIndex
                         ? colors.primary : colors.onSurfaceVariant,
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    padding: EdgeInsetsDirectional.only(
+                      start: index == 0 ? 0 : 10, end: 10,
+                    ),
                     minimumSize: const Size(0, 40),
                     elevation: 0,
                   ).copyWith(
@@ -47,8 +49,7 @@ class PageTitleTabs extends StatelessWidget {
                         context, emphasized: index == selectedIndex,
                       ).copyWith(
                         color: color,
-                        shadows: states.contains(WidgetState.hovered) ||
-                                states.contains(WidgetState.focused)
+                        shadows: states.contains(WidgetState.hovered)
                             ? [Shadow(color: colors.primary, blurRadius: 6)]
                             : const [],
                       );
