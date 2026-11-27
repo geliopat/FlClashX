@@ -12,6 +12,7 @@ import 'package:path/path.dart' as p;
 
 import 'package:fl_clash/common/component_integrity.dart';
 import 'package:fl_clash/common/preferences.dart';
+import 'package:fl_clash/common/file_logger.dart';
 import 'package:fl_clash/core/desktop/helper_client.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
@@ -185,6 +186,12 @@ class _DiagnosticsViewState extends ConsumerState<DiagnosticsView> {
             title: Text(context.appLocalizations.resources),
             leading: const GlyphIcon(AppGlyphs.resources),
             widget: const ResourcesView(),
+          ),
+          ListItem(
+            title: Text(Localizations.localeOf(context).languageCode == 'ru'
+                ? 'Журнал приложения' : 'Application journal'),
+            leading: const GlyphIcon(AppGlyphs.openExternal),
+            onTap: () async => system.openDirectory(await appFileLogger.directoryPath),
           ),
           ListItem(title: Text(AppLocalizations.of(context).forkRunDiagnostics),
             onTap: _busy ? null : _run,
