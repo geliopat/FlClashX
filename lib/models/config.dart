@@ -670,6 +670,7 @@ abstract class Config with _$Config {
         hotKeyActions: defaultHotKeyActions,
         appSettingProps: AppSettingProps(
           dashboardWidgets: platformDefaultDashboardWidgets,
+          panelSetSettings: withYamlSources(const {}, const {}),
         ),
       );
     }

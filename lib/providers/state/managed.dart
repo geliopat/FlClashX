@@ -1,5 +1,19 @@
 part of '../state.dart';
 
+/// Null means the current YAML has not been read successfully yet; an empty
+/// map means it names none of the typed settings. This is runtime-only.
+final yamlSettingReferencesProvider =
+    NotifierProvider<YamlSettingReferences, Map<String, Object>?>(YamlSettingReferences.new);
+
+class YamlSettingReferences extends Notifier<Map<String, Object>?> {
+  @override
+  Map<String, Object>? build() => null;
+
+  void set(Map<String, Object>? values) {
+    state = values == null ? null : Map.unmodifiable(values);
+  }
+}
+
 @Riverpod(keepAlive: true)
 class ManagedClashKeys extends _$ManagedClashKeys {
   @override

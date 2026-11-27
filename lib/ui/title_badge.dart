@@ -2,19 +2,21 @@ import 'package:material_ui/material_ui.dart';
 
 /// A null [badge] clears one set further up, for titles nested in a marked one.
 class TitleBadge extends InheritedWidget {
-  const TitleBadge({super.key, required this.badge, required super.child});
+  const TitleBadge({super.key, required this.badge, this.caption, required super.child});
 
   final Widget? badge;
+  final String? caption;
+
+  static String? captionOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<TitleBadge>()?.caption;
 
   static Widget? of(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<TitleBadge>()?.badge;
 
   static Widget wrap(BuildContext context, Widget title) {
     final badge = of(context);
-    if (badge == null) {
-      return title;
-    }
-    return Row(
+    final caption = captionOf(context);
+    final heading = badge == null ? title : Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Flexible(child: title),
@@ -22,8 +24,25 @@ class TitleBadge extends InheritedWidget {
         badge,
       ],
     );
+    if (caption == null) return heading;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        heading,
+        const SizedBox(height: 2),
+        Tooltip(
+          message: caption,
+          child: Text(caption, maxLines: 2, overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            )),
+        ),
+      ],
+    );
   }
 
   @override
-  bool updateShouldNotify(TitleBadge oldWidget) => badge != oldWidget.badge;
+  bool updateShouldNotify(TitleBadge oldWidget) =>
+      badge != oldWidget.badge || caption != oldWidget.caption;
 }

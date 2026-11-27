@@ -312,11 +312,13 @@ class ListItem<T> extends StatelessWidget {
           );
         }
         final badge = TitleBadge.of(context);
+        final caption = TitleBadge.captionOf(context);
         return OpenContainer<dynamic>(
           clipBehavior: Clip.none,
           closedBuilder: (context, action) {
             return TitleBadge(
               badge: badge,
+              caption: caption,
               child: Builder(
                 builder: (context) => _buildListTile(
                   context,

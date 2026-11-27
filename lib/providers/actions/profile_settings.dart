@@ -56,9 +56,11 @@ class ProfileSettingsAction extends _$ProfileSettingsAction {
     final id = source.id;
     final generation = ++_generation;
     _unread = false;
+    ref.read(yamlSettingReferencesProvider.notifier).set(null);
     if (id == null ||
         source.type == ProfileType.custom ||
         source.extendType == ExtendType.script) {
+      ref.read(yamlSettingReferencesProvider.notifier).set(const {});
       ref.read(managedClashKeysProvider.notifier).set(const {});
       ref.read(globalOverrideProvider.notifier).value = false;
       return;
@@ -84,11 +86,15 @@ class ProfileSettingsAction extends _$ProfileSettingsAction {
     final settings = ref.read(appSettingProvider);
     final previous = previousYamlSources(settings.panelSetSettings);
     final released = Set<String>.of(_released);
+    final current = ref.read(patchClashConfigProvider);
+    final inherited = syncProfileSettings(current, base.config, base.present, modes: modes);
+    final inheritedAuthentication = authenticationFrom(base.config['authentication']);
     final owned = {
       ...settings.ownedSettings,
       if (!hasYamlSourceVersion(settings.panelSetSettings))
-        ...legacyLocalClashKeys(ref.read(patchClashConfigProvider),
-          ref.read(networkSettingProvider).authentication, named).difference(released),
+        ...legacyLocalClashKeys(current,
+          ref.read(networkSettingProvider).authentication, named,
+          inherited: inherited, inheritedAuthentication: inheritedAuthentication).difference(released),
     };
     final kept = keptClashKeys(named: named, previous: previous, owned: owned, released: released);
     final resetMissing = {
@@ -123,6 +129,9 @@ class ProfileSettingsAction extends _$ProfileSettingsAction {
             ),
           );
     }
+    ref.read(yamlSettingReferencesProvider.notifier).set(
+      yamlSettingReferences(inherited, inheritedAuthentication, named),
+    );
     _released.removeAll(released);
   }
 }

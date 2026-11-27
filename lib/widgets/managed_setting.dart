@@ -83,7 +83,15 @@ class ManagedSetting extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isYaml = isClashOwnershipKey(settingKey) && Theme.of(context).platform == TargetPlatform.windows;
+    final owned = ref.watch(settingOwnedProvider(settingKey));
+    final references = isYaml && showsLock ? ref.watch(yamlSettingReferencesProvider) : null;
+    final caption = isYaml && showsLock ? yamlSourceCaption(
+      references, settingKey, owned: owned,
+      russian: Localizations.localeOf(context).languageCode == 'ru',
+    ) : null;
     return ManagedSettingRegion(
+      caption: caption,
       locked: ref.watch(settingLockedProvider(settingKey)),
       releasable: ref.watch(settingReleasableProvider(settingKey)) ||
           (isClashOwnershipKey(settingKey) && ref.watch(appSettingProvider.select(
@@ -99,6 +107,27 @@ class ManagedSetting extends ConsumerWidget {
   }
 }
 
+/// The caption is deliberately separate from the effective setting value.
+String? yamlSourceCaption(Map<String, Object>? references, String key, {
+  required bool owned, required bool russian,
+}) {
+  if (references == null) return owned
+      ? (russian ? 'Локальная настройка' : 'Local setting') : null;
+  if (!references.containsKey(key)) return owned
+      ? (russian ? 'Локальная настройка' : 'Local setting')
+      : (russian ? 'По умолчанию' : 'Default');
+  final value = references[key];
+  final display = switch (value) {
+    bool b => russian ? (b ? 'включено' : 'выключено') : (b ? 'enabled' : 'disabled'),
+    String s when s.isEmpty => russian ? 'пусто' : 'empty',
+    List l when l.isEmpty => russian ? 'пустой список' : 'empty list',
+    List l => l.join(', '),
+    _ => value.toString(),
+  };
+  final source = russian ? 'Из подписки' : 'From subscription';
+  return owned ? '$source: $display' : source;
+}
+
 /// The same ownership affordance also serves draft/profile-scoped settings.
 class ManagedSettingRegion extends StatelessWidget {
   const ManagedSettingRegion({
@@ -110,8 +139,10 @@ class ManagedSettingRegion extends StatelessWidget {
     required this.child,
     this.dimsWhenLocked = true,
     this.showsLock = true,
+    this.caption,
   });
 
+  final String? caption;
   final bool locked;
   final bool releasable;
   final VoidCallback onTakeOver;
@@ -121,19 +152,22 @@ class ManagedSettingRegion extends StatelessWidget {
   final bool showsLock;
 
   Widget _withLock({required bool locked}) => showsLock
-      ? TitleBadge(badge: SettingLock(locked: locked), child: child)
+      ? TitleBadge(badge: SettingLock(locked: locked), caption: caption, child: child)
       : child;
+
+  Widget _withoutLock() => caption == null ? child
+      : TitleBadge(badge: null, caption: caption, child: child);
 
   @override
   Widget build(BuildContext context) {
     if (locked) {
-      if (!dimsWhenLocked) return child;
+      if (!dimsWhenLocked) return _withoutLock();
       return _LockedSetting(
         onTakeOver: onTakeOver,
         child: _withLock(locked: true),
       );
     }
-    if (!releasable) return child;
+    if (!releasable) return _withoutLock();
     return ContextMenuRegion(
       menuItems: [
         CommonPopupMenuItem(

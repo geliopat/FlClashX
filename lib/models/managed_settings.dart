@@ -128,19 +128,40 @@ Set<String> withYamlSources(Set<String> markers, Set<String> named) => {
   for (final key in named.intersection(managedClashKeys)) '$_yamlSourcePrefix$key',
 };
 
-/// On legacy stores, absent non-default values are the only safe candidates
-/// for inferring local ownership. Named values without an explicit ownership
-/// record remain inherited: a stale subscription value is indistinguishable
-/// from an old unrecorded edit. Never infer ownership for default values.
+/// Preserve discrepancies during the one-time legacy migration, even if
+/// the saved value equals the app default (false, zero, empty are intentional).
+/// An old inherited value may also differ; let the user return it to provider
+/// ownership using the visible reference instead of silently overwriting it.
 Set<String> legacyLocalClashKeys(
-  PatchClashConfig current, AuthenticationProps authentication, Set<String> named,
-) => {
-  for (final key in managedClashKeys.difference(named))
+  PatchClashConfig current, AuthenticationProps authentication, Set<String> named, {
+  required PatchClashConfig inherited,
+  required AuthenticationProps inheritedAuthentication,
+}) => {
+  for (final key in managedClashKeys)
     if (key == 'authentication'
-        ? authentication != const AuthenticationProps()
-        : keepOwnedSettings(current, defaultClashConfig, {clashSettingKey(key)}) != defaultClashConfig)
+        ? authentication != (named.contains(key) ? inheritedAuthentication : const AuthenticationProps())
+        : keepOwnedSettings(current, named.contains(key) ? inherited : defaultClashConfig,
+              {clashSettingKey(key)}) != (named.contains(key) ? inherited : defaultClashConfig))
       clashSettingKey(key),
 };
+
+/// Only UI-safe reference values; never keep another copy of credentials,
+/// provider URLs or secret strings in the observable reference state.
+Map<String, Object> yamlSettingReferences(
+  PatchClashConfig inherited, AuthenticationProps authentication, Set<String> named,
+) {
+  final json = inherited.toJson();
+  final tun = inherited.tun.toJson();
+  return {
+    for (final key in named.intersection(managedClashKeys))
+      clashSettingKey(key): switch (key) {
+        'authentication' => authentication.enable,
+        'secret' => inherited.secret.isEmpty ? '' : '••••',
+        'geox-url' => '${inherited.geoXUrl.length} URL',
+        _ => (key.startsWith('tun.') ? tun[key.substring(4)] : json[key]) ?? '',
+      },
+  };
+}
 
 Set<String> keptClashKeys({
   required Set<String> named,

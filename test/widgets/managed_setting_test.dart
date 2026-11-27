@@ -29,6 +29,14 @@ class _NoProfileBaseCore extends Mock implements CoreHandlerInterface {
 }
 
 void main() {
+  test('source captions distinguish unknown, absent, zero, false and inherited', () {
+    const values = <String, Object>{'clash.keep-alive-idle': 0, 'clash.tcp-concurrent': false};
+    expect(yamlSourceCaption(values, 'clash.keep-alive-idle', owned: true, russian: true), 'Из подписки: 0');
+    expect(yamlSourceCaption(values, 'clash.tcp-concurrent', owned: true, russian: false), 'From subscription: disabled');
+    expect(yamlSourceCaption(values, 'clash.keep-alive-idle', owned: false, russian: true), 'Из подписки');
+    expect(yamlSourceCaption(values, 'clash.ipv6', owned: false, russian: false), 'Default');
+    expect(yamlSourceCaption(null, 'clash.ipv6', owned: false, russian: false), isNull);
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late ProviderContainer container;

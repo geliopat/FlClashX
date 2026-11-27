@@ -3,12 +3,26 @@ import 'package:fl_clash/models/models.dart';
 import 'package:test/test.dart';
 
 void main() {
-  test('legacy migration preserves only absent non-default values and explicit ownership', () {
+  test('legacy migration preserves named differences including defaults and empty values', () {
     const current = PatchClashConfig(keepAliveIdle: 0, keepAliveInterval: 60,
-      tcpConcurrent: false, allowLan: true);
+      tcpConcurrent: false, allowLan: true, secret: '');
+    const inherited = PatchClashConfig(keepAliveInterval: 30, allowLan: true,
+      secret: 'provider-secret');
     final owned = legacyLocalClashKeys(current, const AuthenticationProps(),
-      {'keep-alive-interval', 'allow-lan'});
-    expect(owned, {'clash.keep-alive-idle', 'clash.tcp-concurrent'});
+      {'keep-alive-interval', 'allow-lan', 'secret'},
+      inherited: inherited, inheritedAuthentication: const AuthenticationProps());
+    expect(owned, {'clash.keep-alive-idle', 'clash.tcp-concurrent',
+      'clash.keep-alive-interval', 'clash.secret'});
+  });
+
+  test('reference values preserve false and zero and redact authentication and secret', () {
+    const inherited = PatchClashConfig(tcpConcurrent: false, keepAliveIdle: 0,
+      secret: 'provider-secret');
+    final refs = yamlSettingReferences(inherited,
+      const AuthenticationProps(enable: true, username: 'private', password: 'password'),
+      {'tcp-concurrent', 'keep-alive-idle', 'secret', 'authentication'});
+    expect(refs, {'clash.tcp-concurrent': false, 'clash.keep-alive-idle': 0,
+      'clash.secret': '••••', 'clash.authentication': true});
   });
 
   test('source markers survive restart without storing profile values', () {
