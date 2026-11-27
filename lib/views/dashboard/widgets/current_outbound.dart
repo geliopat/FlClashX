@@ -815,7 +815,7 @@ class _StartToggleState extends ConsumerState<_StartToggle>
                   child: Center(
                     child: widget.suspended
                         ? GlyphIcon(
-                            AppGlyphs.pause,
+                            AppGlyphs.wifiOff,
                             size: size * 0.34,
                             color: ink,
                             fill: 1,
