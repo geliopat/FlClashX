@@ -145,8 +145,12 @@ class CoreAction extends _$CoreAction {
         final running = ref.read(setupActionProvider.notifier).requestedRunning;
         _restartingAfterCrash = true;
         try {
-          await restartCore(running: running);
-          _crashRestartedAt = currentTime();
+          if (await restartCore(running: running)) {
+            _crashRestartedAt = currentTime();
+          } else if (_unansweredCrash == null) {
+            _failedRestarts++;
+            _unansweredCrash = 'Core restart did not restore the requested state';
+          }
         } catch (error) {
           if (error case DesktopCoreFailure(phase: DesktopCorePhase.closed)) {
             return;
@@ -227,6 +231,7 @@ class CoreAction extends _$CoreAction {
         ref.read(coreStatusProvider.notifier).value = CoreStatus.connecting;
         final result = await restartLifecycle();
         if (!await _applyLifecycleResult(result)) {
+          outcome = RecoveryOutcome.failed;
           return false;
         }
         var appliedRevision = 0;
