@@ -411,7 +411,7 @@ class _CheckAllButton extends StatelessWidget {
       );
     }
     return DashboardIconButton(
-      glyph: AppGlyphs.bolt,
+      glyph: AppGlyphs.heartPulse,
       tooltip: context.appLocalizations.serviceCheckAll,
       onPressed: onPressed,
     );
@@ -637,7 +637,7 @@ class _ServiceStatusSheetState extends ConsumerState<ServiceStatusSheet> {
       title: localizations.serviceStatus,
       iconActions: [
         IconButtonData(
-          glyph: AppGlyphs.bolt,
+          glyph: AppGlyphs.heartPulse,
           tooltip: localizations.serviceCheckAll,
           isLoading: targets.any(state.isLoading),
           onPressed: () => services.refresh(targets),

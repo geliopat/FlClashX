@@ -402,7 +402,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
                     },
             ),
           ListItem(
-            leading: const GlyphIcon(AppGlyphs.cloudDownload),
+            leading: const GlyphIcon(AppGlyphs.download),
             title: Text(AppLocalizations.of(context).forkUpdateLists),
             subtitle: Text('${AppLocalizations.of(context).forkUpdateListsHint} · 12 h'),
             trailing: _updating

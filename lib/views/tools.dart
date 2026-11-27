@@ -209,7 +209,7 @@ class _BackupItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListItem.open(
-      leading: const GlyphIcon(AppGlyphs.cloudSync),
+      leading: const GlyphIcon(AppGlyphs.databaseBackup),
       title: Text(context.appLocalizations.backupAndRestore),
       widget: const BackupAndRestore(),
     );

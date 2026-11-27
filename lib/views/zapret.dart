@@ -118,6 +118,7 @@ class ZapretView extends ConsumerWidget {
           ),
           if (zapret.running)
             ListItem(
+              leading: const GlyphIcon(AppGlyphs.restart),
               title: Text(AppLocalizations.of(context).forkRestartZapret),
               onTap: zapret.busy ? null : () => ref.read(zapretControllerProvider.notifier).restart(),
             ),

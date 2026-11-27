@@ -527,7 +527,40 @@ abstract final class AppGlyphs {
     GlyphBox(8.5, 8.5, 15.5, 15.5, 1, role: GlyphRole.detail),
   ]);
 
-  static const stop = Glyph([GlyphBox(6, 6, 18, 18, 2.5)]);
+  static const stop = stopCircle;
+
+  static const restart = Glyph([
+    GlyphPath('M19.5 15.5 A8.3 8.3 0 1 1 19.5 8.5',
+        role: GlyphRole.line),
+    GlyphPath('M19.5 3.5V8.5H14.5', role: GlyphRole.line),
+  ]);
+
+  static const download = Glyph([
+    GlyphPath('M12 3V15M7 10L12 15L17 10', role: GlyphRole.line),
+    GlyphPath('M3 15V19Q3 21 5 21H19Q21 21 21 19V15',
+        role: GlyphRole.line),
+  ]);
+
+  static const pause = Glyph([
+    GlyphBox(6, 4, 9.5, 20, 0.8),
+    GlyphBox(14.5, 4, 18, 20, 0.8),
+  ]);
+
+  static const heartPulse = Glyph([
+    GlyphPath(
+      'M3 12C0 5 7 1 12 7C17 1 24 5 21 12M4.8 15L12 21L19.2 15',
+      role: GlyphRole.line,
+    ),
+    GlyphPath('M2 12H7L9 9L12 15L15 11H22', role: GlyphRole.line),
+  ]);
+
+  static const databaseBackup = Glyph([
+    GlyphOval(3, 3, 19, 9, role: GlyphRole.line),
+    GlyphPath('M3 6V18C3 20 7 21 11 21M3 12C3 14 7 15 11 15M19 6V10',
+        role: GlyphRole.line),
+    GlyphPath('M13 17A4.5 4.5 0 1 1 17.5 21M13 13V17H17',
+        role: GlyphRole.line),
+  ]);
 
   /// A headset: the band, two cups and a mic boom.
   static const globe = Glyph([

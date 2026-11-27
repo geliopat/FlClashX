@@ -133,15 +133,25 @@ HRESULT CreateIconGeometry(ID2D1Factory* factory, const AcrylicRow& row,
   } else if (row.icon == "start") {
     begin(3, 2); line(13, 8); line(3, 14); end(true);
   } else if (row.icon == "stop") {
-    begin(2, 2); line(14, 2); line(14, 14); line(2, 14); end(true);
+    // Match the Flutter circle-stop glyph on the native 16-unit grid.
+    begin(2.13f, 8);
+    sink->AddArc(D2D1::ArcSegment(point(13.87f, 8),
+        D2D1::SizeF(5.87f * scale, 5.87f * scale), 0.0f,
+        D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
+    sink->AddArc(D2D1::ArcSegment(point(2.13f, 8),
+        D2D1::SizeF(5.87f * scale, 5.87f * scale), 0.0f,
+        D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
+    end(true);
+    begin(5.67f, 5.67f); line(10.33f, 5.67f);
+    line(10.33f, 10.33f); line(5.67f, 10.33f); end(true);
   } else if (row.icon == "restart") {
-    // The clockwise circular arc and arrowhead share the same endpoint.
-    const auto tip = point(13.196f, 5.0f);
-    begin(14, 8);
-    sink->AddArc(D2D1::ArcSegment(tip, D2D1::SizeF(6 * scale, 6 * scale),
-        0.0f, D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_LARGE));
+    // Match the Flutter clockwise rotate arrow.
+    begin(13, 10.33f);
+    sink->AddArc(D2D1::ArcSegment(point(13, 5.67f),
+        D2D1::SizeF(5.53f * scale, 5.53f * scale), 0.0f,
+        D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_LARGE));
     end();
-    begin(13.196f, 1.8f); line(13.196f, 5); line(9.8f, 5); end();
+    begin(13, 2.33f); line(13, 5.67f); line(9.67f, 5.67f); end();
   } else if (row.icon == "exit") {
     begin(6, 2); line(2, 2); line(2, 14); line(6, 14); end();
     begin(5, 8); line(14, 8); end();
