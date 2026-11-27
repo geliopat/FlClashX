@@ -6,9 +6,8 @@ import 'package:fl_clash/features/update/manifest_signature.dart';
 
 const defaultCoreManifestUrl =
     'https://github.com/geliopat/Clash.Meta/releases/latest/download/core-manifest.json';
-const coreUpdateManifestKeys = [
-  String.fromEnvironment('FLCLASHZ_CORE_UPDATE_PUBLIC_KEY'),
-];
+// One release trust root, separate canonical signature domains.
+const coreUpdateManifestKeys = updateManifestKeys;
 
 const coreManifestMaxBytes = 16 * 1024;
 const coreBinaryMaxBytes = 256 * 1024 * 1024;

@@ -376,7 +376,7 @@ class _Build {
       appVersion: appVersion,
       coreVersion: coreVersion,
       updatePublicKey: Platform.environment['FLCLASHZ_UPDATE_PUBLIC_KEY'] ?? '',
-      coreUpdatePublicKey: Platform.environment['FLCLASHZ_CORE_UPDATE_PUBLIC_KEY'] ?? '',
+      coreUpdatePublicKey: Platform.environment['FLCLASHZ_UPDATE_PUBLIC_KEY'] ?? '',
     ),
   ];
 
