@@ -117,7 +117,13 @@ class ProfileOverrideTarget<K extends OverrideKey, M>
     required this.set,
     this.issues,
     ConfigLabel? description,
+    this.preserveEmpty = false,
   }) : _description = description;
+
+  final bool preserveEmpty;
+
+  @override
+  bool get emptyCancels => !preserveEmpty;
 
   final int profileId;
 
@@ -359,6 +365,46 @@ abstract class OverrideSpec<K extends OverrideKey, M> {
 
   List<K> get values;
 
+  /// Subscription source for the existing typed editors. Profile targets
+  /// must match the selected profile; custom/script profiles have no snapshot.
+  String? get yamlSection => null;
+
+  Map<String, Object?> _source(YamlSectionSources? sources, int? activeId) {
+    if (sources == null || sources.profileId != activeId) return const {};
+    final target = this.target;
+    if (target is ProfileOverrideTarget<K, M> && target.profileId != activeId) return const {};
+    return switch (yamlSection) {
+      'dns' => sources.dns,
+      'tun' => sources.tun,
+      'sniffer' => sources.sniffer,
+      _ => const <String, Object?>{},
+    };
+  }
+
+  Map<String, Object?> source(WidgetRef ref, {required bool watch}) {
+    if (!system.isWindows || yamlSection == null) return const {};
+    final sources = watch ? ref.watch(yamlSectionSourcesProvider) : ref.read(yamlSectionSourcesProvider);
+    final id = watch ? ref.watch(currentProfileIdProvider) : ref.read(currentProfileIdProvider);
+    return _source(sources, id);
+  }
+
+  Set<K> listedKeys(WidgetRef ref, {required bool watch}) {
+    final local = watch ? ref.watch(target.select((state) => state.keys)) : target.read(ref).keys;
+    final inherited = source(ref, watch: watch);
+    return {...local, for (final key in values) if (inherited.containsKey(key.path)) key};
+  }
+
+  M inheritedModel(K key, Object? value) {
+    final fragment = overrideFieldDocument(key, value);
+    final M result = switch (defaults) {
+      Dns() => defaultDns.applyOverrideYaml(yaml.encode(fragment)).dns as M,
+      ProfileTun() => ProfileTun.fromJson(fragment) as M,
+      Sniffer() => defaultSniffer.applyOverrideYaml(yaml.encode(fragment)).sniffer as M,
+      _ => throw const FormatException('Unsupported inherited field'),
+    };
+    return result;
+  }
+
   NullStatusIllustration get illustration;
 
   /// What a newly added key starts from.
@@ -413,7 +459,7 @@ void showOverrideAddSheet<K extends OverrideKey, M>(
   OverrideSpec<K, M> spec,
 ) {
   final appLocalizations = context.appLocalizations;
-  final added = spec.target.read(ref).keys;
+  final added = spec.listedKeys(ref, watch: false);
   final remaining = spec.values.where((key) => !added.contains(key));
   showSheet<void>(
     context: context,
@@ -438,6 +484,7 @@ void showOverrideAddSheet<K extends OverrideKey, M>(
         if (!context.mounted) {
           return;
         }
+        if (spec.listedKeys(ref, watch: false).contains(key)) return;
         spec.target.update(
           ref,
           (state) => (
@@ -527,14 +574,9 @@ class OverrideView<K extends OverrideKey, M> extends ConsumerWidget {
     final appLocalizations = context.appLocalizations;
     final spec = this.spec;
     final target = spec.target;
-    final (:isEmpty, :canAdd) = ref.watch(
-      target.select(
-        (state) => (
-          isEmpty: !spec.values.any(state.keys.contains),
-          canAdd: spec.values.any((key) => !state.keys.contains(key)),
-        ),
-      ),
-    );
+    final listed = spec.listedKeys(ref, watch: true);
+    final isEmpty = !spec.values.any(listed.contains);
+    final canAdd = spec.values.any((key) => !listed.contains(key));
     final addEntry = target.addEntry(appLocalizations);
     return CommonScaffold(
       title: spec.title(appLocalizations),
@@ -579,7 +621,7 @@ class _OverrideList<K extends OverrideKey, M> extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final appLocalizations = context.appLocalizations;
-    final keys = ref.watch(spec.target.select((state) => state.keys));
+    final keys = spec.listedKeys(ref, watch: true);
     final entries = spec.values.where(keys.contains);
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 16).copyWith(
@@ -622,7 +664,7 @@ class _OverrideList<K extends OverrideKey, M> extends ConsumerWidget {
 }
 
 /// A picked key's row, led by the button that takes it off the list.
-class OverrideEntry<K extends OverrideKey, M> extends StatelessWidget {
+class OverrideEntry<K extends OverrideKey, M> extends ConsumerWidget {
   const OverrideEntry({
     super.key,
     required this.spec,
@@ -633,14 +675,61 @@ class OverrideEntry<K extends OverrideKey, M> extends StatelessWidget {
   final K overrideKey;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final field = spec.fieldOf(overrideKey);
-    return field.build(
-      field is ValueOverrideField && spec.target.emptyCancels
+    final target = spec.target;
+    final source = spec.source(ref, watch: true);
+    final owned = ref.watch(target.select((state) => state.keys.contains(overrideKey)));
+    final inherited = source.containsKey(overrideKey.path);
+    final ru = Localizations.localeOf(context).languageCode == 'ru';
+    final sourceLabel = ru ? 'Из подписки' : 'From subscription';
+    final label = spec.label(overrideKey, context.appLocalizations);
+    final value = source[overrideKey.path];
+    final valueText = inheritedOverrideValueLabel(value, russian: ru);
+    void release() => target.update(ref, (state) => spec.withoutKeys(state, {overrideKey}));
+    if (inherited && !owned) {
+      // Inherited rows are never written into the stored override set by
+      // rendering. Taking ownership seeds the existing typed editor.
+      return ListItem(
+        title: Text(label),
+        subtitle: Text('$sourceLabel: $valueText', maxLines: 3, overflow: TextOverflow.ellipsis),
+        trailing: const GlyphIcon(AppGlyphs.lock, size: 16),
+        onTap: () async {
+          final agreed = await dialogs.showMessage(
+            title: context.appLocalizations.managedByProvider,
+            message: TextSpan(text: context.appLocalizations.managedByProviderTip),
+            confirmText: context.appLocalizations.takeOver,
+          );
+          if (agreed != true || !context.mounted) return;
+          final latest = spec.source(ref, watch: false);
+          if (!latest.containsKey(overrideKey.path)) return;
+          try {
+            final model = spec.inheritedModel(overrideKey, latest[overrideKey.path]);
+            target.update(ref, (state) => state.keys.contains(overrideKey) ? state : (
+              model: field.reset(state.model, model),
+              keys: {...state.keys, overrideKey},
+            ));
+          } catch (_) {
+            await dialogs.showMessage(message: TextSpan(text: ru
+                ? 'Значение не поддерживается этим редактором. Исходный YAML сохранён.'
+                : 'This value is not supported by the editor. The source YAML is unchanged.'));
+          }
+        },
+      );
+    }
+    final child = field.build(
+      field is ValueOverrideField && target.emptyCancels
           ? _ListedValue(spec, overrideKey)
-          : spec.target,
+          : target,
       title: (l) => spec.label(overrideKey, l),
       leading: _RemoveButton(spec: spec, overrideKey: overrideKey),
+    );
+    if (spec.yamlSection == null || !system.isWindows || !owned) return child;
+    return ManagedSettingRegion(
+      locked: false, releasable: true,
+      onTakeOver: () {}, onRelease: release,
+      caption: inherited ? '$sourceLabel: $valueText' : (ru ? 'Локальная настройка' : 'Local setting'),
+      child: child,
     );
   }
 }
@@ -694,3 +783,15 @@ class _RemoveButton<K extends OverrideKey, M> extends ConsumerWidget {
     );
   }
 }
+
+
+String inheritedOverrideValueLabel(Object? value, {required bool russian}) => switch (value) {
+  bool b => russian ? (b ? 'включено' : 'выключено') : (b ? 'enabled' : 'disabled'),
+  null => 'null',
+  String s when s.isEmpty => russian ? 'пусто' : 'empty',
+  List l when l.isEmpty => '[]',
+  Map m when m.isEmpty => '{}',
+  List l => l.map((v) => inheritedOverrideValueLabel(v, russian: russian)).join(', '),
+  Map m => m.entries.map((e) => '${e.key}: ${inheritedOverrideValueLabel(e.value, russian: russian)}').join('; '),
+  _ => value.toString(),
+};

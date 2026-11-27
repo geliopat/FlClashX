@@ -240,9 +240,11 @@ Future<SetupState> setupState(Ref ref, int? profileId) async {
           patchClashConfigProvider.select(
             (state) => ProfileOverrides(
               dns: state.dns,
-              dnsOverrideKeys: state.dnsOverrideKeys.intersection(
+              dnsOverrideKeys: system.isWindows ? state.dnsOverrideKeys : state.dnsOverrideKeys.intersection(
                 DnsOverrideKey.normalProfileKeys,
               ),
+              sniffer: system.isWindows ? profile?.overrides.sniffer ?? defaultSniffer : defaultSniffer,
+              snifferOverrideKeys: system.isWindows ? profile?.overrides.snifferOverrideKeys ?? const {} : const {},
               tun: state.tunOverride,
               tunOverrideKeys: state.tunOverrideKeys,
             ),

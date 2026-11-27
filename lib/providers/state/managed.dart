@@ -1,5 +1,14 @@
 part of '../state.dart';
 
+final yamlSectionSourcesProvider = NotifierProvider<YamlSectionSourcesState, YamlSectionSources?>(YamlSectionSourcesState.new);
+
+class YamlSectionSourcesState extends Notifier<YamlSectionSources?> {
+  @override
+  YamlSectionSources? build() => null;
+
+  void set(YamlSectionSources? source) => state = source;
+}
+
 /// Null means the current YAML has not been read successfully yet; an empty
 /// map means it names none of the typed settings. This is runtime-only.
 final yamlSettingReferencesProvider =

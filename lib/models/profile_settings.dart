@@ -208,3 +208,51 @@ extension on GeoResource {
     GeoResource.GEOSITE => 'geosite',
   };
 }
+
+ 
+/// Extract only recognized editor fields, with explicit presence independent
+/// of truthiness. Unknown keys stay in the original YAML and are not rewritten
+/// merely to display a settings page.
+Map<String, Object?> sectionOverrideValues(
+  Map<String, dynamic> config, String section, Iterable<OverrideKey> keys,
+) {
+  final raw = config[section];
+  if (raw is! Map) return const {};
+  final result = <String, Object?>{};
+  for (final key in keys) {
+    final parent = key.parent;
+    final node = parent == null ? raw : raw[parent];
+    if (node is! Map) continue;
+    final field = parent == null ? key.path : key.field;
+    if (node.containsKey(field)) {
+      result[key.path] = node[field];
+    } else if (section == 'sniffer' && parent == 'sniff') {
+      for (final entry in node.entries) {
+        if (entry.key.toString().toUpperCase() == field.toUpperCase()) {
+          result[key.path] = entry.value;
+          break;
+        }
+      }
+    }
+  }
+  return Map.unmodifiable(result);
+}
+
+Map<String, Object?> overrideFieldDocument(OverrideKey key, Object? value) =>
+    key.parent == null
+      ? {key.path: value}
+      : {key.parent!: {key.field: value}};
+
+typedef YamlSectionSources = ({
+  int profileId,
+  Map<String, Object?> dns,
+  Map<String, Object?> tun,
+  Map<String, Object?> sniffer,
+});
+
+YamlSectionSources yamlSectionSourcesOf(int id, Map<String, dynamic> config) => (
+  profileId: id,
+  dns: sectionOverrideValues(config, 'dns', DnsOverrideKey.values),
+  tun: sectionOverrideValues(config, 'tun', TunOverrideKey.values),
+  sniffer: sectionOverrideValues(config, 'sniffer', SnifferOverrideKey.values),
+);

@@ -45,13 +45,14 @@ ProfileOverrides _setProfileSniffer(
 ) => overrides.copyWith(sniffer: state.model, snifferOverrideKeys: state.keys);
 
 class SnifferView extends OverrideView<SnifferOverrideKey, Sniffer> {
-  SnifferView(int profileId, {super.key})
+  SnifferView(int profileId, {super.key, bool preserveEmpty = false})
     : super(
         spec: _SnifferOverrideSpec(
           ProfileOverrideTarget(
             profileId,
             get: _profileSniffer,
             set: _setProfileSniffer,
+            preserveEmpty: preserveEmpty,
           ),
         ),
       );
@@ -69,6 +70,9 @@ class _SnifferOverrideSpec extends OverrideSpec<SnifferOverrideKey, Sniffer>
 
   @override
   List<SnifferOverrideKey> get values => SnifferOverrideKey.values;
+
+  @override
+  String get yamlSection => 'sniffer';
 
   @override
   String overrideYaml(Sniffer model, Set<SnifferOverrideKey> keys) =>

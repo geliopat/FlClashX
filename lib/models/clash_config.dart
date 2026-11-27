@@ -1055,8 +1055,8 @@ extension SnifferOverrideExt on Sniffer {
     return json;
   }
 
-  Map<String, Object?> overrideJson(Set<SnifferOverrideKey> keys) =>
-      _overrideJson(_json, SnifferOverrideKey.values, keys);
+  Map<String, Object?> overrideJson(Set<SnifferOverrideKey> keys, {bool keepEmpty = false}) =>
+      _overrideJson(_json, SnifferOverrideKey.values, keys, keepEmpty: keepEmpty ? keys : const {});
 
   String overrideYaml(Set<SnifferOverrideKey> keys) =>
       yaml.encode(overrideJson(keys));
@@ -1599,8 +1599,8 @@ Set<TunOverrideKey> _tunOverrideKeysFromJson(List<Object?> json) => {
 };
 
 extension TunOverrideExt on ProfileTun {
-  Map<String, Object?> overrideJson(Set<TunOverrideKey> keys) =>
-      _overrideJson(toJson(), TunOverrideKey.values, keys);
+  Map<String, Object?> overrideJson(Set<TunOverrideKey> keys, {bool keepEmpty = false}) =>
+      _overrideJson(toJson(), TunOverrideKey.values, keys, keepEmpty: keepEmpty ? keys : const {});
 }
 
 /// Network TUN values changed from their defaults become app-wide overrides.

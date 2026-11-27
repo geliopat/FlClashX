@@ -161,6 +161,9 @@ class _TunOverrideSpec extends OverrideSpec<TunOverrideKey, ProfileTun> {
   String title(AppLocalizations l) => l.tun;
 
   @override
+  String get yamlSection => 'tun';
+
+  @override
   List<TunOverrideKey> get values =>
       _tunOverrideKeys(isLinux: isLinux, isWindows: isWindows);
 

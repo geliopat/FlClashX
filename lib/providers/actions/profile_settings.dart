@@ -57,6 +57,7 @@ class ProfileSettingsAction extends _$ProfileSettingsAction {
     final generation = ++_generation;
     _unread = false;
     ref.read(yamlSettingReferencesProvider.notifier).set(null);
+    ref.read(yamlSectionSourcesProvider.notifier).set(null);
     if (id == null ||
         source.type == ProfileType.custom ||
         source.extendType == ExtendType.script) {
@@ -146,6 +147,7 @@ class ProfileSettingsAction extends _$ProfileSettingsAction {
     ref.read(yamlSettingReferencesProvider.notifier).set(
       yamlSettingReferences(inherited, inheritedAuthentication, named),
     );
+    ref.read(yamlSectionSourcesProvider.notifier).set(yamlSectionSourcesOf(id, base.config));
     _released.removeAll(released);
   }
 }

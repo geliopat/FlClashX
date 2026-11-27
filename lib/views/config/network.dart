@@ -450,9 +450,7 @@ class TunSection extends ConsumerWidget {
       );
     }
     final spec = appTunOverrideSpec(isLinux: isLinux, isWindows: isWindows);
-    final picked = ref.watch(
-      patchClashConfigProvider.select((state) => state.tunOverrideKeys),
-    );
+    final picked = spec.listedKeys(ref, watch: true);
     final listed = [
       for (final key in spec.values)
         if (picked.contains(key)) key,

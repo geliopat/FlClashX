@@ -2,18 +2,22 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/ui/ui.dart';
 import 'package:fl_clash/views/config/dns.dart';
+import 'package:fl_clash/views/config/sniffer.dart';
+import 'package:fl_clash/providers/providers.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_clash/views/config/network.dart';
 import 'package:fl_clash/views/config/scripts.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'rules.dart';
 
-class AdvancedConfigView extends StatelessWidget {
+class AdvancedConfigView extends ConsumerWidget {
   const AdvancedConfigView({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final appLocalizations = context.appLocalizations;
+    final activeId = ref.watch(currentProfileIdProvider);
     final items = [
       ListItem.open(
         title: Text(appLocalizations.network),
@@ -28,6 +32,11 @@ class AdvancedConfigView extends StatelessWidget {
         leading: const GlyphIcon(AppGlyphs.dns),
         widget: const DnsView(),
       ),
+      if (system.isWindows && activeId != null)
+        ListItem.open(
+          title: Text(appLocalizations.sniffer),
+          widget: SnifferView(activeId, preserveEmpty: true),
+        ),
       ListItem.open(
         title: Text(appLocalizations.addedRules),
         leading: const GlyphIcon(AppGlyphs.rules),

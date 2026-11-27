@@ -238,7 +238,7 @@ Future<RealProfile> _makeRealProfileTask(MakeRealProfileState data) async {
   final tun = {
     if (rawConfig['tun'] is Map) ...rawConfig['tun'] as Map,
     'dns-hijack': defaultDnsHijack,
-    ...overrides.tun.overrideJson(overrides.tunOverrideKeys),
+    ...overrides.tun.overrideJson(overrides.tunOverrideKeys, keepEmpty: Platform.isWindows && data.keepEmptyDnsOverrides),
     ...realPatchConfig.tun.coreJson,
     'auto-detect-interface': true,
   };
@@ -254,6 +254,7 @@ Future<RealProfile> _makeRealProfileTask(MakeRealProfileState data) async {
   rawConfig['geo-update-interval'] = realPatchConfig.geoUpdateInterval;
   final snifferOverride = overrides.sniffer.overrideJson(
     overrides.snifferOverrideKeys,
+    keepEmpty: Platform.isWindows && data.keepEmptyDnsOverrides,
   );
   if (snifferOverride.isNotEmpty) {
     rawConfig['sniffer'] = mergeSnifferOverride(

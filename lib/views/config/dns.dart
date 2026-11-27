@@ -160,7 +160,10 @@ class _DnsOverrideSpec extends OverrideSpec<DnsOverrideKey, Dns> {
 
   @override
   List<DnsOverrideKey> get values =>
-      keys == null ? DnsOverrideKey.values : [...?keys];
+      keys == null || system.isWindows ? DnsOverrideKey.values : [...?keys];
+
+  @override
+  String get yamlSection => 'dns';
 
   @override
   NullStatusIllustration get illustration => NullStatusIllustration.dns;
