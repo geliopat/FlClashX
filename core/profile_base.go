@@ -222,6 +222,9 @@ func loadConfigWithBase(base *SetupBase, configPath string) (*config.Config, err
 	if err := document.Decode(raw); err != nil {
 		return nil, err
 	}
+	if err := prepareGeoSources(raw); err != nil {
+		return nil, err
+	}
 	captureProfileExtras(raw)
 	cfg, err := config.ParseRawConfig(raw)
 	if err != nil {

@@ -153,6 +153,9 @@ func loadConfig(path string) (*config.Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := prepareGeoSources(raw); err != nil {
+		return nil, err
+	}
 	captureProfileExtras(raw)
 	cfg, err := config.ParseRawConfig(raw)
 	if err != nil {
@@ -287,9 +290,17 @@ func applyConfig(params *SetupParams) error {
 	configMu.Lock()
 	defer configMu.Unlock()
 
+	if runtime.GOOS == "windows" {
+		geoSourceMu.Lock()
+		defer geoSourceMu.Unlock()
+	}
 	setTestURL(params.TestURL)
 	skipCertVerify.Store(params.SkipCertVerify)
 	cfg, err := loadSetupConfig(params)
+	if errors.Is(err, errGeoSource) || errors.Is(err, errGeoRestart) {
+		// Keep the old running configuration; do not fall back to an unrelated dataset.
+		return err
+	}
 	if err != nil {
 		// The fallback is what keeps the listeners serving while the host
 		// reports the error, but it applies a config with no proxies in it.

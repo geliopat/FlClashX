@@ -50,7 +50,8 @@ func (resource geoResource) run() error {
 		return resource.update()
 	}
 	name := filepath.Base(resource.path())
-	data, err := downloadBytes(resource.url(), geoDownloadTimeout, skipCertVerify.Load())
+	url := resource.url()
+	data, err := downloadBytes(url, geoDownloadTimeout, skipCertVerify.Load())
 	if err == nil && len(data) == 0 {
 		err = fmt.Errorf("no data")
 	}
@@ -58,11 +59,13 @@ func (resource geoResource) run() error {
 		return fmt.Errorf("can't download %s: %w", name, err)
 	}
 	if current, err := os.ReadFile(geoFileInUse(resource.path())); err == nil && bytes.Equal(current, data) {
+		if runtime.GOOS == "windows" { return writeGeoReceipt(geoFileInUse(resource.path()), url, data) }
 		return nil
 	}
 	if err := resource.install(data); err != nil {
 		return fmt.Errorf("can't install %s: %w", name, err)
 	}
+	if runtime.GOOS == "windows" { return writeGeoReceipt(geoFileInUse(resource.path()), url, data) }
 	return nil
 }
 
@@ -110,6 +113,10 @@ func installPendingGeoFiles() {
 		}
 		if err := os.Rename(pending, path); err != nil {
 			log.Warnln("[GEO] can't install %s: %v", filepath.Base(path), err)
+		} else if runtime.GOOS == "windows" {
+			// The receipt describes the staged bytes, never the old mapped file.
+			_ = os.Remove(geoReceiptPath(path))
+			_ = os.Rename(geoReceiptPath(pending), geoReceiptPath(path))
 		}
 	}
 }
@@ -228,6 +235,10 @@ func handleUpdateGeoData(geoType string) error {
 // mihomo's updater returns nil for a download that matched the file it had,
 // so whether the file changed is what tells an update from a skip.
 func runGeoUpdate(geoType string, resource geoResource) error {
+	if runtime.GOOS == "windows" {
+		geoSourceMu.Lock()
+		defer geoSourceMu.Unlock()
+	}
 	sendMessage(GeoUpdateMessage, GeoUpdateStatus{Type: geoType, Updating: true})
 	before := resource.stamp()
 	url := ""
