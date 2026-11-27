@@ -46,10 +46,11 @@ jobs:
           tmp=$(mktemp -d)
           artifact_name=core-release-request
           if [[ "$GITHUB_EVENT_NAME" == push ]]; then
-            # Exercise real cross-repository transfer and signing, but never
-            # publish a validation artifact. Only the tested immutable run.
-            artifact_name=flclashz-core-windows-amd64
-            gh api "repos/$SOURCE_REPO/actions/runs/46067251590" | jq -er 'select(.conclusion == "success" and .event == "push" and .head_branch == "FlClashZ" and .head_repository.full_name == "geliopat/Clash.Meta" and .head_sha == "3159aaab96a28cdbff0f5358cc91587bc5e2dc7d") | .id' > "$tmp/runs"
+            # Bootstrap only from the exact independently validated stage-two
+            # artifact. Subsequent pushes cannot overwrite the published tag.
+            artifact_name=stage2-core-validation
+            gh api "repos/$SOURCE_REPO/actions/runs/46077612549" | jq -er 'select(.conclusion == "success" and .event == "push" and .head_branch == "candidate/stage2-release" and .head_repository.full_name == "geliopat/Clash.Meta" and .head_sha == "5da6ffcdcd8b86882018752701f13fe4d0db5018") | .id' > "$tmp/runs"
+            gh api "repos/$SOURCE_REPO/actions/runs/46077612549/jobs?per_page=100" | jq -e '[.jobs[] | select(.conclusion == "success") | .name] | sort == ["race","replay","windows"]' >/dev/null
           else
             for workflow in flclashz-core-auto.yml flclashz-core-release.yml; do
               # Only the trusted automatic workflow may request publication on
@@ -72,6 +73,9 @@ jobs:
             artifact_id=$(jq -er '.[0].id' <<< "$matches")
             size=$(jq -er '.[0].size_in_bytes' <<< "$matches")
             digest=$(jq -er '.[0].digest' <<< "$matches")
+            if [[ "$GITHUB_EVENT_NAME" == push ]]; then
+              [[ "$artifact_id" == 15235408457 && "$digest" == sha256:1628905396b9ae2fd5293d9aae4f79b325ac79bb0043f9de4db6fcafeca82d4e ]]
+            fi
             [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
             [[ "$artifact_id" =~ ^[0-9]+$ && "$size" =~ ^[0-9]+$ ]]
             (( size > 0 && size <= 300*1024*1024 ))
@@ -119,9 +123,7 @@ jobs:
           [[ "$(gh api "repos/$SOURCE_REPO/commits/$engine" --jq .sha)" == "$engine" ]]
           [[ "$(gh api "repos/geliopat/FlClashZ/commits/$host" --jq .sha)" == "$host" ]]
           if [[ "$GITHUB_EVENT_NAME" == push ]]; then
-            [[ "$version" == v1.19.34-z.1 && "$engine" == 2732d34e4b32d5b5d1f8d36223d77b4813babaa7 && "$host" == d3899829a60962c0f1fe9d8d59017529b03b984a ]]
-            printf 'ready=true\nversion=%s\nengine=%s\nhost=%s\nrun=%s\n' "$version" "$engine" "$host" "$run_id" >> "$GITHUB_OUTPUT"
-            exit 0
+            [[ "$version" == v1.19.34-z.1 && "$engine" == 53d2f4fc1cb56aaeba947a1a557eeafd48050737 && "$host" == d3899829a60962c0f1fe9d8d59017529b03b984a ]]
           fi
           tag="flclashz-core-$version"
           # Skip the already published request; never overwrite a release or tag.
@@ -194,7 +196,7 @@ jobs:
           print("Independent Ed25519 verification, tamper rejection and binary hash passed.")
           PY
       - name: Publish signed core in Clash.Meta, not in FlClashZ
-        if: steps.request.outputs.ready == 'true' && github.event_name != 'push'
+        if: steps.request.outputs.ready == 'true'
         env:
           GH_TOKEN: ${{ secrets.CORE_RELEASE_TOKEN }}
           VERSION: ${{ steps.request.outputs.version }}
