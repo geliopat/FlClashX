@@ -20,11 +20,12 @@ String _levelLabel(AppLocalizations l, String level) => switch (level) {
 typedef _JournalEntry = ({HelperZapretLog log, String component});
 
 class ZapretLogsView extends StatefulWidget {
-  const ZapretLogsView({super.key, this.journalOnly = false, this.crashOnly = false})
+  const ZapretLogsView({super.key, this.journalOnly = false, this.crashOnly = false, this.embedded = false})
       : assert(!(journalOnly && crashOnly));
 
   final bool journalOnly;
   final bool crashOnly;
+  final bool embedded;
 
   @override
   State<ZapretLogsView> createState() => _ZapretLogsViewState();
@@ -208,6 +209,7 @@ class _ZapretLogsViewState extends State<ZapretLogsView>
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+    if (widget.embedded) return _journal(context);
     return CommonScaffold(
       title: widget.journalOnly ? l.forkServiceJournal
           : widget.crashOnly ? l.forkCrashHistory : l.forkZapretLogs,
