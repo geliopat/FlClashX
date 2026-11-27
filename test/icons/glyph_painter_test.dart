@@ -233,6 +233,17 @@ void main() {
     expect(_alphaAt(latency, 14, 12), greaterThan(0));
   });
 
+  test('speed gauge has a clear open dial and separated needle', () async {
+    final pixels = await _render(AppGlyphs.speed, 0);
+    expect(_alphaAt(pixels, 12, 3), greaterThan(200));
+    expect(_alphaAt(pixels, 3, 12), greaterThan(200));
+    expect(_alphaAt(pixels, 21, 12), greaterThan(200));
+    expect(_alphaAt(pixels, 12, 16), greaterThan(200));
+    expect(_alphaAt(pixels, 14, 12.75), greaterThan(200));
+    expect(_alphaAt(pixels, 17.5, 8), lessThan(20));
+    expect(_alphaAt(pixels, 12, 20), lessThan(20));
+  });
+
   test('a body fills inward from its outline', () async {
     final pixels = await _render(ring, 0.5);
 
