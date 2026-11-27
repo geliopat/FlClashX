@@ -988,14 +988,27 @@ class ZapretController extends Notifier<ZapretState> {
     _fallbackAfter = null;
     _applyHeaderOverlay(preferences);
     if (_launchBlocked || (!force && !state.startWithMihomo)) return;
-    await loadStrategies();
-    await refresh();
-    if (ref.mounted && revision == _lifecycleRevision && !state.available) {
-      throw HelperException(code: 'helperZapretStillUnavailable', message: state.error ?? AppLocalizations().forkCatalogUnavailable);
-    }
-    if (ref.mounted && revision == _lifecycleRevision && !_launchBlocked &&
-        state.available && !state.busy && !state.running) {
-      await setEnabled(true, reason: force ? 'mihomo_restore' : 'mihomo_start');
+    final id = recoveryJournal.begin('Zapret', force ? 'mihomo-restore' : 'mihomo-start');
+    final action = force ? 'mihomo-restore' : 'mihomo-start';
+    var outcome = RecoveryOutcome.interrupted;
+    try {
+      await loadStrategies();
+      await refresh();
+      if (!ref.mounted || revision != _lifecycleRevision || _launchBlocked) return;
+      if (!state.available) {
+        throw HelperException(code: 'helperZapretStillUnavailable', message: state.error ?? AppLocalizations().forkCatalogUnavailable);
+      }
+      if (!state.busy && !state.running) {
+        await setEnabled(true, reason: force ? 'mihomo_restore' : 'mihomo_start');
+      }
+      if (!ref.mounted || revision != _lifecycleRevision || _launchBlocked) return;
+      outcome = state.running ? RecoveryOutcome.succeeded : RecoveryOutcome.failed;
+      if (!state.running) throw StateError(state.error ?? AppLocalizations().forkCoreRecoveredZapretStopped);
+    } catch (_) {
+      outcome = RecoveryOutcome.failed;
+      rethrow;
+    } finally {
+      recoveryJournal.record(id, 'Zapret', action, outcome);
     }
   }
 
