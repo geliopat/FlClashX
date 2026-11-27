@@ -6,6 +6,7 @@ import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/providers/core.dart';
 import 'package:fl_clash/providers/database.dart';
 import 'package:fl_clash/state.dart';
+import 'package:fl_clash/ui/inherited.dart';
 import 'package:fl_clash/views/navigation.dart';
 import 'package:fl_clash/views/views.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -47,18 +48,23 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
   }
 
-  testWidgets('switches between the two feeds from the title tabs and keeps '
-      'the choice', (tester) async {
+  testWidgets('switches feeds and resets to live when returning', (tester) async {
     tester.view.physicalSize = const Size(1400, 1000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    await tester.pumpWidget(
+    Future<void> show(bool active) => tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
-        child: const TestApp(child: ConnectionFeedsView()),
+        child: TestApp(child: PageActivityScope(
+          isActive: active, child: const ConnectionFeedsView(),
+        )),
       ),
     );
+    container.read(appSettingProvider.notifier).update(
+      (state) => state.copyWith(requestFeed: RequestFeed.recent),
+    );
+    await show(true);
     await settle(tester);
 
     expect(find.byType(ConnectionsView), findsOneWidget);
@@ -69,7 +75,15 @@ void main() {
 
     expect(find.byType(RequestsView), findsOneWidget);
     expect(find.byType(ConnectionsView), findsNothing);
-    expect(container.read(appSettingProvider).requestFeed, RequestFeed.recent);
+    final recentState = tester.state(find.byType(RequestsView));
+    await show(false);
+    await settle(tester);
+    await show(true);
+    await settle(tester);
+    expect(find.byType(ConnectionsView), findsOneWidget);
+    await tester.tap(find.text('Recent requests'));
+    await tester.pumpAndSettle();
+    expect(tester.state(find.byType(RequestsView)), same(recentState));
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 2));
