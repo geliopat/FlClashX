@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/core/controller.dart';
 import 'package:fl_clash/core/method.dart';
@@ -57,7 +55,7 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView>
         glyph: AppGlyphs.clearAll,
         tooltip: context.appLocalizations.closeConnections,
         onPressed: () async {
-          unawaited(_core.closeConnections());
+          await _core.closeConnections();
           await _refreshConnections();
         },
       ),
@@ -86,7 +84,7 @@ class _ConnectionsViewState extends ConsumerState<ConnectionsView>
       final connectionsReader = widget.connectionsReader;
       return connectionsReader != null
           ? await connectionsReader()
-          : await _core.getConnections();
+          : (await _core.getConnectionSnapshot()).connections;
     } catch (error) {
       commonPrint.log(
         'updateConnections error: $error',

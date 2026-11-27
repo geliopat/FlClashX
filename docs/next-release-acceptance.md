@@ -13,6 +13,9 @@ Base: v1.1.4. Target proposed: v1.1.5. Work branch, not a stable release. All it
 
 - Mica Alt restored as an independently persisted window material, native DWM tabbed-window backdrop (4), Windows 11 build 22621+, opaque fallback on unsupported systems or native failure. Flutter uses the same initial overlay alpha as Mica; native appearance and future per-surface controls/preview remain pending verification.
 
+- Shared connection snapshot reader coalesces concurrent GUI reads and reuses unchanged data; dashboard, connections and sidebar use it, with invalidation on explicit core lifecycle and connection operations. Sidebar TCP/UDP counts added. Windows performance and reconnect verification remain pending.
+- Window-level ticker suspension for Windows minimized/hidden states and validated settings recovery for missing or malformed primary configuration added. Full transactional Windows persistence, migration and stress tests remain pending.
+
 ## Remaining acceptance requirements
 - Settings ownership: preserve per-key user overrides through app/profile updates, adopt non-overridden changes/new defaults, respect managed locks and migration. Auto-display all supported Windows Mihomo keys in active YAML for DNS (nested lists/maps), TUN, Sniffer, TCP keep-alive (all 3), others; source labels, reset to profile, no duplicates, missing vs false/0/empty, preserve unknown YAML and DNS group suffixes. Existing editors and Add parameter only for absent keys. Verify actual core config and deliberate TUN routing protection.
 - Window/sidebar same background; no borders/divider/shadows/frame, keep resize edges/Snap. Separate window/cards/buttons opaque/Mica/Mica Alt/Acrylic; independent transparency/blur/tint, shared accent and hover intensity, live changes, reset/persistence, native material limitations. All clickable text/icon glow on hover only, no background ripple or selection fill, active text/icon accent, accessible keyboard focus.

@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/core/core.dart';
+import 'package:fl_clash/core/connection_snapshot.dart';
 import 'package:fl_clash/core/interface.dart';
 import 'package:fl_clash/core/spill.dart';
 import 'package:fl_clash/enum/enum.dart';
@@ -42,11 +43,24 @@ class CoreController {
     return _instance!;
   }
 
-  Future<CoreLifecycleResult> start() => _interface.start();
+  late final _connectionSnapshots = ConnectionSnapshotReader(_interface.getConnections);
 
-  Future<CoreLifecycleResult> restart() => _interface.restart();
+  Future<ConnectionSnapshot> getConnectionSnapshot() => _connectionSnapshots.read();
 
-  Future<CoreLifecycleResult> close() => _interface.close();
+  Future<T> _invalidateConnectionsDuring<T>(Future<T> Function() operation) async {
+    _connectionSnapshots.invalidate();
+    try {
+      return await operation();
+    } finally {
+      _connectionSnapshots.invalidate();
+    }
+  }
+
+  Future<CoreLifecycleResult> start() => _invalidateConnectionsDuring(_interface.start);
+
+  Future<CoreLifecycleResult> restart() => _invalidateConnectionsDuring(_interface.restart);
+
+  Future<CoreLifecycleResult> close() => _invalidateConnectionsDuring(_interface.close);
 
   static Future<void> ensureHomeDir() async {
     final homePath = await appPath.homeDirPath;
@@ -240,15 +254,15 @@ class CoreController {
   }
 
   Future<void> closeConnection(String id) async {
-    await _interface.closeConnection(id);
+    await _invalidateConnectionsDuring(() => _interface.closeConnection(id));
   }
 
   Future<void> closeConnections() async {
-    await _interface.closeConnections();
+    await _invalidateConnectionsDuring(_interface.closeConnections);
   }
 
   Future<void> resetConnections() async {
-    await _interface.resetConnections();
+    await _invalidateConnectionsDuring(_interface.resetConnections);
   }
 
   Future<bool> clearDnsCache() async {

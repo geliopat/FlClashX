@@ -153,6 +153,22 @@ void main() {
       expect(Config.strictFromJson((await preferences.getConfigMap())!), config);
     });
 
+    test('valid JSON with corrupt model fields restores last known good', () async {
+      const config = Config(themeProps: defaultThemeProps, currentProfileId: 42);
+      expect(await preferences.saveConfig(config), isTrue);
+      final invalid = Map<String, Object?>.from((await preferences.getConfigMap())!);
+      invalid['themeProps'] = 123;
+      await store.setString(configKey, jsonEncode(invalid));
+      expect(Config.strictFromJson((await preferences.getConfigMap())!), config);
+    });
+
+    test('missing primary settings recover from an existing backup', () async {
+      const config = Config(themeProps: defaultThemeProps, currentProfileId: 42);
+      expect(await preferences.saveConfig(config), isTrue);
+      await store.remove(configKey);
+      expect(Config.strictFromJson((await preferences.getConfigMap())!), config);
+    });
+
     test('getConfigMap returns null for malformed JSON', () async {
       await store.setString(configKey, 'not-json');
 

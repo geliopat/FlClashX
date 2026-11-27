@@ -78,6 +78,8 @@ class _SidebarStatisticsState extends ConsumerState<SidebarStatistics> {
   double? _cpu;
   Timer? _timer;
   bool _reading = false;
+  int? _tcp;
+  int? _udp;
 
   @override
   void initState() {
@@ -121,6 +123,16 @@ class _SidebarStatisticsState extends ConsumerState<SidebarStatistics> {
         } catch (_) {}
       }
       if (!mounted) return;
+      int? tcp;
+      int? udp;
+      if (ref.read(coreStatusProvider) == CoreStatus.connected) {
+        try {
+          final snapshot = await ref.read(coreHandlerProvider).getConnectionSnapshot();
+          tcp = snapshot.tcp;
+          udp = snapshot.udp;
+        } catch (_) {}
+      }
+      if (!mounted || !ref.read(appVisibleProvider)) return;
       final now = _clock.elapsedMicroseconds;
       final elapsed = _lastSample == null ? 0 : now - _lastSample!;
       double? cpu;
@@ -149,6 +161,8 @@ class _SidebarStatisticsState extends ConsumerState<SidebarStatistics> {
         _samples = samples;
         _lastSample = now;
         _cpu = cpu;
+        _tcp = tcp;
+        _udp = udp;
       });
     } finally {
       _reading = false;
@@ -247,6 +261,13 @@ class _SidebarStatisticsState extends ConsumerState<SidebarStatistics> {
           for (final name in _names) _line(name, _bytes(_samples[name]?.rss), style),
           const SizedBox(height: 12),
           Text(l.traffic, style: heading),
+          Row(children: [
+            Expanded(child: Text('TCP ${connected ? _tcp ?? '—' : 0}',
+              style: style?.copyWith(color: NetworkTone.tcp.of(context)))),
+            Expanded(child: Text('UDP ${connected ? _udp ?? '—' : 0}',
+              textAlign: TextAlign.end,
+              style: style?.copyWith(color: NetworkTone.udp.of(context)))),
+          ]),
           _trafficRow(l.forkSidebarSpeed, speed, style, rate: true),
           _trafficRow(l.forkSidebarSession, session, style),
           ValueListenableBuilder<int>(

@@ -103,9 +103,13 @@ class Preferences {
     try {
       final preferences = await _store.value;
       final configString = preferences?.getString(configKey);
-      if (configString == null) return null;
+      if (configString == null) {
+        if (preferences?.containsKey(_lastGoodConfigKey) != true) return null;
+        throw const FormatException('missing primary config');
+      }
       final decoded = json.decode(configString);
       if (decoded is! Map<String, Object?>) throw const FormatException('config');
+      _validateConfig(decoded);
       return decoded;
     } catch (_) {
       commonPrint.log('Invalid settings JSON; checking last known good copy', logLevel: LogLevel.warning);
@@ -114,7 +118,7 @@ class Preferences {
         final raw = store?.getString(_lastGoodConfigKey);
         if (raw == null) return null;
         final map = jsonDecode(raw) as Map<String, Object?>;
-        Config.strictFromJson(map);
+        _validateConfig(map);
         commonPrint.log('Recovered last known good settings', logLevel: LogLevel.warning);
         return map;
       } catch (_) {
@@ -152,12 +156,22 @@ class Preferences {
     }
   }
 
+  static void _validateConfig(Map<String, Object?> map) {
+    // Config.strictFromJson still salvages the nested app/theme settings.
+    // Validate those explicitly before trusting a recovery copy.
+    if (map.containsKey('appSettingProps')) {
+      AppSettingProps.fromJson(Map<String, Object?>.from(map['appSettingProps'] as Map));
+    }
+    ThemeProps.fromJson(Map<String, Object?>.from(map['themeProps'] as Map));
+    Config.strictFromJson(map);
+  }
+
   Future<bool> saveConfig(Config config) {
     final operation = _configWrite.catchError((_) => false).then((_) async {
       final store = await _store.value;
       if (store == null) return false;
       final encoded = jsonEncode(config);
-      Config.strictFromJson(jsonDecode(encoded) as Map<String, Object?>);
+      _validateConfig(jsonDecode(encoded) as Map<String, Object?>);
       if (!await store.setString(configKey, encoded)) return false;
       return store.setString(_lastGoodConfigKey, encoded);
     });

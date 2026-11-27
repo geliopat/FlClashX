@@ -1,6 +1,8 @@
 import 'package:fl_clash/ui/network_palette.dart';
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show listEquals;
+
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/core/controller.dart';
 import 'package:fl_clash/core/method.dart';
@@ -106,8 +108,9 @@ mixin ConnectionsPolling<T extends ConsumerStatefulWidget>
   @override
   Future<void> poll(PollGuard isCurrent) async {
     if (ref.read(coreStatusProvider) != CoreStatus.connected) {
+      if (!isCurrent()) return;
       connectionCount.value = 0;
-      if (connections.isNotEmpty && isCurrent()) {
+      if (connections.isNotEmpty || tcpCount != 0 || udpCount != 0) {
         updateWhenRouteSettled(
           () => setState(() {
             connections = const [];
@@ -120,22 +123,22 @@ mixin ConnectionsPolling<T extends ConsumerStatefulWidget>
     }
     try {
       if (pollsConnections) {
-        final next = [...await _core.getConnections()];
+        final sample = await _core.getConnectionSnapshot();
+        final next = [...sample.connections];
         if (!isCurrent()) return;
         next.sort((a, b) => b.start.compareTo(a.start));
-        final tcp = next
-            .where((item) => item.metadata.network.toLowerCase() == 'tcp')
-            .length;
+        final tcp = sample.tcp;
         connectionCount.value = next.length;
+        if (listEquals(connections, next) && tcpCount == sample.tcp && udpCount == sample.udp) return;
         updateWhenRouteSettled(
           () => setState(() {
             connections = next;
             tcpCount = tcp;
-            udpCount = next.where((item) => item.metadata.network.toLowerCase() == 'udp').length;
+            udpCount = sample.udp;
           }),
         );
       } else {
-        final count = await _core.getConnectionCount();
+        final count = (await _core.getConnectionSnapshot()).count;
         if (!isCurrent()) return;
         connectionCount.value = count;
       }

@@ -35,10 +35,14 @@ class _WindowContainerState extends ConsumerState<WindowManager>
   Timer? _windowGeometryTimer;
   StreamSubscription<ProcessSignal>? _terminateSubscription;
   int _windowGeometryRevision = 0;
+  bool _minimized = false;
+  bool _hidden = false;
 
   @override
   Widget build(BuildContext context) {
-    return widget.child;
+    if (!system.isWindows) return widget.child;
+    final visible = ref.watch(appVisibleProvider);
+    return TickerMode(enabled: visible && !_minimized && !_hidden, child: widget.child);
   }
 
   @override
@@ -186,6 +190,7 @@ class _WindowContainerState extends ConsumerState<WindowManager>
 
   @override
   void onWindowMinimize() async {
+    if (mounted && !_minimized) setState(() => _minimized = true);
     _invalidateWindowGeometryCapture();
     ref.read(storeActionProvider.notifier).savePreferencesDebounce();
     super.onWindowMinimize();
@@ -193,8 +198,21 @@ class _WindowContainerState extends ConsumerState<WindowManager>
 
   @override
   void onWindowRestore() {
+    if (mounted && _minimized) setState(() => _minimized = false);
     super.onWindowRestore();
     _scheduleWindowGeometryCapture();
+  }
+
+  @override
+  void onWindowHide() {
+    if (mounted && !_hidden) setState(() => _hidden = true);
+    super.onWindowHide();
+  }
+
+  @override
+  void onWindowShow() {
+    if (mounted && _hidden) setState(() => _hidden = false);
+    super.onWindowShow();
   }
 
   @override
