@@ -3,6 +3,7 @@ import 'package:fl_clash/models/models.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'core.dart';
+import 'network_probe_settings.dart';
 import 'route_state.dart';
 import 'routed_probe.dart';
 
@@ -14,7 +15,11 @@ part 'generated/outbound_ip.g.dart';
 class OutboundIpProbe extends _$OutboundIpProbe
     with RoutedProbe<String, IpInfo> {
   @override
-  RoutedProbeState<String, IpInfo> build() => buildProbe();
+  RoutedProbeState<String, IpInfo> build() {
+    final initial = buildProbe();
+    ref.listen(networkProbeSettingsProvider.select((s) => s.ipKey), (_, _) => probeSettingsChanged());
+    return initial;
+  }
 
   @override
   Future<Map<String, ProbeAnswer<IpInfo>>> probe(
@@ -24,11 +29,26 @@ class OutboundIpProbe extends _$OutboundIpProbe
     final proxyName = target == routedOutbound && !route.proxied
         ? directOutbound
         : target;
-    final result = await lookupOutboundIp(
-      ref.read(coreHandlerProvider),
-      proxyName,
+    final settings = ref.read(networkProbeSettingsProvider);
+    final core = ref.read(coreHandlerProvider);
+    final selected = settings.selectedIpUrl;
+    final timeout = Duration(seconds: settings.ipTimeout);
+    final watch = Stopwatch()..start();
+    var result = await lookupOutboundIp(core, proxyName,
+      urls: selected == null ? null : [selected],
+      timeout: selected != null && settings.ipFallback
+          ? Duration(milliseconds: timeout.inMilliseconds ~/ 2) : timeout,
     );
-    final value = parseOutboundIp(result);
+    var value = parseOutboundIp(result, customUrl: settings.customIpUrl);
+    // Optional fallback uses the same named outbound and remaining budget.
+    if (value == null && selected != null && settings.ipFallback) {
+      final remaining = timeout - watch.elapsed;
+      final alternatives = ipInfoSources.keys.where((url) => url != selected).toList();
+      if (remaining > Duration.zero && alternatives.isNotEmpty) {
+        result = await lookupOutboundIp(core, proxyName, urls: alternatives, timeout: remaining);
+        value = parseOutboundIp(result, customUrl: settings.customIpUrl);
+      }
+    }
     final hits = result?.hits ?? const <RouteHit>[];
     final exit = result?.chains.firstOrNull;
     return {

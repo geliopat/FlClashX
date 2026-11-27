@@ -1,4 +1,6 @@
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/common/service_probe.dart';
+import 'package:fl_clash/providers/network_probe_settings.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/views/config/general.dart';
 import 'package:fl_clash/widgets/widgets.dart';
@@ -16,6 +18,9 @@ class NetworkTestsView extends ConsumerWidget {
     final speedService = ref.watch(speedTestSettingsProvider.select((s) => s.service));
     // Keep the saved custom value loaded while showing the preset selector.
     ref.watch(customDelayUrlProvider);
+    final probes = ref.watch(networkProbeSettingsProvider);
+    final probeAction = ref.read(networkProbeSettingsProvider.notifier);
+    String seconds(int value) => ru ? '$value сек.' : '$value s';
     return CommonScaffold(
       title: ru ? 'Сетевые тесты' : 'Network tests',
       body: ListView(
@@ -52,8 +57,59 @@ class NetworkTestsView extends ConsumerWidget {
             footer: ru ? 'Тест скорости запускается только вручную.' : 'Speed measurements are manual only.',
           ),
           generateSection(
+            title: ru ? 'Внешний IP' : 'Outbound IP',
+            items: [
+              ListItem<String>.options(
+                title: Text(ru ? 'Источник IP' : 'IP source'),
+                options: ['auto', ...selectableIpSources.keys, 'custom'],
+                value: probes.ipSource,
+                textBuilder: (value) => switch (value) {
+                  'auto' => ru ? 'Автовыбор' : 'Automatic',
+                  'custom' => ru ? 'Свой URL' : 'Custom URL',
+                  _ => value,
+                },
+                onChanged: (value) => probeAction.set(probes.copyWith(ipSource: value)),
+              ),
+              if (probes.ipSource == 'custom')
+                ListItem.input(
+                  title: Text(ru ? 'Свой URL' : 'Custom URL'),
+                  value: probes.customIpUrl,
+                  subtitle: Text(probes.customIpUrl),
+                  resetValue: const NetworkProbeSettings().customIpUrl,
+                  maxLength: TextInputLimits.url,
+                  validator: (value) => validTestEndpoint(value?.trim() ?? '')
+                      ? null : (ru ? 'Некорректный URL' : 'Invalid URL'),
+                  onChanged: (value) {
+                    if (value != null && validTestEndpoint(value.trim())) {
+                      probeAction.set(ref.read(networkProbeSettingsProvider).copyWith(customIpUrl: value.trim()));
+                    }
+                  },
+                ),
+              if (probes.ipSource != 'auto')
+                ListItem(
+                  title: Text(ru ? 'Резервные источники' : 'Fallback sources'),
+                  trailing: Switch(value: probes.ipFallback,
+                    onChanged: (value) => probeAction.set(probes.copyWith(ipFallback: value))),
+                ),
+              ListItem<int>.options(
+                title: Text(ru ? 'Тайм-аут IP' : 'IP timeout'),
+                options: NetworkProbeSettings.timeouts,
+                value: probes.ipTimeout, textBuilder: seconds,
+                onChanged: (value) => probeAction.set(probes.copyWith(ipTimeout: value)),
+              ),
+            ],
+          ),
+          generateSection(
             title: ru ? 'Доступность сервисов' : 'Service availability',
-            items: const [ZapretProbeIntervalItem()],
+            items: [
+              const ZapretProbeIntervalItem(),
+              ListItem<int>.options(
+                title: Text(ru ? 'Тайм-аут проверки' : 'Probe timeout'),
+                options: NetworkProbeSettings.timeouts,
+                value: probes.serviceTimeout, textBuilder: seconds,
+                onChanged: (value) => probeAction.set(probes.copyWith(serviceTimeout: value)),
+              ),
+            ],
           ),
         ],
       ),

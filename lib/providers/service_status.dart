@@ -6,6 +6,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'config.dart';
 import 'core.dart';
+import 'network_probe_settings.dart';
 import 'route_state.dart';
 import 'routed_probe.dart';
 
@@ -15,7 +16,11 @@ part 'generated/service_status.g.dart';
 class ServiceStatus extends _$ServiceStatus
     with RoutedProbe<ServiceTarget, ServiceCheck> {
   @override
-  RoutedProbeState<ServiceTarget, ServiceCheck> build() => buildProbe();
+  RoutedProbeState<ServiceTarget, ServiceCheck> build() {
+    final initial = buildProbe();
+    ref.listen(networkProbeSettingsProvider.select((s) => s.serviceTimeout), (_, _) => probeSettingsChanged());
+    return initial;
+  }
 
   @override
   bool isFailure(ServiceCheck value) =>
@@ -31,6 +36,7 @@ class ServiceStatus extends _$ServiceStatus
       ref.read(coreHandlerProvider),
       proxyName: route.proxied ? '' : directOutbound,
       targets: [target],
+      timeout: Duration(seconds: ref.read(networkProbeSettingsProvider).serviceTimeout),
     );
     final check = checks[target];
     return {

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:fl_clash/common/constant.dart';
 import 'package:fl_clash/core/controller.dart';
@@ -174,6 +175,83 @@ final Map<String, IpInfo Function(String)> ipInfoSources = {
   'https://api.seeip.org/geoip': _json(IpInfo.fromSeeIpJson),
   'https://ident.me/json': _json(IpInfo.fromIdentMeJson),
 };
+
+/// Additional opt-in sources. Automatic selection keeps the original race.
+const selectableIpSources = <String, String>{
+  'IPinfo': 'https://ipinfo.io/json',
+  'IPWhois': 'https://ipwho.is/',
+  'IPAPI': 'http://ip-api.com/json',
+  'ipapi.co': 'https://ipapi.co/json/',
+  'GeoJS': 'https://get.geojs.io/v1/ip/geo.json',
+  'Cloudflare': 'https://www.cloudflare.com/cdn-cgi/trace',
+  'DB-IP': 'https://api.db-ip.com/v2/free/self',
+  'FreeIPAPI': 'https://free.freeipapi.com/api/v1/json/',
+  'IPify': 'https://api.ipify.org?format=json',
+  'AWS': 'https://checkip.amazonaws.com/',
+};
+
+IpInfo? parseFlexibleIpBody(String body) {
+  final plain = body.trim();
+  String? ip;
+  String? country;
+  if (InternetAddress.tryParse(plain) != null) {
+    ip = plain;
+  } else if (plain.startsWith('{')) {
+    final value = jsonDecode(plain);
+    if (value is! Map || value['success'] == false ||
+        value['error'] == true || value['status'] == 'fail') return null;
+    final address = value['ip'] ?? value['query'] ?? value['ipAddress'];
+    if (address is! String) return null;
+    ip = address;
+    final code = value['country_code'] ?? value['countryCode'] ??
+        value['country'] ?? value['cc'];
+    if (code is String) country = code;
+  } else {
+    final fields = <String, String>{};
+    for (final line in plain.split('\n')) {
+      final split = line.indexOf('=');
+      if (split > 0) fields[line.substring(0, split)] = line.substring(split + 1).trim();
+    }
+    ip = fields['ip'];
+    country = fields['loc'];
+  }
+  if (ip == null || InternetAddress.tryParse(ip) == null) return null;
+  final code = country?.trim().toUpperCase() ?? '';
+  return IpInfo(ip: ip, countryCode: RegExp(r'^[A-Z]{2}
+Future<OutboundIpResult?> lookupOutboundIp(
+  CoreController core,
+  String proxyName, {
+  Duration timeout = outboundIpTimeoutDuration,
+  List<String>? urls,
+}) {
+  return core.outboundIp(
+    OutboundIpParams(
+      proxyName: proxyName,
+      urls: urls ?? ipInfoSources.keys.toList(),
+      timeout: timeout.inMilliseconds,
+    ),
+  );
+}
+
+IpInfo? parseOutboundIp(OutboundIpResult? result, {String? customUrl}) {
+  if (result == null || result.error != null || result.body.isEmpty) {
+    return null;
+  }
+  final parse = ipInfoSources[result.url];
+  try {
+    if (parse != null) return parse(result.body);
+    if (selectableIpSources.containsValue(result.url) || result.url == customUrl) {
+      return parseFlexibleIpBody(result.body);
+    }
+    return null;
+  } on FormatException {
+    return null;
+  } on TypeError {
+    return null;
+  }
+}
+).hasMatch(code) ? code : '');
+}
 
 /// Raw so the route stamp survives; [parseOutboundIp] reads the address.
 Future<OutboundIpResult?> lookupOutboundIp(

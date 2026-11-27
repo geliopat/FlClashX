@@ -11,6 +11,14 @@ import 'package:mocktail/mocktail.dart';
 class _MockCore extends Mock implements CoreHandlerInterface {}
 
 void main() {
+  test('IP-only, trace and selectable JSON source formats', () {
+    expect(parseFlexibleIpBody('8.8.8.8\n'), const IpInfo(ip: '8.8.8.8', countryCode: ''));
+    expect(parseFlexibleIpBody('ip=1.1.1.1\nloc=DE\n'), const IpInfo(ip: '1.1.1.1', countryCode: 'DE'));
+    expect(parseFlexibleIpBody('{"ipAddress":"1.1.1.1","countryCode":"GB"}'),
+      const IpInfo(ip: '1.1.1.1', countryCode: 'GB'));
+    expect(parseFlexibleIpBody('{"success":false,"ip":"1.1.1.1"}'), isNull);
+    expect(parseFlexibleIpBody('<html>1.1.1.1</html>'), isNull);
+  });
   setUpAll(() {
     registerFallbackValue(const ServiceCheckParams(timeout: 0));
     registerFallbackValue(const OutboundIpParams(timeout: 0));

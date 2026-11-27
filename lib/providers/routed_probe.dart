@@ -199,6 +199,22 @@ mixin RoutedProbe<K, V>
     }
   }
 
+  /// Invalidate old answers on source changes. Only visible/watched
+  /// targets are automatically asked again. Old completions are discarded.
+  @protected
+  void probeSettingsChanged() {
+    final targets = _watchers.keys.toList();
+    _inFlight.clear();
+    _landed.clear();
+    _unverified.clear();
+    _due.clear();
+    _staleUnder.clear();
+    for (final timer in _cooling.values) { timer.cancel(); }
+    _cooling.clear();
+    state = RoutedProbeState<K, V>();
+    for (final target in targets) { _mark(target); }
+  }
+
   ProbeEntry<V> _entryOf(K target) => state.entryOf(target);
 
   void _mark(K target, {bool keepValue = false, bool forced = false}) {
