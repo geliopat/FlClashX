@@ -33,13 +33,15 @@ class SmartHostsView extends ConsumerWidget {
       ),
     );
     return CommonScaffold(
-      title: AppLocalizations.of(context).forkSmartHosts,
+      title: 'Hosts',
       body: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16).copyWith(
           top: context.sectionsTopPadding,
           bottom: 16 + context.bottomInset,
         ),
         children: [
+          generateSection(items: [const ManualHostsItem()]),
+          const ListSectionGap(),
           generateSection(
             title: AppLocalizations.of(context).forkManagement,
             items: [
@@ -305,6 +307,43 @@ class _SmartHostsEntriesState extends State<_SmartHostsEntries> {
           );
         },
       ),
+    );
+  }
+}
+
+class ManualHostsItem extends ConsumerWidget {
+  const ManualHostsItem({super.key});
+
+  @override
+  Widget build(BuildContext context, ref) {
+    final appLocalizations = context.appLocalizations;
+    final hosts = ref.watch(
+      patchClashConfigProvider.select((state) => state.hosts),
+    );
+    return ListItem.open(
+      title: Text(Localizations.localeOf(context).languageCode == 'ru'
+          ? 'Добавить записи' : 'Add records'),
+      subtitle: Text(
+        hosts.isEmpty
+            ? appLocalizations.none
+            : appLocalizations.itemsCount(hosts.length),
+      ),
+      widget: MapEditView(
+        title: 'Hosts',
+        entries: hosts,
+        keyMaxLength: TextInputLimits.domain,
+        valueMaxLength: TextInputLimits.hostValue,
+        titleBuilder: (item) => Text(item.key),
+        subtitleBuilder: (item) => Text(item.value),
+      ),
+      onChanged: (value) {
+        if (value is! Map<String, String>) {
+          return;
+        }
+        ref
+            .read(patchClashConfigProvider.notifier)
+            .update((state) => state.copyWith(hosts: value));
+      },
     );
   }
 }
