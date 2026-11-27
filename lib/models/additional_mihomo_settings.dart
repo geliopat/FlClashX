@@ -80,10 +80,29 @@ Map<String, dynamic> restoreExplicitMihomoSettings(
     final source = explicit[section];
     if (source is! Map) continue;
     final previous = result[section];
-    result[section] = <String, dynamic>{
+    final merged = <String, dynamic>{
       if (previous is Map) ...previous.cast<String, dynamic>(),
       ...source.cast<String, dynamic>(),
     };
+    if (section == 'dns' && previous is Map) {
+      // Mihomo's policy maps are ordered. The typed base carries their
+      // order, whereas sourceSettings is a Go map serialized by key.
+      for (final key in ['nameserver-policy', 'proxy-server-nameserver-policy']) {
+        final supplied = source[key];
+        final parsed = previous[key];
+        if (supplied is Map && supplied.isNotEmpty && parsed is Map &&
+            parsed.length == supplied.length &&
+            supplied.keys.every(parsed.containsKey)) {
+          merged[key] = parsed;
+        }
+      }
+      final fallback = source['fallback-filter'];
+      final parsedFallback = previous['fallback-filter'];
+      if (fallback is Map && fallback.isNotEmpty && parsedFallback is Map) {
+        merged['fallback-filter'] = {...parsedFallback, ...fallback};
+      }
+    }
+    result[section] = merged;
   }
   for (final key in additionalMihomoKeys.keys.where((key) => !key.contains('.'))) {
     if (explicit.containsKey(key)) result[key] = explicit[key];
