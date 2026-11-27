@@ -622,7 +622,6 @@ class GeneralView extends ConsumerWidget {
         )
       else
         const HostsItem(),
-      if (system.isWindows) const MihomoWatchdogItem(),
       ConfigToggleItem(
         title: (l) => l.appendSystemDns,
         selector: networkSettingProvider.select(
