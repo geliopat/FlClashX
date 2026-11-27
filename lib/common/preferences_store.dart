@@ -13,7 +13,9 @@ const _defaultPrefix = 'flutter.';
 /// writing it (flutter/flutter#89211): same file and format, but each save
 /// replaces it with a flushed sibling.
 class AtomicFilePreferencesStore extends SharedPreferencesStorePlatform {
-  AtomicFilePreferencesStore(this._path);
+  AtomicFilePreferencesStore(this._path, {this.enableRecovery = false});
+
+  final bool enableRecovery;
 
   final Future<String> _path;
   Future<Map<String, Object>>? _values;
@@ -26,31 +28,60 @@ class AtomicFilePreferencesStore extends SharedPreferencesStorePlatform {
     });
   }
 
+  Map<String, Object> _decode(String raw) {
+    final data = json.decode(raw);
+    if (data is! Map) throw const FormatException('Preferences map required');
+    return Map<String, Object>.from(data);
+  }
+
   Future<Map<String, Object>> _load() async {
     final file = File(await _path);
-    if (!await file.exists()) {
-      return {};
-    }
-    final content = await file.readAsString();
-    if (content.isEmpty) {
-      return {};
-    }
-    final data = json.decode(content);
-    return data is Map ? Map<String, Object>.from(data) : {};
-  }
-
-  Future<bool> _update(void Function(Map<String, Object> values) change) async {
-    final values = await _read();
-    change(values);
-    final content = json.encode(values);
-    return _lastWrite = _lastWrite.then((_) => _write(content));
-  }
-
-  Future<bool> _write(String content) async {
-    final file = File(await _path);
+    final backup = File('${file.path}.last-good');
     try {
-      await file.writeAsStringAtomically(content);
+      if (!await file.exists()) {
+        if (enableRecovery && await backup.exists()) {
+          throw const FormatException('Preferences missing');
+        }
+        return {};
+      }
+      final content = await file.readAsString();
+      if (content.isEmpty && (!enableRecovery || !await backup.exists())) return {};
+      return _decode(content);
+    } catch (_) {
+      if (!enableRecovery || !await backup.exists()) rethrow;
+      final recovered = _decode(await backup.readAsString());
+      if (await file.exists()) {
+        // Preserve the exact damaged bytes, without exposing them in logs.
+        final evidence = '${file.path}.corrupt-${DateTime.now().microsecondsSinceEpoch}';
+        await file.copy(evidence);
+      }
+      await file.writeAsStringAtomically(jsonEncode(recovered));
+      commonPrint.log('Recovered complete preferences store from backup',
+        logLevel: LogLevel.warning);
+      return recovered;
+    }
+  }
+
+  Future<bool> _update(void Function(Map<String, Object> values) change) {
+    final operation = _lastWrite.catchError((_) => false).then((_) async {
+      final current = await _read();
+      final next = Map<String, Object>.of(current);
+      change(next);
+      if (!await _write(json.encode(next), previous: json.encode(current))) return false;
+      _values = Future.value(next);
       return true;
+    });
+    return _lastWrite = operation;
+  }
+
+  Future<bool> _write(String content, {required String previous}) async {
+    final file = File(await _path);
+    final backup = File('${file.path}.last-good');
+    try {
+      if (enableRecovery && !await backup.exists() && await file.exists()) {
+        await backup.writeAsStringAtomically(previous);
+      }
+      await file.writeAsStringAtomically(content);
     } catch (error) {
       commonPrint.log(
         'Save preferences failed: ${compactError(error)}',
@@ -58,6 +89,16 @@ class AtomicFilePreferencesStore extends SharedPreferencesStorePlatform {
       );
       return false;
     }
+    if (enableRecovery) {
+      try {
+        await backup.writeAsStringAtomically(content);
+      } catch (_) {
+        // The primary commit succeeded. Keep the previous backup and report
+        // the reduced recovery guarantee without rolling back the live state.
+        commonPrint.log('Preferences backup write failed', logLevel: LogLevel.warning);
+      }
+    }
+    return true;
   }
 
   @override
