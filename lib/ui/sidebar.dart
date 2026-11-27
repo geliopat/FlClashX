@@ -68,7 +68,7 @@ class NavigationSidebar extends StatefulWidget {
 }
 
 class _NavigationSidebarState extends State<NavigationSidebar>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   final _overlayController = OverlayPortalController();
   late final AnimationController _overlayExpansion = AnimationController(
     vsync: this,
@@ -78,6 +78,32 @@ class _NavigationSidebarState extends State<NavigationSidebar>
     parent: _overlayExpansion,
     curve: Easing.standard,
   );
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  // A portal must never keep its modal hit-test barrier after the window
+  // loses focus or its anchor geometry changes while frames are suspended.
+  void _dismissOverlayImmediately() {
+    if (!_overlayController.isShowing) return;
+    _overlayExpansion.value = 0;
+    _hideIfDismissed();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) {
+      _dismissOverlayImmediately();
+    }
+  }
+
+  @override
+  void didChangeMetrics() {
+    _dismissOverlayImmediately();
+  }
 
   @override
   void didUpdateWidget(covariant NavigationSidebar oldWidget) {
@@ -112,6 +138,7 @@ class _NavigationSidebarState extends State<NavigationSidebar>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _overlayProgress.dispose();
     _overlayExpansion.dispose();
     super.dispose();
@@ -378,6 +405,8 @@ class _SidebarPane extends StatelessWidget {
             child: ScrollConfiguration(
               behavior: const HiddenBarScrollBehavior(),
               child: SingleChildScrollView(
+                primary: false,
+                clipBehavior: Clip.hardEdge,
                 child: Stack(
                   children: [
                     Column(

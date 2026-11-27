@@ -202,6 +202,73 @@ void main() {
     },
   );
 
+  testWidgets('desktop destinations remain clickable after window restoration', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1400, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final container = ProviderContainer(
+      overrides: [
+        navigationItemsStateProvider.overrideWithValue(
+          NavigationItemsState(
+            value: [
+              for (final (glyph, label) in [
+                (AppGlyphs.dashboard, PageLabel.dashboard),
+                (AppGlyphs.profiles, PageLabel.profiles),
+                (AppGlyphs.connections, PageLabel.connections),
+                (AppGlyphs.settings, PageLabel.tools),
+              ])
+                NavigationItem(
+                  glyph: glyph,
+                  label: label,
+                  modes: label == PageLabel.connections
+                      ? const [NavigationItemMode.desktop]
+                      : const [NavigationItemMode.desktop, NavigationItemMode.mobile],
+                  builder: (_) => Text('restored:${label.name}'),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    globalState.container = container;
+    final size = container.read(viewSizeProvider.notifier);
+    size.value = const Size(1400, 1000);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const TestApp(includeNavigatorKey: false, child: HomePage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    Future<void> select(Glyph glyph, PageLabel label) async {
+      await tester.tap(find.descendant(
+        of: find.byType(NavigationSidebar),
+        matching: _glyph(glyph),
+      ));
+      await tester.pumpAndSettle();
+      expect(container.read(currentPageLabelProvider), label);
+      expect(find.text('restored:${label.name}').hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    }
+
+    await select(AppGlyphs.connections, PageLabel.connections);
+    for (final width in [500.0, 1400.0, 0.0, 1400.0]) {
+      if (width > 0) tester.view.physicalSize = Size(width, 1000);
+      size.value = width == 0 ? Size.zero : Size(width, 1000);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    }
+    await select(AppGlyphs.profiles, PageLabel.profiles);
+    await select(AppGlyphs.settings, PageLabel.tools);
+    await select(AppGlyphs.dashboard, PageLabel.dashboard);
+    await select(AppGlyphs.connections, PageLabel.connections);
+  });
+
   testWidgets('the sidebar widens in place only at desktop width', (
     tester,
   ) async {

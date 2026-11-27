@@ -201,11 +201,17 @@ class AppSidebarContainer extends ConsumerWidget {
 
   const AppSidebarContainer({super.key, required this.child});
 
-  void _updateSideBarWidth(WidgetRef ref, double contentWidth) {
+  void _updateSideBarWidth(
+    BuildContext context,
+    WidgetRef ref,
+    double contentWidth,
+  ) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!context.mounted) return;
+      final viewWidth = ref.read(viewSizeProvider.select((state) => state.width));
+      if (viewWidth <= 0) return;
       ref.read(sideWidthProvider.notifier).value =
-          ref.read(viewSizeProvider.select((state) => state.width)) -
-          contentWidth;
+          (viewWidth - contentWidth).clamp(0.0, viewWidth).toDouble();
     });
   }
 
@@ -267,7 +273,7 @@ class AppSidebarContainer extends ConsumerWidget {
             child: ClipRect(
               child: LayoutBuilder(
                 builder: (_, constraints) {
-                  _updateSideBarWidth(ref, constraints.maxWidth);
+                  _updateSideBarWidth(context, ref, constraints.maxWidth);
                   return MediaQuery.removePadding(
                     context: context,
                     removeLeft: hasSidebar && isLtr,

@@ -416,6 +416,42 @@ void main() {
       expect(find.text('Collapse'), findsOneWidget);
     });
 
+    testWidgets('window deactivation clears the overlay hit-test barrier', (
+      tester,
+    ) async {
+      int? selected;
+      await tester.pumpWidget(
+        _sidebar(expanded: false, onSelected: (index) => selected = index),
+      );
+      await openOverlay(tester);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+      expect(find.text('Proxies'), findsOneWidget);
+
+      await tester.tap(_glyph(AppGlyphs.profiles));
+      expect(selected, 2);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('metrics changes clear the old overlay anchor and barrier', (
+      tester,
+    ) async {
+      int? selected;
+      await tester.pumpWidget(
+        _sidebar(expanded: false, onSelected: (index) => selected = index),
+      );
+      await openOverlay(tester);
+      addTearDown(tester.view.resetPhysicalSize);
+      tester.view.physicalSize = const Size(1100, 800);
+      await tester.pump();
+      expect(find.text('Proxies'), findsOneWidget);
+      await tester.tap(_glyph(AppGlyphs.profiles));
+      expect(selected, 2);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('widening the window closes the pane', (tester) async {
       await tester.pumpWidget(_sidebar(expanded: false));
       await openOverlay(tester);

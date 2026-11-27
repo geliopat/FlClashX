@@ -304,7 +304,10 @@ class _HomePageViewState extends ConsumerState<_HomePageView> {
   @override
   void initState() {
     super.initState();
-    _pageController = PageController(initialPage: _pageIndex);
+    _pageController = PageController(
+      initialPage: _pageIndex < 0 ? 0 : _pageIndex,
+      keepPage: false,
+    );
     ref.listenManual(currentPageLabelProvider, (prev, next) {
       if (prev != next) {
         _toPage(next);
@@ -349,15 +352,37 @@ class _HomePageViewState extends ConsumerState<_HomePageView> {
     final tabAnimation = ref.read(appSettingProvider).tabAnimation;
     final isMobile = ref.read(isMobileViewProvider);
     final slide = ++_slide;
-    final page = _pageController.hasClients
-        ? _pageController.page?.round() ?? index
-        : index;
-    final current = _order?[page] ?? page;
-    if (_order != null) {
-      setState(() => _order = null);
-      _pageController.jumpToPage(current);
+    if (!_pageController.hasClients) {
+      // The view may be detached while the window is being restored.
+      // Retry only the latest selection once the PageView is attached.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && slide == _slide && _pageController.hasClients) {
+          _toPage(ref.read(currentPageLabelProvider), true);
+        }
+      });
+      WidgetsBinding.instance.ensureVisualUpdate();
+      return;
     }
-    if (!isMobile || ignoreAnimateTo) {
+    final position = _pageController.position;
+    if (!isMobile || ignoreAnimateTo ||
+        !position.hasViewportDimension || position.viewportDimension <= 0 ||
+        !position.hasContentDimensions) {
+      if (_order != null) setState(() => _order = null);
+      _pageController.jumpToPage(index);
+      return;
+    }
+    final page = _pageController.page?.round() ?? index;
+    final order = _order;
+    final current = order != null && page >= 0 && page < order.length
+        ? order[page]
+        : page;
+    if (order != null) {
+      setState(() => _order = null);
+      if (current >= 0 && current < widget.navigationItems.length) {
+        _pageController.jumpToPage(current);
+      }
+    }
+    if (current < 0 || current >= widget.navigationItems.length) {
       _pageController.jumpToPage(index);
       return;
     }
