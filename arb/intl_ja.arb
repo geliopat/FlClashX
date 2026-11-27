@@ -1302,5 +1302,13 @@
   "forkEmptyResponse": "空の応答",
   "forkInvalidRedirect": "無効なリダイレクト",
   "forkSourceTooLarge": "取得元が 10 MiB を超えています",
-  "forkTooManyRedirects": "リダイレクトが多すぎます"
+  "forkTooManyRedirects": "リダイレクトが多すぎます",
+  "forkSpeedTest": "速度を測定",
+  "forkSpeedTestAll": "全ノードの速度を測定",
+  "forkSpeedTestUrl": "速度測定サービス",
+  "forkDirectYandex": "DIRECT は常に Yandex Internetometer を使用",
+  "forkSpeedDownloadUrl": "ダウンロード URL (GET)",
+  "forkSpeedUploadUrl": "アップロード URL (POST)",
+  "forkSpeedMbps": "Mbps",
+  "forkSpeedFailed": "測定失敗"
 }

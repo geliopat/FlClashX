@@ -1302,5 +1302,13 @@
   "forkEmptyResponse": "빈 응답",
   "forkInvalidRedirect": "잘못된 리디렉션",
   "forkSourceTooLarge": "소스가 10 MiB를 초과합니다",
-  "forkTooManyRedirects": "리디렉션이 너무 많습니다"
+  "forkTooManyRedirects": "리디렉션이 너무 많습니다",
+  "forkSpeedTest": "속도 테스트",
+  "forkSpeedTestAll": "모든 노드 속도 테스트",
+  "forkSpeedTestUrl": "속도 테스트 서비스",
+  "forkDirectYandex": "DIRECT는 항상 Yandex Internetometer 사용",
+  "forkSpeedDownloadUrl": "다운로드 URL (GET)",
+  "forkSpeedUploadUrl": "업로드 URL (POST)",
+  "forkSpeedMbps": "Mbps",
+  "forkSpeedFailed": "테스트 실패"
 }

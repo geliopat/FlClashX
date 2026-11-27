@@ -230,6 +230,14 @@ class MessageLookup extends MessageLookupByLibrary {
 
   final messages = _notInlinedMessages(_notInlinedMessages);
   static Map<String, Function> _notInlinedMessages(_) => <String, Function>{
+    "forkSpeedTest": MessageLookupByLibrary.simpleMessage("测试速度"),
+    "forkSpeedTestAll": MessageLookupByLibrary.simpleMessage("测试所有节点速度"),
+    "forkSpeedTestUrl": MessageLookupByLibrary.simpleMessage("测速服务"),
+    "forkDirectYandex": MessageLookupByLibrary.simpleMessage("DIRECT 始终使用 Yandex Internetometer"),
+    "forkSpeedDownloadUrl": MessageLookupByLibrary.simpleMessage("下载测试 URL (GET)"),
+    "forkSpeedUploadUrl": MessageLookupByLibrary.simpleMessage("上传测试 URL (POST)"),
+    "forkSpeedMbps": MessageLookupByLibrary.simpleMessage("Mbps"),
+    "forkSpeedFailed": MessageLookupByLibrary.simpleMessage("测试失败"),
     "forkVeryFast": MessageLookupByLibrary.simpleMessage("极速"),
     "forkFast": MessageLookupByLibrary.simpleMessage("快速"),
     "forkFull": MessageLookupByLibrary.simpleMessage("完整"),

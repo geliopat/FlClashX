@@ -1302,5 +1302,13 @@
   "forkEmptyResponse": "空响应",
   "forkInvalidRedirect": "无效重定向",
   "forkSourceTooLarge": "来源超过 10 MiB",
-  "forkTooManyRedirects": "重定向次数过多"
+  "forkTooManyRedirects": "重定向次数过多",
+  "forkSpeedTest": "测试速度",
+  "forkSpeedTestAll": "测试所有节点速度",
+  "forkSpeedTestUrl": "测速服务",
+  "forkDirectYandex": "DIRECT 始终使用 Yandex Internetometer",
+  "forkSpeedDownloadUrl": "下载测试 URL (GET)",
+  "forkSpeedUploadUrl": "上传测试 URL (POST)",
+  "forkSpeedMbps": "Mbps",
+  "forkSpeedFailed": "测试失败"
 }
