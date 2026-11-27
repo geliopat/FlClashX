@@ -34,6 +34,7 @@ type speedSample struct {
 	bytes int64
 	first, last time.Time
 	err string
+	retryable bool
 }
 
 type timedSpeedReader struct {
@@ -80,8 +81,10 @@ func measureSpeedPhase(client *http.Client, service, endpoint string, upload, mu
 	var elapsed time.Duration
 	size := int64(256000)
 	failure := "timeout"
+	retried := false
 	// A wave has independent connections. Increase the chunk size only after
-	// successful waves; never retry failed streams or count incomplete uploads.
+	// successful waves. Retry a wholly failed transient wave at most once,
+	// inside the original deadline and traffic budget.
 	for remaining >= 65536 && ctx.Err() == nil {
 		streams := min(options.streams,int(remaining/65536))
 		chunk := min(size,remaining/int64(streams))
@@ -104,18 +107,36 @@ func measureSpeedPhase(client *http.Client, service, endpoint string, upload, mu
 		var first,last time.Time
 		var total int64
 		failed := false
+		allFailuresRetryable := true
 		for i:=0; i<streams; i++ {
 			s := <-wave
-			if s.err != "" { failed=true; failure=s.err; continue }
+			if s.err != "" {
+				failed = true
+				allFailuresRetryable = allFailuresRetryable && s.retryable
+				failure = s.err
+				continue
+			}
 			if first.IsZero() || s.first.Before(first) { first=s.first }
 			if s.last.After(last) { last=s.last }
 			total += s.bytes
+		}
+		if failed {
+			// A mixed wave is not a valid aggregate throughput sample. Never
+			// report the surviving streams as the whole requested group.
+			if total == 0 && allFailuresRetryable && !retried && ctx.Err() == nil && remaining >= 65536 {
+				retried = true
+				continue
+			}
+			if ctx.Err() != nil && measured >= 65536 && elapsed > 0 {
+				break // the time budget ended after at least one complete wave
+			}
+			return nil, measured, failure
 		}
 		if total > 0 && last.After(first) {
 			measured += total
 			elapsed += last.Sub(first)
 		}
-		if failed || elapsed >= time.Duration(options.seconds)*time.Second { break }
+		if elapsed >= time.Duration(options.seconds)*time.Second { break }
 		// Ramp based on completed body duration, not TCP/TLS setup latency.
 		switch {
 		case size < 1000000: size=1000000
@@ -156,9 +177,11 @@ func runSpeedSample(ctx context.Context, client *http.Client, service, endpoint 
 	if upload { req.ContentLength=bodyLength; req.Header.Set("Content-Type",contentType) }
 	if !upload && service=="cachefly" { req.Header.Set("Range",fmt.Sprintf("bytes=0-%d",limit-1)) }
 	resp,err:=client.Do(req)
-	if err!=nil { return fail(probeErrorKind(err)) }
+	if err!=nil { return speedSample{err: probeErrorKind(err), retryable: ctx.Err() == nil} }
 	defer resp.Body.Close()
-	if resp.StatusCode<200 || resp.StatusCode>=300 { return fail("http") }
+	if resp.StatusCode<200 || resp.StatusCode>=300 {
+		return speedSample{err: "http", retryable: resp.StatusCode == 502 || resp.StatusCode == 503 || resp.StatusCode == 504}
+	}
 	if strings.Contains(strings.ToLower(resp.Header.Get("Content-Type")),"text/html") { return fail("invalid-body") }
 	if upload {
 		// Only a complete, acknowledged body is counted. The receipt excludes
