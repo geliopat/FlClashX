@@ -1,9 +1,6 @@
 name: Zapret Windows validation
 
 on:
-  # Temporary opt-in validation of the cache integration branch; no publication.
-  push:
-    branches: [ci/windows-build-cache]
   workflow_dispatch:
     inputs:
       candidate_ref:
