@@ -6,6 +6,7 @@ import 'package:fl_clash/ui/color.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart' show ThemeMode;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../helpers/test_profiles.dart';
 
@@ -29,6 +30,7 @@ Profile _profile(
 );
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   late ProviderContainer container;
 
   ThemeMode themeMode() => container.read(themeSettingProvider).themeMode;
@@ -38,6 +40,7 @@ void main() {
       .update((state) => state.copyWith(themeMode: mode));
 
   setUp(() {
+    SharedPreferences.setMockInitialValues({});
     container = ProviderContainer(
       overrides: [profilesProvider.overrideWith(() => TestProfiles([]))],
     );

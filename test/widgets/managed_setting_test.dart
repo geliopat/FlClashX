@@ -13,6 +13,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart' show Override;
 import 'package:mocktail/mocktail.dart';
@@ -31,6 +32,29 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late ProviderContainer container;
+  ProviderContainer? activeContainer;
+
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
+  void testManagedWidgets(
+    String description,
+    Future<void> Function(WidgetTester) callback,
+  ) {
+    testWidgets(description, (tester) async {
+      try {
+        await callback(tester);
+      } finally {
+        try {
+          await tester.pumpWidget(const SizedBox.shrink());
+        } finally {
+          activeContainer?.dispose();
+          activeContainer = null;
+        }
+      }
+    });
+  }
 
   Override noCore() => coreHandlerProvider.overrideWithValue(
     CoreController.scoped(_NoProfileBaseCore()),
@@ -56,7 +80,7 @@ void main() {
         noCore(),
       ],
     );
-    addTearDown(container.dispose);
+    activeContainer = container;
     globalState.container = container;
     container.listen(appSettingProvider, (_, _) {});
     container.listen(profileHeadersActionProvider, (_, _) {});
@@ -76,7 +100,7 @@ void main() {
 
   Finder row() => find.widgetWithText(ListTile, 'Minimize on exit');
 
-  testWidgets('a managed row is dimmed and asks before it is taken over', (
+  testManagedWidgets('a managed row is dimmed and asks before it is taken over', (
     tester,
   ) async {
     await pumpGeneral(tester);
@@ -107,7 +131,7 @@ void main() {
     );
   });
 
-  testWidgets('Enter on a locked row asks before a takeover', (tester) async {
+  testManagedWidgets('Enter on a locked row asks before a takeover', (tester) async {
     await pumpGeneral(tester);
     final detector = find
         .ancestor(of: row(), matching: find.byType(FocusableActionDetector))
@@ -126,7 +150,7 @@ void main() {
     expect(setting().ownedSettings, isEmpty);
   });
 
-  testWidgets('a locked row takes focus itself, never its control', (
+  testManagedWidgets('a locked row takes focus itself, never its control', (
     tester,
   ) async {
     await pumpGeneral(tester);
@@ -151,7 +175,7 @@ void main() {
     expect(Focus.of(tester.element(inside)).canRequestFocus, isTrue);
   });
 
-  testWidgets('a taken-over row is handed back from its context menu', (
+  testManagedWidgets('a taken-over row is handed back from its context menu', (
     tester,
   ) async {
     await pumpGeneral(tester);
@@ -174,13 +198,14 @@ void main() {
     expect(setting().minimizeOnExit, isTrue);
   });
 
-  testWidgets('proxy options restore the provider from the row context menu', (
+  testManagedWidgets('proxy options restore the provider from the row context menu', (
     tester,
   ) async {
     final styled = Profile(
       id: 5,
       label: 'Provider',
       type: ProfileType.url,
+      autoUpdateDuration: Duration.zero,
       providerHeaders: {'flclashz-view': 'proxies.type:list;proxies.layout:tight'},
     );
     container = ProviderContainer(
@@ -190,7 +215,7 @@ void main() {
         noCore(),
       ],
     );
-    addTearDown(container.dispose);
+    activeContainer = container;
     globalState.container = container;
     container.listen(profileHeadersActionProvider, (_, _) {});
     container.read(appSettingProvider.notifier).update((state) =>
@@ -220,7 +245,7 @@ void main() {
     expect(setting().ownedSettings, isEmpty);
   });
 
-  testWidgets('one row in diagnostics hands every setting back', (
+  testManagedWidgets('one row in diagnostics hands every setting back', (
     tester,
   ) async {
     await pumpGeneral(tester);
@@ -267,7 +292,7 @@ void main() {
         noCore(),
       ],
     );
-    addTearDown(container.dispose);
+    activeContainer = container;
     globalState.container = container;
     container
         .read(viewSizeProvider.notifier)
@@ -281,7 +306,7 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('the theme key dims the appearance block', (tester) async {
+  testManagedWidgets('the theme key dims the appearance block', (tester) async {
     await pumpTheme(tester, 'app.theme:dark');
 
     expect(
@@ -300,7 +325,7 @@ void main() {
     );
   });
 
-  testWidgets('the hint shows only on a page with a managed row', (
+  testManagedWidgets('the hint shows only on a page with a managed row', (
     tester,
   ) async {
     await pumpGeneral(tester);
@@ -327,7 +352,7 @@ void main() {
     (widget) => widget is SettingLock && widget.locked == locked,
   );
 
-  testWidgets(
+  testManagedWidgets(
     'a provider row shows a closed lock, a taken-over one an open lock',
     (tester) async {
       await pumpGeneral(tester);
@@ -360,7 +385,7 @@ void main() {
     },
   );
 
-  testWidgets('a locked theme block shows its lock once, not on nested rows', (
+  testManagedWidgets('a locked theme block shows its lock once, not on nested rows', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(1000, 3000);
@@ -381,7 +406,7 @@ void main() {
         noCore(),
       ],
     );
-    addTearDown(container.dispose);
+    activeContainer = container;
     globalState.container = container;
     container
         .read(viewSizeProvider.notifier)
@@ -397,7 +422,7 @@ void main() {
     expect(find.byType(SettingLock), findsOneWidget);
   });
 
-  testWidgets('a card that opts out keeps its menu but shows no lock', (
+  testManagedWidgets('a card that opts out keeps its menu but shows no lock', (
     tester,
   ) async {
     container = ProviderContainer(
@@ -407,7 +432,7 @@ void main() {
         noCore(),
       ],
     );
-    addTearDown(container.dispose);
+    activeContainer = container;
     globalState.container = container;
     container
         .read(appSettingProvider.notifier)
