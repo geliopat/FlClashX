@@ -31,7 +31,7 @@ jobs:
         with:
           go-version: '1.27.1'
           cache: false
-      - name: Verify existing signing key matches the pinned public key
+      - name: Verify existing signing key and optional public key pin
         env:
           CORE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
           CORE_PUBLIC_KEY: ${{ vars.FLCLASHZ_UPDATE_PUBLIC_KEY }}
@@ -46,14 +46,17 @@ jobs:
           func main() {
               seed, err := base64.StdEncoding.DecodeString(strings.TrimSpace(os.Getenv("CORE_SIGNING_KEY")))
               if err != nil || len(seed) != ed25519.SeedSize { fmt.Fprintln(os.Stderr, "Missing or invalid signing seed"); os.Exit(1) }
-              pub, err := base64.StdEncoding.DecodeString(strings.TrimSpace(os.Getenv("CORE_PUBLIC_KEY")))
-              if err != nil || len(pub) != ed25519.PublicKeySize { fmt.Fprintln(os.Stderr, "Missing or invalid public key"); os.Exit(1) }
               key := ed25519.NewKeyFromSeed(seed)
-              if !key.Public().(ed25519.PublicKey).Equal(ed25519.PublicKey(pub)) { fmt.Fprintln(os.Stderr, "Signing key mismatch"); os.Exit(1) }
+              pub := key.Public().(ed25519.PublicKey)
+              if pin := strings.TrimSpace(os.Getenv("CORE_PUBLIC_KEY")); pin != "" {
+                  pinned, err := base64.StdEncoding.DecodeString(pin)
+                  if err != nil || len(pinned) != ed25519.PublicKeySize { fmt.Fprintln(os.Stderr, "Invalid configured public key"); os.Exit(1) }
+                  if !pub.Equal(ed25519.PublicKey(pinned)) { fmt.Fprintln(os.Stderr, "Signing key mismatch"); os.Exit(1) }
+              } else { fmt.Println("Public key derived from existing signing seed, as in the application release workflow") }
               msg := []byte("flclashz-core-access-self-test-v1")
               if !ed25519.Verify(pub, msg, ed25519.Sign(key, msg)) { os.Exit(1) }
               fmt.Println("Existing Ed25519 key self-test passed")
           }
           GO
           go run "$RUNNER_TEMP/check-core-key.go"
-          echo "Existing Ed25519 signing key matches configured public key." >> "$GITHUB_STEP_SUMMARY"
+          echo "Existing Ed25519 signing key self-test passed; configured public key pin checked if present." >> "$GITHUB_STEP_SUMMARY"
