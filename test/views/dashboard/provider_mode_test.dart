@@ -39,6 +39,23 @@ class _RecordingSetupAction extends SetupAction {
   }
 }
 
+class _RecordingDelayAction extends ProxiesAction {
+  final calls = <(String, String?)>[];
+  final release = Completer<void>();
+
+  @override
+  void build() {}
+
+  @override
+  Future<void> proxyDelayTest(Proxy proxy, [String? testUrl]) async {
+    calls.add((proxy.name, testUrl));
+    await release.future;
+    ref.read(delayDataSourceProvider.notifier).setDelay(
+      Delay(name: proxy.name, url: testUrl ?? ref.read(realTestUrlProvider()), value: 42),
+    );
+  }
+}
+
 class _Ips extends OutboundIpProbe {
   final refreshed = <String>[];
   final watched = <String>{};
@@ -102,6 +119,7 @@ void main() {
     bool running = false,
     String? logoPath,
     OutboundIpProbe Function() ips = _Ips.new,
+    ProxiesAction Function()? delayAction,
   }) {
     container = ProviderContainer(
       overrides: [
@@ -119,6 +137,7 @@ void main() {
           ),
         ),
         setupActionProvider.overrideWith(_RecordingSetupAction.new),
+        if (delayAction != null) proxiesActionProvider.overrideWith(delayAction),
         suspendProvider.overrideWithValue(false),
         viewSizeProvider.overrideWithBuild((_, _) => const Size(450, 900)),
       ],
@@ -577,6 +596,36 @@ void main() {
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
     expect(container.read(appSettingProvider).hideIp, isTrue);
+  });
+
+  testWidgets('tapping the delay tests only the selected proxy, not the picker', (tester) async {
+    final action = _RecordingDelayAction();
+    const node = '🇳🇱 Amsterdam';
+    setUp_(
+      profiles: [_profile(headers: const {'flclashx-serverinfo': 'Auto'})],
+      groups: [_group('Auto', [node, 'Berlin'], now: node)],
+      delayAction: () => action,
+    );
+    container.read(coreStatusProvider.notifier).value = CoreStatus.connected;
+    final url = container.read(realTestUrlProvider());
+    container.read(delayDataSourceProvider.notifier).setDelay(
+      Delay(name: node, url: url, value: 103),
+    );
+    await pump(tester);
+    expect(find.text('103 ms'), findsOneWidget);
+    await tester.tap(find.text('103 ms'));
+    await tester.pump();
+    expect(action.calls.map((call) => call.$1), [node]);
+    expect(find.byType(ProxiesView), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('server-location-delay')));
+    await tester.pump();
+    expect(action.calls, hasLength(1));
+    expect(find.byType(ProxiesView), findsNothing);
+    action.release.complete();
+    await tester.pumpAndSettle();
+    expect(find.text('42 ms'), findsOneWidget);
+    expect(find.byType(ProxiesView), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('the whole card opens the server picker', (tester) async {

@@ -1,6 +1,7 @@
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/service_probe.dart' show routedOutbound;
 import 'package:fl_clash/models/models.dart';
+import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/providers/outbound_ip.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
@@ -18,7 +19,7 @@ const _flagSize = 52.0;
 /// The status card of a `providermode` dashboard: the pick of the panel's
 /// server group, or of the first group with one, with its flag, the exit
 /// address while running and its delay. The whole card opens the picker;
-/// the flag alone checks the location again.
+/// the flag checks the location again and the delay region tests the pick.
 class ServerLocationCard extends ConsumerStatefulWidget {
   const ServerLocationCard({super.key});
 
@@ -28,6 +29,23 @@ class ServerLocationCard extends ConsumerStatefulWidget {
 
 class _ServerLocationCardState extends ConsumerState<ServerLocationCard>
     with ExitIpLookup<ServerLocationCard> {
+  bool _testingDelay = false;
+
+  Future<void> _testDelay(Proxy proxy, String? testUrl) async {
+    if (_testingDelay ||
+        ref.read(coreStatusProvider) != CoreStatus.connected ||
+        ref.read(delayTestPhaseProvider(
+          proxyName: proxy.name, testUrl: testUrl,
+        )) != null) return;
+    setState(() => _testingDelay = true);
+    try {
+      await ref.read(proxiesActionProvider.notifier)
+          .proxyDelayTest(proxy, testUrl);
+    } finally {
+      if (mounted) setState(() => _testingDelay = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final appLocalizations = context.appLocalizations;
@@ -47,12 +65,20 @@ class _ServerLocationCardState extends ConsumerState<ServerLocationCard>
         ? null
         : ref.watch(realSelectedProxyStateProvider(selected));
     final serverName = selected ?? '';
+    final testUrl = leaf?.testUrl ?? picked?.testUrl;
+    final proxy = picked?.all.where((item) => item.name == serverName).firstOrNull;
+    final phase = serverName.isEmpty ? null : ref.watch(
+      delayTestPhaseProvider(proxyName: serverName, testUrl: testUrl),
+    );
+    final testing = _testingDelay || phase != null;
+    final canTest = proxy != null && !testing &&
+        ref.watch(coreStatusProvider) == CoreStatus.connected;
     final delay = serverName.isEmpty
         ? null
         : ref.watch(
             delayProvider(
               proxyName: serverName,
-              testUrl: leaf?.testUrl ?? picked?.testUrl,
+              testUrl: testUrl,
             ),
           );
     final isStart = ref.watch(isStartProvider);
@@ -145,23 +171,52 @@ class _ServerLocationCardState extends ConsumerState<ServerLocationCard>
             ),
           ),
           if (serverName.isNotEmpty)
-            SizedBox(
-              width: 52,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _SignalBars(delay: delay),
-                  if (delay != null && delay > 0)
-                    Text(
-                      '$delay ms',
-                      maxLines: 1,
-                      style: DashboardText.figure(
-                        context,
-                        AppTextStyle.caption1,
-                        color: colorScheme.delayColor(delay) ?? colors.thumb,
+            Tooltip(
+              message: appLocalizations.delayTest,
+              child: Semantics(
+                button: true,
+                enabled: canTest,
+                child: FocusRing(
+                  shape: AppShape.xs,
+                  standsOff: true,
+                  child: InkWell(
+                    key: const ValueKey('server-location-delay'),
+                    customBorder: AppShape.xs,
+                    mouseCursor: canTest ? clickableCursor : SystemMouseCursors.basic,
+                    // Keep this region independent of the surrounding card's
+                    // picker even while a test is queued or the core is down.
+                    onTap: () {
+                      if (canTest) _testDelay(proxy, testUrl);
+                    },
+                    child: SizedBox(
+                      width: 52,
+                      height: 44,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (testing)
+                            SizedBox(
+                              height: 20,
+                              child: Center(child: CommonCircleLoading(size: 16)),
+                            )
+                          else
+                            _SignalBars(delay: delay),
+                          if (delay != null && delay > 0)
+                            Text(
+                              '$delay ms',
+                              maxLines: 1,
+                              style: DashboardText.figure(
+                                context,
+                                AppTextStyle.caption1,
+                                color: colorScheme.delayColor(delay) ?? colors.thumb,
+                              ),
+                            ),
+                        ],
                       ),
                     ),
-                ],
+                  ),
+                ),
               ),
             ),
         ],
