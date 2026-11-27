@@ -3,6 +3,7 @@ import 'dart:ui' show PathMetric, Tangent, lerpDouble;
 
 import 'package:fl_clash/ui/icons/glyph.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter/foundation.dart' show listEquals;
 
 const _grid = Rect.fromLTWH(0, 0, Glyph.size, Glyph.size);
 const _fillStart = Glyph.strokeWidth / 2;
@@ -24,11 +25,13 @@ class GlyphPainter extends CustomPainter {
     required this.glyph,
     required this.fill,
     required this.color,
+    this.shadows = const [],
   });
 
   final Glyph glyph;
   final double fill;
   final Color color;
+  final List<Shadow> shadows;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -57,6 +60,20 @@ class GlyphPainter extends CustomPainter {
     final precut = cutBody != null;
     canvas.save();
     canvas.scale(size.shortestSide / Glyph.size);
+    for (final shadow in shadows) {
+      canvas.save();
+      canvas.translate(shadow.offset.dx, shadow.offset.dy);
+      for (final shape in glyph.shapes) {
+        if (shape.role == GlyphRole.detail) continue;
+        final glow = _stroke(shadow.color, glyphLineWidth(fill))
+          ..maskFilter = MaskFilter.blur(BlurStyle.normal, shadow.blurSigma);
+        if (shape.solid || (shape.role == GlyphRole.body && fill > 0.5)) {
+          glow.style = PaintingStyle.fill;
+        }
+        canvas.drawPath(shape.path, glow);
+      }
+      canvas.restore();
+    }
     // Opaque strokes under one alpha keep a translucent color even on overlaps,
     // and cutouts clear only the glyph's own layer. A layer is an offscreen
     // pass every frame, so a glyph at rest takes its cutouts as geometry.
@@ -150,7 +167,8 @@ class GlyphPainter extends CustomPainter {
   bool shouldRepaint(GlyphPainter oldDelegate) =>
       glyph != oldDelegate.glyph ||
       fill != oldDelegate.fill ||
-      color != oldDelegate.color;
+      color != oldDelegate.color ||
+      !listEquals(shadows, oldDelegate.shadows);
 }
 
 Paint _stroke(Color color, double width) => Paint()
