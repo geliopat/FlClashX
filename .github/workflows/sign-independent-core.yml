@@ -55,7 +55,7 @@ jobs:
               # Only the trusted automatic workflow may request publication on
               # push. The manual workflow remains explicit-dispatch only.
               gh api "repos/$SOURCE_REPO/actions/workflows/$workflow/runs?branch=FlClashZ&status=success&per_page=30" |
-                jq -r --arg workflow "$workflow" '.workflow_runs[] | select(.conclusion == "success" and .head_branch == "FlClashZ" and .head_repository.full_name == "geliopat/Clash.Meta" and (.event == "schedule" or .event == "workflow_dispatch" or ($workflow == "flclashz-core-auto.yml" and .event == "push"))) | .id' > "$tmp/$workflow"
+                jq -r --arg workflow "$workflow" '.workflow_runs[] | select(.conclusion == "success" and .head_branch == "FlClashZ" and .head_repository.full_name == "geliopat/Clash.Meta" and (.event == "schedule" or .event == "workflow_dispatch" or ($workflow == "flclashz-core-auto.yml" and (.event == "push" or .event == "workflow_run")))) | .id' > "$tmp/$workflow"
             done
             sort -urn "$tmp/"*.yml > "$tmp/runs"
           fi
