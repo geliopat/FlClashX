@@ -107,6 +107,15 @@ class _LogsViewState extends ConsumerState<LogsView>
         onPressed: () async => system.openDirectory(await fileLogger.directoryPath),
       ),
       IconButtonData(
+        glyph: AppGlyphs.clearAll,
+        tooltip: ru ? 'Очистить отображаемый журнал' : 'Clear displayed log',
+        onPressed: () {
+          final logs = ref.read(logsProvider.notifier);
+          logs.clearVisible();
+          _listController.resumeAutoScrollToEnd(ref.read(logsProvider).list);
+        },
+      ),
+      IconButtonData(
         glyph: AppGlyphs.copy,
         tooltip: ru ? 'Копировать видимые записи' : 'Copy visible entries',
         onPressed: () async => Clipboard.setData(ClipboardData(
