@@ -793,6 +793,9 @@ class CommonScaffoldState extends State<CommonScaffold>
         isMobileView &&
         ModalRoute.of(context)?.impliesAppBarDismissal == true;
     final compactTitle = isCompact || pushed;
+    // Reserve the same leading slot on every desktop page. A nested page
+    // may put its back button there without shifting the title.
+    final fixedDesktopTitle = !isCompact && !isMobileView;
     final titleEndInset = appBarActionInset(
       _isCompactBar(context, isMobileView),
     );
@@ -851,13 +854,17 @@ class CommonScaffoldState extends State<CommonScaffold>
                     : AppTextStyle.pageTitle.of(context),
                 leading: hidesBar
                     ? null
-                    : underField(searchLeading, _leadingUnderSearch),
+                    : underField(
+                        searchLeading ??
+                            (fixedDesktopTitle ? const SizedBox.shrink() : null),
+                        _leadingUnderSearch,
+                      ),
                 // The leading slot already trails its button by a margin.
-                titleSpacing: leading == null ? null : 0,
+                titleSpacing: fixedDesktopTitle || leading != null ? 0 : null,
                 title: hidesBar
                     ? null
                     : underField(
-                        leading == null || isCompact
+                        (!fixedDesktopTitle && leading == null) || isCompact
                             ? _buildTitle(compact: compactTitle)
                             : Padding(
                                 padding: EdgeInsetsDirectional.only(
