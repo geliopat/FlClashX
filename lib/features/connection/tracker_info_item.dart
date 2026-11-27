@@ -1,3 +1,4 @@
+import 'package:fl_clash/ui/network_palette.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
@@ -167,6 +168,13 @@ class _TrackerInfoBody extends StatelessWidget {
       spacing: 4,
       children: [
         _buildTitle(styles),
+        if (trackerInfo.failure case final failure?)
+          Text(
+            '${failure.kind == 'timeout' ? context.appLocalizations.timeout : context.appLocalizations.error}: ${failure.message}',
+            style: styles.secondary.copyWith(color: NetworkTone.reject.of(context)),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
         Wrap(
           spacing: 6,
           runSpacing: 4,
@@ -256,6 +264,10 @@ class TrackerInfoDetailView extends StatelessWidget {
           title: appLocalizations.basicInfo,
           items: _buildRows([
             (appLocalizations.creationTime, trackerInfo.start.showFull),
+            if (trackerInfo.failure case final failure?) ...[
+              (appLocalizations.status, failure.kind == 'timeout' ? appLocalizations.timeout : appLocalizations.error),
+              (appLocalizations.errorDetails, failure.message),
+            ],
             (appLocalizations.networkType, metadata.network),
             (appLocalizations.process, trackerInfo.progressText),
             (appLocalizations.rule, _ruleText(trackerInfo)),

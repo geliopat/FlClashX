@@ -71,7 +71,7 @@ List<RecordColumn<TrackerInfo>> trackerInfoColumns(
       ),
     RecordColumn(
       TableColumn('exit', appLocalizations.outboundExit, width: 120),
-      cell: (_, info) => _ExitChip(exit: info.chains.firstOrNull ?? ''),
+      cell: (_, info) => _ExitChip(exit: info.failure == null ? info.chains.firstOrNull ?? '' : ''),
       sortKey: (info) => (info.chains.firstOrNull ?? '').toLowerCase(),
     ),
     if (isLive) ...[
@@ -285,6 +285,11 @@ class TrackerTargetText extends StatelessWidget {
     return Text.rich(
       TextSpan(
         children: [
+          if (trackerInfo.failure case final failure?)
+            TextSpan(
+              text: '${failure.kind == 'timeout' ? context.appLocalizations.timeout : context.appLocalizations.error}: ',
+              style: TextStyle(color: NetworkTone.reject.of(context)),
+            ),
           TextSpan(text: trackerInfo.title),
           if (port.isNotEmpty)
             TextSpan(
