@@ -389,6 +389,17 @@ abstract class OverrideSpec<K extends OverrideKey, M> {
     return _source(sources, id);
   }
 
+  bool sourcePending(WidgetRef ref, {required bool watch}) {
+    if (!system.isWindows || yamlSection == null) return false;
+    final profile = watch ? ref.watch(currentProfileProvider) : ref.read(currentProfileProvider);
+    if (profile == null || profile.type == ProfileType.custom ||
+        profile.extendType == ExtendType.script) return false;
+    final target = this.target;
+    if (target is ProfileOverrideTarget<K, M> && target.profileId != profile.id) return false;
+    final sources = watch ? ref.watch(yamlSectionSourcesProvider) : ref.read(yamlSectionSourcesProvider);
+    return sources?.profileId != profile.id;
+  }
+
   Set<K> listedKeys(WidgetRef ref, {required bool watch}) {
     final local = watch ? ref.watch(target.select((state) => state.keys)) : target.read(ref).keys;
     final inherited = source(ref, watch: watch);
@@ -461,6 +472,7 @@ void showOverrideAddSheet<K extends OverrideKey, M>(
   OverrideSpec<K, M> spec,
 ) {
   final appLocalizations = context.appLocalizations;
+  if (spec.sourcePending(ref, watch: false)) return;
   final added = spec.listedKeys(ref, watch: false);
   final remaining = spec.values.where((key) => !added.contains(key));
   showSheet<void>(
@@ -578,7 +590,8 @@ class OverrideView<K extends OverrideKey, M> extends ConsumerWidget {
     final target = spec.target;
     final listed = spec.listedKeys(ref, watch: true);
     final isEmpty = !spec.values.any(listed.contains);
-    final canAdd = spec.values.any((key) => !listed.contains(key));
+    final sourcePending = spec.sourcePending(ref, watch: true);
+    final canAdd = !sourcePending && spec.values.any((key) => !listed.contains(key));
     final addEntry = target.addEntry(appLocalizations);
     return CommonScaffold(
       title: spec.title(appLocalizations),
@@ -606,7 +619,7 @@ class OverrideView<K extends OverrideKey, M> extends ConsumerWidget {
             size: TonalButtonSize.bar,
             glyph: AppGlyphs.addCircle,
             label: addEntry,
-            onPressed: () => _handleAdd(context, ref),
+            onPressed: canAdd ? () => _handleAdd(context, ref) : null,
           ),
         ),
         child: _OverrideList(spec: spec),
