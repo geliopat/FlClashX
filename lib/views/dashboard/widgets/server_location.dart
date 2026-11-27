@@ -71,8 +71,8 @@ class _ServerLocationCardState extends ConsumerState<ServerLocationCard>
       delayTestPhaseProvider(proxyName: serverName, testUrl: testUrl),
     );
     final testing = _testingDelay || phase != null;
-    final canTest = proxy != null && !testing &&
-        ref.watch(coreStatusProvider) == CoreStatus.connected;
+    final coreConnected = ref.watch(coreStatusProvider) == CoreStatus.connected;
+    final canTest = proxy != null && !testing && coreConnected;
     final delay = serverName.isEmpty
         ? null
         : ref.watch(
@@ -186,7 +186,7 @@ class _ServerLocationCardState extends ConsumerState<ServerLocationCard>
                     // Keep this region independent of the surrounding card's
                     // picker even while a test is queued or the core is down.
                     onTap: () {
-                      if (canTest) _testDelay(proxy, testUrl);
+                      if (canTest && proxy != null) _testDelay(proxy, testUrl);
                     },
                     child: SizedBox(
                       width: 52,

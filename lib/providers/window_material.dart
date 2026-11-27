@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui' show Brightness, Color;
 
 import 'package:fl_clash/providers/state.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,8 +13,11 @@ const windowMaterials = [
 ];
 
 WindowEffect parseWindowMaterial(String? name) =>
-    windowMaterials.where((effect) => effect.name == name).firstOrNull ??
-    WindowEffect.none;
+    switch (name) {
+      'mica' => WindowEffect.mica,
+      'acrylic' => WindowEffect.acrylic,
+      _ => WindowEffect.none,
+    };
 
 const _key = 'theme.windowMaterial';
 
@@ -33,7 +37,7 @@ Future<void> saveWindowMaterial(WidgetRef ref, WindowEffect effect) async {
   if (!await prefs.setString(_key, effect.name)) {
     throw StateError('Unable to save window material');
   }
-  if (ref.mounted) ref.invalidate(windowMaterialPreferenceProvider);
+  if (ref.context.mounted) ref.invalidate(windowMaterialPreferenceProvider);
 }
 
 /// Only expose a translucent Flutter surface after the native plugin accepts
@@ -48,7 +52,15 @@ final windowMaterialProvider = FutureProvider<WindowEffect>((ref) async {
     final supported = await desktopWindow.isEffectSupported(requested);
     if (!ref.mounted) return WindowEffect.none;
     final effect = supported ? requested : WindowEffect.none;
-    await desktopWindow.setEffect(effect, brightness: brightness);
+    await desktopWindow.setEffect(
+      effect,
+      brightness: brightness,
+      tint: effect == WindowEffect.acrylic
+          ? brightness == Brightness.dark
+              ? const Color(0x99202020)
+              : const Color(0x99F0F0F0)
+          : null,
+    );
     return effect;
   } catch (_) {
     if (ref.mounted) {
