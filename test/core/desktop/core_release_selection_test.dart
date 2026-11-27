@@ -54,6 +54,32 @@ void main() {
     expect(await store.selectedForLaunch(), isNull);
   });
 
+  test('committed slot verification failure recovers bundled core', () async {
+    await store.activate(manifest, bundledVersion: 'v1.19.34', restart: () async => true);
+    expect(await store.rejectCommitted(manifest.hash), isTrue);
+    expect(await store.selectedForLaunch(), isNull);
+  });
+
+  test('a trial cannot be silently substituted by a launch failure', () async {
+    await expectLater(store.activate(manifest, bundledVersion: 'v1.19.34', restart: () async {
+      final selected = await store.selectedForLaunch();
+      if (selected == null) return true;
+      expect(await store.rejectCommitted(selected.hash), isFalse);
+      return false;
+    }), throwsA(isA<CoreReleaseActivationException>()));
+    expect(await store.selectedForLaunch(), isNull);
+  });
+
+  test('crash during durable commit restores previous selection', () async {
+    var checks = 0;
+    await expectLater(store.activate(
+      manifest, bundledVersion: 'v1.19.34', restart: () async => true,
+      healthy: () => ++checks != 2,
+    ), throwsA(isA<CoreReleaseActivationException>().having((e) => e.restored, 'restored', isTrue)));
+    expect(await store.selectedForLaunch(), isNull);
+    expect((await store.read()).pending, isFalse);
+  });
+
   test('does not downgrade the bundled core', () async {
     await expectLater(store.activate(manifest, bundledVersion: 'v1.20.0', restart: () async {
       fail('Incompatible downgrade must not restart');

@@ -262,13 +262,16 @@ class CoreAction extends _$CoreAction {
           await _core.isInit;
     }
 
+    bool healthy() => !_coreReleaseCrashed &&
+        ref.read(coreStatusProvider) == CoreStatus.connected;
+
     try {
       final result = restore
-          ? await coreReleaseSelection.restorePrevious(restart: restart)
+          ? await coreReleaseSelection.restorePrevious(restart: restart, healthy: healthy)
           : await coreReleaseSelection.activate(
               manifest!, bundledVersion: coreVersionDefine.isNotEmpty
                   ? coreVersionDefine : await _core.getCoreVersion(),
-              restart: restart,
+              restart: restart, healthy: healthy,
             );
       outcome = result ? RecoveryOutcome.succeeded : RecoveryOutcome.failed;
       return result;
@@ -281,12 +284,11 @@ class CoreAction extends _$CoreAction {
   }
 
   Future<bool>? requestRelaunch() {
-    if (_coreReleaseOperation != null) return _coreReleaseOperation;
     final operation = _restartOperation;
     if (operation != null) {
       _relaunchRequested = true;
     }
-    return operation;
+    return _coreReleaseOperation ?? operation;
   }
 
   /// An in-process core (Android) cannot be relaunched, so a restart stops

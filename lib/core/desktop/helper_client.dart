@@ -196,6 +196,7 @@ final class HelperClient {
   final String Function() _baseUrl;
   String? _coreSha256Cache;
   final Future<CoreReleaseRef?> Function()? _selectedRelease;
+  final Future<bool> Function(String)? _rejectCommittedRelease;
 
   HelperClient({
     Dio? dio,
@@ -203,7 +204,9 @@ final class HelperClient {
     Future<String> Function()? readCoreSha256,
     String? baseUrl,
     Future<CoreReleaseRef?> Function()? selectedRelease,
+    Future<bool> Function(String)? rejectCommittedRelease,
   }) : _selectedRelease = selectedRelease,
+       _rejectCommittedRelease = rejectCommittedRelease,
        _dio = dio ?? _createDio(),
        _baseUrl = baseUrl == null ? _defaultBaseUrl : (() => baseUrl),
        _expectedHelperPath = expectedHelperPath ?? _defaultHelperPath,
@@ -446,8 +449,17 @@ final class HelperClient {
     required String sessionId,
   }) async {
     _validateSessionId(sessionId);
+    return _startSelected(address: address, sessionId: sessionId, remainingFallbacks: 2);
+  }
+
+  Future<HelperStartResponse> _startSelected({
+    required String address,
+    required String sessionId,
+    required int remainingFallbacks,
+  }) async {
+    CoreReleaseRef? selected;
     try {
-      final selected = await _selectedRelease?.call();
+      selected = await _selectedRelease?.call();
       final response = await _dio.post<Object?>(
         '$baseUrl/${selected == null ? 'start' : 'core/start'}',
         data: {'address': address, 'sessionId': sessionId,
@@ -470,7 +482,17 @@ final class HelperClient {
     } on HelperException {
       rethrow;
     } on DioException catch (error) {
-      throw _mapDioException(error, operation: 'start');
+      final failure = _mapDioException(error, operation: 'start');
+      // Helper validates independent slots before disturbing a running core.
+      // A failed *committed* slot can be abandoned; a candidate trial belongs
+      // exclusively to CoreAction and is never silently substituted here.
+      if (selected != null && remainingFallbacks > 0 &&
+          failure.code == 'coreReleaseVerificationFailed' &&
+          await (_rejectCommittedRelease?.call(selected.hash) ?? Future.value(false))) {
+        return _startSelected(address: address, sessionId: sessionId,
+          remainingFallbacks: remainingFallbacks - 1);
+      }
+      throw failure;
     } catch (error) {
       throw HelperException(
         code: 'transportError',
@@ -1170,4 +1192,6 @@ final class HelperCoreLease implements CoreProcessLease {
 final helperClient = HelperClient(
   selectedRelease: Platform.isWindows && !safeModeBuild
       ? coreReleaseSelection.selectedForLaunch : null,
+  rejectCommittedRelease: Platform.isWindows && !safeModeBuild
+      ? coreReleaseSelection.rejectCommitted : null,
 );

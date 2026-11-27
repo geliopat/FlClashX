@@ -118,6 +118,26 @@ final class CoreReleaseSelectionStore {
     }
   }
 
+  /// A committed slot can disappear (for example, after reinstall) or fail
+  /// Helper verification. Outside a trial, fall back to the previous signed
+  /// slot or bundled core. During a trial only the transaction may roll back.
+  Future<bool> rejectCommitted(String hash) async {
+    if (_busy || _trial) return false;
+    _busy = true;
+    try {
+      final state = await read();
+      if (state.current?.hash != hash) return false;
+      final previous = state.hasPrevious ? state.previous : null;
+      await _write(CoreReleaseState(
+        current: previous,
+        hasPrevious: previous != null,
+      ));
+      return true;
+    } finally {
+      _busy = false;
+    }
+  }
+
   Future<void> _write(CoreReleaseState state) async {
     final file = await _file();
     await file.writeAsStringAtomically(jsonEncode(state.toJson()));
@@ -127,7 +147,9 @@ final class CoreReleaseSelectionStore {
     CoreReleaseManifest manifest, {
     required String bundledVersion,
     required Future<bool> Function() restart,
+    bool Function()? healthy,
   }) => _change(
+    healthy: healthy,
     target: CoreReleaseRef.fromManifest(manifest),
     bundledVersion: bundledVersion,
     restart: restart,
@@ -135,13 +157,15 @@ final class CoreReleaseSelectionStore {
 
   Future<bool> restorePrevious({
     required Future<bool> Function() restart,
-  }) => _change(restore: true, restart: restart);
+    bool Function()? healthy,
+  }) => _change(restore: true, restart: restart, healthy: healthy);
 
   Future<bool> _change({
     CoreReleaseRef? target,
     String? bundledVersion,
     bool restore = false,
     required Future<bool> Function() restart,
+    bool Function()? healthy,
   }) async {
     if (_busy) throw StateError('Core release activation already running');
     _busy = true;
@@ -171,10 +195,15 @@ final class CoreReleaseSelectionStore {
       _trialSelection = target;
       _trial = true;
       try {
-        if (!await restart()) throw StateError('Core restart did not restore the requested configuration');
+        if (!await restart() || healthy?.call() == false) {
+          throw StateError('Core restart did not restore the requested configuration');
+        }
         await _write(CoreReleaseState(
           current: target, previous: state.current, hasPrevious: true,
         ));
+        if (healthy?.call() == false) {
+          throw StateError('Core crashed while committing the selected release');
+        }
         return true;
       } catch (error) {
         // Override in memory even if rewriting the journal fails: pending
@@ -182,17 +211,19 @@ final class CoreReleaseSelectionStore {
         _trialSelection = state.current;
         Object? rollbackError;
         var restored = false;
-        try {
-          restored = await restart();
-          if (!restored) rollbackError = StateError('Previous core did not start');
-        } catch (failure) {
-          rollbackError = failure;
-        }
+        // Restore durable selection BEFORE relaunch. Even a crash during
+        // rollback must not leave a newly committed unhealthy candidate selected.
         try {
           await _write(CoreReleaseState(
             current: state.current, previous: state.previous,
             hasPrevious: state.hasPrevious,
           ));
+        } catch (failure) {
+          rollbackError = failure;
+        }
+        try {
+          restored = await restart() && healthy?.call() != false;
+          if (!restored) rollbackError ??= StateError('Previous core did not start');
         } catch (failure) {
           rollbackError ??= failure;
         }
