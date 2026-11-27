@@ -1,4 +1,5 @@
 import 'package:fl_clash/ui/network_palette.dart';
+import 'package:fl_clash/ui/flag.dart';
 import 'package:fl_clash/features/features.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:material_ui/material_ui.dart';

@@ -1,3 +1,4 @@
+import 'package:fl_clash/ui/network_palette.dart';
 import 'dart:async';
 
 import 'package:fl_clash/common/common.dart';
@@ -130,7 +131,7 @@ mixin ConnectionsPolling<T extends ConsumerStatefulWidget>
           () => setState(() {
             connections = next;
             tcpCount = tcp;
-            udpCount = next.length - tcp;
+            udpCount = next.where((item) => item.metadata.network.toLowerCase() == 'udp').length;
           }),
         );
       } else {
@@ -362,14 +363,8 @@ class _ConnectionsTableCardState extends ConsumerState<ConnectionsTableCard>
                     if (_feed == DashboardFeed.connections &&
                         connections.isNotEmpty &&
                         constraints.maxWidth >= _midTableWidth) ...[
-                      DashboardChip(
-                        label: 'TCP $tcpCount',
-                        tone: DashboardChipTone.idle,
-                      ),
-                      DashboardChip(
-                        label: 'UDP $udpCount',
-                        tone: DashboardChipTone.idle,
-                      ),
+                      Text('TCP $tcpCount', style: TextStyle(color: NetworkTone.tcp.of(context))),
+                      Text('UDP $udpCount', style: TextStyle(color: NetworkTone.udp.of(context))),
                     ],
                   ],
                 ),

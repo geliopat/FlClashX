@@ -1,4 +1,5 @@
 import 'package:fl_clash/ui/context.dart';
+import 'package:fl_clash/ui/surface.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// Semantic hues independent of accent. The surface estimate is not a
@@ -46,5 +47,14 @@ enum NetworkTone {
     return contrast(result, background) >= 4.5 ? result : target;
   }
 
-  Color of(BuildContext context) => on(context.colorScheme.surface);
+  static final _cache = <Color, Map<NetworkTone, Color>>{};
+
+  Color of(BuildContext context) {
+    final surface = context.surfaceLevel.colorOf(context.colorScheme);
+    if (!_cache.containsKey(surface) && _cache.length >= 32) {
+      _cache.remove(_cache.keys.first);
+    }
+    return _cache.putIfAbsent(surface, () => <NetworkTone, Color>{})
+        .putIfAbsent(this, () => on(surface));
+  }
 }

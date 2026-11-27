@@ -134,6 +134,9 @@ class _ZapretLogsViewState extends State<ZapretLogsView>
 
   Widget _filterSection(BuildContext context, {String? error}) {
     final l = AppLocalizations.of(context);
+    if (_tab == 0 && error == null) {
+      return Text(l.forkLogFooter, style: context.listCaptionStyle);
+    }
     return generateSection(
       items: [
         if (_tab != 0)
