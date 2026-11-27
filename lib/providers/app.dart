@@ -39,6 +39,11 @@ class Logs extends _$Logs with AutoDisposeNotifierMixin {
     this.value = state.append(value);
   }
 
+  // Clear the GUI buffer only. FileLogger retention and on-disk history are untouched.
+  void clearVisible() {
+    value = FixedList<Log>(maxLogsLength);
+  }
+
   Future<bool> exportLogs() async {
     final logString = await encodeLogsTask(value.list);
     final tempFilePath = await appPath.tempFilePath;
