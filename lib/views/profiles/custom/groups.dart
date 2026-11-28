@@ -82,7 +82,8 @@ enum _GroupOption {
         _GroupOption.strategy => type == GroupType.LoadBalance,
         hashKey =>
           type == GroupType.LoadBalance &&
-              strategy != LoadBalanceStrategy.roundRobin,
+              strategy != LoadBalanceStrategy.roundRobin &&
+              strategy != LoadBalanceStrategy.adaptiveBalance,
         _ => true,
       };
 
@@ -615,7 +616,9 @@ class _EditProxyGroupViewState extends ConsumerState<EditProxyGroupView> {
     }
     ref
         .read(proxyGroupProvider.notifier)
-        .update((state) => state.copyWith(strategy: value));
+        .update((state) => value == LoadBalanceStrategy.adaptiveBalance
+            ? state.copyWith(strategy: value, hashKey: null)
+            : state.copyWith(strategy: value));
   }
 
   Future<void> _showEmptyFallbackOptions() async {
