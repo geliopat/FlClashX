@@ -35,7 +35,7 @@ void main() {
     container = ProviderContainer(
       overrides: [
         profilesProvider.overrideWith(TestProfiles.new),
-        coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
+        coreHandlerProvider.overrideWithValue(CoreController.scoped(core, snapshotMaxAge: Duration.zero)),
       ],
     );
     globalState.container = container;

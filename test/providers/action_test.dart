@@ -6,6 +6,9 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:fl_clash/common/constant.dart';
 import 'package:fl_clash/common/path.dart';
+import 'package:fl_clash/common/traffic_history.dart';
+import 'package:fl_clash/common/file_logger.dart';
+import 'package:fl_clash/common/recovery_journal.dart';
 import 'package:fl_clash/core/controller.dart';
 import 'package:fl_clash/core/desktop/model.dart';
 import 'package:fl_clash/core/interface.dart';
@@ -109,8 +112,17 @@ Future<_HeldDownload> _holdDownload() async {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  late Directory testHome;
   setUp(() async {
     await mockPreferences();
+    testHome = await Directory.systemTemp.createTemp('client-action-');
+    await useAppPaths(testHome);
+  });
+  tearDown(() async {
+    await appFileLogger.flush();
+    await crashFileLogger.flush();
+    await recoveryJournal.flush();
+    if (await testHome.exists()) await testHome.delete(recursive: true);
   });
   group('ProfilesAction', () {
     test('keeps edited profile data when remote update fails', () async {
@@ -647,9 +659,7 @@ void main() {
   group('CoreAction', () {
     test('Windows gate rejects missing capabilities and accepts compatible identity', () async {
       if (!Platform.isWindows) return;
-      final root = await Directory.systemTemp.createTemp('flclash-core-gate-');
-      addTearDown(() => root.delete(recursive: true));
-      await useAppPaths(root);
+      // The per-test app path starts without any selected signed release.
       final core = _MockCoreHandlerInterface();
       when(() => core.invokeMethod<List<dynamic>>(method: CoreMethod.getCoreCapabilities))
           .thenAnswer((_) async => <dynamic>[]);
@@ -673,6 +683,7 @@ void main() {
       when(() => core.shutdown()).thenAnswer((_) async => true);
       final container = ProviderContainer(
         overrides: [
+          trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
           zapretControllerProvider.overrideWith(_FakeZapret.new),
           coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
           coreActionProvider.overrideWith(
@@ -704,7 +715,8 @@ void main() {
         when(() => core.shutdown()).thenAnswer((_) => shutdown.future);
         final container = ProviderContainer(
           overrides: [
-            zapretControllerProvider.overrideWith(_FakeZapret.new),
+            trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_FakeZapret.new),
             initProvider.overrideWithBuild((_, _) => true),
             commonActionProvider.overrideWith(_RaceCommonAction.new),
             coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
@@ -740,7 +752,8 @@ void main() {
         when(core.clearDnsCache).thenAnswer((_) async => true);
         final container = ProviderContainer(
           overrides: [
-            zapretControllerProvider.overrideWith(_FakeZapret.new),
+            trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_FakeZapret.new),
             coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
           ],
         );
@@ -763,6 +776,7 @@ void main() {
     test('applies the profile after restarting a stopped core', () async {
       final container = ProviderContainer(
         overrides: [
+          trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
           zapretControllerProvider.overrideWith(_FakeZapret.new),
           coreActionProvider.overrideWith(_TestCoreAction.new),
           setupActionProvider.overrideWith(_TestSetupAction.new),
@@ -786,7 +800,8 @@ void main() {
       () async {
         final container = ProviderContainer(
           overrides: [
-            zapretControllerProvider.overrideWith(_FakeZapret.new),
+            trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_FakeZapret.new),
             coreActionProvider.overrideWith(_TestCoreAction.new),
             setupActionProvider.overrideWith(_TestSetupAction.new),
           ],
@@ -809,6 +824,7 @@ void main() {
     test('a stop confirmed mid-restart keeps the proxy off', () async {
       final container = ProviderContainer(
         overrides: [
+          trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
           zapretControllerProvider.overrideWith(_FakeZapret.new),
           initProvider.overrideWithBuild((_, _) => true),
           commonActionProvider.overrideWith(_RaceCommonAction.new),
@@ -841,6 +857,7 @@ void main() {
     test('a stop rolled back mid-restart keeps the proxy off', () async {
       final container = ProviderContainer(
         overrides: [
+          trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
           zapretControllerProvider.overrideWith(_FakeZapret.new),
           initProvider.overrideWithBuild((_, _) => true),
           commonActionProvider.overrideWith(_RaceCommonAction.new),
@@ -883,7 +900,8 @@ void main() {
       () async {
         final container = ProviderContainer(
           overrides: [
-            zapretControllerProvider.overrideWith(_FakeZapret.new),
+            trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_FakeZapret.new),
             coreActionProvider.overrideWith(_TestCoreAction.new),
             setupActionProvider.overrideWith(_TestSetupAction.new),
           ],
@@ -908,7 +926,8 @@ void main() {
       () async {
         final container = ProviderContainer(
           overrides: [
-            zapretControllerProvider.overrideWith(_FakeZapret.new),
+            trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_FakeZapret.new),
             coreActionProvider.overrideWith(_TestCoreAction.new),
             setupActionProvider.overrideWith(_TestSetupAction.new),
           ],
@@ -936,6 +955,7 @@ void main() {
     test('reapplies the latest request without restarting twice', () async {
       final container = ProviderContainer(
         overrides: [
+          trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
           zapretControllerProvider.overrideWith(_FakeZapret.new),
           coreActionProvider.overrideWith(_TestCoreAction.new),
           setupActionProvider.overrideWith(_TestSetupAction.new),
@@ -969,6 +989,7 @@ void main() {
     test('surfaces a failed restart to its caller as a rejection', () async {
       final container = ProviderContainer(
         overrides: [
+          trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
           zapretControllerProvider.overrideWith(_FakeZapret.new),
           coreActionProvider.overrideWith(_TestCoreAction.new),
           setupActionProvider.overrideWith(_TestSetupAction.new),
@@ -997,7 +1018,8 @@ void main() {
       'startCore leaves status and initCore to the superseding operation',
       () async {
         final container = ProviderContainer(
-          overrides: [zapretControllerProvider.overrideWith(_FakeZapret.new), coreActionProvider.overrideWith(_TestCoreAction.new)],
+          overrides: [trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_FakeZapret.new), coreActionProvider.overrideWith(_TestCoreAction.new)],
         );
         addTearDown(container.dispose);
         final coreAction =
@@ -1016,7 +1038,8 @@ void main() {
 
     test('startCore treats a coalesced outcome as applied', () async {
       final container = ProviderContainer(
-        overrides: [zapretControllerProvider.overrideWith(_FakeZapret.new), coreActionProvider.overrideWith(_TestCoreAction.new)],
+        overrides: [trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_FakeZapret.new), coreActionProvider.overrideWith(_TestCoreAction.new)],
       );
       addTearDown(container.dispose);
       final coreAction =
@@ -1037,7 +1060,8 @@ void main() {
       () async {
         final container = ProviderContainer(
           overrides: [
-            zapretControllerProvider.overrideWith(_FakeZapret.new),
+            trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_FakeZapret.new),
             coreActionProvider.overrideWith(_TestCoreAction.new),
             setupActionProvider.overrideWith(_TestSetupAction.new),
           ],
@@ -1068,6 +1092,7 @@ void main() {
     test('restartCore treats a coalesced outcome as applied', () async {
       final container = ProviderContainer(
         overrides: [
+          trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
           zapretControllerProvider.overrideWith(_FakeZapret.new),
           coreActionProvider.overrideWith(_TestCoreAction.new),
           setupActionProvider.overrideWith(_TestSetupAction.new),
@@ -1103,7 +1128,8 @@ void main() {
         addTearDown(() => debugPrint = original);
         container = ProviderContainer(
           overrides: [
-            zapretControllerProvider.overrideWith(_FakeZapret.new),
+            trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_FakeZapret.new),
             coreActionProvider.overrideWith(_TestCoreAction.new),
             setupActionProvider.overrideWith(_TestSetupAction.new),
           ],
@@ -1149,15 +1175,17 @@ void main() {
         expect(printed, contains(contains('boom')));
       });
 
-      test('leaves a Core that fell within 5 s of two restarts in a row '
+      test('leaves a Core that fell within 5 s of three restarts in a row '
           'down and logs why', () async {
         await crashAfter(Duration.zero, 'first');
         await crashAfter(const Duration(seconds: 4), 'second');
         await crashAfter(const Duration(seconds: 4), 'third');
+        expect(coreAction.lifecycleRestartCount, 3);
+        await crashAfter(const Duration(seconds: 4), 'fourth');
 
-        expect(coreAction.lifecycleRestartCount, 2);
+        expect(coreAction.lifecycleRestartCount, 3);
         expect(container.read(coreStatusProvider), CoreStatus.disconnected);
-        expect(printed.last, allOf(contains('5s'), contains('third')));
+        expect(printed.last, allOf(contains('5s'), contains('fourth')));
       });
 
       test('restarts a Core that outlived the window again', () async {
@@ -1208,7 +1236,8 @@ void main() {
       (ProviderContainer, _TestCoreAction, _RestartSetupAction) realRun() {
         final container = ProviderContainer(
           overrides: [
-            zapretControllerProvider.overrideWith(_FakeZapret.new),
+            trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_FakeZapret.new),
             initProvider.overrideWithBuild((_, _) => true),
             commonActionProvider.overrideWith(_RaceCommonAction.new),
             coreActionProvider.overrideWith(_TestCoreAction.new),
@@ -1291,7 +1320,7 @@ void main() {
       test('a crash during a restart counts however long it took', () async {
         var slowCrashes = 0;
         coreAction.onInit = () {
-          if (slowCrashes == 2) {
+          if (slowCrashes == 3) {
             return;
           }
           slowCrashes++;
@@ -1303,8 +1332,8 @@ void main() {
 
         await crashAfter(Duration.zero, 'boom');
 
-        expect(coreAction.lifecycleRestartCount, 2);
-        expect(printed.last, contains('slow 2'));
+        expect(coreAction.lifecycleRestartCount, 3);
+        expect(printed.last, contains('slow 3'));
       });
 
       test('stops once the app exit has closed the Core', () async {
@@ -1325,7 +1354,7 @@ void main() {
 
         await crashAfter(Duration.zero, 'boom');
 
-        expect(coreAction.lifecycleRestartCount, 2);
+        expect(coreAction.lifecycleRestartCount, 3);
         expect(container.read(coreStatusProvider), CoreStatus.disconnected);
         expect(printed.last, contains('no core binary'));
       });
@@ -1338,7 +1367,8 @@ void main() {
         final startCompleter = Completer<bool>();
         final container = ProviderContainer(
           overrides: [
-            zapretControllerProvider.overrideWith(_FakeZapret.new),
+            trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_FakeZapret.new),
             initProvider.overrideWithBuild((_, _) => true),
             commonActionProvider.overrideWith(_RaceCommonAction.new),
             setupActionProvider.overrideWith(_RaceSetupAction.new),
@@ -1369,7 +1399,8 @@ void main() {
         final stopCompleter = Completer<bool>();
         final container = ProviderContainer(
           overrides: [
-            zapretControllerProvider.overrideWith(_FakeZapret.new),
+            trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_FakeZapret.new),
             initProvider.overrideWithBuild((_, _) => true),
             commonActionProvider.overrideWith(_RaceCommonAction.new),
             setupActionProvider.overrideWith(_RaceSetupAction.new),
@@ -1407,7 +1438,8 @@ void main() {
         final startCompleter = Completer<bool>();
         final container = ProviderContainer(
           overrides: [
-            zapretControllerProvider.overrideWith(_FakeZapret.new),
+            trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_FakeZapret.new),
             initProvider.overrideWithBuild((_, _) => true),
             commonActionProvider.overrideWith(_RaceCommonAction.new),
             setupActionProvider.overrideWith(_RaceSetupAction.new),
@@ -1444,7 +1476,8 @@ void main() {
         final startCompleter = Completer<bool>();
         final container = ProviderContainer(
           overrides: [
-            zapretControllerProvider.overrideWith(_FakeZapret.new),
+            trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_FakeZapret.new),
             initProvider.overrideWithBuild((_, _) => true),
             commonActionProvider.overrideWith(_RaceCommonAction.new),
             setupActionProvider.overrideWith(_RaceSetupAction.new),
@@ -1474,7 +1507,8 @@ void main() {
       test('stale initialization cannot start after a newer stop', () async {
         final container = ProviderContainer(
           overrides: [
-            zapretControllerProvider.overrideWith(_FakeZapret.new),
+            trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_FakeZapret.new),
             initProvider.overrideWithBuild((_, _) => true),
             commonActionProvider.overrideWith(_RaceCommonAction.new),
             setupActionProvider.overrideWith(_InitializingSetupAction.new),
@@ -1504,7 +1538,8 @@ void main() {
         () async {
           final container = ProviderContainer(
             overrides: [
-              zapretControllerProvider.overrideWith(_FakeZapret.new),
+              trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_FakeZapret.new),
               initProvider.overrideWithBuild((_, _) => true),
               suspendProvider.overrideWithValue(true),
               commonActionProvider.overrideWith(_RaceCommonAction.new),
@@ -1534,7 +1569,8 @@ void main() {
         late _RestartRecordingCoreAction coreAction;
         final container = ProviderContainer(
           overrides: [
-            zapretControllerProvider.overrideWith(_FakeZapret.new),
+            trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_FakeZapret.new),
             setupActionProvider.overrideWith(() {
               setupAction = _AuthorizationSetupAction([AuthorizeCode.success]);
               return setupAction;
@@ -1572,7 +1608,8 @@ void main() {
         late _RestartRecordingCoreAction coreAction;
         final container = ProviderContainer(
           overrides: [
-            zapretControllerProvider.overrideWith(_FakeZapret.new),
+            trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_FakeZapret.new),
             setupActionProvider.overrideWith(() {
               setupAction = _AuthorizationSetupAction([
                 AuthorizeCode.none,
@@ -1613,7 +1650,8 @@ void main() {
         late _RestartRecordingCoreAction coreAction;
         final container = ProviderContainer(
           overrides: [
-            zapretControllerProvider.overrideWith(_FakeZapret.new),
+            trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_FakeZapret.new),
             currentProfileProvider.overrideWithValue(null),
             setupActionProvider.overrideWith(() {
               setupAction = _AuthorizationSetupAction([AuthorizeCode.success]);
@@ -1644,7 +1682,8 @@ void main() {
       () async {
         final container = ProviderContainer(
           overrides: [
-            zapretControllerProvider.overrideWith(_FakeZapret.new),
+            trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_FakeZapret.new),
             currentProfileProvider.overrideWithValue(null),
             coreActionProvider.overrideWith(_TestCoreAction.new),
             setupActionProvider.overrideWith(
@@ -1688,7 +1727,8 @@ void main() {
       () async {
         final container = ProviderContainer(
           overrides: [
-            zapretControllerProvider.overrideWith(_FakeZapret.new),
+            trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
+          zapretControllerProvider.overrideWith(_FakeZapret.new),
             currentProfileProvider.overrideWithValue(null),
             coreActionProvider.overrideWith(_TestCoreAction.new),
             setupActionProvider.overrideWith(
@@ -1726,6 +1766,7 @@ void main() {
       late _AuthorizationSetupAction setupAction;
       final container = ProviderContainer(
         overrides: [
+          trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
           zapretControllerProvider.overrideWith(_FakeZapret.new),
           currentProfileProvider.overrideWithValue(null),
           setupActionProvider.overrideWith(() {
@@ -1758,6 +1799,7 @@ void main() {
       late _AuthorizationSetupAction setupAction;
       final container = ProviderContainer(
         overrides: [
+          trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
           zapretControllerProvider.overrideWith(_FakeZapret.new),
           setupActionProvider.overrideWith(() {
             setupAction = _AuthorizationSetupAction([], pending: pending);
@@ -1787,6 +1829,7 @@ void main() {
       late _AuthorizationSetupAction setupAction;
       final container = ProviderContainer(
         overrides: [
+          trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
           zapretControllerProvider.overrideWith(_FakeZapret.new),
           setupActionProvider.overrideWith(() {
             setupAction = _AuthorizationSetupAction([AuthorizeCode.error]);

@@ -90,6 +90,14 @@ class TrafficHistory {
   int generation = 0;
   bool loaded = false;
   bool resetting = false;
+  bool _disposed = false;
+
+  void dispose() {
+    if (_disposed) return;
+    _disposed = true;
+    generation++;
+    revision.dispose();
+  }
 
   Future<File> _file() async =>
       File(p.join(await appPath.homeDirPath, 'traffic-history-v1.json'));
@@ -108,14 +116,14 @@ class TrafficHistory {
           logLevel: LogLevel.warning);
     } finally {
       loaded = true;
-      revision.value++;
+      if (!_disposed) revision.value++;
     }
   }
 
   Future<void> record({required int generation, Traffic? all, Traffic? proxy}) async {
-    if (resetting || generation != this.generation) return;
+    if (_disposed || resetting || generation != this.generation) return;
     await load();
-    if (resetting || generation != this.generation) return;
+    if (_disposed || resetting || generation != this.generation) return;
     final now = DateTime.now();
     window.record(now, all: all, proxy: proxy);
     revision.value++;
@@ -132,7 +140,7 @@ class TrafficHistory {
   }
 
   void finishReset(int token, {required bool confirmed}) {
-    if (token != generation) return;
+    if (_disposed || token != generation) return;
     window.resetBaseline(confirmed: confirmed);
     resetting = false;
     revision.value++;
@@ -155,4 +163,8 @@ class TrafficHistory {
   }
 }
 
-final trafficHistoryProvider = Provider<TrafficHistory>((ref) => TrafficHistory());
+final trafficHistoryProvider = Provider<TrafficHistory>((ref) {
+  final history = TrafficHistory();
+  ref.onDispose(history.dispose);
+  return history;
+});

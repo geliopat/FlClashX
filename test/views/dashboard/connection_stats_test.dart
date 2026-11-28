@@ -52,7 +52,7 @@ void main() {
 
   setUp(() {
     core = _MockCore();
-    when(() => core.getConnectionCount()).thenAnswer((_) async => 0);
+    when(core.getConnections).thenAnswer((_) async => const <TrackerInfo>[]);
     container = ProviderContainer(
       overrides: [
         profilesProvider.overrideWith(TestProfiles.new),
@@ -97,7 +97,7 @@ void main() {
   }
 
   testWidgets('counts what the Core is holding open', (tester) async {
-    when(() => core.getConnectionCount()).thenAnswer((_) async => 34);
+    when(core.getConnections).thenAnswer((_) async => List.generate(34, _request));
 
     await pumpCard(tester);
 
@@ -126,7 +126,7 @@ void main() {
 
   testWidgets('a count too long for a third of a phone is shortened in any '
       'locale', (tester) async {
-    when(() => core.getConnectionCount()).thenAnswer((_) async => 99999);
+    when(core.getConnections).thenAnswer((_) async => List<TrackerInfo>.filled(99999, _request(0)));
     container.read(requestCountProvider.notifier).value = 123456;
 
     await pumpCard(tester, locale: const Locale('zh', 'CN'));

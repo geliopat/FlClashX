@@ -31,7 +31,8 @@ class CoreController {
   }
 
   @visibleForTesting
-  CoreController.scoped(this._interface);
+  CoreController.scoped(this._interface, {Duration? snapshotMaxAge})
+    : _snapshotMaxAge = snapshotMaxAge ?? const Duration(milliseconds: 900);
 
   @visibleForTesting
   static void resetInstance() {
@@ -43,7 +44,8 @@ class CoreController {
     return _instance!;
   }
 
-  late final _connectionSnapshots = ConnectionSnapshotReader(_interface.getConnections);
+  Duration _snapshotMaxAge = const Duration(milliseconds: 900);
+  late final _connectionSnapshots = ConnectionSnapshotReader(_interface.getConnections, maxAge: _snapshotMaxAge);
 
   Future<ConnectionSnapshot> getConnectionSnapshot() => _connectionSnapshots.read();
 

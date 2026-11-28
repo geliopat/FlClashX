@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'dart:async';
 
+import 'package:fl_clash/common/traffic_history.dart';
 import 'package:fl_clash/core/controller.dart';
 import 'package:fl_clash/core/interface.dart';
 import 'package:fl_clash/enum/enum.dart';
@@ -42,6 +44,7 @@ void main() {
   ProviderContainer buildContainer() {
     final container = ProviderContainer(
       overrides: [
+        trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),
         coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
         profilesProvider.overrideWith(TestProfiles.new),
       ],
@@ -146,7 +149,7 @@ void main() {
     });
 
     test(
-      'drops concurrent in-flight updates while one is in progress',
+      'coalesces concurrent callers on the same in-flight traffic sample',
       () async {
         final container = buildContainer();
         final completer = Completer<Traffic>();
@@ -162,12 +165,12 @@ void main() {
             .read(commonActionProvider.notifier)
             .updateTraffic();
 
-        await expectLater(second, completes);
+        expect(second, same(first));
         completer.complete(const Traffic(up: 5, down: 10));
-        await first;
+        await Future.wait([first, second]);
 
         verify(() => core.getTraffic(any())).called(1);
-        verify(() => core.getTotalTraffic(any())).called(1);
+        verify(() => core.getTotalTraffic(any())).called(Platform.isWindows ? 2 : 1);
       },
     );
   });

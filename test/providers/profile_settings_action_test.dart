@@ -137,6 +137,9 @@ void main() {
     answer({'socks-port': 7891}, ['socks-port']);
     await select(_profile(1));
     await select(_profile(2, type: ProfileType.custom));
+    // Real UI edits explicitly register local ownership, even if no
+    // subscription currently manages the setting.
+    container.read(managedSettingsActionProvider.notifier).takeOver('clash.socks-port');
     container
         .read(patchClashConfigProvider.notifier)
         .update((state) => state.copyWith(socksPort: 1234));

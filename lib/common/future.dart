@@ -49,8 +49,15 @@ class ResolveOnce<T> {
 
   Future<T> get value async {
     if (_resolved case (:final value)) return value;
-    final value = await (_pending ??= _resolve());
-    _resolved = (value: value);
-    return value;
+    final pending = _pending ??= Future<T>.sync(_resolve);
+    try {
+      final value = await pending;
+      _resolved = (value: value);
+      return value;
+    } catch (_) {
+      // A transient platform failure must not poison all subsequent callers.
+      if (identical(_pending, pending)) _pending = null;
+      rethrow;
+    }
   }
 }

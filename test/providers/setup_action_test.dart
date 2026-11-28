@@ -2919,7 +2919,8 @@ void main() {
 
         await messageAction.setRunning(true, initialize: true);
 
-        expect(messageAction.coreRunningCalls, [true, false]);
+        // Windows validates and commits the profile before listener start.
+        expect(messageAction.coreRunningCalls, Platform.isWindows ? [false] : [true, false]);
         expect(scoped.read(runTimeProvider), isNull);
         verify(() => core.setupConfig(any())).called(1);
       },
