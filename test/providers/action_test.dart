@@ -19,6 +19,8 @@ import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/providers/core.dart';
 import 'package:fl_clash/providers/database.dart';
 import 'package:fl_clash/providers/state.dart';
+import 'package:fl_clash/providers/zapret.dart';
+import 'package:fl_clash/features/update/core_release_manifest.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -27,7 +29,6 @@ import 'package:riverpod/riverpod.dart';
 
 import '../helpers/app_paths.dart';
 import '../helpers/preferences.dart';
-import 'package:fl_clash/providers/zapret.dart';
 import '../helpers/setup_actions.dart';
 import '../helpers/test_profiles.dart';
 
@@ -644,11 +645,35 @@ void main() {
   });
 
   group('CoreAction', () {
+    test('Windows gate rejects missing capabilities and accepts compatible identity', () async {
+      if (!Platform.isWindows) return;
+      final root = await Directory.systemTemp.createTemp('flclash-core-gate-');
+      addTearDown(() => root.delete(recursive: true));
+      await useAppPaths(root);
+      final core = _MockCoreHandlerInterface();
+      when(() => core.invokeMethod<List<dynamic>>(method: CoreMethod.getCoreCapabilities))
+          .thenAnswer((_) async => <dynamic>[]);
+      when(() => core.invokeMethod<Map<String, dynamic>>(method: CoreMethod.getCoreIdentity))
+          .thenAnswer((_) async => <String, dynamic>{'version': coreVersionDefine});
+      when(() => core.getCoreVersion()).thenAnswer((_) async => coreVersionDefine);
+      final container = ProviderContainer(overrides: [
+        coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
+        coreActionProvider.overrideWith(_GateCoreAction.new),
+        safeModeProvider.overrideWithValue(false),
+      ]);
+      addTearDown(container.dispose);
+      final action = container.read(coreActionProvider.notifier) as _GateCoreAction;
+      await expectLater(action.verify(), throwsStateError);
+      when(() => core.invokeMethod<List<dynamic>>(method: CoreMethod.getCoreCapabilities))
+          .thenAnswer((_) async => requiredWindowsCoreCapabilities.toList());
+      await expectLater(action.verify(), completes);
+    });
     test('an embedded core is stopped, shut down and started again', () async {
       final core = _MockCoreHandlerInterface();
       when(() => core.shutdown()).thenAnswer((_) async => true);
       final container = ProviderContainer(
-        overrides: [zapretControllerProvider.overrideWith(_FakeZapret.new), 
+        overrides: [
+          zapretControllerProvider.overrideWith(_FakeZapret.new),
           coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
           coreActionProvider.overrideWith(
             () => _TestCoreAction()..embedded = true,
@@ -678,7 +703,8 @@ void main() {
         final shutdown = Completer<bool>();
         when(() => core.shutdown()).thenAnswer((_) => shutdown.future);
         final container = ProviderContainer(
-          overrides: [zapretControllerProvider.overrideWith(_FakeZapret.new), 
+          overrides: [
+            zapretControllerProvider.overrideWith(_FakeZapret.new),
             initProvider.overrideWithBuild((_, _) => true),
             commonActionProvider.overrideWith(_RaceCommonAction.new),
             coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
@@ -713,7 +739,8 @@ void main() {
         final core = _MockCoreHandlerInterface();
         when(core.clearDnsCache).thenAnswer((_) async => true);
         final container = ProviderContainer(
-          overrides: [zapretControllerProvider.overrideWith(_FakeZapret.new), 
+          overrides: [
+            zapretControllerProvider.overrideWith(_FakeZapret.new),
             coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
           ],
         );
@@ -735,7 +762,8 @@ void main() {
 
     test('applies the profile after restarting a stopped core', () async {
       final container = ProviderContainer(
-        overrides: [zapretControllerProvider.overrideWith(_FakeZapret.new), 
+        overrides: [
+          zapretControllerProvider.overrideWith(_FakeZapret.new),
           coreActionProvider.overrideWith(_TestCoreAction.new),
           setupActionProvider.overrideWith(_TestSetupAction.new),
         ],
@@ -757,7 +785,8 @@ void main() {
       'restores the started state after restarting a running core',
       () async {
         final container = ProviderContainer(
-          overrides: [zapretControllerProvider.overrideWith(_FakeZapret.new), 
+          overrides: [
+            zapretControllerProvider.overrideWith(_FakeZapret.new),
             coreActionProvider.overrideWith(_TestCoreAction.new),
             setupActionProvider.overrideWith(_TestSetupAction.new),
           ],
@@ -779,7 +808,8 @@ void main() {
 
     test('a stop confirmed mid-restart keeps the proxy off', () async {
       final container = ProviderContainer(
-        overrides: [zapretControllerProvider.overrideWith(_FakeZapret.new), 
+        overrides: [
+          zapretControllerProvider.overrideWith(_FakeZapret.new),
           initProvider.overrideWithBuild((_, _) => true),
           commonActionProvider.overrideWith(_RaceCommonAction.new),
           coreActionProvider.overrideWith(_TestCoreAction.new),
@@ -810,7 +840,8 @@ void main() {
 
     test('a stop rolled back mid-restart keeps the proxy off', () async {
       final container = ProviderContainer(
-        overrides: [zapretControllerProvider.overrideWith(_FakeZapret.new), 
+        overrides: [
+          zapretControllerProvider.overrideWith(_FakeZapret.new),
           initProvider.overrideWithBuild((_, _) => true),
           commonActionProvider.overrideWith(_RaceCommonAction.new),
           coreActionProvider.overrideWith(_TestCoreAction.new),
@@ -851,7 +882,8 @@ void main() {
       'a rejected setup while running reports restartCore as unsuccessful',
       () async {
         final container = ProviderContainer(
-          overrides: [zapretControllerProvider.overrideWith(_FakeZapret.new), 
+          overrides: [
+            zapretControllerProvider.overrideWith(_FakeZapret.new),
             coreActionProvider.overrideWith(_TestCoreAction.new),
             setupActionProvider.overrideWith(_TestSetupAction.new),
           ],
@@ -875,7 +907,8 @@ void main() {
       'coalesces concurrent restart requests into one lifecycle restart',
       () async {
         final container = ProviderContainer(
-          overrides: [zapretControllerProvider.overrideWith(_FakeZapret.new), 
+          overrides: [
+            zapretControllerProvider.overrideWith(_FakeZapret.new),
             coreActionProvider.overrideWith(_TestCoreAction.new),
             setupActionProvider.overrideWith(_TestSetupAction.new),
           ],
@@ -902,7 +935,8 @@ void main() {
 
     test('reapplies the latest request without restarting twice', () async {
       final container = ProviderContainer(
-        overrides: [zapretControllerProvider.overrideWith(_FakeZapret.new), 
+        overrides: [
+          zapretControllerProvider.overrideWith(_FakeZapret.new),
           coreActionProvider.overrideWith(_TestCoreAction.new),
           setupActionProvider.overrideWith(_TestSetupAction.new),
         ],
@@ -934,7 +968,8 @@ void main() {
 
     test('surfaces a failed restart to its caller as a rejection', () async {
       final container = ProviderContainer(
-        overrides: [zapretControllerProvider.overrideWith(_FakeZapret.new), 
+        overrides: [
+          zapretControllerProvider.overrideWith(_FakeZapret.new),
           coreActionProvider.overrideWith(_TestCoreAction.new),
           setupActionProvider.overrideWith(_TestSetupAction.new),
         ],
@@ -1001,7 +1036,8 @@ void main() {
       'restartCore leaves status and initCore to the superseding operation',
       () async {
         final container = ProviderContainer(
-          overrides: [zapretControllerProvider.overrideWith(_FakeZapret.new), 
+          overrides: [
+            zapretControllerProvider.overrideWith(_FakeZapret.new),
             coreActionProvider.overrideWith(_TestCoreAction.new),
             setupActionProvider.overrideWith(_TestSetupAction.new),
           ],
@@ -1031,7 +1067,8 @@ void main() {
 
     test('restartCore treats a coalesced outcome as applied', () async {
       final container = ProviderContainer(
-        overrides: [zapretControllerProvider.overrideWith(_FakeZapret.new), 
+        overrides: [
+          zapretControllerProvider.overrideWith(_FakeZapret.new),
           coreActionProvider.overrideWith(_TestCoreAction.new),
           setupActionProvider.overrideWith(_TestSetupAction.new),
         ],
@@ -1065,7 +1102,8 @@ void main() {
         debugPrint = (message, {wrapWidth}) => printed.add(message ?? '');
         addTearDown(() => debugPrint = original);
         container = ProviderContainer(
-          overrides: [zapretControllerProvider.overrideWith(_FakeZapret.new), 
+          overrides: [
+            zapretControllerProvider.overrideWith(_FakeZapret.new),
             coreActionProvider.overrideWith(_TestCoreAction.new),
             setupActionProvider.overrideWith(_TestSetupAction.new),
           ],
@@ -1169,7 +1207,8 @@ void main() {
 
       (ProviderContainer, _TestCoreAction, _RestartSetupAction) realRun() {
         final container = ProviderContainer(
-          overrides: [zapretControllerProvider.overrideWith(_FakeZapret.new), 
+          overrides: [
+            zapretControllerProvider.overrideWith(_FakeZapret.new),
             initProvider.overrideWithBuild((_, _) => true),
             commonActionProvider.overrideWith(_RaceCommonAction.new),
             coreActionProvider.overrideWith(_TestCoreAction.new),
@@ -1298,7 +1337,8 @@ void main() {
       test('updates runtime and traffic while core start is pending', () async {
         final startCompleter = Completer<bool>();
         final container = ProviderContainer(
-          overrides: [zapretControllerProvider.overrideWith(_FakeZapret.new), 
+          overrides: [
+            zapretControllerProvider.overrideWith(_FakeZapret.new),
             initProvider.overrideWithBuild((_, _) => true),
             commonActionProvider.overrideWith(_RaceCommonAction.new),
             setupActionProvider.overrideWith(_RaceSetupAction.new),
@@ -1328,7 +1368,8 @@ void main() {
       test('serializes listener changes while latest start owns UI', () async {
         final stopCompleter = Completer<bool>();
         final container = ProviderContainer(
-          overrides: [zapretControllerProvider.overrideWith(_FakeZapret.new), 
+          overrides: [
+            zapretControllerProvider.overrideWith(_FakeZapret.new),
             initProvider.overrideWithBuild((_, _) => true),
             commonActionProvider.overrideWith(_RaceCommonAction.new),
             setupActionProvider.overrideWith(_RaceSetupAction.new),
@@ -1365,7 +1406,8 @@ void main() {
       test('newer stop prevents stale start continuation', () async {
         final startCompleter = Completer<bool>();
         final container = ProviderContainer(
-          overrides: [zapretControllerProvider.overrideWith(_FakeZapret.new), 
+          overrides: [
+            zapretControllerProvider.overrideWith(_FakeZapret.new),
             initProvider.overrideWithBuild((_, _) => true),
             commonActionProvider.overrideWith(_RaceCommonAction.new),
             setupActionProvider.overrideWith(_RaceSetupAction.new),
@@ -1401,7 +1443,8 @@ void main() {
       test('skips an intermediate stop when a newer start is queued', () async {
         final startCompleter = Completer<bool>();
         final container = ProviderContainer(
-          overrides: [zapretControllerProvider.overrideWith(_FakeZapret.new), 
+          overrides: [
+            zapretControllerProvider.overrideWith(_FakeZapret.new),
             initProvider.overrideWithBuild((_, _) => true),
             commonActionProvider.overrideWith(_RaceCommonAction.new),
             setupActionProvider.overrideWith(_RaceSetupAction.new),
@@ -1430,7 +1473,8 @@ void main() {
 
       test('stale initialization cannot start after a newer stop', () async {
         final container = ProviderContainer(
-          overrides: [zapretControllerProvider.overrideWith(_FakeZapret.new), 
+          overrides: [
+            zapretControllerProvider.overrideWith(_FakeZapret.new),
             initProvider.overrideWithBuild((_, _) => true),
             commonActionProvider.overrideWith(_RaceCommonAction.new),
             setupActionProvider.overrideWith(_InitializingSetupAction.new),
@@ -1459,7 +1503,8 @@ void main() {
         'keeps suspended startup local until the listener resumes',
         () async {
           final container = ProviderContainer(
-            overrides: [zapretControllerProvider.overrideWith(_FakeZapret.new), 
+            overrides: [
+              zapretControllerProvider.overrideWith(_FakeZapret.new),
               initProvider.overrideWithBuild((_, _) => true),
               suspendProvider.overrideWithValue(true),
               commonActionProvider.overrideWith(_RaceCommonAction.new),
@@ -1488,7 +1533,8 @@ void main() {
         late _AuthorizationSetupAction setupAction;
         late _RestartRecordingCoreAction coreAction;
         final container = ProviderContainer(
-          overrides: [zapretControllerProvider.overrideWith(_FakeZapret.new), 
+          overrides: [
+            zapretControllerProvider.overrideWith(_FakeZapret.new),
             setupActionProvider.overrideWith(() {
               setupAction = _AuthorizationSetupAction([AuthorizeCode.success]);
               return setupAction;
@@ -1525,7 +1571,8 @@ void main() {
         late _AuthorizationSetupAction setupAction;
         late _RestartRecordingCoreAction coreAction;
         final container = ProviderContainer(
-          overrides: [zapretControllerProvider.overrideWith(_FakeZapret.new), 
+          overrides: [
+            zapretControllerProvider.overrideWith(_FakeZapret.new),
             setupActionProvider.overrideWith(() {
               setupAction = _AuthorizationSetupAction([
                 AuthorizeCode.none,
@@ -1565,7 +1612,8 @@ void main() {
         late _AuthorizationSetupAction setupAction;
         late _RestartRecordingCoreAction coreAction;
         final container = ProviderContainer(
-          overrides: [zapretControllerProvider.overrideWith(_FakeZapret.new), 
+          overrides: [
+            zapretControllerProvider.overrideWith(_FakeZapret.new),
             currentProfileProvider.overrideWithValue(null),
             setupActionProvider.overrideWith(() {
               setupAction = _AuthorizationSetupAction([AuthorizeCode.success]);
@@ -1595,7 +1643,8 @@ void main() {
       'a restart whose restore is newly authorized launches the Core again',
       () async {
         final container = ProviderContainer(
-          overrides: [zapretControllerProvider.overrideWith(_FakeZapret.new), 
+          overrides: [
+            zapretControllerProvider.overrideWith(_FakeZapret.new),
             currentProfileProvider.overrideWithValue(null),
             coreActionProvider.overrideWith(_TestCoreAction.new),
             setupActionProvider.overrideWith(
@@ -1638,7 +1687,8 @@ void main() {
       'a relaunch that fails after a new authorization reopens it',
       () async {
         final container = ProviderContainer(
-          overrides: [zapretControllerProvider.overrideWith(_FakeZapret.new), 
+          overrides: [
+            zapretControllerProvider.overrideWith(_FakeZapret.new),
             currentProfileProvider.overrideWithValue(null),
             coreActionProvider.overrideWith(_TestCoreAction.new),
             setupActionProvider.overrideWith(
@@ -1675,7 +1725,8 @@ void main() {
     test('reopens authorization and propagates a failed restart', () async {
       late _AuthorizationSetupAction setupAction;
       final container = ProviderContainer(
-        overrides: [zapretControllerProvider.overrideWith(_FakeZapret.new), 
+        overrides: [
+          zapretControllerProvider.overrideWith(_FakeZapret.new),
           currentProfileProvider.overrideWithValue(null),
           setupActionProvider.overrideWith(() {
             setupAction = _AuthorizationSetupAction([AuthorizeCode.success]);
@@ -1706,7 +1757,8 @@ void main() {
       final pending = Completer<AuthorizeCode>();
       late _AuthorizationSetupAction setupAction;
       final container = ProviderContainer(
-        overrides: [zapretControllerProvider.overrideWith(_FakeZapret.new), 
+        overrides: [
+          zapretControllerProvider.overrideWith(_FakeZapret.new),
           setupActionProvider.overrideWith(() {
             setupAction = _AuthorizationSetupAction([], pending: pending);
             return setupAction;
@@ -1734,7 +1786,8 @@ void main() {
       await AppLocalizations.load(const Locale('en'));
       late _AuthorizationSetupAction setupAction;
       final container = ProviderContainer(
-        overrides: [zapretControllerProvider.overrideWith(_FakeZapret.new), 
+        overrides: [
+          zapretControllerProvider.overrideWith(_FakeZapret.new),
           setupActionProvider.overrideWith(() {
             setupAction = _AuthorizationSetupAction([AuthorizeCode.error]);
             return setupAction;
@@ -1760,6 +1813,10 @@ void main() {
       expect(setupAction.authorizationRequestCount, 1);
     });
   });
+}
+
+class _GateCoreAction extends CoreAction {
+  Future<void> verify() => verifyRunningCore();
 }
 
 class _FakeZapret extends ZapretController {

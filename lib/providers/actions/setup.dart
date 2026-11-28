@@ -1135,119 +1135,119 @@ class SetupAction extends _$SetupAction {
     _appliedHostCandidates = const {};
     final pushRevision = ++_pushes;
     try {
-    if (system.isWindows) {
-      ref.read(proxiesActionProvider.notifier).cancelDelayTests();
-    }
-    globalState.lastConfigMd5 = null;
-    globalState.lastConfigCounts = null;
-    if (system.isAndroid) {
-      await ref.read(vpnOptionsProvider.future);
-      await preferences.saveShareState(ref.read(sharedStateProvider));
-      await preferences.saveAppliedConfigMd5(null);
-    }
-    // Recaptured so _start's catch can roll back after safeRun swallows it.
-    (Object, StackTrace)? handoffFailure;
-    var setupFailed = false;
-    await globalState.loadingRun(
-      () async {
-        ZapretController? zapret;
-        ({int revision, bool restore, bool wasStopping, bool changed})? transition;
-        var protectionYaml = '';
-        var accepted = false;
-        Directory? stagedBase;
-        try {
-          if (system.isWindows && !ref.read(safeModeProvider)) {
-            protectionYaml = await _zapretEffectiveYaml(realProfile);
-            final controller = ref.read(zapretControllerProvider.notifier);
-            zapret = controller;
-            transition = await controller.beginProfileApply(protectionYaml, profile?.id);
-          }
-          if (setupParams.base == null) {
-            if (system.isWindows) {
-              // Send the complete overlay through the native parse-then-write
-              // path. The empty base adds no routes, proxies or resources.
-              stagedBase = await Directory(await appPath.homeDirPath)
-                  .createTemp('profile-apply-');
-              final empty = File(join(stagedBase.path, 'base.yaml'));
-              await empty.writeAsString('{}', flush: true);
-              setupParams = setupParams.copyWith(base: SetupBase(
-                path: empty.path, overlay: yamlString.isEmpty ? '{}' : yamlString,
-              ));
-            } else {
-              final configFilePath = await appPath.configFilePath;
-              await File(configFilePath).writeAsStringAtomically(yamlString);
-            }
-          }
-          final profileId = profile?.id;
-          if (profileId != null) {
-            await appPath.ensureProviderDirs(profileId);
-          }
-          final String message;
+      if (system.isWindows) {
+        ref.read(proxiesActionProvider.notifier).cancelDelayTests();
+      }
+      globalState.lastConfigMd5 = null;
+      globalState.lastConfigCounts = null;
+      if (system.isAndroid) {
+        await ref.read(vpnOptionsProvider.future);
+        await preferences.saveShareState(ref.read(sharedStateProvider));
+        await preferences.saveAppliedConfigMd5(null);
+      }
+      // Recaptured so _start's catch can roll back after safeRun swallows it.
+      (Object, StackTrace)? handoffFailure;
+      var setupFailed = false;
+      await globalState.loadingRun(
+        () async {
+          ZapretController? zapret;
+          ({int revision, bool restore, bool wasStopping, bool changed})? transition;
+          var protectionYaml = '';
+          var accepted = false;
+          Directory? stagedBase;
           try {
-            message = await _core.setupConfig(
-              params: setupParams,
-              preloadInvoke: preloadInvoke,
-            );
-          } finally {
-            _pushes++;
-          }
-          if (message.isNotEmpty) {
-            globalState.lastConfigCounts = configCountsOf(const {});
-            await globalState.safeRun(() => onUpdated?.call());
-            throw MessageException(message);
-          }
-          accepted = !profileFailed;
-          if (accepted) _appliedHostCandidates = hostCandidates;
-        } catch (e, s) {
-          setupFailed = true;
-          if (preloadInvoke != null) {
-            handoffFailure = (e, s);
-          }
-          rethrow;
-        } finally {
-          if (stagedBase != null) {
-            try { await stagedBase.delete(recursive: true); } on FileSystemException {}
-          }
-          if (zapret != null && transition != null) {
+            if (system.isWindows && !ref.read(safeModeProvider)) {
+              protectionYaml = await _zapretEffectiveYaml(realProfile);
+              final controller = ref.read(zapretControllerProvider.notifier);
+              zapret = controller;
+              transition = await controller.beginProfileApply(protectionYaml, profile?.id);
+            }
+            if (setupParams.base == null) {
+              if (system.isWindows) {
+                // Send the complete overlay through the native parse-then-write
+                // path. The empty base adds no routes, proxies or resources.
+                stagedBase = await Directory(await appPath.homeDirPath)
+                    .createTemp('profile-apply-');
+                final empty = File(join(stagedBase.path, 'base.yaml'));
+                await empty.writeAsString('{}', flush: true);
+                setupParams = setupParams.copyWith(base: SetupBase(
+                  path: empty.path, overlay: yamlString.isEmpty ? '{}' : yamlString,
+                ));
+              } else {
+                final configFilePath = await appPath.configFilePath;
+                await File(configFilePath).writeAsStringAtomically(yamlString);
+              }
+            }
+            final profileId = profile?.id;
+            if (profileId != null) {
+              await appPath.ensureProviderDirs(profileId);
+            }
+            final String message;
             try {
-              await zapret.finishProfileApply(transition,
-                yaml: protectionYaml, profileId: profile?.id, accepted: accepted);
-            } catch (error) {
-              // Core apply has already completed. Surface the Zapret error
-              // without rolling back or misreporting the Mihomo config.
-              commonPrint.log('Zapret infrastructure reconciliation failed: $error',
-                logLevel: LogLevel.warning);
+              message = await _core.setupConfig(
+                params: setupParams,
+                preloadInvoke: preloadInvoke,
+              );
+            } finally {
+              _pushes++;
+            }
+            if (message.isNotEmpty) {
+              globalState.lastConfigCounts = configCountsOf(const {});
+              await globalState.safeRun(() => onUpdated?.call());
+              throw MessageException(message);
+            }
+            accepted = !profileFailed;
+            if (accepted) _appliedHostCandidates = hostCandidates;
+          } catch (e, s) {
+            setupFailed = true;
+            if (preloadInvoke != null) {
+              handoffFailure = (e, s);
+            }
+            rethrow;
+          } finally {
+            if (stagedBase != null) {
+              try { await stagedBase.delete(recursive: true); } on FileSystemException {}
+            }
+            if (zapret != null && transition != null) {
+              try {
+                await zapret.finishProfileApply(transition,
+                  yaml: protectionYaml, profileId: profile?.id, accepted: accepted);
+              } catch (error) {
+                // Core apply has already completed. Surface the Zapret error
+                // without rolling back or misreporting the Mihomo config.
+                commonPrint.log('Zapret infrastructure reconciliation failed: $error',
+                  logLevel: LogLevel.warning);
+              }
             }
           }
-        }
-        globalState.lastConfigMd5 = yamlMd5;
-        globalState.lastConfigCounts =
-            realProfile?.counts ?? configCountsOf(const {});
-        _appliedInputs = inputs;
-        if (system.isAndroid) {
-          await preferences.saveAppliedConfigMd5(yamlMd5);
-        }
-        if (profile?.id == ref.read(currentProfileIdProvider)) {
-          await ref
-              .read(proxiesActionProvider.notifier)
-              .resendPicksSince(setupParams.selectedMap);
-        }
-        await onUpdated?.call();
-        if (system.isWindows && accepted) {
-          unawaited(ref.read(resourcesActionProvider.notifier).profileApplied(profile?.id));
-        }
-      },
-      silence: true,
-      tag: !silence ? LoadingTag.proxies : null,
-    );
-    _lastPushDuration = pushWatch.elapsed;
-    if (handoffFailure != null) {
-      Error.throwWithStackTrace(handoffFailure!.$1, handoffFailure!.$2);
-    }
-    if (setupFailed || profileFailed) {
-      return _SetupTaskResult.failed;
-    }
-    return _SetupTaskResult.completed;
+          globalState.lastConfigMd5 = yamlMd5;
+          globalState.lastConfigCounts =
+              realProfile?.counts ?? configCountsOf(const {});
+          _appliedInputs = inputs;
+          if (system.isAndroid) {
+            await preferences.saveAppliedConfigMd5(yamlMd5);
+          }
+          if (profile?.id == ref.read(currentProfileIdProvider)) {
+            await ref
+                .read(proxiesActionProvider.notifier)
+                .resendPicksSince(setupParams.selectedMap);
+          }
+          await onUpdated?.call();
+          if (system.isWindows && accepted) {
+            unawaited(ref.read(resourcesActionProvider.notifier).profileApplied(profile?.id));
+          }
+        },
+        silence: true,
+        tag: !silence ? LoadingTag.proxies : null,
+      );
+      _lastPushDuration = pushWatch.elapsed;
+      if (handoffFailure != null) {
+        Error.throwWithStackTrace(handoffFailure!.$1, handoffFailure!.$2);
+      }
+      if (setupFailed || profileFailed) {
+        return _SetupTaskResult.failed;
+      }
+      return _SetupTaskResult.completed;
     } finally {
       // Staging, preference or Zapret preparation can fail before the
       // native setupConfig RPC. Always release the in-flight revision.
