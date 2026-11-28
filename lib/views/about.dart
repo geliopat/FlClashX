@@ -60,6 +60,15 @@ final coreVersionProvider = FutureProvider.autoDispose<String?>((ref) async {
   return version.isEmpty ? null : version;
 });
 
+final runningCoreIdentityProvider = FutureProvider.autoDispose<Map<String, dynamic>?>((ref) async {
+  if (ref.watch(coreStatusProvider) != CoreStatus.connected) return null;
+  try {
+    return await ref.read(coreHandlerProvider).getCoreIdentity();
+  } catch (_) {
+    return null;
+  }
+});
+
 class AboutView extends ConsumerWidget {
   const AboutView({super.key});
 
@@ -212,6 +221,7 @@ class _AboutHero extends ConsumerWidget {
     final colorScheme = context.colorScheme;
     final appLocalizations = context.appLocalizations;
     final coreVersion = ref.watch(coreVersionProvider).value;
+    final coreIdentity = ref.watch(runningCoreIdentityProvider).value;
     final raised = context.raisedSurfaceLevel.colorOf(colorScheme);
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
@@ -256,6 +266,15 @@ class _AboutHero extends ConsumerWidget {
                   url: 'https://github.com/$_coreRepository',
                   color: colorScheme.secondaryContainer,
                   foregroundColor: colorScheme.onSecondaryContainer,
+                ),
+              if (coreIdentity != null)
+                _Pill(
+                  label: (coreIdentity['version'] as String? ?? '').isNotEmpty
+                      ? 'FlClashZ Core ${coreIdentity['version']}'
+                      : 'FlClashZ Core · ${Localizations.localeOf(context).languageCode == 'ru' ? 'встроенное' : 'bundled'}',
+                  url: 'https://github.com/geliopat/Clash.Meta/releases',
+                  color: raised,
+                  foregroundColor: colorScheme.onSurfaceVariant,
                 ),
               _Pill(
                 label: 'GPL-3.0',
