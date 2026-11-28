@@ -157,6 +157,30 @@ void main() {
     expect(exitCount, 1);
   });
 
+  test('a hung preliminary cleanup cannot consume the core close budget', () async {
+    final cleanup = Completer<void>();
+    final window = Completer<void>();
+    final calls = <String>[];
+    final coordinator = SystemExitCoordinator(
+      watchdogDuration: const Duration(hours: 1),
+      cleanupTimeout: const Duration(milliseconds: 10),
+      windowCloseTimeout: const Duration(milliseconds: 10),
+      closeWindow: () {
+        calls.add('window');
+        return window.future;
+      },
+      closeCore: () async { calls.add('core'); },
+      exitApplication: () async { calls.add('exit'); },
+    );
+    await expectLater(
+      coordinator.exit(cleanup: () => cleanup.future),
+      throwsA(isA<TimeoutException>()),
+    );
+    expect(calls, ['window', 'core', 'exit']);
+    cleanup.complete();
+    window.complete();
+  });
+
   test('cleanup failure does not skip window or Core shutdown', () async {
     final calls = <String>[];
     final coordinator = SystemExitCoordinator(

@@ -4,6 +4,8 @@ typedef ExitStep = Future<void> Function();
 
 final class SystemExitCoordinator {
   final Duration watchdogDuration;
+  final Duration? cleanupTimeout;
+  final Duration? windowCloseTimeout;
   final ExitStep closeWindow;
   final ExitStep closeCore;
   final ExitStep exitApplication;
@@ -13,6 +15,8 @@ final class SystemExitCoordinator {
 
   SystemExitCoordinator({
     required this.watchdogDuration,
+    this.cleanupTimeout,
+    this.windowCloseTimeout,
     required this.closeWindow,
     required this.closeCore,
     required this.exitApplication,
@@ -32,9 +36,10 @@ final class SystemExitCoordinator {
     Object? firstError;
     StackTrace? firstStackTrace;
 
-    Future<void> runStep(ExitStep step) async {
+    Future<void> runStep(ExitStep step, {Duration? timeout}) async {
       try {
-        await step();
+        final operation = step();
+        await (timeout == null ? operation : operation.timeout(timeout));
       } catch (error, stackTrace) {
         firstError ??= error;
         firstStackTrace ??= stackTrace;
@@ -45,8 +50,9 @@ final class SystemExitCoordinator {
       unawaited(_exitApplicationOnce().catchError((_) {}));
     });
     try {
-      await runStep(cleanup);
-      await runStep(closeWindow);
+      // Reserve time for the core close even when a preliminary step hangs.
+      await runStep(cleanup, timeout: cleanupTimeout);
+      await runStep(closeWindow, timeout: windowCloseTimeout);
       await runStep(closeCore);
     } finally {
       watchdog.cancel();

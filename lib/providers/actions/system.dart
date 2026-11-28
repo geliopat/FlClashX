@@ -26,6 +26,8 @@ class SystemAction extends _$SystemAction {
   Future<void> handleExit([bool needSave = true]) {
     final coordinator = _exitCoordinator ??= SystemExitCoordinator(
       watchdogDuration: exitWatchdogDuration,
+      cleanupTimeout: system.isWindows ? const Duration(seconds: 20) : null,
+      windowCloseTimeout: system.isWindows ? const Duration(seconds: 3) : null,
       closeWindow: closeWindow,
       closeCore: closeCore,
       exitApplication: exitApplication,
@@ -58,39 +60,58 @@ class SystemAction extends _$SystemAction {
   @protected
   Future<void> cleanupExitResources(bool needSave) async {
     ref.read(setupActionProvider.notifier).quiesceForExit();
-    if (system.isWindows) {
-      try {
-        await ref.read(zapretControllerProvider.notifier).stopAlongsideMihomo();
-      } catch (error) {
-        commonPrint.log('Zapret exit stop failed: $error', logLevel: LogLevel.warning);
-      }
-    }
-    if (system.isWindows && ref.read(coreStatusProvider) == CoreStatus.connected) {
-      await ref.read(commonActionProvider.notifier).updateTraffic();
-    }
-    final saveOperation = needSave ? _savePreferencesSafely() : null;
+
+    // Release OS settings immediately, even if the core or Helper is hung.
+    // The proxy queue closes synchronously to further starts before its
+    // pending OS calls finish.
+    final network = Future.wait<void>([
+      if (systemDnsCoordinator != null) systemDnsCoordinator!.shutdown(),
+      ?systemProxyQueue?.close(),
+    ]);
+    final save = needSave ? _savePreferencesSafely() : null;
     final tray = trayPort;
-    if (tray != null) {
-      await tray.shutdown().onError<Object>((error, stackTrace) {
-        commonPrint.log(
-          'Tray shutdown failed: ${compactError(error)}',
-          logLevel: LogLevel.error,
-        );
-      });
-    }
-    await Future.wait([
-      ?saveOperation,
+
+    await Future.wait<void>([
+      network.then<void>((_) {}),
+      _cleanupStep('Zapret', () async {
+        if (system.isWindows) {
+          await ref.read(zapretControllerProvider.notifier).stopAlongsideMihomo();
+        }
+      }),
+      _cleanupStep('Traffic history', () async {
+        if (!system.isWindows) return;
+        final history = ref.read(trafficHistoryProvider);
+        if (ref.read(coreStatusProvider) == CoreStatus.connected) {
+          try {
+            await ref.read(commonActionProvider.notifier).updateTraffic()
+                .timeout(const Duration(seconds: 3));
+          } on TimeoutException {
+            commonPrint.log('Final traffic sample timed out', logLevel: LogLevel.warning);
+          }
+        }
+        await history.flush();
+      }),
+      if (tray != null) _cleanupStep('Tray', tray.shutdown),
+      ?save,
       drainDatabaseWrites(),
-      if (system.isWindows) ref.read(trafficHistoryProvider).flush(),
       fileLogger.dispose(),
       if (system.isWindows) appFileLogger.flush(),
       if (system.isWindows) zapretFileLogger.flush(),
       if (system.isWindows) crashFileLogger.flush(),
       if (system.isWindows) recoveryJournal.flush(),
-      bootGuard.markClosed(),
-      if (systemDnsCoordinator != null) systemDnsCoordinator!.shutdown(),
-      ?systemProxyQueue?.close(),
     ]);
+    await bootGuard.markClosed();
+  }
+
+  Future<void> _cleanupStep(String name, Future<void> Function() step) async {
+    try {
+      await step();
+    } catch (error) {
+      commonPrint.log(
+        '$name exit cleanup failed: ${compactError(error)}',
+        logLevel: LogLevel.warning,
+      );
+    }
   }
 
   Future<void> _savePreferencesSafely() async {
