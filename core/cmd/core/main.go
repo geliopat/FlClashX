@@ -21,6 +21,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "Arguments error")
 		os.Exit(1)
 	}
+	core.SetBuildIdentity(releaseVersion, engineRevision, hostRevision)
 	go core.ExitOnTermination()
 	core.StartServer(args[1])
 }
