@@ -586,3 +586,22 @@ func TestStopRouteWatchOutranksEarlierWatches(t *testing.T) {
 		t.Error("a watch issued after the stop was ignored")
 	}
 }
+
+type cyclicExitProxy struct {
+	constant.Proxy
+	name string
+	next constant.Proxy
+}
+
+func (p *cyclicExitProxy) Name() string { return p.name }
+func (p *cyclicExitProxy) Type() constant.AdapterType { return constant.Selector }
+func (p *cyclicExitProxy) Unwrap(*constant.Metadata, bool) constant.Proxy { return p.next }
+
+func TestRoutePredictionRejectsCyclicUnwrap(t *testing.T) {
+	a := &cyclicExitProxy{name: "A"}
+	b := &cyclicExitProxy{name: "B", next: a}
+	a.next = b
+	if got := exitThrough(a, nil); got != "" {
+		t.Fatalf("cyclic route predicted %q", got)
+	}
+}

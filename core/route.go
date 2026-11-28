@@ -261,7 +261,14 @@ func exitThrough(proxy constant.Proxy, metadata *constant.Metadata) string {
 type exitNames map[string]string
 
 func (names exitNames) through(proxy constant.Proxy, metadata *constant.Metadata) string {
+	// Route prediction must terminate even if a provider introduces a
+	// cyclic group graph. Do not affect the native routing selection.
+	seen := make(map[string]struct{})
 	for proxy != nil {
+		if _, exists := seen[proxy.Name()]; exists {
+			return ""
+		}
+		seen[proxy.Name()] = struct{}{}
 		if proxy.Type() == constant.LoadBalance {
 			return names.of(proxy)
 		}

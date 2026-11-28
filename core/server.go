@@ -204,7 +204,9 @@ func serve(dialed ipcConn) {
 
 		call := &MethodCall{}
 		if err := json.Unmarshal(data, call); err != nil {
-			logError("server unmarshal error: %v (data: %q)", err, data)
+			// Invalid requests may contain credentials, subscription data or
+			// entire profiles. Never copy their payload into the log.
+			logError("server unmarshal error: %v (frame length: %d)", err, len(data))
 			continue
 		}
 

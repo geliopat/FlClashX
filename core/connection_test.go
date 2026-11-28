@@ -1,7 +1,9 @@
 package core
 
 import (
+	"errors"
 	"io"
+	"os"
 	"net"
 	"testing"
 	"time"
@@ -140,5 +142,23 @@ func TestAConnectionArrivingAfterTheStopIsTurnedAway(t *testing.T) {
 	}
 	if _, err := local.Write([]byte("x")); err == nil {
 		t.Error("a connection turned away after the stop is still open")
+	}
+}
+
+func TestStopNetworkClosesUntrackedInboundAndActiveTrackers(t *testing.T) {
+	isRunning.Store(true)
+	local, remote := net.Pipe()
+	t.Cleanup(func() { _ = remote.Close() })
+	early := &ownedInboundConn{Conn: local}
+	openInbound.Store(early, struct{}{})
+	t.Cleanup(func() { openInbound.Delete(early); _ = local.Close() })
+	tracker := newPipeTracker(t)
+	handleStopListener()
+	if statistic.DefaultManager.Get(tracker.ID()) != nil {
+		t.Fatal("active tracker survived network stop")
+	}
+	_ = local.SetWriteDeadline(time.Now().Add(time.Second))
+	if _, err := local.Write([]byte("closed")); err == nil || errors.Is(err, os.ErrDeadlineExceeded) {
+		t.Fatal("untracked inbound survived network stop")
 	}
 }

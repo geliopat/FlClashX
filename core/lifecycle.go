@@ -68,13 +68,17 @@ func handleStopListener() bool {
 	defer configMu.Unlock()
 	stopAllChainHealth()
 	isRunning.Store(false)
+	stopNetworkLocked()
+	return true
+}
+
+// configMu is held. Both Stop and Shutdown must release early inbound
+// connections and active trackers before returning.
+func stopNetworkLocked() {
 	stopListeners()
-	// A closed listener only turns new connections away; those it already
-	// accepted would keep going through the proxy.
 	handleCloseConnections()
 	closeOpenInbound()
 	resolver.ResetConnection()
-	return true
 }
 
 func updateListeners(cfg *config.Config) {
@@ -150,16 +154,18 @@ func handleShutdown() bool {
 	handleStopLog()
 	stopRouteWatch()
 
-	configMu.Lock()
-	stopAllChainHealth()
-	isRunning.Store(false)
-	stopListeners()
-	stopGeoUpdater()
-	stopDelayWatch()
-	executor.Shutdown()
-	currentConfig = nil
-	isInit.Store(false)
-	configMu.Unlock()
+	func() {
+		configMu.Lock()
+		defer configMu.Unlock()
+		stopAllChainHealth()
+		isRunning.Store(false)
+		stopNetworkLocked()
+		stopGeoUpdater()
+		stopDelayWatch()
+		executor.Shutdown()
+		currentConfig = nil
+		isInit.Store(false)
+	}()
 
 	handleForceGC()
 	return true
