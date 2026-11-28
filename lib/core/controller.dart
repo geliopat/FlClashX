@@ -402,6 +402,47 @@ class CoreController {
     return _interface.getCoreVersion();
   }
 
+  /// Feature discovery must use the running process, not the installed
+  /// manifest or the upstream Mihomo version. Old signed hosts lack this RPC.
+  Future<Set<String>> getCoreCapabilities() async {
+    try {
+      final data = await _interface.invokeMethod<List<dynamic>>(
+        method: CoreMethod.getCoreCapabilities,
+      );
+      return data?.whereType<String>().toSet() ?? const {};
+    } on CoreMethodException catch (error) {
+      if (error.code == 'not_implemented') return const {};
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> getEngineDiagnostics() async {
+    final result = await _interface.invokeMethod<Map<String, dynamic>>(
+      method: CoreMethod.getEngineDiagnostics,
+    );
+    if (result == null) {
+      throw const CoreMethodException(code: 'no_response', message: 'No engine diagnostics response');
+    }
+    return result;
+  }
+
+  Future<void> setEngineDiagnostics({
+    required int closedFlowCapacity,
+    required bool chainDiagnostics,
+  }) async {
+    final result = await _interface.invokeMethod<Map<String, dynamic>>(
+      method: CoreMethod.setEngineDiagnostics,
+      arguments: {
+        'closedFlowCapacity': closedFlowCapacity,
+        'chainDiagnostics': chainDiagnostics,
+      },
+    );
+    if (result == null || result['closedFlowCapacity'] != closedFlowCapacity ||
+        result['chainDiagnostics'] != chainDiagnostics) {
+      throw const CoreMethodException(code: 'invalid_response', message: 'Diagnostics settings not applied');
+    }
+  }
+
   Future<bool> shutdown() => _interface.shutdown();
 
   Future<void> resetTraffic() async {
