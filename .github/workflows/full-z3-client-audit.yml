@@ -34,16 +34,12 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Client differs from audited host' }
           if ((git rev-parse HEAD:core/third_party/mihomo).Trim() -cne $env:ENGINE_SHA) { throw 'Gitlink mismatch' }
           if ((git -C core/third_party/mihomo rev-parse HEAD).Trim() -cne $env:ENGINE_SHA) { throw 'Engine mismatch' }
-      - uses: actions/checkout@v5
-        with:
-          ref: ${{ env.HOST_SHA }}
-          path: audited-host
-          persist-credentials: false
-          submodules: true
+      # The root checkout's core and build_config.yaml were verified above.
+      # Avoid nesting a second Flutter project in the analysis/test root.
       - uses: actions/setup-go@v6
         with:
           go-version: '1.27.1'
-          cache-dependency-path: audited-host/core/go.sum
+          cache-dependency-path: core/go.sum
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
@@ -51,7 +47,7 @@ jobs:
           cache: true
       - uses: dtolnay/rust-toolchain@stable
       - name: Build exact reviewed candidate
-        working-directory: audited-host/core
+        working-directory: core
         shell: pwsh
         run: |
           $dir = Join-Path $env:RUNNER_TEMP 'z3-candidate'
@@ -93,6 +89,7 @@ jobs:
         run: |
           & .github/scripts/test-signed-core-system.ps1
       - name: Install Flutter dependencies
+        id: pub_get
         run: flutter pub get
       - name: Full Flutter test suite
         shell: pwsh
@@ -100,6 +97,7 @@ jobs:
           flutter test "--dart-define=FLCLASHZ_UPDATE_PUBLIC_KEY=$env:FLCLASHZ_UPDATE_PUBLIC_KEY"
           if ($LASTEXITCODE -ne 0) { throw 'Flutter tests failed' }
       - name: Analyze all Dart sources
+        if: always() && steps.pub_get.outcome == 'success'
         run: flutter analyze --no-fatal-infos
       - name: Prepare audited unsigned binary only
         shell: pwsh

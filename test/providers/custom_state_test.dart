@@ -908,7 +908,7 @@ void main() {
           for (final match in RegExp(
             r'^type (\w+) struct \{\n([\s\S]*?)\n\}',
             multiLine: true,
-          ).allMatches(file.readAsStringSync()))
+          ).allMatches(file.readAsStringSync().replaceAll('\r\n', '\n')))
             match.group(1)!: match.group(2)!,
     };
     final keyPattern = RegExp(r'proxy:"([^",]+)(,omitempty)?"');
@@ -921,7 +921,7 @@ void main() {
       for (final match in RegExp(
         r'^\tcase "([^"]+)":\n\t\t\w+ := &outbound\.(\w+)\{',
         multiLine: true,
-      ).allMatches(File('$root/parser.go').readAsStringSync()))
+      ).allMatches(File('$root/parser.go').readAsStringSync().replaceAll('\r\n', '\n')))
         match.group(1)!: [
           structs[match.group(2)]!,
           for (final embedded in embeddedPattern.allMatches(

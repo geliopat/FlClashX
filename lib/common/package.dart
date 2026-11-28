@@ -13,7 +13,7 @@ extension PackageInfoExtension on PackageInfo {
   /// contains `android` for panel rules matching a substring.
   String uaWith(String coreVersion, {bool tv = false}) => [
     '$userAgentAppName/v$displayVersion',
-    if (coreVersion.isNotEmpty) 'core/v$coreVersion',
+    if (coreVersion.isNotEmpty) 'core/${coreVersion.startsWith('v') ? coreVersion : 'v$coreVersion'}',
     'Platform/${tv ? 'androidtv' : Platform.operatingSystem}',
   ].join(' ');
 }

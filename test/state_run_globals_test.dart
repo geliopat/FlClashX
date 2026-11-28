@@ -47,7 +47,7 @@ void main() {
 
       expect(
         globalState.ua,
-        'FlClashX/v1.2.3 Platform/${Platform.operatingSystem}',
+        'FlClashZ/v1.2.3 Platform/${Platform.operatingSystem}',
       );
     });
 
@@ -57,14 +57,25 @@ void main() {
 
       expect(
         globalState.ua,
-        'FlClashX/v1.2.3 core/v1.19.32 Platform/${Platform.operatingSystem}',
+        'FlClashZ/v1.2.3 core/v1.19.32 Platform/${Platform.operatingSystem}',
+      );
+    });
+
+    test('the build version and native version use a single v prefix', () {
+      expect(
+        _packageInfo.uaWith('1.19.34'),
+        'FlClashZ/v1.2.3 core/v1.19.34 Platform/${Platform.operatingSystem}',
+      );
+      expect(
+        _packageInfo.uaWith('v1.19.34'),
+        _packageInfo.uaWith('1.19.34'),
       );
     });
 
     test('an Android TV names itself androidtv', () {
       expect(
         _packageInfo.uaWith('v1.19.32', tv: true),
-        'FlClashX/v1.2.3 core/v1.19.32 Platform/androidtv',
+        'FlClashZ/v1.2.3 core/v1.19.32 Platform/androidtv',
       );
     });
   });

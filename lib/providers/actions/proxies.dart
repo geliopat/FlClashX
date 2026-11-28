@@ -91,14 +91,16 @@ class ProxiesAction extends _$ProxiesAction {
     ref.onDispose(() {
       _delayFlushTimer?.cancel();
       _autoDelayTimer?.cancel();
+      for (final job in _delayTestJobs) {
+        job.cancelled = true;
+        job.held.clear();
+      }
     });
     if (system.isWindows) {
-      _autoDelayTimer = Timer.periodic(const Duration(seconds: 5), (_) => unawaited(_autoDelayTick()));
-      ref.listen(autoDelayProvider, (_, _) => unawaited(_autoDelayTick()));
+      ref.listen(autoDelayProvider, (_, _) => _syncAutoDelayTimer());
+      ref.listen(safeModeProvider, (_, _) => _syncAutoDelayTimer());
       ref.listen(selectedMapProvider, (_, _) => unawaited(_autoDelayTick()));
-      ref.listen(initProvider, (_, initialized) {
-        if (initialized) unawaited(_autoDelayTick());
-      });
+      ref.listen(initProvider, (_, _) => _syncAutoDelayTimer());
       ref.listen(groupsProvider, (_, _) => unawaited(_autoDelayTick()));
       ref.listen(currentProfileIdProvider, (_, _) {
         cancelDelayTests();
@@ -113,10 +115,31 @@ class ProxiesAction extends _$ProxiesAction {
     ref.listen(coreStatusProvider, (_, next) {
       if (next != CoreStatus.connected) {
         cancelDelayTests();
-      } else if (system.isWindows) {
-        unawaited(_autoDelayTick());
       }
+      if (system.isWindows) _syncAutoDelayTimer();
     });
+    if (system.isWindows) _syncAutoDelayTimer();
+  }
+
+  // A dormant or disconnected core does not need an application-lifetime
+  // polling timer. Re-arm and probe immediately when it becomes usable.
+  void _syncAutoDelayTimer() {
+    if (!ref.mounted) return;
+    final intervals = ref.read(autoDelayProvider);
+    final enabled = ref.read(initProvider) &&
+        ref.read(coreStatusProvider) == CoreStatus.connected &&
+        !ref.read(safeModeProvider) &&
+        (intervals.active > 0 || intervals.others > 0);
+    if (!enabled) {
+      _autoDelayTimer?.cancel();
+      _autoDelayTimer = null;
+      return;
+    }
+    _autoDelayTimer ??= Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => unawaited(_autoDelayTick()),
+    );
+    unawaited(_autoDelayTick());
   }
 
   void cancelDelayTests() {
@@ -787,15 +810,19 @@ class ProxiesAction extends _$ProxiesAction {
       );
     } finally {
       _delayTestJobs.remove(job);
-      _flushDelayResults();
-      final abandoned = job.held.toList();
-      job.held.clear();
-      pending.apply(
-        finished: abandoned.where(job.startedOnDispatch.contains),
-        released: abandoned.where(
-          (key) => !job.startedOnDispatch.contains(key),
-        ),
-      );
+      if (ref.mounted) {
+        _flushDelayResults();
+        final abandoned = job.held.toList();
+        job.held.clear();
+        pending.apply(
+          finished: abandoned.where(job.startedOnDispatch.contains),
+          released: abandoned.where(
+            (key) => !job.startedOnDispatch.contains(key),
+          ),
+        );
+      } else {
+        job.held.clear();
+      }
     }
   }
 
@@ -814,7 +841,7 @@ class ProxiesAction extends _$ProxiesAction {
         target.proxyName,
         job.timeout,
       );
-      if (delay != null && !job.cancelled) {
+      if (delay != null && !job.cancelled && ref.mounted) {
         // Native Mihomo events update the UI, but must not postpone our timer.
         _lastDelayTest[target.key] = DateTime.now();
         setDelay(delay);
@@ -839,7 +866,7 @@ class ProxiesAction extends _$ProxiesAction {
       );
     } finally {
       final finished = target.displayKeys.where(job.held.remove).toList();
-      if (finished.isNotEmpty) {
+      if (finished.isNotEmpty && ref.mounted) {
         _bufferedFinishes.addAll(finished);
         _scheduleDelayFlush();
       }
