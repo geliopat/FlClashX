@@ -255,6 +255,21 @@ class CoreAction extends _$CoreAction {
       final actual = await _core.getCoreVersion();
       String normalized(String version) => version.startsWith('v') ? version : 'v$version';
       if (expected.isNotEmpty && normalized(actual) != normalized(expected)) return false;
+      // A signed release from an older adapter can carry the same Mihomo
+      // version. Validate the actual process during the trial, not just its
+      // version or the persisted selection. Rollback is allowed to restore
+      // the pre-trial process even when its capabilities were older.
+      if (manifest != null && selected?.hash == manifest.hash) {
+        final identity = await _core.getCoreIdentity();
+        if (identity?['version'] != manifest.version.value ||
+            identity?['engineRevision'] != manifest.engineRevision ||
+            identity?['hostRevision'] != manifest.hostRevision) return false;
+        final capabilities = await _core.getCoreCapabilities();
+        if (!capabilities.containsAll(const {
+          'core-identity-v1', 'closed-flow-history-v1',
+          'chain-diagnostics-v1', 'dns-stages-v1',
+        })) return false;
+      }
       // Detect immediate crashes after successful configuration/listener setup.
       await Future<void>.delayed(const Duration(seconds: 2));
       return !_coreReleaseCrashed &&
