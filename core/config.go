@@ -53,7 +53,7 @@ func (params *SetupParams) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-var setupConfig = applyConfig
+var setupConfig = applyInitializedConfig
 
 func handleSetupConfig(params *SetupParams) error {
 	if !isInit.Load() {
@@ -220,9 +220,21 @@ func (s profileProbeSettings) restore() {
 }
 
 func applyConfig(params *SetupParams) error {
+	return applyConfigWithInitialization(params, false)
+}
+
+// IPC must not apply a profile after a concurrent Shutdown has won the lock.
+func applyInitializedConfig(params *SetupParams) error {
+	return applyConfigWithInitialization(params, true)
+}
+
+func applyConfigWithInitialization(params *SetupParams, requireInit bool) error {
 	runtime.GC()
 	configMu.Lock()
 	defer configMu.Unlock()
+	if requireInit && !isInit.Load() {
+		return errNotInitialized
+	}
 
 	previous := applyProfileProbeSettings(params)
 	cfg, err := loadSetupConfig(params)

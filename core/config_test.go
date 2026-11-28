@@ -1191,3 +1191,12 @@ func TestDialerLoopsOfRetainsCycleReachabilityForEachProxy(t *testing.T) {
 		t.Fatalf("loops = %v, want a and b", got)
 	}
 }
+
+func TestApplyInitializedConfigRejectsAfterShutdown(t *testing.T) {
+	previous := isInit.Load()
+	isInit.Store(false)
+	t.Cleanup(func() { isInit.Store(previous) })
+	if err := applyInitializedConfig(defaultSetupParams()); !errors.Is(err, errNotInitialized) {
+		t.Fatalf("apply after shutdown = %v", err)
+	}
+}
