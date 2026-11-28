@@ -13,6 +13,7 @@ type DnsQuery struct {
 	Initiator string    `json:"initiator"`
 	Upstream  string    `json:"upstream,omitempty"`
 	Cached    bool      `json:"cached,omitempty"`
+	Stages    []string  `json:"stages,omitempty"`
 	Answers   []string  `json:"answers"`
 	Rcode     string    `json:"rcode,omitempty"`
 	Error     string    `json:"error,omitempty"`
@@ -27,6 +28,7 @@ func newDnsQuery(record dnsQueryRecord) DnsQuery {
 		Initiator: record.Initiator,
 		Upstream:  record.Upstream,
 		Cached:    record.Cached,
+		Stages:    append([]string(nil), record.Stages...),
 		Answers:   []string{},
 		Delay:     time.Since(record.Start).Milliseconds(),
 		Time:      record.Start,
