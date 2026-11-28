@@ -4,12 +4,10 @@ on:
     branches: [work/v1.1.5-ui-config]
     paths:
       - '.github/workflows/validate-independent-core-client.yml'
-      - 'lib/features/update/core_release*'
-      - 'lib/views/core_release_section.dart'
-      - 'lib/views/dns_queries.dart'
-      - 'lib/models/clash_config.dart'
-      - 'lib/providers/actions/profile_settings.dart'
-      - 'lib/core/desktop/core_release_selection.dart'
+      - 'lib/**'
+      - 'test/**'
+      - 'plugins/setup/**'
+      - 'setup.dart'
       - 'services/helper/src/service/core_release.rs'
       - 'core/third_party/mihomo'
       - 'core/**'
@@ -106,7 +104,40 @@ jobs:
       - name: Verify actual release, rollback and UI
         shell: pwsh
         run: |
-          flutter test "--dart-define=FLCLASHZ_UPDATE_PUBLIC_KEY=$env:FLCLASHZ_UPDATE_PUBLIC_KEY" test/features/update/core_release_manifest_test.dart test/core/desktop/core_release_selection_test.dart test/core/desktop/helper_client_test.dart test/views/about_test.dart test/setup_test.dart test/views/dns_queries_view_test.dart test/models/profile_settings_test.dart test/models/config_test.dart
+          flutter test "--dart-define=FLCLASHZ_UPDATE_PUBLIC_KEY=$env:FLCLASHZ_UPDATE_PUBLIC_KEY" test/features/update/core_release_manifest_test.dart test/core/desktop/core_release_selection_test.dart test/core/desktop/helper_client_test.dart test/views/about_test.dart test/setup_test.dart test/views/dns_queries_view_test.dart test/models/profile_settings_test.dart test/models/config_test.dart test/core/protocol_contract_test.dart
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Analyze Dart sources
         run: flutter analyze --no-fatal-infos
+
+  native-chain-api:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    env:
+      CGO_ENABLED: '0'
+      GOWORK: 'off'
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          submodules: false
+      - uses: actions/checkout@v5
+        with:
+          repository: geliopat/Clash.Meta
+          ref: '54e4b78179073dcbffccca4ce9a1caa6866e518d'
+          path: core/third_party/mihomo
+          persist-credentials: false
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.27.1'
+          cache-dependency-path: core/go.sum
+      - name: Confirm additive source is present and test host against it
+        working-directory: core
+        shell: pwsh
+        run: |
+          $out = go test -mod=readonly -count=1 -tags with_gvisor -timeout 10m -v -run 'TestChainHealthOwnerSourceIntegration|TestNativeDiagnosticsSettingsAndCapabilityContract' .
+          $out | Write-Host
+          if ($LASTEXITCODE -ne 0 -or !($out -match '^--- PASS: TestChainHealthOwnerSourceIntegration')) { throw 'Native chain source integration did not pass' }
+      - name: Run host and native regressions with additive API
+        working-directory: core
+        run: go test -mod=readonly -count=1 -tags with_gvisor -timeout 10m ./... github.com/metacubex/mihomo/adapter github.com/metacubex/mihomo/adapter/outboundgroup github.com/metacubex/mihomo/component/proxydialer github.com/metacubex/mihomo/dns github.com/metacubex/mihomo/transport/xhttp github.com/metacubex/mihomo/tunnel/statistic
