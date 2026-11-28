@@ -84,13 +84,26 @@ class GoBuilder {
   static const _versionSymbol = 'github.com/metacubex/mihomo/constant.Version';
 
   String? _engineRevision() {
-    final directory = p.join(_corePath, 'third_party', 'mihomo');
+    final directory = p.absolute(_corePath, 'third_party', 'mihomo');
     try {
       final result = Process.runSync('git', ['rev-parse', 'HEAD'],
           workingDirectory: directory);
       final revision = result.stdout.toString().trim();
-      if (result.exitCode == 0 &&
-          RegExp(r'^[0-9a-f]{40}
+      if (result.exitCode != 0 ||
+          !RegExp(r'^[0-9a-f]{40}$').hasMatch(revision)) return null;
+      final top = Process.runSync('git', ['rev-parse', '--show-toplevel'],
+          workingDirectory: directory);
+      if (top.exitCode == 0 &&
+          p.equals(p.normalize(top.stdout.toString().trim()), p.normalize(directory))) {
+        return revision;
+      }
+    } on ProcessException {
+      return null;
+    }
+    return null;
+  }
+
+  String _ldflags() => [
     config.goLdflags,
     if (config.coreVersion.isNotEmpty)
       '-X $_versionSymbol=${config.coreVersion}',
