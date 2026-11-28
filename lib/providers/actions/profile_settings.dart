@@ -108,7 +108,7 @@ class ProfileSettingsAction extends _$ProfileSettingsAction {
     final named = base.present.toSet().intersection(managedClashKeys);
     final settings = ref.read(appSettingProvider);
     final previous = previousYamlSources(settings.panelSetSettings);
-    final released = Set<String>.of(_released);
+    final releasedSnapshot = Set<String>.of(_released);
     final current = ref.read(patchClashConfigProvider);
     final inherited = syncProfileSettings(current, base.config, base.present, modes: modes);
     final inheritedAuthentication = authenticationFrom(base.config['authentication']);
@@ -117,11 +117,11 @@ class ProfileSettingsAction extends _$ProfileSettingsAction {
       if (!hasYamlSourceVersion(settings.panelSetSettings))
         ...legacyLocalClashKeys(current,
           ref.read(networkSettingProvider).authentication, named,
-          inherited: inherited, inheritedAuthentication: inheritedAuthentication).difference(released),
+          inherited: inherited, inheritedAuthentication: inheritedAuthentication).difference(releasedSnapshot),
     };
-    final kept = keptClashKeys(named: named, previous: previous, owned: owned, released: released);
+    final kept = keptClashKeys(named: named, previous: previous, owned: owned, released: releasedSnapshot);
     final resetMissing = {
-      for (final key in released)
+      for (final key in releasedSnapshot)
         if (!owned.contains(key) && !named.contains(key.substring(6))) key,
     };
     ref.read(appSettingProvider.notifier).update((state) => state.copyWith(
@@ -161,6 +161,6 @@ class ProfileSettingsAction extends _$ProfileSettingsAction {
       yamlSettingReferences(inherited, inheritedAuthentication, named),
     );
     ref.read(yamlSectionSourcesProvider.notifier).set(yamlSectionSourcesOf(id, base.sourceSettings, defaults: {for (final key in ['tun','profile','experimental','sniffer',...additionalMihomoKeys.keys.where((key) => !key.contains('.'))]) if (base.config.containsKey(key)) key: base.config[key]}));
-    _released.removeAll(released);
+    _released.removeAll(releasedSnapshot);
   }
 }
