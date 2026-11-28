@@ -1,6 +1,9 @@
 import 'dart:io';
 
 import 'package:fl_clash/common/traffic_history.dart';
+import 'package:fl_clash/common/recovery_journal.dart';
+import 'package:fl_clash/common/file_logger.dart';
+import 'package:fl_clash/enum/enum.dart';
 
 import 'package:fl_clash/core/desktop/model.dart';
 import 'package:fl_clash/providers/providers.dart';
@@ -9,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../helpers/preferences.dart';
+import '../helpers/app_paths.dart';
 import '../helpers/test_profiles.dart';
 import 'setup_action_test.dart' show TestSetupAction, TestCommonAction;
 
@@ -75,6 +79,11 @@ class _Core extends CoreAction {
   @override
   bool get coreIsEmbedded => false;
 
+  // This lifecycle double does not launch an executable. The real identity
+  // gate is covered separately by the candidate IPC and manifest tests.
+  @override
+  Future<void> verifyRunningCore() async {}
+
   @override
   Future<void> initCore() async {
     events.add('mihomo:init');
@@ -91,6 +100,16 @@ class _Core extends CoreAction {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  late Directory root;
+  setUp(() async {
+    root = await Directory.systemTemp.createTemp('windows_linked_lifecycle_');
+    await useAppPaths(root);
+  });
+  tearDown(() async {
+    await recoveryJournal.flush();
+    await appFileLogger.flush();
+    if (await root.exists()) await root.delete(recursive: true);
+  });
 
   test('Windows linked start, stop and restart are ordered', () async {
     await mockPreferences();
@@ -154,7 +173,9 @@ void main() {
     ]);
     globalState.container = container;
     addTearDown(container.dispose);
+    container.read(coreStatusProvider.notifier).value = CoreStatus.connected;
     await expectLater(container.read(coreActionProvider.notifier).restartCore(), throwsStateError);
+    expect(container.read(coreStatusProvider), CoreStatus.connected);
     expect(events, contains('zapret:stop'));
     expect(events, isNot(contains('mihomo:process:restart')));
   }, skip: !Platform.isWindows);

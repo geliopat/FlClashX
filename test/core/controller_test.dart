@@ -177,7 +177,7 @@ void main() {
       final events = <String>[];
       when(() => mock.setupConfig(params)).thenAnswer((_) {
         events.add('setup');
-        return Future.value('ok');
+        return Future.value('');
       });
 
       final setupFuture = controller.setupConfig(
@@ -195,7 +195,17 @@ void main() {
       expect(completed, isFalse);
 
       preloadCompleter.complete();
-      expect(await setupFuture, 'ok');
+      expect(await setupFuture, '');
+    });
+
+    test('Windows rejects a profile before calling preload', () async {
+      const params = SetupParams(selectedMap: {}, testUrl: 'http://x.com');
+      when(() => mock.setupConfig(params)).thenAnswer((_) async => 'rejected');
+      var preloaded = false;
+      expect(await controller.setupConfig(params: params, preloadInvoke: () async {
+        preloaded = true;
+      }), 'rejected');
+      expect(preloaded, !Platform.isWindows);
     });
   });
 

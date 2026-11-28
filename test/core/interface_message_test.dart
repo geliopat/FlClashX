@@ -124,10 +124,12 @@ void main() {
     expect(await core.watchRoute(true), isNull);
   });
 
-  test('calls nobody waits on absorb a Core that is gone', () async {
+  test('traffic reset requires acknowledgment; fire-and-forget logging tolerates disconnect', () async {
     final core = _DisconnectedCore();
 
-    await core.resetTraffic();
+    await expectLater(core.resetTraffic(), throwsA(
+      isA<CoreMethodException>().having((error) => error.code, 'code', 'transport_disconnected'),
+    ));
     await core.startLog();
     await core.stopLog();
 

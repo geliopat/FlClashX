@@ -1941,7 +1941,16 @@ void main() {
           await configFile.delete();
         }
         final configAsDirectory = Directory(configPath);
-        await configAsDirectory.create(recursive: true);
+        final blockedHome = File('${tempDir.path}/blocked-profile-staging');
+        if (Platform.isWindows) {
+          // Windows delegates config.yaml writes to the native transaction.
+          // Fail the Dart staging directory instead of mocking a write
+          // that no longer occurs on this platform.
+          await blockedHome.writeAsString('not a directory');
+          await useAppPaths(Directory(blockedHome.path));
+        } else {
+          await configAsDirectory.create(recursive: true);
+        }
 
         final core = _MockCoreHandlerInterface();
         when(() => core.setupConfig(any())).thenAnswer((_) async => '');
@@ -1965,8 +1974,14 @@ void main() {
 
           expect(succeeded, isFalse);
           verifyNever(() => core.setupConfig(any()));
+          expect(scoped.read(setupActionProvider.notifier).pushes.isEven, isTrue);
         } finally {
-          await configAsDirectory.delete(recursive: true);
+          if (Platform.isWindows) {
+            await useAppPaths(tempDir);
+            await blockedHome.delete();
+          } else {
+            await configAsDirectory.delete(recursive: true);
+          }
         }
       },
     );
@@ -2787,6 +2802,9 @@ void main() {
       ).save('const main = (config) => config;');
       final core = _MockCoreHandlerInterface();
       when(() => core.getConfig(any())).thenAnswer((_) async => {});
+      when(() => core.getProfileBase(any())).thenAnswer(
+        (_) async => const ProfileBase(config: {}, digest: 'd'),
+      );
       final scoped = ProviderContainer(
         overrides: [
           trafficHistoryProvider.overrideWith((ref) => TrafficHistory(persist: false)),

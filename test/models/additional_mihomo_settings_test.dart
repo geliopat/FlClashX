@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:fl_clash/models/models.dart';
 import 'package:test/test.dart';
 
@@ -49,7 +51,7 @@ void main() {
   });
   test('profile persistence and release are independent', () {
     const initial = ProfileOverrides(additionalSettingsYaml: 'geodata-mode: false');
-    final restored = ProfileOverrides.fromJson(initial.toJson());
+    final restored = ProfileOverrides.fromJson(jsonDecode(jsonEncode(initial)) as Map<String, dynamic>);
     expect(restored.additionalSettingsYaml, initial.additionalSettingsYaml);
     expect(restored.copyWith(additionalSettingsYaml: '').additionalSettingsYaml, '');
     expect(restored.copyWith(), restored);

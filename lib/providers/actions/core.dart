@@ -340,6 +340,7 @@ class CoreAction extends _$CoreAction {
     final action = _restartingAfterCrash ? 'watchdog' : 'restart';
     final recoveryId = system.isWindows ? recoveryJournal.begin('Mihomo', action) : null;
     var outcome = RecoveryOutcome.interrupted;
+    var lifecycleStarted = false;
     final setupAction = ref.read(setupActionProvider.notifier);
     final bool wasRunning = running ?? ref.read(isStartProvider);
     var restartZapret = false;
@@ -354,6 +355,7 @@ class CoreAction extends _$CoreAction {
           rethrow;
         }
       }
+      lifecycleStarted = true;
       ref.read(coreStatusProvider.notifier).value = CoreStatus.connecting;
       final stopping = coreIsEmbedded && wasRunning
           ? setupAction.setRunning(false)
@@ -395,7 +397,11 @@ class CoreAction extends _$CoreAction {
       return applied;
     } catch (_) {
       outcome = RecoveryOutcome.failed;
-      ref.read(coreStatusProvider.notifier).value = CoreStatus.disconnected;
+      // A refused Helper/Zapret preflight never stopped Mihomo. Do not
+      // announce a disconnection while the previous process still owns IPC.
+      if (lifecycleStarted && ref.mounted) {
+        ref.read(coreStatusProvider.notifier).value = CoreStatus.disconnected;
+      }
       rethrow;
     } finally {
       if (recoveryId != null) recoveryJournal.record(recoveryId, 'Mihomo', action, outcome);

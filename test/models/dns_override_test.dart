@@ -119,7 +119,7 @@ void main() {
       expect(json['fallback-filter'], {'geoip-code': 'US'});
       expect(json['nameserver-policy'], {
         'geosite:cn': ['a', 'b'],
-        'x.com': '1.1.1.1',
+        'x.com': ['1.1.1.1'],
       });
     });
 

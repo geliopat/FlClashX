@@ -1133,7 +1133,8 @@ class SetupAction extends _$SetupAction {
       unawaited(ref.read(resourcesActionProvider.notifier).profileApplied(null));
     }
     _appliedHostCandidates = const {};
-    _pushes++;
+    final pushRevision = ++_pushes;
+    try {
     if (system.isWindows) {
       ref.read(proxiesActionProvider.notifier).cancelDelayTests();
     }
@@ -1247,5 +1248,10 @@ class SetupAction extends _$SetupAction {
       return _SetupTaskResult.failed;
     }
     return _SetupTaskResult.completed;
+    } finally {
+      // Staging, preference or Zapret preparation can fail before the
+      // native setupConfig RPC. Always release the in-flight revision.
+      if (_pushes == pushRevision) _pushes++;
+    }
   }
 }
