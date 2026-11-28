@@ -77,7 +77,9 @@ enum LoadBalanceStrategy {
   @JsonValue('round-robin')
   roundRobin('round-robin'),
   @JsonValue('sticky-sessions')
-  stickySessions('sticky-sessions');
+  stickySessions('sticky-sessions'),
+  @JsonValue('adaptive-balance')
+  adaptiveBalance('adaptive-balance');
 
   final String value;
 
