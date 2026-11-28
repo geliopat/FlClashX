@@ -3,7 +3,6 @@ import 'package:fl_clash/features/features.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/state.dart';
-import 'package:fl_clash/ui/chip.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
 import 'package:fl_clash/ui/null_status.dart';
 import 'package:fl_clash/ui/scroll.dart';
@@ -465,7 +464,9 @@ void main() {
 
     await pumpRequests(tester);
 
-    await tester.tap(find.widgetWithText(TonalChip, 'Tokyo'));
+    final exit = find.widgetWithText(OutboundChip, 'Tokyo');
+    expect(exit, findsOneWidget);
+    await tester.tap(find.descendant(of: exit, matching: find.byType(TextButton)));
     await tester.pumpAndSettle();
 
     expect(find.textContaining('alpha.test'), findsNothing);
