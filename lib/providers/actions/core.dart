@@ -267,7 +267,7 @@ class CoreAction extends _$CoreAction {
         final capabilities = await _core.getCoreCapabilities();
         if (!capabilities.containsAll(const {
           'core-identity-v1', 'closed-flow-history-v1',
-          'chain-diagnostics-v1', 'dns-stages-v1', 'adaptive-balance-v1',
+          'chain-diagnostics-v1', 'dns-stages-v1', 'adaptive-balance-v1', 'chain-health-v1',
         })) return false;
       }
       // Detect immediate crashes after successful configuration/listener setup.

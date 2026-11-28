@@ -25,7 +25,7 @@ class _ChainHealthViewState extends ConsumerState<ChainHealthView> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(_refresh);
+    Future.microtask(() { if (mounted) _refresh(); });
   }
 
   List<Map<String, dynamic>> _rows(Object? value) => [
@@ -63,7 +63,7 @@ class _ChainHealthViewState extends ConsumerState<ChainHealthView> {
         _jobs = _rows(state['jobs']);
       });
     } catch (error) {
-      if (mounted) setState(() => _error = '$error');
+      if (mounted) setState(() { _error = '$error'; _available = false; });
     } finally {
       if (mounted) setState(() => _busy = false);
     }

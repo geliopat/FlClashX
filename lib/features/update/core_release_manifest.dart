@@ -12,6 +12,8 @@ const coreUpdateManifestKeys = updateManifestKeys;
 const coreManifestMaxBytes = 16 * 1024;
 const coreBinaryMaxBytes = 256 * 1024 * 1024;
 const supportedCoreIpcRevision = 1;
+// z.1 has the engine patches but predates the adapter capabilities.
+const minimumIndependentCoreVersion = 'v1.19.34-z.2';
 const _product = 'FlClashZ-core';
 const _name = 'FlClashCore.exe';
 final _version = RegExp(r'^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-z\.([1-9][0-9]*)$');

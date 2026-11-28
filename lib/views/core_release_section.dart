@@ -5,6 +5,7 @@ import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/flclashz_upstream_versions.dart';
 import 'package:fl_clash/core/desktop/core_release_selection.dart';
 import 'package:fl_clash/core/desktop/helper_client.dart';
+import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/features/update/core_release_manifest.dart';
 import 'package:fl_clash/features/update/core_release_updater.dart';
 import 'package:fl_clash/features/update/download.dart';
@@ -67,7 +68,7 @@ class _CoreReleaseSectionState extends ConsumerState<CoreReleaseSection> {
     final version = offer.manifest.version;
     // The first published package predates the new adapter RPCs. Its
     // engine is identical, but installing it would remove client features.
-    if (offer.manifest.hostRevision == 'd3899829a60962c0f1fe9d8d59017529b03b984a') {
+    if (version.compareTo(CoreReleaseVersion.parse(minimumIndependentCoreVersion)) < 0) {
       setState(() => _status = _tr('Для этой версии клиента требуется новый адаптер ядра', 'This client requires a newer core adapter'));
       return;
     }

@@ -32,7 +32,7 @@ class _EngineDiagnosticsViewState extends ConsumerState<EngineDiagnosticsView> w
   void initState() {
     super.initState();
     coreEventManager.addListener(this);
-    Future.microtask(_load);
+    Future.microtask(() { if (mounted) _load(); });
   }
 
   @override
@@ -80,7 +80,7 @@ class _EngineDiagnosticsViewState extends ConsumerState<EngineDiagnosticsView> w
       if (!mounted) return;
       final settings = snapshot['settings'] as Map;
       List<Map<String, dynamic>> rows(String key) => [
-        for (final item in (snapshot[key] as List).whereType<Map>())
+        for (final item in (snapshot[key] as List? ?? const []).whereType<Map>())
           Map<String, dynamic>.from(item),
       ];
       setState(() {

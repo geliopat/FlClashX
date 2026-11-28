@@ -91,11 +91,15 @@ final class CoreReleaseActivationException implements Exception {
 /// a process crash or power loss cannot commit an untested candidate.
 final class CoreReleaseSelectionStore {
   final Future<File> Function() _file;
+  final CoreReleaseVersion? minimumVersion;
   bool _trial = false;
   bool _busy = false;
   CoreReleaseRef? _trialSelection;
 
-  CoreReleaseSelectionStore(this._file);
+  CoreReleaseSelectionStore(this._file, {this.minimumVersion});
+
+  bool _compatible(CoreReleaseRef? release) => release == null ||
+      minimumVersion == null || release.version.compareTo(minimumVersion!) >= 0;
 
   Future<CoreReleaseState> read() async {
     final file = await _file();
@@ -103,7 +107,15 @@ final class CoreReleaseSelectionStore {
     if (await file.length() > 4096) {
       throw const FormatException('Oversized core selection journal');
     }
-    return CoreReleaseState.fromJson(jsonDecode(await file.readAsString()));
+    final state = CoreReleaseState.fromJson(jsonDecode(await file.readAsString()));
+    // A newer client can replace an old standalone adapter with its own
+    // compatible bundled core without deleting the old signed slot.
+    if (!_compatible(state.current)) return const CoreReleaseState();
+    if (!_compatible(state.previous)) {
+      return CoreReleaseState(current: state.current,
+          hasPrevious: state.hasPrevious, pending: state.pending);
+    }
+    return state;
   }
 
   Future<CoreReleaseRef?> selectedForLaunch() async {
@@ -180,7 +192,7 @@ final class CoreReleaseSelectionStore {
         final base = bundledVersion!;
         final normalized = base.startsWith('v') ? base : 'v$base';
         final firstIndependent = CoreReleaseVersion.parse('$normalized-z.1');
-        if (next.version.compareTo(firstIndependent) < 0 ||
+        if (!_compatible(next) || next.version.compareTo(firstIndependent) < 0 ||
             (current != null && next.version.compareTo(current.version) <= 0)) {
           throw StateError('Core release is not newer than the installed version');
         }
@@ -242,4 +254,5 @@ final class CoreReleaseSelectionStore {
 
 final coreReleaseSelection = CoreReleaseSelectionStore(
   () async => File(p.join(await appPath.homeDirPath, 'core-release-selection.json')),
+  minimumVersion: CoreReleaseVersion.parse(minimumIndependentCoreVersion),
 );
