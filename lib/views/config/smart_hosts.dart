@@ -71,7 +71,7 @@ class SmartHostsView extends ConsumerWidget {
                 title: Text(AppLocalizations.of(context).forkUpdateNow),
                 subtitle: Text(state.lastUpdate == null ? AppLocalizations.of(context).forkNoUpdate : '${AppLocalizations.of(context).lastUpdated}: ${state.lastUpdate!.toLocal().toString().split('.').first}'),
                 onTap: state.updating || !state.enabled ? null : controller.refresh,
-                trailing: state.updating ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2)) : null,
+                trailing: state.updating ? const SizedBox.square(dimension: 18, child: CommonCircleLoading(size: 18)) : null,
               ),
             ],
             footer: AppLocalizations.of(context).forkSmartHostsHint,
@@ -146,7 +146,7 @@ class SmartHostsView extends ConsumerWidget {
                 title: Text(AppLocalizations.of(context).forkCheckCdn),
                 subtitle: Text(state.cdnMessage ?? AppLocalizations.of(context).forkRealDirect),
                 onTap: state.cdnChecking || state.updating ? null : controller.checkCdn,
-                trailing: state.cdnChecking ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2)) : null,
+                trailing: state.cdnChecking ? const SizedBox.square(dimension: 18, child: CommonCircleLoading(size: 18)) : null,
               ),
               for (final record in state.cdnMeasurements)
                 ListItem(title: Text(record.host),
@@ -234,7 +234,7 @@ class _AppliedHostsViewState extends ConsumerState<_AppliedHostsView> {
         title: AppLocalizations.of(context).forkAppliedHosts,
         body: Center(
           child: snapshot.connectionState != ConnectionState.done
-              ? const CircularProgressIndicator()
+              ? const CommonCircleLoading()
               : Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -281,7 +281,7 @@ class _SmartHostsEntriesState extends State<_SmartHostsEntries> {
     return CommonScaffold(
       title: '${widget.title ?? AppLocalizations.of(context).forkReceivedHosts} (${widget.entries.length})',
       searchState: AppBarSearchState(onSearch: (query) => setState(() => _query = query)),
-      body: ListView.builder(
+      body: Builder(builder: (context) => ListView.builder(
         padding: EdgeInsets.fromLTRB(16, context.contentTopPadding, 16, 16 + context.bottomInset),
         itemCount: entries.length + 1,
         itemBuilder: (context, index) {
@@ -306,7 +306,7 @@ class _SmartHostsEntriesState extends State<_SmartHostsEntries> {
             ].join('\n'), maxLines: 12),
           );
         },
-      ),
+      )),
     );
   }
 }

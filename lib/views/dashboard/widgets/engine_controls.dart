@@ -103,7 +103,7 @@ class _EngineControlButtonState extends State<EngineControlButton> {
                 mouseCursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
                 child: DecoratedBox(
                   decoration: ShapeDecoration(
-                    shape: _focused ? StadiumBorder(side: BorderSide(color: scheme.primary, width: 2))
+                    shape: _focused ? AppShape.full.copyWith(side: BorderSide(color: scheme.primary, width: 2))
                         : AppShape.full,
                   ),
                   child: Center(
@@ -118,7 +118,7 @@ class _EngineControlButtonState extends State<EngineControlButton> {
                             IconTheme.merge(
                               data: IconThemeData(color: ink, shadows: shadows),
                               child: widget.busy
-                                  ? SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2, color: ink))
+                                  ? SizedBox.square(dimension: 18, child: CommonCircleLoading(size: 18, color: ink))
                                   : GlyphIcon(widget.suspended ? AppGlyphs.wifiOff
                                       : widget.running ? AppGlyphs.engineStop : AppGlyphs.enginePlay,
                                       size: 24, fill: 0),
@@ -127,10 +127,10 @@ class _EngineControlButtonState extends State<EngineControlButton> {
                               mainAxisSize: MainAxisSize.min,
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(widget.name, style: TextStyle(color: ink,
-                                  fontSize: 12, fontWeight: FontWeight.w600, shadows: shadows)),
-                                Text(uptime, style: TextStyle(color: ink,
-                                  fontSize: 16, fontFeatures: const [FontFeature.tabularFigures()],
+                                Text(widget.name, style: AppTextStyle.caption1.of(context, emphasized: true)
+                                  .copyWith(color: ink, shadows: shadows)),
+                                Text(uptime, style: AppTextStyle.callout.of(context)
+                                  .copyWith(color: ink, fontFeatures: const [FontFeature.tabularFigures()],
                                   shadows: shadows)),
                               ],
                             ),

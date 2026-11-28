@@ -278,7 +278,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
               trailing: _updatingHelper
                   ? const SizedBox.square(
                       dimension: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: CommonCircleLoading(size: 18),
                     )
                   : null,
               onTap: zapret.busy || _updatingHelper
@@ -343,7 +343,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
               title: Text(AppLocalizations.of(context).loading),
               trailing: SizedBox.square(
                 dimension: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
+                child: CommonCircleLoading(size: 18),
               ),
             ),
           if (_lists.isNotEmpty && _selected != null)
@@ -403,7 +403,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
             trailing: _updating
                 ? const SizedBox.square(
                     dimension: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: CommonCircleLoading(size: 18),
                   )
                 : null,
             onTap: _lists.isEmpty || listsBusy ? null : _updateLists,
@@ -415,7 +415,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
             trailing: _loading && _lists.isNotEmpty
                 ? const SizedBox.square(
                     dimension: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: CommonCircleLoading(size: 18),
                   )
                 : null,
             onTap: listsBusy ? null : () => _loadLists(),
@@ -428,7 +428,7 @@ class _ZapretSettingsViewState extends ConsumerState<ZapretSettingsView> {
               trailing: _saving
                   ? const SizedBox.square(
                       dimension: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: CommonCircleLoading(size: 18),
                     )
                   : null,
               onTap: !_listLoaded || listsBusy ? null : _restoreBackup,

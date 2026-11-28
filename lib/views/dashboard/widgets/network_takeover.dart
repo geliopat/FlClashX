@@ -7,7 +7,7 @@ import 'package:fl_clash/ui/ui.dart';
 import 'package:fl_clash/views/dashboard/layout.dart';
 import 'package:fl_clash/views/dashboard/style.dart';
 import 'package:fl_clash/widgets/managed_setting.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_new_shapes/material_new_shapes.dart';
 
@@ -318,7 +318,8 @@ class ZapretTile extends ConsumerWidget {
                 children: [
                   Expanded(
                     child: InkWell(
-                      borderRadius: BorderRadius.circular(DashboardCorner.tab),
+                      mouseCursor: clickableCursor,
+                      customBorder: AppShape.all(DashboardCorner.tab),
                       onTap: () => showZapretStrategiesSheet(context),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(

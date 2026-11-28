@@ -84,7 +84,7 @@ class ZapretView extends ConsumerWidget {
             leading: zapret.busy || zapret.dashboardRestarting
                 ? const SizedBox.square(
                     dimension: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: CommonCircleLoading(size: 18),
                   )
                 : Tooltip(
                     message: zapret.running
@@ -265,7 +265,7 @@ class ZapretView extends ConsumerWidget {
                 diagnostics.resultOf(target).latencyMs == null
                     ? diagnostics.resultOf(target).localizedStatusLabel(AppLocalizations.of(context))
                     : '${diagnostics.resultOf(target).latencyMs} ms',
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                style: AppTextStyle.caption1.of(context, emphasized: true).copyWith(
                       color: context.colorScheme.onSurfaceVariant,
                     ),
               ),
@@ -313,7 +313,7 @@ class _ZapretHistoryViewState extends State<_ZapretHistoryView> {
       future: _runs,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
-          return const Center(child: CircularProgressIndicator());
+          return const Center(child: CommonCircleLoading.page());
         }
         if (snapshot.hasError) {
           return Center(child: Text('${AppLocalizations.of(context).forkCheckFailed}: ${snapshot.error}'));
@@ -398,7 +398,7 @@ class ZapretResultsView extends ConsumerWidget {
             if (run!.failure != null) Text(run!.failure!, style: TextStyle(color: context.colorScheme.error)),
           ],
           Text('${AppLocalizations.of(context).forkResults}: ${ranked.length}/${run == null ? zapret.strategies.length : run!.totalStrategies ?? '—'}',
-            style: Theme.of(context).textTheme.titleMedium),
+            style: AppTextStyle.headline.of(context)),
           const SizedBox(height: 8),
           Text(top.isEmpty
               ? AppLocalizations.of(context).forkNoFinalists
@@ -416,7 +416,7 @@ class ZapretResultsView extends ConsumerWidget {
                     Row(children: [
                       Expanded(child: Text(
                         '${ranks.containsKey(trial.id) ? '#${ranks[trial.id]} · ' : ''}${nameOf(trial)}',
-                        style: Theme.of(context).textTheme.titleMedium,
+                        style: AppTextStyle.headline.of(context),
                       )),
                       if (run == null && zapret.activeStrategyId == trial.id)
                         const GlyphIcon(AppGlyphs.checkCircle),

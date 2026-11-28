@@ -78,9 +78,9 @@ class ZapretDiagnosticsCard extends ConsumerWidget {
           ),
           const SizedBox(height: 8),
           DecoratedBox(
-            decoration: BoxDecoration(
+            decoration: ShapeDecoration(
               color: colors.tone,
-              borderRadius: BorderRadius.circular(DashboardCorner.tab),
+              shape: AppShape.all(DashboardCorner.tab),
             ),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
@@ -167,9 +167,9 @@ class _ProbeGroup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: BoxDecoration(
+      decoration: ShapeDecoration(
         color: background,
-        borderRadius: BorderRadius.circular(DashboardCorner.tab),
+        shape: AppShape.all(DashboardCorner.tab),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),

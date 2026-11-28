@@ -15,6 +15,10 @@ const _allowed = {
   'lib/ui/popup.dart',
   // Nor a drag along the proxies group chips, which run across the sheet.
   'lib/views/proxies/group_tabs.dart',
+  // The fixed desktop navigation rail and its independent footer.
+  'lib/ui/sidebar.dart',
+  // Horizontal title tabs must not drag the vertical sheet.
+  'lib/ui/title_tabs.dart',
 };
 
 int _lineOf(String source, int offset) =>

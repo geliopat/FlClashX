@@ -1,4 +1,5 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:fl_clash/ui/typography.dart';
 
 /// A null [badge] clears one set further up, for titles nested in a marked one.
 class TitleBadge extends InheritedWidget {
@@ -34,7 +35,7 @@ class TitleBadge extends InheritedWidget {
         Tooltip(
           message: caption,
           child: Text(caption, maxLines: 2, overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            style: AppTextStyle.footnote.of(context).copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             )),
         ),

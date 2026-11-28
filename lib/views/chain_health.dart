@@ -152,7 +152,7 @@ class _ChainHealthViewState extends ConsumerState<ChainHealthView> {
                     ? _tr('Проверка по HTTPS 204 через выбранный каскад. Один выходной узел на группу; только новые TCP-соединения.',
                         'HTTPS 204 probes through the selected cascade. One owner per group; new TCP connections only.')
                     : _tr('Требуется ядро с API активной проверки цепочек', 'Core with active chain probe API required'))),
-                trailing: _busy ? const CircularProgressIndicator() : const GlyphIcon(AppGlyphs.sync),
+                trailing: _busy ? const CommonCircleLoading() : const GlyphIcon(AppGlyphs.sync),
                 onTap: connected && !_busy ? () => _refresh() : null,
               ),
             ]);

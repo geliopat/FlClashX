@@ -266,7 +266,7 @@ class _ZapretLogsViewState extends State<ZapretLogsView>
       future: _archive,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done && !snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
+          return const Center(child: CommonCircleLoading.page());
         }
         if (snapshot.hasError) {
           return Center(child: Column(

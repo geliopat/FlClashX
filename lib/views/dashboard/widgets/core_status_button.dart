@@ -117,12 +117,12 @@ class _CoreStatusButtonState extends ConsumerState<CoreStatusButton> {
       aspect: ViewScopeAspect.isMobile)?.isMobile ?? false;
     final iconOnly = coreStatus == CoreStatus.connected || mobile;
     final icon = CorePulse(status: coreStatus);
-    return Tooltip(
-      message: restartAll ? AppLocalizations.of(context).forkRestartAll : appLocalizations.coreStatus,
-      child: FadeScaleBox(
+    final tooltip = restartAll ? AppLocalizations.of(context).forkRestartAll : appLocalizations.coreStatus;
+    final button = FadeScaleBox(
         alignment: Alignment.centerRight,
         child: iconOnly
             ? IconButton.filled(
+                tooltip: tooltip,
                 key: ValueKey(iconOnly),
                 style: style,
                 onPressed: canRestart ? _handleConnection : null,
@@ -144,8 +144,8 @@ class _CoreStatusButtonState extends ConsumerState<CoreStatusButton> {
                   CoreStatus.disconnected => appLocalizations.disconnected,
                 }),
               ),
-      ),
     );
+    return iconOnly ? button : Tooltip(message: tooltip, child: button);
   }
 }
 

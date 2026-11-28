@@ -82,7 +82,7 @@ class _RecoveryHistoryViewState extends State<RecoveryHistoryView> {
                 if (snapshot.data?.helperUnavailable == true)
                   ListItem(title: Text(l.forkJournalUnavailable)),
                 if (snapshot.connectionState == ConnectionState.waiting)
-                  const Center(child: CircularProgressIndicator())
+                  const Center(child: CommonCircleLoading.page())
                 else if (snapshot.hasError)
                   ListItem(title: Text(l.forkLogReadError))
                 else if (events.isEmpty)

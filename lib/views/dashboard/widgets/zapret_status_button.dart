@@ -45,17 +45,17 @@ class ZapretStatusButton extends ConsumerWidget {
     final icon = busy
         ? const SizedBox.square(
             dimension: 18,
-            child: CircularProgressIndicator(strokeWidth: 2),
+            child: CommonCircleLoading(size: 18),
           )
         : ZapretMark(running: state.running);
     final iconOnly = state.running || ViewScope.isMobileOf(context);
     const style = ElasticPress.buttonStyle;
-    return Tooltip(
-      message: state.error ?? 'Zapret',
-      child: FadeScaleBox(
+    final tooltip = state.error ?? 'Zapret';
+    final button = FadeScaleBox(
         alignment: Alignment.centerRight,
         child: iconOnly
             ? IconButton.filled(
+                tooltip: tooltip,
                 style: style,
                 onPressed: busy || safeMode || !initialized
                     ? null
@@ -74,8 +74,8 @@ class ZapretStatusButton extends ConsumerWidget {
                         ? 'Zapret включён'
                         : 'Zapret выключен'),
               ),
-      ),
     );
+    return iconOnly ? button : Tooltip(message: tooltip, child: button);
   }
 }
 
@@ -95,10 +95,7 @@ class ZapretMark extends StatelessWidget {
         child: Text(
           'Z',
           textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 18,
-            height: 1,
-            fontWeight: FontWeight.w800,
+          style: AppTextStyle.custom(context, size: 18, leading: 18, weight: FontWeight.w800).copyWith(
             color: color ??
                 (running
                     ? context.colorScheme.success
@@ -187,10 +184,7 @@ class ProviderZapretButton extends ConsumerWidget {
                 child: state.busy
                     ? SizedBox.square(
                         dimension: 22,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: ink,
-                        ),
+                        child: CommonCircleLoading(size: 22, color: ink),
                       )
                     : Row(
                         mainAxisSize: MainAxisSize.min,

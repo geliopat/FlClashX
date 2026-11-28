@@ -207,7 +207,7 @@ class _DiagnosticsViewState extends ConsumerState<DiagnosticsView> {
           ),
           ListItem(title: Text(AppLocalizations.of(context).forkRunDiagnostics),
             onTap: _busy ? null : _run,
-            trailing: _busy ? const CircularProgressIndicator() : GlyphIcon(AppGlyphs.playPause(0))),
+            trailing: _busy ? const CommonCircleLoading() : GlyphIcon(AppGlyphs.playPause(0))),
           ListItem(title: Text(AppLocalizations.of(context).forkCopyReport),
             onTap: _busy || _results.isEmpty ? null : () async {
               await Clipboard.setData(ClipboardData(text: _results.entries.map((entry) => '${entry.key}: ${entry.value}').join('\n')));

@@ -158,7 +158,7 @@ class _EngineDiagnosticsViewState extends ConsumerState<EngineDiagnosticsView> w
               items: [
                 ListItem(
                   title: Text(_tr('Обновить данные', 'Refresh data')),
-                  trailing: _busy ? const CircularProgressIndicator() : const GlyphIcon(AppGlyphs.sync),
+                  trailing: _busy ? const CommonCircleLoading() : const GlyphIcon(AppGlyphs.sync),
                   onTap: connected && !_busy ? () => _load() : null,
                   subtitle: Text(_error ?? (_supported
                       ? _tr('Записей: $count', 'Records: $count')
