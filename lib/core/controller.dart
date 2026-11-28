@@ -416,6 +416,17 @@ class CoreController {
     }
   }
 
+  Future<Map<String, dynamic>?> getCoreIdentity() async {
+    try {
+      return await _interface.invokeMethod<Map<String, dynamic>>(
+        method: CoreMethod.getCoreIdentity,
+      );
+    } on CoreMethodException catch (error) {
+      if (error.code == 'not_implemented') return null;
+      rethrow;
+    }
+  }
+
   Future<Map<String, dynamic>> getEngineDiagnostics() async {
     final result = await _interface.invokeMethod<Map<String, dynamic>>(
       method: CoreMethod.getEngineDiagnostics,
