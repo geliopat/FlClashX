@@ -498,6 +498,8 @@ class DnsQueryDetailView extends StatelessWidget {
         appLocalizations.cache,
         dnsQuery.cached ? appLocalizations.yes : appLocalizations.no,
       ),
+      if (dnsQuery.stages.isNotEmpty)
+        (Localizations.localeOf(context).languageCode == 'ru' ? 'Этапы DNS' : 'DNS stages', dnsQuery.stages.join(' → ')),
       (appLocalizations.responseCode, dnsQuery.rcode),
       (appLocalizations.delay, '${dnsQuery.delay} ms'),
     ];
