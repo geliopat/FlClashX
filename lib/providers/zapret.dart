@@ -619,6 +619,7 @@ class ZapretController extends Notifier<ZapretState> {
     return _baseUptime + _uptime.elapsed;
   }
   var _refreshing = false;
+  int _statusRevision = 0;
   bool _cancelTrial = false;
   bool _lifecycleStopping = false;
   int _lifecycleRevision = 0;
@@ -638,6 +639,7 @@ class ZapretController extends Notifier<ZapretState> {
       ref.read(coreStatusProvider) != CoreStatus.connected;
 
   Future<bool> beginCoreRestart({bool repairHelper = false}) async {
+    ++_statusRevision;
     _coreRestarting = true;
     final restore = state.running || _desiredRunning;
     final readiness = await _client.readiness(
@@ -1015,6 +1017,7 @@ class ZapretController extends Notifier<ZapretState> {
   /// Cancel trials and suppress restoration before stopping the service.
   Future<bool> stopAlongsideMihomo() async {
     if (!Platform.isWindows || !ref.mounted) return false;
+    ++_statusRevision;
     ++_lifecycleRevision;
     _lifecycleStopping = true;
     _cancelTrial = true;
@@ -1041,7 +1044,12 @@ class ZapretController extends Notifier<ZapretState> {
     // Confirm again after all Dart workers have drained.
     final stopped = await _client.stopZapret();
     if (stopped.running) throw StateError(AppLocalizations().forkStillRunning);
-    await refresh();
+    if (ref.mounted) {
+      // A poll that started before stop may still own the refresh slot.
+      // Publish the confirmed stop directly and invalidate that old poll.
+      ++_statusRevision;
+      _applyHelperStatus(stopped);
+    }
     return wasRunning || before.running;
   }
 
@@ -1054,27 +1062,14 @@ class ZapretController extends Notifier<ZapretState> {
   Future<void> refresh() async {
     if (!Platform.isWindows || _refreshing || state.busy) return;
     _refreshing = true;
+    final revision = _statusRevision;
+    bool current() => ref.mounted && revision == _statusRevision && !state.busy;
     try {
       final response = await _client.zapretStatus();
-      if (!ref.mounted || state.busy) return;
-      state = state.copyWith(
-        available: state.strategies.isNotEmpty,
-        running: response.running,
-        elapsed: _observeProcess(response.running, response.pid, response.uptimeMs),
-        pid: response.pid,
-        clearPid: !response.running,
-        cleanedProcesses: response.cleanedProcesses,
-        activeStrategyId: response.strategyId,
-        activeEngine: response.engine,
-        clearActiveStrategy: !response.running,
-        clearActiveEngine: !response.running,
-        activeMode: response.mode,
-        clearActiveMode: !response.running,
-        winDivertFilters: response.winDivertFilters,
-        processingLists: response.processingLists,
-      );
+      if (!current()) return;
+      _applyHelperStatus(response);
     } on HelperException catch (error) {
-      if (!ref.mounted) return;
+      if (!current()) return;
       state = state.copyWith(
         available: false,
         running: false,
@@ -1088,7 +1083,7 @@ class ZapretController extends Notifier<ZapretState> {
         error: error.message,
       );
     } catch (error) {
-      if (!ref.mounted) return;
+      if (!current()) return;
       state = state.copyWith(
         available: false,
         running: false,
@@ -1106,6 +1101,25 @@ class ZapretController extends Notifier<ZapretState> {
     }
   }
 
+  void _applyHelperStatus(HelperZapretStatus response) {
+    state = state.copyWith(
+      available: state.strategies.isNotEmpty,
+      running: response.running,
+      elapsed: _observeProcess(response.running, response.pid, response.uptimeMs),
+      pid: response.pid,
+      clearPid: !response.running,
+      cleanedProcesses: response.cleanedProcesses,
+      activeStrategyId: response.strategyId,
+      activeEngine: response.engine,
+      clearActiveStrategy: !response.running,
+      clearActiveEngine: !response.running,
+      activeMode: response.mode,
+      clearActiveMode: !response.running,
+      winDivertFilters: response.winDivertFilters,
+      processingLists: response.processingLists,
+    );
+  }
+
   Future<void> setEnabled(bool enabled, {String reason = 'manual'}) async {
     if (!Platform.isWindows || state.busy) return;
     if (enabled && _launchBlocked) return;
@@ -1114,6 +1128,7 @@ class ZapretController extends Notifier<ZapretState> {
       _initialTuneAttempted = false;
       _failedChecks = 0;
     }
+    ++_statusRevision;
     state = state.copyWith(busy: true, clearError: true);
     try {
       await _requireHelper();
@@ -1176,6 +1191,7 @@ class ZapretController extends Notifier<ZapretState> {
     try {
       // Keep other strategy operations out of the read-only preflight,
       // but release busy before the restart worker drains Zapret.
+      ++_statusRevision;
       state = state.copyWith(busy: true);
       final bool needsRepair;
       try {
@@ -1251,6 +1267,7 @@ class ZapretController extends Notifier<ZapretState> {
     if (!Platform.isWindows || state.busy || _launchBlocked) return;
     final id = recoveryJournal.begin('Zapret', 'restart');
     var outcome = RecoveryOutcome.interrupted;
+    ++_statusRevision;
     state = state.copyWith(busy: true, clearError: true);
     try {
       await _requireHelper();
@@ -1396,6 +1413,7 @@ class ZapretController extends Notifier<ZapretState> {
     final runClock = Stopwatch()..start();
     final strategies = state.strategies.toList();
     final selectedMode = _effectiveMode(state.mode);
+    ++_statusRevision;
     state = state.copyWith(busy: true, trials: const [], testProgress: l.forkPreparing, clearTestSummary: true, clearError: true);
     final results = <String, ZapretTrial>{};
     HelperZapretStatus? original;
@@ -1644,6 +1662,7 @@ class ZapretController extends Notifier<ZapretState> {
         await _automaticTune();
         return;
       }
+      ++_statusRevision;
       state = state.copyWith(busy: true);
       var accepted = false;
       try {
