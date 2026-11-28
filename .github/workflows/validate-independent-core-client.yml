@@ -85,16 +85,86 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Obtain actual published signed package
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           $dir = Join-Path $env:RUNNER_TEMP 'signed-core'
           New-Item -ItemType Directory -Force $dir | Out-Null
-          $base = 'https://github.com/geliopat/Clash.Meta/releases/download/flclashz-core-v1.19.34-z.2'
+          $tag = 'flclashz-core-v1.19.34-z.3'
+          $releaseJson = gh api "repos/geliopat/Clash.Meta/releases/tags/$tag"
+          if ($LASTEXITCODE -ne 0) { throw 'Required signed z.3 release is not available' }
+          $release = $releaseJson | ConvertFrom-Json
+          if ($release.tag_name -cne $tag -or $release.draft -or !$release.published_at) { throw 'Invalid published core release' }
+          $base = "https://github.com/geliopat/Clash.Meta/releases/download/$tag"
           foreach ($name in @('core-manifest.json', 'FlClashCore.exe')) {
-            curl.exe --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --output (Join-Path $dir $name) "$base/$name"
+            $assets = @($release.assets | Where-Object { $_.name -ceq $name })
+            if ($assets.Count -ne 1 -or $assets[0].digest -cnotmatch '^sha256:[0-9a-f]{64}
+          "FLCLASHZ_TEST_SIGNED_CORE_DIR=$dir" >> $env:GITHUB_ENV
+      - name: Validate core adapter
+        working-directory: core
+        run: go test -mod=readonly -count=1 -tags with_gvisor -timeout 10m ./...
+      - name: Verify actual release and tamper rejection in Helper
+        run: |
+          cargo test --locked --manifest-path services/helper/Cargo.toml --features windows-service 'core_release::'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Actual privileged Helper staging and managed network smoke
+        shell: pwsh
+        run: |
+          & .github/scripts/test-signed-core-system.ps1
+      - name: Install Flutter dependencies
+        id: pub_get
+        run: flutter pub get
+      - name: Verify generated model contract and actual release, rollback and UI
+        shell: pwsh
+        run: |
+          flutter test "--dart-define=FLCLASHZ_UPDATE_PUBLIC_KEY=$env:FLCLASHZ_UPDATE_PUBLIC_KEY" test/features/update/core_release_manifest_test.dart test/core/desktop/core_release_selection_test.dart test/core/desktop/helper_client_test.dart test/views/about_test.dart test/setup_test.dart test/views/dns_queries_view_test.dart test/models/profile_settings_test.dart test/models/config_test.dart test/core/protocol_contract_test.dart test/common/path_test.dart test/common/file_logger_test.dart test/common/service_probe_test.dart test/providers/network_probe_settings_test.dart
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Analyze Dart sources
+        if: always() && steps.pub_get.outcome == 'success'
+        run: flutter analyze --no-fatal-infos
+
+  native-chain-api:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    env:
+      CGO_ENABLED: '0'
+      GOWORK: 'off'
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          submodules: false
+      - uses: actions/checkout@v5
+        with:
+          repository: geliopat/Clash.Meta
+          ref: '88b3bc4604b0008ce08a8c5634b8f9ddd573d533'
+          path: core/third_party/mihomo
+          persist-credentials: false
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.27.1'
+          cache-dependency-path: core/go.sum
+      - name: Confirm additive source is present and test host against it
+        working-directory: core
+        shell: pwsh
+        run: |
+          $out = go test -mod=readonly -count=1 -tags with_gvisor -timeout 10m -v -run 'TestChainHealthOwnerSourceIntegration|TestNativeDiagnosticsSettingsAndCapabilityContract' .
+          $out | Write-Host
+          if ($LASTEXITCODE -ne 0 -or !($out -match '^--- PASS: TestChainHealthOwnerSourceIntegration')) { throw 'Native chain source integration did not pass' }
+      - name: Run host and native regressions with additive API
+        working-directory: core
+        run: go test -mod=readonly -count=1 -tags with_gvisor -timeout 10m ./... github.com/metacubex/mihomo/adapter github.com/metacubex/mihomo/adapter/outboundgroup github.com/metacubex/mihomo/component/proxydialer github.com/metacubex/mihomo/dns github.com/metacubex/mihomo/transport/xhttp github.com/metacubex/mihomo/tunnel/statistic
+) { throw "Missing unique release digest: $name" }
+            $path = Join-Path $dir $name
+            curl.exe --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --output $path "$base/$name"
             if ($LASTEXITCODE -ne 0) { throw "Download failed: $name" }
+            $actual = (Get-FileHash $path -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ("sha256:$actual" -cne $assets[0].digest -or (Get-Item $path).Length -ne $assets[0].size) { throw "Published release asset mismatch: $name" }
           }
-          if ((Get-FileHash (Join-Path $dir 'FlClashCore.exe') -Algorithm SHA256).Hash.ToLowerInvariant() -cne 'e504d2c5b2503057a8fc55e3665fe5a4c93852dc702a322d787d1df89e5b7c82') { throw 'Published core differs from verified release' }
-          if ((Get-FileHash (Join-Path $dir 'core-manifest.json') -Algorithm SHA256).Hash.ToLowerInvariant() -cne 'acd3bd2b729e96492b91ecde7fa019358fe2e546cb8a159bef02ba44fd1938df') { throw 'Published manifest differs from verified release' }
+          $manifest = Get-Content (Join-Path $dir 'core-manifest.json') -Raw | ConvertFrom-Json
+          if ($manifest.version -cne 'v1.19.34-z.3' -or $manifest.hostRevision -cne 'ca8354f682baa8920a769a1d4f2d77f29e1b6a7d' -or $manifest.engineRevision -cne '88b3bc4604b0008ce08a8c5634b8f9ddd573d533') { throw 'Unexpected signed package identity' }
+          # Helper and Dart separately verify the signature and complete binary.
           "FLCLASHZ_TEST_SIGNED_CORE_DIR=$dir" >> $env:GITHUB_ENV
       - name: Validate core adapter
         working-directory: core

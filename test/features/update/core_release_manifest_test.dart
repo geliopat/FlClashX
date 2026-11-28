@@ -87,17 +87,22 @@ void main() {
     if (directory == null) return;
     final bytes = await File('$directory/core-manifest.json').readAsBytes();
     final verified = await CoreReleaseManifest.verify(bytes);
-    expect(verified.version.value, 'v1.19.34-z.2');
+    expect(verified.version.value, 'v1.19.34-z.3');
     expect(verified.engineRevision, '88b3bc4604b0008ce08a8c5634b8f9ddd573d533');
-    expect(verified.hostRevision, '8640948576d11e707a9306c17ac432ae29a125c4');
+    expect(verified.hostRevision, 'ca8354f682baa8920a769a1d4f2d77f29e1b6a7d');
     await verified.verifyBinary(File('$directory/FlClashCore.exe'));
     final modified = jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
-    modified['version'] = 'v1.19.34-z.3';
+    modified['version'] = 'v1.19.34-z.4';
     await expectLater(CoreReleaseManifest.verify(utf8.encode(jsonEncode(modified))), throwsFormatException);
   });
 
-  test('downloads the published signed z2 using the actual client downloader', () async {
-    if (Platform.environment['FLCLASHZ_TEST_SIGNED_CORE_DIR'] == null) return;
+  test('downloads the published signed z3 using the actual client downloader', () async {
+    final directory = Platform.environment['FLCLASHZ_TEST_SIGNED_CORE_DIR'];
+    if (directory == null) return;
+    final expected = await CoreReleaseManifest.verify(
+      await File('$directory/core-manifest.json').readAsBytes(),
+    );
+    await expected.verifyBinary(File('$directory/FlClashCore.exe'));
     final root = await Directory.systemTemp.createTemp('core_release_download_');
     try {
       final updater = CoreReleaseUpdater(
@@ -105,13 +110,15 @@ void main() {
         helper: HelperClient(),
       );
       final offer = await updater.check(url:
-        'https://github.com/geliopat/Clash.Meta/releases/download/flclashz-core-v1.19.34-z.2/core-manifest.json');
-      expect(offer.manifest.version.value, 'v1.19.34-z.2');
-      expect(offer.manifest.hash, 'e504d2c5b2503057a8fc55e3665fe5a4c93852dc702a322d787d1df89e5b7c82');
+        'https://github.com/geliopat/Clash.Meta/releases/download/flclashz-core-v1.19.34-z.3/core-manifest.json');
+      expect(offer.manifest.version.value, 'v1.19.34-z.3');
+      expect(offer.manifest.hash, expected.hash);
+      expect(offer.manifest.hostRevision, 'ca8354f682baa8920a769a1d4f2d77f29e1b6a7d');
+      expect(offer.manifest.engineRevision, expected.engineRevision);
       final downloaded = await updater.downloadOffer(offer);
       try {
         await downloaded.manifest.verifyBinary(downloaded.binary);
-        expect(await downloaded.binary.length(), 71178240);
+        expect(await downloaded.binary.length(), expected.size);
       } finally {
         await downloaded.dispose();
       }
