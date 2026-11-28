@@ -220,6 +220,7 @@ enum CoreEventType {
   delay,
   request,
   requestTraffic,
+  closedFlowChanged,
   dns,
   loaded,
   crash,

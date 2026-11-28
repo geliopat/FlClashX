@@ -167,6 +167,20 @@ class _EmptyConfigCoreHandler extends _RecordingCoreHandler {
 }
 
 void main() {
+  test('native DNS stages survive JSON and copyWith, old messages omit them', () {
+    final legacy = DnsQuery.fromJson({
+      'domain': 'example.test', 'type': 'A', 'time': '2026-01-01T00:00:00Z',
+    });
+    expect(legacy.stages, isEmpty);
+    final traced = legacy.copyWith(stages: ['policy', 'main']);
+    expect(traced.toJson()['stages'], ['policy', 'main']);
+    expect(DnsQuery.fromJson(traced.toJson()), traced);
+    expect(traced, isNot(legacy));
+    expect(traced.searchFields, contains('policy'));
+    expect(CoreEvent.fromJson({'type': 'closedFlowChanged', 'data': null}).type,
+        CoreEventType.closedFlowChanged);
+  });
+
   test('applied Hosts cross IPC without losing aliases or multiple IPs', () async {
     final handler = _RecordingCoreHandler();
     expect(await handler.getAppliedHosts(), {

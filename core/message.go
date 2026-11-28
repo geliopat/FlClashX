@@ -40,7 +40,7 @@ func classOfMessage(message Message) messageClass {
 		return stateMessageClass
 	case LogMessage, RequestMessage:
 		return bulkMessageClass
-	case DnsMessage, RequestTrafficMessage:
+	case DnsMessage, RequestTrafficMessage, ClosedFlowChangedMessage:
 		return yieldingBulkMessageClass
 	default:
 		return priorityMessageClass

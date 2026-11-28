@@ -282,6 +282,7 @@ const _$CoreEventTypeEnumMap = {
   CoreEventType.delay: 'delay',
   CoreEventType.request: 'request',
   CoreEventType.requestTraffic: 'requestTraffic',
+  CoreEventType.closedFlowChanged: 'closedFlowChanged',
   CoreEventType.dns: 'dns',
   CoreEventType.loaded: 'loaded',
   CoreEventType.crash: 'crash',

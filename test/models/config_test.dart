@@ -1159,6 +1159,18 @@ void main() {
       );
     });
 
+    test('adaptive balance round trips and never emits a hash key', () {
+      final adaptive = group.copyWith(
+        type: GroupType.LoadBalance,
+        strategy: LoadBalanceStrategy.adaptiveBalance,
+        hashKey: 'in-user',
+      );
+      expect(adaptive.definition['strategy'], 'adaptive-balance');
+      expect(adaptive.definition.containsKey('hash-key'), isFalse);
+      expect(ProxyGroup.fromJson(adaptive.toJson()).strategy,
+          LoadBalanceStrategy.adaptiveBalance);
+    });
+
     test('reads its YAML back and keeps what the YAML does not carry', () {
       final edited = group.withDefinitionYaml(
         group.definitionYaml.replaceFirst('interval: 300', 'interval: 600'),

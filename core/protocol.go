@@ -87,6 +87,7 @@ const (
 	DelayMessage     MessageType = "delay"
 	RequestMessage   MessageType = "request"
 	DnsMessage       MessageType = "dns"
+	ClosedFlowChangedMessage MessageType = "closedFlowChanged"
 	LoadedMessage    MessageType = "loaded"
 	GeoUpdateMessage MessageType = "geoUpdate"
 	// Named after the Dart enum value, which is how CoreEvent.fromJson decodes it.

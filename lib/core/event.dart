@@ -32,6 +32,8 @@ abstract mixin class CoreEventListener {
 
   void onDns(DnsQuery dnsQuery) {}
 
+  void onClosedFlowChanged() {}
+
   void onLoaded(String providerName) {}
 
   void onCrash(String message) {}
@@ -75,6 +77,9 @@ class CoreEventManager {
                     download: (item['download'] as num).toInt(),
                   ),
               });
+              break;
+            case CoreEventType.closedFlowChanged:
+              listener.onClosedFlowChanged();
               break;
             case CoreEventType.dns:
               listener.onDns(DnsQuery.fromJson(event.data));

@@ -1,4 +1,5 @@
 import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/core/event.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
@@ -15,7 +16,7 @@ class EngineDiagnosticsView extends ConsumerStatefulWidget {
   ConsumerState<EngineDiagnosticsView> createState() => _EngineDiagnosticsViewState();
 }
 
-class _EngineDiagnosticsViewState extends ConsumerState<EngineDiagnosticsView> {
+class _EngineDiagnosticsViewState extends ConsumerState<EngineDiagnosticsView> with CoreEventListener {
   bool _busy = false;
   bool _supported = false;
   String? _error;
@@ -30,7 +31,22 @@ class _EngineDiagnosticsViewState extends ConsumerState<EngineDiagnosticsView> {
   @override
   void initState() {
     super.initState();
+    coreEventManager.addListener(this);
     Future.microtask(_load);
+  }
+
+  @override
+  void dispose() {
+    coreEventManager.removeListener(this);
+    super.dispose();
+  }
+
+  @override
+  void onClosedFlowChanged() {
+    if (mounted && !_busy && _capacity > 0 &&
+        ModalRoute.of(context)?.isCurrent != false) {
+      _load();
+    }
   }
 
   Future<void> _load({int? capacity, bool? chain}) async {

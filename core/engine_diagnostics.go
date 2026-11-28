@@ -2,6 +2,7 @@ package core
 
 import (
 	"sync"
+	"time"
 
 	"github.com/metacubex/mihomo/component/proxydialer"
 	"github.com/metacubex/mihomo/tunnel/statistic"
@@ -54,6 +55,11 @@ func handleSetEngineDiagnostics(settings engineDiagnosticsSettings) (engineDiagn
 		if err := statistic.DefaultManager.SetClosedFlowHistoryCapacity(settings.ClosedFlowCapacity); err != nil {
 			return old, err
 		}
+		capacity := 0
+		if settings.ClosedFlowCapacity > 0 { capacity = 128 }
+		subscription, err := statistic.DefaultManager.SubscribeClosedFlows(capacity)
+		if err != nil { return old, err }
+		if subscription != nil { go watchClosedFlowChanges(subscription) }
 	}
 	if settings.ChainDiagnostics != old.ChainDiagnostics {
 		proxydialer.EnableChainDiagnostics(settings.ChainDiagnostics)
@@ -74,4 +80,27 @@ func handleGetEngineDiagnostics() engineDiagnosticsSnapshot {
 
 func resetEngineDiagnostics() {
 	_, _ = handleSetEngineDiagnostics(engineDiagnosticsSettings{})
+}
+
+ // Notify the host at most once per second. The ring snapshot is the
+ // authoritative history, so dropped events never become fabricated counters.
+func watchClosedFlowChanges(subscription *statistic.ClosedFlowSubscription) {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+	dirty := false
+	var dropped uint64
+	for {
+		select {
+		case _, open := <-subscription.Events():
+			if !open { return }
+			dirty = true
+		case <-ticker.C:
+			next := subscription.Dropped()
+			dirty = dirty || next != dropped
+			dropped = next
+			if dirty && hostWantsEvents() {
+				if sendMessage(ClosedFlowChangedMessage, nil) { dirty = false }
+			}
+		}
+	}
 }
