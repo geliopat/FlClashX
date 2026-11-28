@@ -190,12 +190,23 @@ func TestRouteChangesSplitResetsFromMoves(t *testing.T) {
 
 func TestStartingTheListenersAdvancesTheEpoch(t *testing.T) {
 	recorder := recordRoutes(t)
-	withCurrentConfig(t, nil)
-	t.Cleanup(func() { isRunning.Store(false) })
+	cfg, err := config.Parse([]byte("mode: rule\nrules:\n  - MATCH,DIRECT\n"))
+	if err != nil {
+		t.Fatalf("parse accepted profile: %v", err)
+	}
+	withCurrentConfig(t, cfg)
+	previousRunning := isRunning.Load()
+	isRunning.Store(false)
+	t.Cleanup(func() {
+		handleStopListener()
+		isRunning.Store(previousRunning)
+	})
 	handleWatchRoute(true, 0)
 	before := routeState().CoreEpoch
 
-	handleStartListener()
+	if !handleStartListener() || !isRunning.Load() {
+		t.Fatal("listeners did not start with an accepted profile")
+	}
 
 	if got := routeState().CoreEpoch; got != before+1 {
 		t.Errorf("epoch = %d after the listeners came up, want %d", got, before+1)
