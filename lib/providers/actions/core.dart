@@ -256,6 +256,7 @@ class CoreAction extends _$CoreAction {
     CoreReleaseManifest? manifest,
     bool restore = false,
   }) {
+    if (_exiting) return Future.value(false);
     if (!system.isWindows || safeModeBuild || ref.read(safeModeProvider)) {
       return Future.error(StateError('Independent core updates require normal Windows mode'));
     }

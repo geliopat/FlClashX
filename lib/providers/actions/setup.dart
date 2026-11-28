@@ -119,6 +119,7 @@ class SetupAction extends _$SetupAction {
       _setupParams.copyWith(selectedMap: const {});
 
   Future<bool> fullSetup() async {
+    if (_exiting) return false;
     // Startup may already be applying the profile this replaces.
     if (!ref.read(initProvider)) {
       _setupAfterInit = true;
@@ -418,9 +419,10 @@ class SetupAction extends _$SetupAction {
 
   /// An excluded SSID parks the listener without ending the run.
   void syncSuspend() {
+    if (_exiting) return;
     debouncer.call(FunctionTag.suspend, () {
       return _listenerScheduler.run(() async {
-        if (!ref.read(isStartProvider) || ref.read(safeModeProvider)) {
+        if (_exiting || !ref.read(isStartProvider) || ref.read(safeModeProvider)) {
           return;
         }
         await _setListening(!ref.read(suspendProvider));
@@ -680,6 +682,7 @@ class SetupAction extends _$SetupAction {
     bool force = false,
     Future<void> Function()? preloadInvoke,
   }) async {
+    if (_exiting) return _SetupTaskResult.failed;
     _configRequests++;
     final result = await _setupScheduler.run(() {
       if (_exiting) return Future.value(_SetupTaskResult.failed);

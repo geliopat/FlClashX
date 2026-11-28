@@ -529,7 +529,7 @@ class ZapretController extends Notifier<ZapretState> {
   bool _collectingLogs = false;
   final _seenLogEvents = <String>{};
 
-  bool _canCommitListUpdate() => ref.mounted && ref.read(initProvider) &&
+  bool _canCommitListUpdate() => !_exiting && ref.read(initProvider) &&
       !ref.read(safeModeProvider) && state.available && !state.busy &&
       !state.dashboardRestarting && !_coreRestarting && !_profileApplying;
 
@@ -573,10 +573,11 @@ class ZapretController extends Notifier<ZapretState> {
   }
 
   Future<void> collectPersistentLogs() async {
-    if (_collectingLogs || !Platform.isWindows) return;
+    if (_collectingLogs || !Platform.isWindows || _exiting) return;
     _collectingLogs = true;
     try {
       final logs = await _client.zapretLogs();
+      if (_exiting) return;
       zapretFileLogger.enable();
       crashFileLogger.enable();
       for (final entry in logs) {
@@ -634,7 +635,9 @@ class ZapretController extends Notifier<ZapretState> {
   bool _profileBlocked = false;
   bool _desiredRunning = false;
 
-  bool get _launchBlocked => _lifecycleStopping || _coreRestarting ||
+  bool get _exiting => !ref.mounted || ref.read(systemActionProvider.notifier).isExiting;
+
+  bool get _launchBlocked => _exiting || _lifecycleStopping || _coreRestarting ||
       _profileApplying || _profileBlocked || ref.read(safeModeProvider) ||
       ref.read(coreStatusProvider) != CoreStatus.connected;
 
@@ -670,6 +673,7 @@ class ZapretController extends Notifier<ZapretState> {
   }
 
   Future<void> _recoverHelper({required bool forceReinstall}) async {
+    if (_exiting) throw StateError('Application is exiting');
     final action = forceReinstall ? 'reinstall' : 'restore-service';
     final id = recoveryJournal.begin('Helper', action);
     var outcome = RecoveryOutcome.failed;
@@ -980,10 +984,10 @@ class ZapretController extends Notifier<ZapretState> {
 
   /// Start only after the new Mihomo run is ready. A later stop supersedes this.
   Future<void> startAlongsideMihomo({bool force = false}) async {
-    if (!Platform.isWindows || !ref.mounted || _coreRestarting) return;
+    if (!Platform.isWindows || _exiting || _coreRestarting) return;
     final revision = ++_lifecycleRevision;
     final preferences = await SharedPreferences.getInstance();
-    if (!ref.mounted || revision != _lifecycleRevision || _coreRestarting) return;
+    if (_exiting || revision != _lifecycleRevision || _coreRestarting) return;
     _lifecycleStopping = false;
     _initialTuneAttempted = false;
     _failedChecks = 0;
@@ -1060,10 +1064,10 @@ class ZapretController extends Notifier<ZapretState> {
   }
 
   Future<void> refresh() async {
-    if (!Platform.isWindows || _refreshing || state.busy) return;
+    if (!Platform.isWindows || _exiting || _refreshing || state.busy) return;
     _refreshing = true;
     final revision = _statusRevision;
-    bool current() => ref.mounted && revision == _statusRevision && !state.busy;
+    bool current() => !_exiting && revision == _statusRevision && !state.busy;
     try {
       final response = await _client.zapretStatus();
       if (!current()) return;
@@ -1181,7 +1185,7 @@ class ZapretController extends Notifier<ZapretState> {
   /// could not be loaded. Do not replace a service outside the coordinated
   /// core restart: it may own both processes.
   Future<void> restartFromDashboard({bool restartAll = false}) async {
-    if (!Platform.isWindows || !ref.mounted || state.busy ||
+    if (!Platform.isWindows || _exiting || state.busy ||
         state.dashboardRestarting || _coreRestarting || _profileApplying ||
         ref.read(safeModeProvider)) {
       return;
