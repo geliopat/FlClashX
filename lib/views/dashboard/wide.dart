@@ -90,6 +90,10 @@ List<DashboardWidget> wideDashboardWidgetsOf(SupportPlatform platform) => [
     if (card.platforms.contains(platform)) card,
 ];
 
+/// Zapret includes a second strategy row; ordinary controls have one row.
+double wideControlRowHeight(WideRow row, {required bool compact, required double scale}) =>
+    (row.cards.contains(DashboardWidget.zapret) ? 128 : compact ? 56 : 64) * scale;
+
 /// Four columns fill the window, the tables taking what the rows above them
 /// leave when they come last. A window too short for the tables, and every two
 /// column one, gets the summary cards instead, so no list scrolls inside a page
@@ -142,9 +146,8 @@ class _WideDashboardState extends ConsumerState<WideDashboard> {
       WideRowKind.middle => ((compact ? 152 : 176) + (offers ? 44 : 0)) * scale,
       WideRowKind.bottom => (compact ? 112 : 120) * scale,
     };
-    // Zapret has a second strategy row, unlike one-line takeover controls.
-    double rowHeight(WideRow row) => row.cards.contains(DashboardWidget.zapret)
-        ? math.max(heightOf(row.kind), 128 * scale)
+    double rowHeight(WideRow row) => row.kind == WideRowKind.control
+        ? wideControlRowHeight(row, compact: compact, scale: scale)
         : heightOf(row.kind);
     final tablesHeight = connectionsTableMinHeight(density, scale);
     final rows = wideRowsOf(cards, columns);

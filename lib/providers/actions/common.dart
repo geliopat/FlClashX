@@ -296,6 +296,7 @@ class CommonAction extends _$CommonAction {
       final context = globalState.navigatorKey.currentContext!;
       final notes = _releaseSpan(context, data['body'] as String?);
       final platform = await _updatePlatform();
+      if (!context.mounted || !ref.mounted) return;
       final required = data['_required'] == true;
       final downloader = UpdateDownloader(root: _updateCacheRoot);
       await dialogs.showCommonDialog<void>(

@@ -129,6 +129,24 @@ void main() {
       expect(calls, ['keep', 'new']);
     });
 
+    test('a callback can cancel and replace its own tag', () async {
+      final throttler = Throttler();
+      final done = Completer<void>();
+      throttler.call('tag', () {
+        throttler.cancel('tag');
+        expect(throttler.call('tag', done.complete, duration: window), isFalse);
+        expect(throttler.call('tag', () {}, duration: window), isTrue);
+      }, duration: window);
+      await done.future;
+    });
+
+    test('an immediate callback can cancel its own cooldown', () {
+      final throttler = Throttler();
+      throttler.call('tag', () => throttler.cancel('tag'), fire: true);
+      expect(throttler.call('tag', () {}, fire: true), isFalse);
+      throttler.cancel('tag');
+    });
+
     test('runs the callback at the end of the window by default', () async {
       final throttler = Throttler();
       var calls = 0;

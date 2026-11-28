@@ -60,6 +60,18 @@ void main() {
     );
   });
 
+  test('Zapret strategy row has space at all supported text scales', () {
+    const zapret = WideRow(WideRowKind.control, [DashboardWidget.zapret]);
+    const ordinary = WideRow(WideRowKind.control, [DashboardWidget.outboundMode]);
+    for (final scale in [1.0, 1.25, 1.5, 2.0]) {
+      for (final compact in [true, false]) {
+        expect(wideControlRowHeight(zapret, compact: compact, scale: scale), 128 * scale);
+        expect(wideControlRowHeight(ordinary, compact: compact, scale: scale),
+            (compact ? 56 : 64) * scale);
+      }
+    }
+  });
+
   test('a card starts a new row when its kind changes or the row is full', () {
     expect(
       _rows(const [

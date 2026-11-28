@@ -92,17 +92,15 @@ class Throttler {
     if (_operations.containsKey(tag)) {
       return true;
     }
-    if (fire) {
-      _applyAndReport(tag, func, args);
-      _operations[tag] = Timer(duration, () {
-        _operations.remove(tag);
-      });
-    } else {
-      _operations[tag] = Timer(duration, () {
-        _applyAndReport(tag, func, args);
-        _operations.remove(tag);
-      });
-    }
+    late final Timer timer;
+    timer = Timer(duration, () {
+      if (!identical(_operations[tag], timer)) return;
+      if (!fire) _applyAndReport(tag, func, args);
+      // A callback can cancel this tag and enqueue a replacement.
+      if (identical(_operations[tag], timer)) _operations.remove(tag);
+    });
+    _operations[tag] = timer;
+    if (fire) _applyAndReport(tag, func, args);
     return false;
   }
 }

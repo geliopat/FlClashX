@@ -364,11 +364,16 @@ class ZapretTile extends ConsumerWidget {
               child: Row(
                 children: [
                   Expanded(
-                    child: Text(
-                      state.error ?? 'Загрузка каталога стратегий...',
-                      style: AppTextStyle.footnote.of(context).copyWith(
-                            color: context.colorScheme.onSurfaceVariant,
-                          ),
+                    child: Tooltip(
+                      message: state.error ?? 'Загрузка каталога стратегий...',
+                      child: Text(
+                        state.error ?? 'Загрузка каталога стратегий...',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyle.footnote.of(context).copyWith(
+                          color: context.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
                     ),
                   ),
                   DashboardIconButton(
