@@ -1150,3 +1150,27 @@ func TestAppliedHostsSnapshot(t *testing.T) {
 		t.Fatalf("unexpected applied hosts: %v", got)
 	}
 }
+
+func TestProfileProbeSettingsRestoreExactState(t *testing.T) {
+	originalURL := testURL.Load()
+	originalSkip := skipCertVerify.Load()
+	t.Cleanup(func() {
+		testURL.Store(originalURL)
+		skipCertVerify.Store(originalSkip)
+	})
+	for _, old := range []*string{nil, originalURL} {
+		testURL.Store(old)
+		skipCertVerify.Store(true)
+		params := defaultSetupParams()
+		params.TestURL = "https://replacement.example/generate_204"
+		params.SkipCertVerify = false
+		previous := applyProfileProbeSettings(params)
+		if currentTestURL() != params.TestURL || skipCertVerify.Load() {
+			t.Fatal("new profile probe settings not applied")
+		}
+		previous.restore()
+		if testURL.Load() != old || !skipCertVerify.Load() {
+			t.Fatal("profile probe settings did not restore exact state")
+		}
+	}
+}

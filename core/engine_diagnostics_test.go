@@ -2,9 +2,11 @@ package core
 
 import (
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/metacubex/mihomo/adapter"
+	"github.com/metacubex/mihomo/adapter/outboundgroup"
 )
 
 func TestNativeDiagnosticsSettingsAndCapabilityContract(t *testing.T) {
@@ -39,5 +41,37 @@ func TestChainHealthOwnerSourceIntegration(t *testing.T) {
 	owner,dialer,factory,ok:=describeChainHealthOwner(proxy)
 	if !ok || owner.Name!="owner" || owner.Group!="front" || owner.Provider!="provider" || owner.Identity=="" || dialer==nil || factory==nil {
 		t.Fatalf("live source not identified: %+v",owner)
+	}
+}
+
+func TestChainHealthReportsIgnoreReplacedJobs(t *testing.T) {
+	const name = "refactor-test-chain"
+	old := &chainHealthJob{}
+	active := &chainHealthJob{}
+	chainHealthJobs.Lock()
+	previous := chainHealthJobs.jobs[name]
+	chainHealthJobs.jobs[name] = active
+	chainHealthJobs.Unlock()
+	t.Cleanup(func() {
+		chainHealthJobs.Lock()
+		defer chainHealthJobs.Unlock()
+		if previous == nil {
+			delete(chainHealthJobs.jobs, name)
+		} else {
+			chainHealthJobs.jobs[name] = previous
+		}
+	})
+
+	reportChainHealth(name, old, []outboundgroup.ChainProbeResult{{Member: "old"}}, errors.New("old"))
+	finishChainHealth(name, old)
+	results := []outboundgroup.ChainProbeResult{{Member: "current", Healthy: true}}
+	reportChainHealth(name, active, results, nil)
+	results[0].Member = "mutated"
+	chainHealthJobs.Lock()
+	defer chainHealthJobs.Unlock()
+	if chainHealthJobs.jobs[name] != active || len(active.status.Results) != 1 ||
+		active.status.Results[0].Member != "current" || active.status.Error != "" ||
+		len(old.status.Results) != 0 {
+		t.Fatal("stale job or caller-owned results altered the active snapshot")
 	}
 }
