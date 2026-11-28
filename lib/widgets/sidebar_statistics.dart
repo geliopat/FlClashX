@@ -2,6 +2,7 @@ import 'package:fl_clash/ui/network_palette.dart';
 import 'package:fl_clash/ui/hover_glow.dart';
 import 'package:fl_clash/ui/surface.dart';
 import 'package:fl_clash/ui/shape.dart';
+import 'package:fl_clash/ui/typography.dart';
 import 'dart:async';
 import 'dart:ffi';
 import 'dart:io';
@@ -246,9 +247,8 @@ class _SidebarStatisticsState extends ConsumerState<SidebarStatistics> {
   Widget build(BuildContext context) {
     final l = context.appLocalizations;
     final history = ref.watch(trafficHistoryProvider);
-    final theme = Theme.of(context);
-    final style = theme.textTheme.bodySmall;
-    final heading = theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600);
+    final style = AppTextStyle.footnote.of(context);
+    final heading = AppTextStyle.footnote.of(context, emphasized: true);
     final connected = ref.watch(coreStatusProvider) == CoreStatus.connected;
     final running = ref.watch(runTimeProvider) != null;
     final sampledSpeed = ref.watch(trafficsProvider.select(
@@ -282,10 +282,10 @@ class _SidebarStatisticsState extends ConsumerState<SidebarStatistics> {
             children: [
           Row(children: [
             Expanded(child: Text('TCP ${connected ? _tcp ?? '—' : 0}',
-              style: style?.copyWith(color: NetworkTone.tcp.of(context)))),
+              style: style.copyWith(color: NetworkTone.tcp.of(context)))),
             Expanded(child: Text('UDP ${connected ? _udp ?? '—' : 0}',
               textAlign: TextAlign.end,
-              style: style?.copyWith(color: NetworkTone.udp.of(context)))),
+              style: style.copyWith(color: NetworkTone.udp.of(context)))),
           ]),
           _trafficRow(l.forkSidebarSpeed, speed, style, rate: true),
           _trafficRow(l.forkSidebarSession, session, style),

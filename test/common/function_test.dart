@@ -118,6 +118,17 @@ void main() {
       expect(throttler.call('tag', () {}, duration: window), isTrue);
     });
 
+    test('cancel prevents pending work and lets the tag be reused', () async {
+      final throttler = Throttler();
+      final calls = <String>[];
+      throttler.call('cancel', () => calls.add('old'), duration: window);
+      throttler.call('keep', () => calls.add('keep'), duration: window);
+      throttler.cancel('cancel');
+      expect(throttler.call('cancel', () => calls.add('new'), duration: window), isFalse);
+      await Future<void>.delayed(window * 3);
+      expect(calls, ['keep', 'new']);
+    });
+
     test('runs the callback at the end of the window by default', () async {
       final throttler = Throttler();
       var calls = 0;

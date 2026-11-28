@@ -80,6 +80,8 @@ class SerialTaskScheduler {
 class Throttler {
   final Map<dynamic, Timer> _operations = {};
 
+  void cancel(dynamic tag) => _operations.remove(tag)?.cancel();
+
   bool call(
     dynamic tag,
     Function func, {

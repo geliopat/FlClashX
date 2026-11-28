@@ -96,7 +96,10 @@ void main() {
     SystemAction Function()? systemAction,
   }) async {
     container = ProviderContainer(
-      overrides: [zapretControllerProvider.overrideWith(IdleZapret.new), 
+      overrides: [
+        zapretControllerProvider.overrideWith(IdleZapret.new),
+        zapretDiagnosticsProvider.overrideWithBuild((_, _) => const ZapretDiagnosticsState({})),
+        smartHostsProvider.overrideWithBuild((_, _) => const SmartHostsState()),
         profilesProvider.overrideWith(TestProfiles.new),
         systemActionProvider.overrideWith(
           systemAction ?? _RecordingSystemAction.new,
@@ -234,7 +237,10 @@ void main() {
   ) async {
     addTearDown(() => AppLocalizations.load(const Locale('en')));
     container = ProviderContainer(
-      overrides: [zapretControllerProvider.overrideWith(IdleZapret.new), 
+      overrides: [
+        zapretControllerProvider.overrideWith(IdleZapret.new),
+        zapretDiagnosticsProvider.overrideWithBuild((_, _) => const ZapretDiagnosticsState({})),
+        smartHostsProvider.overrideWithBuild((_, _) => const SmartHostsState()),
         profilesProvider.overrideWith(TestProfiles.new),
         systemActionProvider.overrideWith(_RecordingSystemAction.new),
       ],
@@ -254,7 +260,10 @@ void main() {
     tester,
   ) async {
     container = ProviderContainer(
-      overrides: [zapretControllerProvider.overrideWith(IdleZapret.new), 
+      overrides: [
+        zapretControllerProvider.overrideWith(IdleZapret.new),
+        zapretDiagnosticsProvider.overrideWithBuild((_, _) => const ZapretDiagnosticsState({})),
+        smartHostsProvider.overrideWithBuild((_, _) => const SmartHostsState()),
         profilesProvider.overrideWith(TestProfiles.new),
         systemActionProvider.overrideWith(_RecordingSystemAction.new),
       ],

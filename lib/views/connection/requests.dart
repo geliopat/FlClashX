@@ -62,11 +62,16 @@ class _RequestsViewState extends ConsumerState<RequestsView>
     _pageActive = active;
     // Keep the list controller and its state, but catch up with the
     // shared request history only when the feed becomes visible.
-    if (active) updateRequestsThrottler();
+    if (active) {
+      updateRequestsThrottler();
+    } else {
+      throttler.cancel((FunctionTag.requests, this));
+    }
   }
 
   @override
   void dispose() {
+    throttler.cancel((FunctionTag.requests, this));
     _listController.dispose();
     if (widget.scrollController == null) {
       _scrollController.dispose();
