@@ -52,6 +52,17 @@ void main() {
 
   ThemeProps readTheme() => container.read(themeSettingProvider);
 
+  Finder section(String key) => find.byKey(ValueKey(key));
+  Finder inSection(String key, Finder matching) =>
+      find.descendant(of: section(key), matching: matching);
+  Future<void> revealSection(WidgetTester tester, String key) async {
+    await tester.scrollUntilVisible(
+      section(key), 400, scrollable: find.byType(Scrollable).first,
+    );
+    await tester.ensureVisible(section(key));
+    await tester.pumpAndSettle();
+  }
+
   group('theme mode', () {
     testWidgets('defaults to following the system', (tester) async {
       await pumpThemeView(tester);
@@ -92,7 +103,7 @@ void main() {
       for (final color in defaultPrimaryColors) {
         expect(swatch(color), findsOneWidget);
       }
-      expect(find.byTooltip('Reset'), findsNothing);
+      expect(inSection('theme-primary-color', find.byTooltip('Reset')), findsNothing);
     });
 
     testWidgets('picks a color and the style of its scheme', (tester) async {
@@ -363,7 +374,7 @@ void main() {
     }
 
     Future<void> openFonts(WidgetTester tester) async {
-      await tester.tap(find.text('Aa').first);
+      await tester.tap(inSection('theme-font-family', find.text('Aa')));
       await tester.pumpAndSettle();
       await pumpSettled(tester);
     }
@@ -372,9 +383,10 @@ void main() {
       tester,
     ) async {
       await pumpThemeView(tester);
+      await revealSection(tester, 'theme-font-family');
 
       expect(readTheme().fontFamily, isNull);
-      expect(find.text('Default'), findsOneWidget);
+      expect(inSection('theme-font-family', find.text('Default')), findsOneWidget);
 
       await openFonts(tester);
       expect(
@@ -402,8 +414,9 @@ void main() {
         return ['Arrival Sans'];
       };
       await pumpThemeView(tester);
+      await revealSection(tester, 'theme-font-family');
 
-      await tester.tap(find.text('Aa').first);
+      await tester.tap(inSection('theme-font-family', find.text('Aa')));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
       await tester.pump(const Duration(milliseconds: 16));
@@ -426,8 +439,9 @@ void main() {
       final families = Completer<List<String>>();
       systemFontFamiliesReader = () => families.future;
       await pumpThemeView(tester);
+      await revealSection(tester, 'theme-font-family');
 
-      await tester.tap(find.text('Aa').first);
+      await tester.tap(inSection('theme-font-family', find.text('Aa')));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 200));
       expect(fontsIllustration, findsNothing);
@@ -447,13 +461,14 @@ void main() {
           .read(themeSettingProvider.notifier)
           .update((state) => state.copyWith(fontFamily: 'Beta Serif'));
       await pumpThemeView(tester);
+      await revealSection(tester, 'theme-font-family');
 
       expect(
-        tester.widget<Text>(find.text('Beta Serif')).style?.fontFamily,
+        tester.widget<Text>(inSection('theme-font-family', find.text('Beta Serif'))).style?.fontFamily,
         'Beta Serif',
       );
       expect(
-        tester.widget<Text>(find.text('Aa').first).style?.fontFamily,
+        tester.widget<Text>(inSection('theme-font-family', find.text('Aa'))).style?.fontFamily,
         'Beta Serif',
       );
     });
@@ -466,7 +481,8 @@ void main() {
         return families;
       };
       await pumpThemeView(tester);
-      await tester.tap(find.text('Aa').first);
+      await revealSection(tester, 'theme-font-family');
+      await tester.tap(inSection('theme-font-family', find.text('Aa')));
       for (var i = 0; i < 20 && !loaded; i++) {
         await tester.pump(const Duration(milliseconds: 50));
       }
@@ -497,6 +513,7 @@ void main() {
     ) async {
       systemFontFamiliesReader = () async => throw const OSError('fc', 1);
       await pumpThemeView(tester);
+      await revealSection(tester, 'theme-font-family');
 
       await openFonts(tester);
 
@@ -509,17 +526,18 @@ void main() {
   group('text scale', () {
     testWidgets('follows the system until custom is picked', (tester) async {
       await pumpThemeView(tester);
+      await revealSection(tester, 'theme-text-scale');
 
       expect(readTheme().textScale.enable, isFalse);
-      expect(tester.widget<Slider>(find.byType(Slider)).onChanged, isNull);
+      expect(tester.widget<Slider>(inSection('theme-text-scale', find.byType(Slider))).onChanged, isNull);
 
-      await tester.tap(find.text('Custom'));
+      await tester.tap(inSection('theme-text-scale', find.text('Custom')));
       await tester.pumpAndSettle();
 
       expect(readTheme().textScale.enable, isTrue);
-      expect(tester.widget<Slider>(find.byType(Slider)).onChanged, isNotNull);
+      expect(tester.widget<Slider>(inSection('theme-text-scale', find.byType(Slider))).onChanged, isNotNull);
 
-      await tester.tap(find.text('Follow system'));
+      await tester.tap(inSection('theme-text-scale', find.text('Follow system')));
       await tester.pumpAndSettle();
 
       expect(readTheme().textScale.enable, isFalse);
@@ -527,11 +545,12 @@ void main() {
 
     testWidgets('writes the scale only when the drag ends', (tester) async {
       await pumpThemeView(tester);
-      await tester.tap(find.text('Custom'));
+      await revealSection(tester, 'theme-text-scale');
+      await tester.tap(inSection('theme-text-scale', find.text('Custom')));
       await tester.pumpAndSettle();
       final before = readTheme().textScale.scale;
 
-      final slider = find.byType(Slider);
+      final slider = inSection('theme-text-scale', find.byType(Slider));
       await tester.ensureVisible(slider);
       await tester.pumpAndSettle();
       final gesture = await tester.startGesture(tester.getCenter(slider));
@@ -552,14 +571,15 @@ void main() {
           );
 
       await pumpThemeView(tester);
+      await revealSection(tester, 'theme-text-scale');
 
-      expect(find.text('120%'), findsOneWidget);
+      expect(inSection('theme-text-scale', find.text('120%')), findsOneWidget);
 
-      await tester.tap(find.byTooltip('Reset').last);
+      await tester.tap(inSection('theme-text-scale', find.byTooltip('Reset')));
       await tester.pumpAndSettle();
 
       expect(readTheme().textScale.scale, 1);
-      expect(find.text('100%'), findsOneWidget);
+      expect(inSection('theme-text-scale', find.text('100%')), findsOneWidget);
     });
   });
 }

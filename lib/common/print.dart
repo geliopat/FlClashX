@@ -7,6 +7,7 @@ import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/state.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 
 String compactError(Object error) {
   if (error is DioException) {
@@ -28,14 +29,24 @@ class CommonPrint {
     return _instance!;
   }
 
+  // Widget tests may use an in-memory sink rather than scheduling disk I/O
+  // inside a fake async zone. Production always uses the application logger.
+  @visibleForTesting
+  void Function(Log)? applicationLogSinkForTesting;
+
   void log(String? text, {LogLevel logLevel = LogLevel.info}) {
     final payload = '[APP] $text';
     debugPrint(payload);
     final log = Log.app(payload).copyWith(logLevel: logLevel);
     if (Platform.isWindows) {
       // Application diagnostics are not Mihomo engine events.
-      appFileLogger.enable();
-      appFileLogger.write(log);
+      final sink = applicationLogSinkForTesting;
+      if (sink != null) {
+        sink(log);
+      } else {
+        appFileLogger.enable();
+        appFileLogger.write(log);
+      }
       return;
     }
     if (!globalState.isAttach) {

@@ -142,6 +142,10 @@ class _WideDashboardState extends ConsumerState<WideDashboard> {
       WideRowKind.middle => ((compact ? 152 : 176) + (offers ? 44 : 0)) * scale,
       WideRowKind.bottom => (compact ? 112 : 120) * scale,
     };
+    // Zapret has a second strategy row, unlike one-line takeover controls.
+    double rowHeight(WideRow row) => row.cards.contains(DashboardWidget.zapret)
+        ? math.max(heightOf(row.kind), 128 * scale)
+        : heightOf(row.kind);
     final tablesHeight = connectionsTableMinHeight(density, scale);
     final rows = wideRowsOf(cards, columns);
     final last = rows.lastOrNull;
@@ -165,7 +169,7 @@ class _WideDashboardState extends ConsumerState<WideDashboard> {
             gap * (rows.length - 1) +
             rows
                 .where((row) => !bottomLast || row != last)
-                .fold(0.0, (sum, row) => sum + heightOf(row.kind));
+                .fold(0.0, (sum, row) => sum + rowHeight(row));
         final tablesFit =
             columns == 4 &&
             bottomLast &&
@@ -213,7 +217,7 @@ class _WideDashboardState extends ConsumerState<WideDashboard> {
           if (row == last && fills) {
             return Expanded(child: content);
           }
-          return SizedBox(height: heightOf(row.kind), child: content);
+          return SizedBox(height: rowHeight(row), child: content);
         }
 
         return SingleChildScrollView(

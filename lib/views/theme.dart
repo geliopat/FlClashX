@@ -61,7 +61,7 @@ class ThemeView extends StatelessWidget {
           const SizedBox(height: 16),
           const ManagedSetting(
             settingKey: 'view.app.color',
-            child: _PrimaryColorItem(),
+            child: _PrimaryColorItem(key: ValueKey('theme-primary-color')),
           ),
           const SizedBox(height: 16),
           const ManagedSetting(
@@ -88,9 +88,9 @@ class ThemeView extends StatelessWidget {
           ],
           const ManagedSetting(settingKey: hideIpSetting, child: _HideIpItem()),
           const SizedBox(height: 16),
-          const _FontFamilyItem(),
+          const _FontFamilyItem(key: ValueKey('theme-font-family')),
           const SizedBox(height: 16),
-          const _TextScaleFactorItem(),
+          const _TextScaleFactorItem(key: ValueKey('theme-text-scale')),
         ],
       ),
     );
@@ -412,7 +412,7 @@ class _ThemeModeItem extends ConsumerWidget {
 }
 
 class _PrimaryColorItem extends ConsumerWidget {
-  const _PrimaryColorItem();
+  const _PrimaryColorItem({super.key});
 
   Future<void> _handleReset(BuildContext context, WidgetRef ref) async {
     final res = await dialogs.showMessage(
@@ -1151,7 +1151,7 @@ class _HideIpItem extends ConsumerWidget {
 }
 
 class _FontFamilyItem extends ConsumerWidget {
-  const _FontFamilyItem();
+  const _FontFamilyItem({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1232,7 +1232,7 @@ class _FontFamilyItem extends ConsumerWidget {
 }
 
 class _TextScaleFactorItem extends ConsumerStatefulWidget {
-  const _TextScaleFactorItem();
+  const _TextScaleFactorItem({super.key});
 
   static const _step = 0.05;
 

@@ -102,9 +102,10 @@ void main() {
   setUpAll(() async {
     logRoot = await Directory.systemTemp.createTemp('client-log-test-');
     await useAppPaths(logRoot);
+    commonPrint.applicationLogSinkForTesting = (_) {};
   });
   tearDownAll(() async {
-    await appFileLogger.flush();
+    commonPrint.applicationLogSinkForTesting = null;
     if (await logRoot.exists()) await logRoot.delete(recursive: true);
   });
 

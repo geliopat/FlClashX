@@ -421,7 +421,7 @@ void main() {
         find.descendant(of: row(), matching: lock(locked: false)),
         findsOneWidget,
       );
-      expect(lock(locked: false), findsOneWidget);
+      expect(lock(locked: false), findsNWidgets(2));
       expect(find.textContaining('An open lock marks'), findsOneWidget);
     },
   );

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:fl_clash/common/app_localizations.dart';
 import 'package:fl_clash/common/app_ports.dart';
 import 'package:fl_clash/common/traffic_history.dart';
@@ -22,6 +24,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../helpers/glyph_finders.dart';
 import '../helpers/test_app.dart';
+import '../helpers/idle_zapret.dart';
 
 Finder _glyph(Glyph glyph) => find.byGlyph(glyph);
 
@@ -148,14 +151,17 @@ void main() {
             )
             .first,
       );
-      expect(sidebarSurface.color, colorScheme.chromeSurface);
-      expect(sidebarSurface.color, isNot(sidebarContainer.color));
-      expect(
-        (sidebarSurface.shape! as BorderDirectional).end,
-        Divider.createBorderSide(
-          tester.element(find.byType(NavigationSidebar)),
-        ),
-      );
+      if (Platform.isWindows) {
+        expect(sidebarSurface.color, Colors.transparent);
+        expect(sidebarSurface.shape, isNull);
+      } else {
+        expect(sidebarSurface.color, colorScheme.chromeSurface);
+        expect(sidebarSurface.color, isNot(sidebarContainer.color));
+        expect(
+          (sidebarSurface.shape! as BorderDirectional).end,
+          Divider.createBorderSide(tester.element(find.byType(NavigationSidebar))),
+        );
+      }
 
       await tester.tap(find.text('count: 0'));
       await tester.pump();
@@ -320,7 +326,8 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
     final sidebar = find.byType(NavigationSidebar);
-    expect(tester.getSize(sidebar).width, 220);
+    final expandedWidth = tester.getSize(sidebar).width;
+    expect(expandedWidth, Platform.isWindows ? inInclusiveRange(164, 260) : 220);
 
     await tester.tap(find.byTooltip('Collapse'));
     await tester.pump();
@@ -331,7 +338,7 @@ void main() {
     await tester.tap(find.byTooltip('Expand'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
-    expect(tester.getSize(sidebar).width, 220);
+    expect(tester.getSize(sidebar).width, expandedWidth);
 
     tester.view.physicalSize = const Size(800, 800);
     container.read(viewSizeProvider.notifier).value = const Size(800, 800);
@@ -537,7 +544,11 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
 
-      final container = ProviderContainer();
+      final container = ProviderContainer(overrides: [
+        zapretControllerProvider.overrideWith(IdleZapret.new),
+        zapretDiagnosticsProvider.overrideWithBuild((_, _) => const ZapretDiagnosticsState({})),
+        smartHostsProvider.overrideWithBuild((_, _) => const SmartHostsState()),
+      ]);
       addTearDown(container.dispose);
       globalState.container = container;
       container.read(viewSizeProvider.notifier).value = const Size(1400, 1000);

@@ -291,6 +291,7 @@ class WindowHeaderLayout extends StatelessWidget {
       child: Stack(
         children: [
           Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               SizedBox(height: integrated ? 0 : height),
               Expanded(
