@@ -2083,7 +2083,7 @@ as bool,
 /// @nodoc
 mixin _$DnsQuery {
 
- String get domain; String get type;@JsonKey(unknownEnumValue: JsonKey.nullForUndefinedEnumValue) DnsQueryInitiator? get initiator; String get upstream; bool get cached; List<String> get answers; String get rcode; String get error; int get delay; DateTime get time;
+ String get domain; String get type;@JsonKey(unknownEnumValue: JsonKey.nullForUndefinedEnumValue) DnsQueryInitiator? get initiator; String get upstream; bool get cached; List<String> get stages; List<String> get answers; String get rcode; String get error; int get delay; DateTime get time;
 /// Create a copy of DnsQuery
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -2097,20 +2097,20 @@ $DnsQueryCopyWith<DnsQuery> get copyWith => _$DnsQueryCopyWithImpl<DnsQuery>(thi
 @override
 bool operator ==(Object other) {
   final _this = this as DnsQuery;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is DnsQuery&&(identical(other.domain, _this.domain) || other.domain == _this.domain)&&(identical(other.type, _this.type) || other.type == _this.type)&&(identical(other.initiator, _this.initiator) || other.initiator == _this.initiator)&&(identical(other.upstream, _this.upstream) || other.upstream == _this.upstream)&&(identical(other.cached, _this.cached) || other.cached == _this.cached)&&const DeepCollectionEquality().equals(other.answers, _this.answers)&&(identical(other.rcode, _this.rcode) || other.rcode == _this.rcode)&&(identical(other.error, _this.error) || other.error == _this.error)&&(identical(other.delay, _this.delay) || other.delay == _this.delay)&&(identical(other.time, _this.time) || other.time == _this.time));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is DnsQuery&&(identical(other.domain, _this.domain) || other.domain == _this.domain)&&(identical(other.type, _this.type) || other.type == _this.type)&&(identical(other.initiator, _this.initiator) || other.initiator == _this.initiator)&&(identical(other.upstream, _this.upstream) || other.upstream == _this.upstream)&&(identical(other.cached, _this.cached) || other.cached == _this.cached)&&const DeepCollectionEquality().equals(other.stages, _this.stages)&&const DeepCollectionEquality().equals(other.answers, _this.answers)&&(identical(other.rcode, _this.rcode) || other.rcode == _this.rcode)&&(identical(other.error, _this.error) || other.error == _this.error)&&(identical(other.delay, _this.delay) || other.delay == _this.delay)&&(identical(other.time, _this.time) || other.time == _this.time));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
   final _this = this as DnsQuery;
-  return Object.hash(runtimeType,_this.domain,_this.type,_this.initiator,_this.upstream,_this.cached,const DeepCollectionEquality().hash(_this.answers),_this.rcode,_this.error,_this.delay,_this.time);
+  return Object.hash(runtimeType,_this.domain,_this.type,_this.initiator,_this.upstream,_this.cached,const DeepCollectionEquality().hash(_this.stages),const DeepCollectionEquality().hash(_this.answers),_this.rcode,_this.error,_this.delay,_this.time);
 }
 
 @override
 String toString() {
   final _this = this as DnsQuery;
-  return 'DnsQuery(domain: ${_this.domain}, type: ${_this.type}, initiator: ${_this.initiator}, upstream: ${_this.upstream}, cached: ${_this.cached}, answers: ${_this.answers}, rcode: ${_this.rcode}, error: ${_this.error}, delay: ${_this.delay}, time: ${_this.time})';
+  return 'DnsQuery(domain: ${_this.domain}, type: ${_this.type}, initiator: ${_this.initiator}, upstream: ${_this.upstream}, cached: ${_this.cached}, stages: ${_this.stages}, answers: ${_this.answers}, rcode: ${_this.rcode}, error: ${_this.error}, delay: ${_this.delay}, time: ${_this.time})';
 }
 
 
@@ -2121,7 +2121,7 @@ abstract mixin class $DnsQueryCopyWith<$Res>  {
   factory $DnsQueryCopyWith(DnsQuery value, $Res Function(DnsQuery) _then) = _$DnsQueryCopyWithImpl;
 @useResult
 $Res call({
- String domain, String type,@JsonKey(unknownEnumValue: JsonKey.nullForUndefinedEnumValue) DnsQueryInitiator? initiator, String upstream, bool cached, List<String> answers, String rcode, String error, int delay, DateTime time
+ String domain, String type,@JsonKey(unknownEnumValue: JsonKey.nullForUndefinedEnumValue) DnsQueryInitiator? initiator, String upstream, bool cached, List<String> stages, List<String> answers, String rcode, String error, int delay, DateTime time
 });
 
 
@@ -2138,14 +2138,15 @@ class _$DnsQueryCopyWithImpl<$Res>
 
 /// Create a copy of DnsQuery
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? domain = null,Object? type = null,Object? initiator = freezed,Object? upstream = null,Object? cached = null,Object? answers = null,Object? rcode = null,Object? error = null,Object? delay = null,Object? time = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? domain = null,Object? type = null,Object? initiator = freezed,Object? upstream = null,Object? cached = null,Object? stages = null,Object? answers = null,Object? rcode = null,Object? error = null,Object? delay = null,Object? time = null,}) {
   return _then(DnsQuery(
 domain: null == domain ? _self.domain : domain // ignore: cast_nullable_to_non_nullable
 as String,type: null == type ? _self.type : type // ignore: cast_nullable_to_non_nullable
 as String,initiator: freezed == initiator ? _self.initiator : initiator // ignore: cast_nullable_to_non_nullable
 as DnsQueryInitiator?,upstream: null == upstream ? _self.upstream : upstream // ignore: cast_nullable_to_non_nullable
 as String,cached: null == cached ? _self.cached : cached // ignore: cast_nullable_to_non_nullable
-as bool,answers: null == answers ? _self.answers : answers // ignore: cast_nullable_to_non_nullable
+as bool,stages: null == stages ? _self.stages : stages // ignore: cast_nullable_to_non_nullable
+as List<String>,answers: null == answers ? _self.answers : answers // ignore: cast_nullable_to_non_nullable
 as List<String>,rcode: null == rcode ? _self.rcode : rcode // ignore: cast_nullable_to_non_nullable
 as String,error: null == error ? _self.error : error // ignore: cast_nullable_to_non_nullable
 as String,delay: null == delay ? _self.delay : delay // ignore: cast_nullable_to_non_nullable
@@ -2235,10 +2236,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String domain,  String type, @JsonKey(unknownEnumValue: JsonKey.nullForUndefinedEnumValue)  DnsQueryInitiator? initiator,  String upstream,  bool cached,  List<String> answers,  String rcode,  String error,  int delay,  DateTime time)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String domain,  String type, @JsonKey(unknownEnumValue: JsonKey.nullForUndefinedEnumValue)  DnsQueryInitiator? initiator,  String upstream,  bool cached,  List<String> stages,  List<String> answers,  String rcode,  String error,  int delay,  DateTime time)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _DnsQuery() when $default != null:
-return $default(_that.domain,_that.type,_that.initiator,_that.upstream,_that.cached,_that.answers,_that.rcode,_that.error,_that.delay,_that.time);case _:
+return $default(_that.domain,_that.type,_that.initiator,_that.upstream,_that.cached,_that.stages,_that.answers,_that.rcode,_that.error,_that.delay,_that.time);case _:
   return orElse();
 
 }
@@ -2256,10 +2257,10 @@ return $default(_that.domain,_that.type,_that.initiator,_that.upstream,_that.cac
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String domain,  String type, @JsonKey(unknownEnumValue: JsonKey.nullForUndefinedEnumValue)  DnsQueryInitiator? initiator,  String upstream,  bool cached,  List<String> answers,  String rcode,  String error,  int delay,  DateTime time)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String domain,  String type, @JsonKey(unknownEnumValue: JsonKey.nullForUndefinedEnumValue)  DnsQueryInitiator? initiator,  String upstream,  bool cached,  List<String> stages,  List<String> answers,  String rcode,  String error,  int delay,  DateTime time)  $default,) {final _that = this;
 switch (_that) {
 case _DnsQuery():
-return $default(_that.domain,_that.type,_that.initiator,_that.upstream,_that.cached,_that.answers,_that.rcode,_that.error,_that.delay,_that.time);case _:
+return $default(_that.domain,_that.type,_that.initiator,_that.upstream,_that.cached,_that.stages,_that.answers,_that.rcode,_that.error,_that.delay,_that.time);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -2276,10 +2277,10 @@ return $default(_that.domain,_that.type,_that.initiator,_that.upstream,_that.cac
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String domain,  String type, @JsonKey(unknownEnumValue: JsonKey.nullForUndefinedEnumValue)  DnsQueryInitiator? initiator,  String upstream,  bool cached,  List<String> answers,  String rcode,  String error,  int delay,  DateTime time)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String domain,  String type, @JsonKey(unknownEnumValue: JsonKey.nullForUndefinedEnumValue)  DnsQueryInitiator? initiator,  String upstream,  bool cached,  List<String> stages,  List<String> answers,  String rcode,  String error,  int delay,  DateTime time)?  $default,) {final _that = this;
 switch (_that) {
 case _DnsQuery() when $default != null:
-return $default(_that.domain,_that.type,_that.initiator,_that.upstream,_that.cached,_that.answers,_that.rcode,_that.error,_that.delay,_that.time);case _:
+return $default(_that.domain,_that.type,_that.initiator,_that.upstream,_that.cached,_that.stages,_that.answers,_that.rcode,_that.error,_that.delay,_that.time);case _:
   return null;
 
 }
@@ -2291,7 +2292,7 @@ return $default(_that.domain,_that.type,_that.initiator,_that.upstream,_that.cac
 @JsonSerializable()
 
 class _DnsQuery implements DnsQuery {
-  const _DnsQuery({required this.domain, required this.type, @JsonKey(unknownEnumValue: JsonKey.nullForUndefinedEnumValue) this.initiator, this.upstream = '', this.cached = false,  List<String> answers = const [], this.rcode = '', this.error = '', this.delay = 0, required this.time}): _answers = answers;
+  const _DnsQuery({required this.domain, required this.type, @JsonKey(unknownEnumValue: JsonKey.nullForUndefinedEnumValue) this.initiator, this.upstream = '', this.cached = false,  List<String> stages = const [],  List<String> answers = const [], this.rcode = '', this.error = '', this.delay = 0, required this.time}): _stages = stages, _answers = answers;
   factory _DnsQuery.fromJson(Map<String, dynamic> json) => _$DnsQueryFromJson(json);
 
 @override final  String domain;
@@ -2299,6 +2300,11 @@ class _DnsQuery implements DnsQuery {
 @override@JsonKey(unknownEnumValue: JsonKey.nullForUndefinedEnumValue) final  DnsQueryInitiator? initiator;
 @override@JsonKey() final  String upstream;
 @override@JsonKey() final  bool cached;
+ final List<String> _stages;
+@override@JsonKey() List<String> get stages {
+  if (_stages is EqualUnmodifiableListView) return _stages;
+  return EqualUnmodifiableListView(_stages);
+}
  final  List<String> _answers;
 @override@JsonKey() List<String> get answers {
   if (_answers is EqualUnmodifiableListView) return _answers;
@@ -2324,18 +2330,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _DnsQuery&&(identical(other.domain, domain) || other.domain == domain)&&(identical(other.type, type) || other.type == type)&&(identical(other.initiator, initiator) || other.initiator == initiator)&&(identical(other.upstream, upstream) || other.upstream == upstream)&&(identical(other.cached, cached) || other.cached == cached)&&const DeepCollectionEquality().equals(other.answers, _answers)&&(identical(other.rcode, rcode) || other.rcode == rcode)&&(identical(other.error, error) || other.error == error)&&(identical(other.delay, delay) || other.delay == delay)&&(identical(other.time, time) || other.time == time));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _DnsQuery&&(identical(other.domain, domain) || other.domain == domain)&&(identical(other.type, type) || other.type == type)&&(identical(other.initiator, initiator) || other.initiator == initiator)&&(identical(other.upstream, upstream) || other.upstream == upstream)&&(identical(other.cached, cached) || other.cached == cached)&&const DeepCollectionEquality().equals(other.stages, _stages)&&const DeepCollectionEquality().equals(other.answers, _answers)&&(identical(other.rcode, rcode) || other.rcode == rcode)&&(identical(other.error, error) || other.error == error)&&(identical(other.delay, delay) || other.delay == delay)&&(identical(other.time, time) || other.time == time));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
-    return Object.hash(runtimeType,domain,type,initiator,upstream,cached,const DeepCollectionEquality().hash(_answers),rcode,error,delay,time);
+    return Object.hash(runtimeType,domain,type,initiator,upstream,cached,const DeepCollectionEquality().hash(_stages),const DeepCollectionEquality().hash(_answers),rcode,error,delay,time);
 }
 
 @override
 String toString() {
-    return 'DnsQuery(domain: $domain, type: $type, initiator: $initiator, upstream: $upstream, cached: $cached, answers: $answers, rcode: $rcode, error: $error, delay: $delay, time: $time)';
+    return 'DnsQuery(domain: $domain, type: $type, initiator: $initiator, upstream: $upstream, cached: $cached, stages: $stages, answers: $answers, rcode: $rcode, error: $error, delay: $delay, time: $time)';
 }
 
 
@@ -2346,7 +2352,7 @@ abstract mixin class _$DnsQueryCopyWith<$Res> implements $DnsQueryCopyWith<$Res>
   factory _$DnsQueryCopyWith(_DnsQuery value, $Res Function(_DnsQuery) _then) = __$DnsQueryCopyWithImpl;
 @override @useResult
 $Res call({
- String domain, String type,@JsonKey(unknownEnumValue: JsonKey.nullForUndefinedEnumValue) DnsQueryInitiator? initiator, String upstream, bool cached, List<String> answers, String rcode, String error, int delay, DateTime time
+ String domain, String type,@JsonKey(unknownEnumValue: JsonKey.nullForUndefinedEnumValue) DnsQueryInitiator? initiator, String upstream, bool cached, List<String> stages, List<String> answers, String rcode, String error, int delay, DateTime time
 });
 
 
@@ -2363,14 +2369,15 @@ class __$DnsQueryCopyWithImpl<$Res>
 
 /// Create a copy of DnsQuery
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? domain = null,Object? type = null,Object? initiator = freezed,Object? upstream = null,Object? cached = null,Object? answers = null,Object? rcode = null,Object? error = null,Object? delay = null,Object? time = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? domain = null,Object? type = null,Object? initiator = freezed,Object? upstream = null,Object? cached = null,Object? stages = null,Object? answers = null,Object? rcode = null,Object? error = null,Object? delay = null,Object? time = null,}) {
   return _then(_DnsQuery(
 domain: null == domain ? _self.domain : domain // ignore: cast_nullable_to_non_nullable
 as String,type: null == type ? _self.type : type // ignore: cast_nullable_to_non_nullable
 as String,initiator: freezed == initiator ? _self.initiator : initiator // ignore: cast_nullable_to_non_nullable
 as DnsQueryInitiator?,upstream: null == upstream ? _self.upstream : upstream // ignore: cast_nullable_to_non_nullable
 as String,cached: null == cached ? _self.cached : cached // ignore: cast_nullable_to_non_nullable
-as bool,answers: null == answers ? _self._answers : answers // ignore: cast_nullable_to_non_nullable
+as bool,stages: null == stages ? _self.stages : stages // ignore: cast_nullable_to_non_nullable
+as List<String>,answers: null == answers ? _self._answers : answers // ignore: cast_nullable_to_non_nullable
 as List<String>,rcode: null == rcode ? _self.rcode : rcode // ignore: cast_nullable_to_non_nullable
 as String,error: null == error ? _self.error : error // ignore: cast_nullable_to_non_nullable
 as String,delay: null == delay ? _self.delay : delay // ignore: cast_nullable_to_non_nullable
