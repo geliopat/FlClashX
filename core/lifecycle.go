@@ -141,6 +141,7 @@ func stopListeners() {
 }
 
 func handleShutdown() bool {
+	resetEngineDiagnostics()
 	handleStopLog()
 	stopRouteWatch()
 
