@@ -157,6 +157,7 @@ extension ProxyGroupExt on ProxyGroup {
       // The core refuses a round-robin group that sets one.
       if (type == GroupType.LoadBalance &&
           strategy != LoadBalanceStrategy.roundRobin &&
+          strategy != LoadBalanceStrategy.adaptiveBalance &&
           hashKey?.isNotEmpty == true)
         'hash-key': hashKey,
     };
