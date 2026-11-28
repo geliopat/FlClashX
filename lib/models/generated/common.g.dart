@@ -139,6 +139,7 @@ _DnsQuery _$DnsQueryFromJson(Map<String, dynamic> json) => _DnsQuery(
   ),
   upstream: json['upstream'] as String? ?? '',
   cached: json['cached'] as bool? ?? false,
+  stages: (json['stages'] as List<dynamic>?)?.map((e) => e as String).toList() ?? const [],
   answers:
       (json['answers'] as List<dynamic>?)?.map((e) => e as String).toList() ??
       const [],
@@ -154,6 +155,7 @@ Map<String, dynamic> _$DnsQueryToJson(_DnsQuery instance) => <String, dynamic>{
   'initiator': _$DnsQueryInitiatorEnumMap[instance.initiator],
   'upstream': instance.upstream,
   'cached': instance.cached,
+  'stages': instance.stages,
   'answers': instance.answers,
   'rcode': instance.rcode,
   'error': instance.error,
