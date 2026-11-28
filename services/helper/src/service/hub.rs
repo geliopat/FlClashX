@@ -2730,7 +2730,7 @@ mod tests {
     // The normal suite skips the privileged case rather than weakening ACLs.
     #[cfg(windows)]
     #[tokio::test]
-    async fn published_z2_system_stage_launch_and_loopback() {
+    async fn published_z3_system_stage_launch_and_loopback() {
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
         use tokio::net::{windows::named_pipe::{NamedPipeServer, ServerOptions}, TcpListener, TcpStream};
         use serde_json::{json, Value};
@@ -2742,7 +2742,9 @@ mod tests {
         package.extend_from_slice(&(manifest.len() as u32).to_be_bytes());
         package.extend_from_slice(&manifest);
         package.extend_from_slice(&binary);
-        let hash = "e504d2c5b2503057a8fc55e3665fe5a4c93852dc702a322d787d1df89e5b7c82";
+        let verified = super::super::core_release::Manifest::verify(&manifest).unwrap();
+        verified.verify_reader(binary.as_slice()).unwrap();
+        let hash = verified.hash();
         assert_eq!(super::super::core_store::stage(&package).unwrap(), hash);
         assert_eq!(super::super::core_store::stage(&package).unwrap(), hash);
         let last = package.len() - 1;
@@ -2787,10 +2789,12 @@ mod tests {
             }).await.unwrap()
         }
         let identity = rpc(&mut pipe, 1, "getCoreIdentity", Value::Null).await;
-        assert_eq!(identity["version"], "v1.19.34-z.2");
-        assert_eq!(identity["engineRevision"], "88b3bc4604b0008ce08a8c5634b8f9ddd573d533");
+        assert_eq!(identity["version"], "v1.19.34-z.3");
+        assert_eq!(identity["hostRevision"], "03c93c9adf1d847be367f1ecd1f3381d6bb25183");
+        assert_eq!(identity["engineRevision"], "d6f29e555e63906208d9b5cba098af802126ba24");
         let capabilities = rpc(&mut pipe, 2, "getCoreCapabilities", Value::Null).await;
         assert!(capabilities.as_array().unwrap().contains(&json!("chain-health-v1")));
+        assert!(capabilities.as_array().unwrap().contains(&json!("atomic-profile-apply-v1")));
         // An invalid slot must never interrupt the already running signed core.
         let rejected = start_selected(StartParams { address, session_id: id.to_owned() },
             Some("0".repeat(64)));
@@ -2808,9 +2812,17 @@ mod tests {
             "mixed-port: {mixed_port}\nallow-lan: false\nmode: rule\nlog-level: error\ngeo-auto-update: false\ndns:\n  enable: false\ntun:\n  enable: false\nrules:\n  - MATCH,DIRECT\n"
         )).unwrap();
         assert_eq!(rpc(&mut pipe, 4, "initClash", json!({"home-dir":home.to_str().unwrap(),"version":1})).await, true);
+        assert_eq!(rpc(&mut pipe, 9, "startListener", Value::Null).await, false);
         assert_eq!(rpc(&mut pipe, 5, "setupConfig", json!({"selected-map":{},"test-url":"https://example.com","skip-cert-verify":false})).await, "");
         assert_eq!(rpc(&mut pipe, 6, "startListener", Value::Null).await, true);
+        // The failed apply must not replace the live profile or listener.
+        let accepted_config = std::fs::read(home.join("config.yaml")).unwrap();
+        std::fs::write(home.join("config.yaml"), b"proxies: [").unwrap();
+        let rejected_profile = rpc(&mut pipe, 10, "setupConfig", json!({"selected-map":{},"test-url":"https://rejected.example","skip-cert-verify":true})).await;
+        assert!(rejected_profile.as_str().is_some_and(|error| !error.is_empty()));
+        std::fs::write(home.join("config.yaml"), accepted_config).unwrap();
         let origin = tokio::spawn(async move {
+            for _ in 0..2 {
             let (mut peer, _) = target.accept().await.unwrap();
             let mut request = Vec::new();
             while !request.ends_with(b"\r\n\r\n") {
@@ -2818,16 +2830,25 @@ mod tests {
                 request.push(peer.read_u8().await.unwrap());
             }
             assert!(String::from_utf8_lossy(&request).starts_with("GET /core-smoke "));
-            peer.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 7\r\nConnection: close\r\n\r\nz2-pass").await.unwrap();
+            peer.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 7\r\nConnection: close\r\n\r\nz3-pass").await.unwrap();
+            }
         });
+        async fn smoke_request(mixed_port: u16, target_port: u16) {
         tokio::time::timeout(Duration::from_secs(15), async {
             let mut client = TcpStream::connect(("127.0.0.1", mixed_port)).await.unwrap();
             client.write_all(format!("GET http://127.0.0.1:{target_port}/core-smoke HTTP/1.1\r\nHost: 127.0.0.1:{target_port}\r\nConnection: close\r\n\r\n").as_bytes()).await.unwrap();
             let mut reply = Vec::new();
             client.read_to_end(&mut reply).await.unwrap();
-            assert!(String::from_utf8_lossy(&reply).contains("z2-pass"));
-            origin.await.unwrap();
+            assert!(String::from_utf8_lossy(&reply).contains("z3-pass"));
         }).await.unwrap();
+        }
+        smoke_request(mixed_port, target_port).await;
+        assert_eq!(rpc(&mut pipe, 11, "clearDnsCache", Value::Null).await, true);
+        assert_eq!(rpc(&mut pipe, 12, "stopListener", Value::Null).await, true);
+        assert!(TcpStream::connect(("127.0.0.1", mixed_port)).await.is_err());
+        assert_eq!(rpc(&mut pipe, 13, "startListener", Value::Null).await, true);
+        smoke_request(mixed_port, target_port).await;
+        origin.await.unwrap();
         assert_eq!(rpc(&mut pipe, 7, "stopListener", Value::Null).await, true);
         assert_eq!(rpc(&mut pipe, 8, "shutdown", Value::Null).await, true);
         drop(pipe);

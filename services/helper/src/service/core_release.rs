@@ -152,9 +152,9 @@ mod tests {
         let directory = std::path::PathBuf::from(directory);
         let bytes = std::fs::read(directory.join("core-manifest.json")).unwrap();
         let manifest = Manifest::verify(&bytes).unwrap();
-        assert_eq!(manifest.version, "v1.19.34-z.2");
-        assert_eq!(manifest.engine_revision, "88b3bc4604b0008ce08a8c5634b8f9ddd573d533");
-        assert_eq!(manifest.host_revision, "8640948576d11e707a9306c17ac432ae29a125c4");
+        assert_eq!(manifest.version, "v1.19.34-z.3");
+        assert_eq!(manifest.engine_revision, "d6f29e555e63906208d9b5cba098af802126ba24");
+        assert_eq!(manifest.host_revision, "03c93c9adf1d847be367f1ecd1f3381d6bb25183");
         let file = std::fs::File::open(directory.join(CORE_NAME)).unwrap();
         manifest.verify_reader(file).unwrap();
     }

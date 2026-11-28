@@ -21,7 +21,7 @@ $env:FLCLASHZ_SYSTEM_CORE_TEST_DIR = $PSScriptRoot
 $env:RUST_BACKTRACE = '1'
 try {
   if ([Security.Principal.WindowsIdentity]::GetCurrent().User.Value -ne 'S-1-5-18') { throw 'Not LocalSystem' }
-  & (Join-Path $PSScriptRoot 'helper-test.exe') --exact service::hub::tests::published_z2_system_stage_launch_and_loopback --nocapture *> (Join-Path $PSScriptRoot 'result.log')
+  & (Join-Path $PSScriptRoot 'helper-test.exe') --exact service::hub::tests::published_z3_system_stage_launch_and_loopback --nocapture *> (Join-Path $PSScriptRoot 'result.log')
   $code = $LASTEXITCODE
 } catch {
   $_ | Out-File -Append (Join-Path $PSScriptRoot 'result.log')
