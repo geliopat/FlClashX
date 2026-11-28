@@ -342,6 +342,7 @@ class _NumberItem extends ConsumerWidget {
     final appLocalizations = context.appLocalizations;
     final label = title(appLocalizations);
     final value = ref.watch(patchClashConfigProvider.select(select));
+    final managedKey = this.managedKey;
     final item = ListItem.input(
       title: Text(label),
       subtitle: Text(
@@ -367,14 +368,13 @@ class _NumberItem extends ConsumerWidget {
           return;
         }
         if (managedKey != null) {
-          ref.read(managedSettingsActionProvider.notifier).takeOver(managedKey!);
+          ref.read(managedSettingsActionProvider.notifier).takeOver(managedKey);
         }
         ref
             .read(patchClashConfigProvider.notifier)
             .update((state) => update(state, int.parse(value.trim())));
       },
     );
-    final managedKey = this.managedKey;
     return managedKey == null
         ? item
         : ManagedSetting(settingKey: managedKey, child: item);

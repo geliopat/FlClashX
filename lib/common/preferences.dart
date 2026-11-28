@@ -132,7 +132,7 @@ class Preferences {
       final preferences = await _store.value;
       final configString = preferences?.getString(configKey);
       if (configString == null) {
-        if (preferences?.containsKey(_lastGoodConfigKey) != true) return _readRecoveryFile();
+        if (preferences?.containsKey(_lastGoodConfigKey) != true) return await _readRecoveryFile();
         throw const FormatException('missing primary config');
       }
       final decoded = json.decode(configString);

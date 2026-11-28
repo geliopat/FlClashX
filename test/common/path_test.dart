@@ -96,7 +96,7 @@ void main() {
     );
   });
 
-  test('confines a provider path the profile tried to choose', () async {
+  test('Windows preserves explicit profile paths for native validation; other platforms confine them', () async {
     final proxiesDir = await appPath.getProviderDirPath(
       7,
       proxiesProviderDirectoryName,
@@ -135,16 +135,16 @@ void main() {
 
     expect(
       config['proxy-providers']['escape']['path'],
-      join(proxiesDir, 'proxy-providers/escape'.toMd5()),
+      Platform.isWindows ? '../../../../config.yaml' : join(proxiesDir, 'proxy-providers/escape'.toMd5()),
     );
     expect(
       config['proxy-providers']['urlless']['path'],
-      join(proxiesDir, 'proxy-providers/urlless'.toMd5()),
+      Platform.isWindows ? 'cache.db' : join(proxiesDir, 'proxy-providers/urlless'.toMd5()),
     );
     expect(config['proxy-providers']['literal']['path'], isNull);
     expect(
       config['rule-providers']['sneak']['path'],
-      join(rulesDir, 'rule-providers/sneak'.toMd5()),
+      Platform.isWindows ? '/etc/hosts' : join(rulesDir, 'rule-providers/sneak'.toMd5()),
     );
   });
 

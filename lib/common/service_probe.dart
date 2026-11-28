@@ -222,7 +222,10 @@ IpInfo? parseFlexibleIpBody(String body) {
   }
   if (ip == null || InternetAddress.tryParse(ip) == null) return null;
   final code = country?.trim().toUpperCase() ?? '';
-  return IpInfo(ip: ip, countryCode: RegExp(r'^[A-Z]{2}
+  return IpInfo(ip: ip, countryCode: RegExp(r'^[A-Z]{2}$').hasMatch(code) ? code : '');
+}
+
+/// Raw so the route stamp survives; [parseOutboundIp] reads the address.
 Future<OutboundIpResult?> lookupOutboundIp(
   CoreController core,
   String proxyName, {
@@ -249,38 +252,6 @@ IpInfo? parseOutboundIp(OutboundIpResult? result, {String? customUrl}) {
       return parseFlexibleIpBody(result.body);
     }
     return null;
-  } on FormatException {
-    return null;
-  } on TypeError {
-    return null;
-  }
-}
-).hasMatch(code) ? code : '');
-}
-
-/// Raw so the route stamp survives; [parseOutboundIp] reads the address.
-Future<OutboundIpResult?> lookupOutboundIp(
-  CoreController core,
-  String proxyName, {
-  Duration timeout = outboundIpTimeoutDuration,
-}) {
-  return core.outboundIp(
-    OutboundIpParams(
-      proxyName: proxyName,
-      urls: ipInfoSources.keys.toList(),
-      timeout: timeout.inMilliseconds,
-    ),
-  );
-}
-
-IpInfo? parseOutboundIp(OutboundIpResult? result) {
-  if (result == null || result.error != null || result.body.isEmpty) {
-    return null;
-  }
-  final parse = ipInfoSources[result.url];
-  if (parse == null) return null;
-  try {
-    return parse(result.body);
   } on FormatException {
     return null;
   } on TypeError {

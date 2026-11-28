@@ -1,3 +1,4 @@
+import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/common/recovery_journal.dart';
 import 'package:fl_clash/l10n/l10n.dart';
