@@ -41,16 +41,18 @@ extension FileExt on File {
     return writeAsBytes(bytes);
   }
 
-  /// Writes to one file must not overlap: they share the temporary sibling.
+  /// Each writer owns its staging directory, even across isolates or processes.
+  /// Concurrent writers may replace one another, but cannot share partial data.
   Future<void> writeAsStringAtomically(String content) async {
-    final temp = File('$path.$pid.tmp');
+    await parent.create(recursive: true);
+    final staging = await parent.createTemp('.flclash-write-');
+    final temp = File('${staging.path}${Platform.pathSeparator}value');
     try {
-      await temp.parent.create(recursive: true);
       await temp.writeAsString(content, flush: true);
       await temp._renameRetryingWhileHeldOpen(path);
-    } catch (_) {
-      await temp.delete().then((_) {}, onError: (_) {});
-      rethrow;
+    } finally {
+      // Never remove another writer's temporary file.
+      await staging.delete(recursive: true).then((_) {}, onError: (_) {});
     }
   }
 
