@@ -6,6 +6,9 @@ on:
       - '.github/workflows/validate-independent-core-client.yml'
       - 'lib/features/update/core_release*'
       - 'lib/views/core_release_section.dart'
+      - 'lib/views/dns_queries.dart'
+      - 'lib/models/clash_config.dart'
+      - 'lib/providers/actions/profile_settings.dart'
       - 'lib/core/desktop/core_release_selection.dart'
       - 'services/helper/src/service/core_release.rs'
       - 'core/third_party/mihomo'
@@ -103,7 +106,7 @@ jobs:
       - name: Verify actual release, rollback and UI
         shell: pwsh
         run: |
-          flutter test "--dart-define=FLCLASHZ_UPDATE_PUBLIC_KEY=$env:FLCLASHZ_UPDATE_PUBLIC_KEY" test/features/update/core_release_manifest_test.dart test/core/desktop/core_release_selection_test.dart test/core/desktop/helper_client_test.dart test/views/about_test.dart test/setup_test.dart
+          flutter test "--dart-define=FLCLASHZ_UPDATE_PUBLIC_KEY=$env:FLCLASHZ_UPDATE_PUBLIC_KEY" test/features/update/core_release_manifest_test.dart test/core/desktop/core_release_selection_test.dart test/core/desktop/helper_client_test.dart test/views/about_test.dart test/setup_test.dart test/views/dns_queries_view_test.dart test/models/profile_settings_test.dart test/models/config_test.dart
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Analyze Dart sources
         run: flutter analyze --no-fatal-infos
