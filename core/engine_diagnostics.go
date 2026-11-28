@@ -41,7 +41,7 @@ var engineDiagnostics struct {
 }
 
 func handleCoreCapabilities() []string {
-	return []string{"closed-flow-history-v1", "chain-diagnostics-v1", "dns-stages-v1", "core-identity-v1"}
+	return []string{"closed-flow-history-v1", "chain-diagnostics-v1", "dns-stages-v1", "core-identity-v1", "adaptive-balance-v1"}
 }
 
 func handleSetEngineDiagnostics(settings engineDiagnosticsSettings) (engineDiagnosticsSettings, error) {
