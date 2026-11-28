@@ -41,10 +41,10 @@ void main() {
       for (final entity in Directory('lib').listSync(recursive: true)) {
         if (entity is! File ||
             !entity.path.endsWith('.dart') ||
-            entity.path.contains('/generated/')) {
+            entity.path.replaceAll(Platform.pathSeparator, '/').contains('/generated/')) {
           continue;
         }
-        final path = p.relative(entity.path);
+        final path = p.relative(entity.path).replaceAll(Platform.pathSeparator, '/');
         if (_allowed.contains(path)) {
           continue;
         }

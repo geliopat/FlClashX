@@ -15,8 +15,8 @@ void main() {
     for (final entity in Directory('lib').listSync(recursive: true)) {
       if (entity is! File ||
           !entity.path.endsWith('.dart') ||
-          entity.path.contains('/generated/') ||
-          _secretFields.contains(entity.path)) {
+          entity.path.replaceAll(Platform.pathSeparator, '/').contains('/generated/') ||
+          _secretFields.contains(entity.path.replaceAll(Platform.pathSeparator, '/'))) {
         continue;
       }
       final lines = entity.readAsLinesSync();

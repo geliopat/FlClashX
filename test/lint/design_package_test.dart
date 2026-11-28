@@ -38,7 +38,7 @@ void main() {
         if (entity is! File || !entity.path.endsWith('.dart')) {
           continue;
         }
-        final relative = p.relative(entity.path);
+        final relative = p.relative(entity.path).replaceAll(Platform.pathSeparator, '/');
         if (_isGenerated(relative)) {
           continue;
         }
