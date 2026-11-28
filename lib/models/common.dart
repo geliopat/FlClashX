@@ -300,6 +300,7 @@ abstract class DnsQuery with _$DnsQuery {
     DnsQueryInitiator? initiator,
     @Default('') String upstream,
     @Default(false) bool cached,
+    @Default([]) List<String> stages,
     @Default([]) List<String> answers,
     @Default('') String rcode,
     @Default('') String error,
@@ -312,7 +313,7 @@ abstract class DnsQuery with _$DnsQuery {
 }
 
 extension DnsQueryExt on DnsQuery {
-  // dns_watch.go wraps these three Mihomo package-level resolvers.
+  // Native Mihomo notifies the host of the initiating resolver.
   // The initiator is not proof of which upstream DNS server answered.
   String get resolverName => switch (initiator) {
     DnsQueryInitiator.rule => 'DefaultResolver',
@@ -344,6 +345,7 @@ extension DnsQueryExt on DnsQuery {
     rcode,
     resolverName,
     upstream,
+    ...stages,
     error,
     ...answers,
   ];
