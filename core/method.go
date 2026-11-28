@@ -189,6 +189,8 @@ var methodHandlers = map[CoreMethod]methodHandler{
 	getCoreCapabilitiesMethod: withoutArguments(handleCoreCapabilities),
 	getCoreIdentityMethod: withoutArguments(handleCoreIdentity),
 	getEngineDiagnosticsMethod: withoutArguments(handleGetEngineDiagnostics),
+	getChainHealthMethod: withoutArguments(handleGetChainHealth),
+	setChainHealthMethod: withFallible(handleSetChainHealth),
 	setEngineDiagnosticsMethod: withFallible(handleSetEngineDiagnostics),
 	startLogMethod:            acknowledged(handleStartLog),
 	stopLogMethod:             acknowledged(handleStopLog),

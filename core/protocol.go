@@ -53,6 +53,8 @@ const (
 	getCoreCapabilitiesMethod      CoreMethod = "getCoreCapabilities"
 	getCoreIdentityMethod          CoreMethod = "getCoreIdentity"
 	getEngineDiagnosticsMethod     CoreMethod = "getEngineDiagnostics"
+	getChainHealthMethod           CoreMethod = "getChainHealth"
+	setChainHealthMethod           CoreMethod = "setChainHealth"
 	setEngineDiagnosticsMethod     CoreMethod = "setEngineDiagnostics"
 	updateGeoDataMethod            CoreMethod = "updateGeoData"
 	updateExternalProviderMethod   CoreMethod = "updateExternalProvider"

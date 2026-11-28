@@ -427,6 +427,25 @@ class CoreController {
     }
   }
 
+  Future<Map<String, dynamic>> getChainHealth() async {
+    final result = await _interface.invokeMethod<Map<String, dynamic>>(
+      method: CoreMethod.getChainHealth,
+    );
+    if (result == null) throw const CoreMethodException(code: 'no_response', message: 'No chain health response');
+    return result;
+  }
+
+  Future<void> setChainHealth({
+    required String name, required String group, required String identity,
+    required bool enabled,
+  }) async {
+    final result = await _interface.invokeMethod<bool>(
+      method: CoreMethod.setChainHealth,
+      arguments: {'name': name, 'group': group, 'identity': identity, 'enabled': enabled},
+    );
+    if (result != true) throw const CoreMethodException(code: 'invalid_response', message: 'Chain health setting not applied');
+  }
+
   Future<Map<String, dynamic>> getEngineDiagnostics() async {
     final result = await _interface.invokeMethod<Map<String, dynamic>>(
       method: CoreMethod.getEngineDiagnostics,

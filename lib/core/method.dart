@@ -55,6 +55,8 @@ enum CoreMethod {
   getCoreCapabilities,
   getCoreIdentity,
   getEngineDiagnostics,
+  getChainHealth,
+  setChainHealth,
   setEngineDiagnostics,
   crash,
   setupConfig,

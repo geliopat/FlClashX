@@ -61,6 +61,7 @@ func handleClearDnsCache() {
 func handleResetNetwork() {
 	configMu.Lock()
 	defer configMu.Unlock()
+	stopAllChainHealth()
 	handleCloseConnections()
 	dns.ClearAll()
 	seen := make(map[constant.Proxy]struct{})

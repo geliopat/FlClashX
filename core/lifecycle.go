@@ -50,6 +50,7 @@ func handleGetCoreVersion() string {
 func handleStartListener() bool {
 	configMu.Lock()
 	defer configMu.Unlock()
+	stopAllChainHealth()
 	isRunning.Store(true)
 	updateListeners(currentConfig)
 	resolver.ResetConnection()
@@ -62,6 +63,7 @@ func handleStartListener() bool {
 func handleStopListener() bool {
 	configMu.Lock()
 	defer configMu.Unlock()
+	stopAllChainHealth()
 	isRunning.Store(false)
 	stopListeners()
 	// A closed listener only turns new connections away; those it already
@@ -146,6 +148,7 @@ func handleShutdown() bool {
 	stopRouteWatch()
 
 	configMu.Lock()
+	stopAllChainHealth()
 	isRunning.Store(false)
 	stopListeners()
 	stopGeoUpdater()

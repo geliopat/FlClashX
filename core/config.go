@@ -216,6 +216,7 @@ func applyConfig(params *SetupParams) error {
 	// while its providers were still empty.
 	patchSelectGroup(cfg.Proxies, params.SelectedMap)
 	carried := carriedPicks()
+	stopAllChainHealth()
 	currentConfig = cfg
 	hub.ApplyConfig(mihomoConfig(cfg))
 	afterApply(cfg)
@@ -308,6 +309,7 @@ func updateConfig(params *UpdateParams) error {
 		}
 	}
 	syncGeoUpdater(params.GeoAutoUpdate, params.GeoUpdateInterval)
+	if routeChange == routeReset { stopAllChainHealth() }
 	if routeChange != routeUnchanged {
 		changeRoute(routeChange)
 	}
