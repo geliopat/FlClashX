@@ -399,13 +399,15 @@ class SetupAction extends _$SetupAction {
         }
         if (!_isCurrent(request)) return true;
       }
-      return _setListening(request.running);
+      return _setListening(request.running, current: () => _isCurrent(request));
     });
   }
 
-  Future<bool> _setListening(bool running) async {
+  Future<bool> _setListening(bool running, {bool Function()? current}) async {
     final vpnOptions = await ref.read(vpnOptionsProvider.future);
+    if (_exiting || current?.call() == false) return false;
     final answered = await setCoreRunning(running);
+    if (_exiting) return false;
     ref.read(runningVpnOptionsProvider.notifier).value = running && answered
         ? vpnOptions
         : null;
@@ -425,7 +427,8 @@ class SetupAction extends _$SetupAction {
         if (_exiting || !ref.read(isStartProvider) || ref.read(safeModeProvider)) {
           return;
         }
-        await _setListening(!ref.read(suspendProvider));
+        final running = !ref.read(suspendProvider);
+        await _setListening(running, current: () => ref.read(isStartProvider) && running == !ref.read(suspendProvider));
       });
     });
   }
@@ -453,6 +456,7 @@ class SetupAction extends _$SetupAction {
           return null;
         }
         final vpnOptions = await ref.read(vpnOptionsProvider.future);
+        if (!_isCurrent(request)) return null;
         var restartZapret = false;
         if (system.isWindows) {
           try {
@@ -464,6 +468,7 @@ class SetupAction extends _$SetupAction {
         }
         if (!_isCurrent(request)) return null;
         final answered = await restartCoreRunning();
+        if (_exiting) return null;
         if (answered) {
           ref.read(runningVpnOptionsProvider.notifier).value = vpnOptions;
           if (system.isWindows && _isCurrent(request)) {

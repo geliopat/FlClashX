@@ -356,6 +356,9 @@ class CoreAction extends _$CoreAction {
     var lifecycleStarted = false;
     final setupAction = ref.read(setupActionProvider.notifier);
     final bool wasRunning = running ?? ref.read(isStartProvider);
+    // Capture the intent before Helper preparation can wait on the service.
+    // A stop issued during that wait must not be mistaken for the old intent.
+    final initialRunIntent = setupAction.runIntent;
     var restartZapret = false;
     final zapret = system.isWindows && !ref.read(safeModeProvider)
         ? ref.read(zapretControllerProvider.notifier) : null;
@@ -374,7 +377,7 @@ class CoreAction extends _$CoreAction {
       final stopping = coreIsEmbedded && wasRunning
           ? setupAction.setRunning(false)
           : null;
-      final runIntent = setupAction.runIntent;
+      final runIntent = coreIsEmbedded ? setupAction.runIntent : initialRunIntent;
       if (coreIsEmbedded) {
         await stopping;
         await _core.shutdown();
