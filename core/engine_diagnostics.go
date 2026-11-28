@@ -20,13 +20,28 @@ type engineDiagnosticsSnapshot struct {
 	Chains   []proxydialer.ChainDialObservation  `json:"chains"`
 }
 
+// Build identity is set exactly once by the desktop entrypoint before IPC starts.
+var buildIdentity struct {
+	Version string `json:"version"`
+	EngineRevision string `json:"engineRevision"`
+	HostRevision string `json:"hostRevision"`
+}
+
+func SetBuildIdentity(version, engine, host string) {
+	buildIdentity.Version = version
+	buildIdentity.EngineRevision = engine
+	buildIdentity.HostRevision = host
+}
+
+func handleCoreIdentity() any { return buildIdentity }
+
 var engineDiagnostics struct {
 	sync.Mutex
 	settings engineDiagnosticsSettings
 }
 
 func handleCoreCapabilities() []string {
-	return []string{"closed-flow-history-v1", "chain-diagnostics-v1", "dns-stages-v1"}
+	return []string{"closed-flow-history-v1", "chain-diagnostics-v1", "dns-stages-v1", "core-identity-v1"}
 }
 
 func handleSetEngineDiagnostics(settings engineDiagnosticsSettings) (engineDiagnosticsSettings, error) {
