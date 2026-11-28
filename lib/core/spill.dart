@@ -40,19 +40,17 @@ Future<CoreMethodResponse> resolveSpilledResponse(
   if (file == null) {
     return response;
   }
-  if (!await _isSpilled(file)) {
-    return CoreMethodResponse(
-      id: response.id,
-      error: CoreMethodError(
-        code: 'spill_error',
-        message: 'Core answered with a file outside its spill directory: $file',
-      ),
-    );
-  }
   try {
-    return CoreMethodResponse.fromJson(
+    if (!await _isSpilled(file)) {
+      throw FormatException('Core answered with a file outside its spill directory: $file');
+    }
+    final resolved = CoreMethodResponse.fromJson(
       await compute(_readSpilledResponse, (file, method)),
     );
+    if (resolved.id != response.id) {
+      throw const FormatException('Spilled response ID mismatch');
+    }
+    return resolved;
   } catch (error) {
     return CoreMethodResponse(
       id: response.id,

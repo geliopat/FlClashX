@@ -50,6 +50,16 @@ void main() {
     expect(file.existsSync(), isFalse);
   });
 
+  test('rejects a spilled response with a different request ID', () async {
+    final file = spill(spillDirectory, {'id': 'other', 'result': true});
+    final response = await resolveSpilledResponse(
+      CoreMethodResponse(id: 'expected', file: file.path),
+    );
+    expect(response.id, 'expected');
+    expect(response.error?.code, 'spill_error');
+    expect(file.existsSync(), isFalse);
+  });
+
   test('a spilled connection list arrives parsed', () async {
     final file = spill(spillDirectory, {
       'id': '4',

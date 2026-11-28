@@ -35,6 +35,8 @@ abstract interface class CoreRpcChannel {
 final class CoreRpcClient implements CoreRpcChannel {
   final DesktopCoreTransport transport;
   final Duration extensionGrace;
+  final Future<CoreMethodResponse> Function(CoreMethodResponse, {CoreMethod? method}) _resolveSpill;
+  final Map<String, String> _resolving = {};
   final Map<String, ({Completer<Object?> completer, CoreMethod method})>
   _pending = {};
   late final StreamSubscription<Uint8List> _frameSubscription;
@@ -53,7 +55,8 @@ final class CoreRpcClient implements CoreRpcChannel {
   CoreRpcClient(
     this.transport, {
     @visibleForTesting this.extensionGrace = _maxExtensionGrace,
-  }) {
+    @visibleForTesting Future<CoreMethodResponse> Function(CoreMethodResponse, {CoreMethod? method})? resolveSpill,
+  }) : _resolveSpill = resolveSpill ?? resolveSpilledResponse {
     _frameSubscription = transport.frames.listen(
       _handleFrame,
       onError: _handleFrameError,
@@ -113,6 +116,7 @@ final class CoreRpcClient implements CoreRpcChannel {
       return null;
     } on CoreMethodException {
       _pending.remove(id);
+      _resolving.remove(id);
       rethrow;
     } catch (error) {
       _removePending(id, completer);
@@ -164,6 +168,7 @@ final class CoreRpcClient implements CoreRpcChannel {
   static Duration _shorter(Duration a, Duration b) => a < b ? a : b;
 
   void _removePending(String id, Completer<Object?> completer) {
+    _resolving.remove(id);
     final removed = _pending.remove(id);
     if (identical(removed?.completer, completer) && !completer.isCompleted) {
       completer.complete(null);
@@ -210,22 +215,55 @@ final class CoreRpcClient implements CoreRpcChannel {
       ..reset()
       ..start();
     final id = response.id;
-    final pending = id == null ? null : _pending.remove(id);
-    final completer = pending?.completer;
-    if (pending == null || completer == null || completer.isCompleted) {
-      unawaited(discardSpilledResponse(response));
+    final pending = id == null ? null : _pending[id];
+    if (id == null || pending == null || pending.completer.isCompleted) {
+      unawaited(discardSpilledResponse(response).catchError((Object _) {}));
       return;
     }
-    if (response.file != null) {
-      unawaited(
-        resolveSpilledResponse(
-          response,
-          method: pending.method,
-        ).then((resolved) => _complete(completer, resolved)),
-      );
+    final activeFile = _resolving[id];
+    if (activeFile != null) {
+      // A duplicate must not delete the file currently being decoded.
+      if (response.file != activeFile) {
+        unawaited(discardSpilledResponse(response).catchError((Object _) {}));
+      }
       return;
     }
+    final completer = pending.completer;
+    if (response.file case final file?) {
+      // Keep the request pending until decoding finishes so that disconnect,
+      // timeout and close can invalidate it like any other RPC.
+      _resolving[id] = file;
+      unawaited(_finishSpill(id, response, pending.method, completer));
+      return;
+    }
+    _pending.remove(id);
     _complete(completer, response);
+  }
+
+  Future<void> _finishSpill(
+    String id,
+    CoreMethodResponse response,
+    CoreMethod method,
+    Completer<Object?> completer,
+  ) async {
+    CoreMethodResponse resolved;
+    try {
+      resolved = await _resolveSpill(response, method: method);
+      if (resolved.id != id) {
+        throw const FormatException('Spilled response ID mismatch');
+      }
+    } catch (error) {
+      resolved = CoreMethodResponse(
+        id: id,
+        error: CoreMethodError(code: 'spill_error', message: '$error'),
+      );
+    }
+    if (!identical(_pending[id]?.completer, completer)) {
+      return;
+    }
+    _pending.remove(id);
+    _resolving.remove(id);
+    _complete(completer, resolved);
   }
 
   void _complete(Completer<Object?> completer, CoreMethodResponse response) {
@@ -280,6 +318,7 @@ final class CoreRpcClient implements CoreRpcChannel {
       for (final pending in _pending.values) pending.completer,
     ];
     _pending.clear();
+    _resolving.clear();
     for (final completer in completers) {
       if (!completer.isCompleted) {
         completer.completeError(error);

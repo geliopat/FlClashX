@@ -48,6 +48,38 @@ void main() {
     await transport.close();
   });
 
+  for (final close in [false, true]) {
+    test('a decoding spill fails when the transport ${close ? 'closes' : 'disconnects'}', () async {
+      final transport = FakeDesktopCoreTransport.connected();
+      final decoding = Completer<CoreMethodResponse>();
+      final entered = Completer<void>();
+      final client = CoreRpcClient(transport, resolveSpill: (response, {method}) {
+        entered.complete();
+        return decoding.future;
+      });
+      final invocation = client.invoke<bool>(method: CoreMethod.getIsInit);
+      final request = await _sentRequest(transport);
+      final failure = expectLater(invocation, throwsA(
+        isA<CoreMethodException>().having((e) => e.code, 'code', 'transport_disconnected'),
+      ));
+      transport.addJson({'id': request['id'], 'file': 'pending.json'});
+      await entered.future;
+      expect(client.pendingCount, 1);
+      if (close) {
+        await client.close();
+      } else {
+        transport.disconnect(1);
+      }
+      await failure;
+      expect(client.pendingCount, 0);
+      decoding.complete(CoreMethodResponse(id: request['id'] as String, result: true));
+      await pumpEventQueue();
+      expect(client.pendingCount, 0);
+      await client.close();
+      await transport.close();
+    });
+  }
+
   test('correlates a response and ignores a late duplicate', () async {
     final transport = FakeDesktopCoreTransport.connected();
     final client = CoreRpcClient(transport);
