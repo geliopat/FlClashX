@@ -87,6 +87,7 @@ const _$LoadBalanceStrategyEnumMap = {
   LoadBalanceStrategy.consistentHashing: 'consistent-hashing',
   LoadBalanceStrategy.roundRobin: 'round-robin',
   LoadBalanceStrategy.stickySessions: 'sticky-sessions',
+  LoadBalanceStrategy.adaptiveBalance: 'adaptive-balance',
 };
 
 _Proxy _$ProxyFromJson(Map<String, dynamic> json) => _Proxy(
