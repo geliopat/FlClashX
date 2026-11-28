@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:fl_clash/core/event.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/providers/providers.dart';
@@ -17,6 +19,15 @@ class EngineDiagnosticsView extends ConsumerStatefulWidget {
 
 class _EngineDiagnosticsViewState extends ConsumerState<EngineDiagnosticsView> with CoreEventListener {
   bool _busy = false;
+  int _generation = 0;
+  Timer? _refreshTimer;
+
+  bool _isCurrent(int generation) => mounted &&
+      generation == _generation &&
+      ref.read(coreStatusProvider) == CoreStatus.connected;
+
+  bool get _visible => mounted && ModalRoute.of(context)?.isCurrent != false &&
+      TickerMode.of(context);
   bool _supported = false;
   String? _error;
   int _capacity = 0;
@@ -31,25 +42,47 @@ class _EngineDiagnosticsViewState extends ConsumerState<EngineDiagnosticsView> w
   void initState() {
     super.initState();
     coreEventManager.addListener(this);
-    Future.microtask(() { if (mounted) _load(); });
+    ref.listenManual(coreStatusProvider, (previous, next) {
+      if (previous == next || !mounted) return;
+      _generation++;
+      setState(() {
+        _busy = false; _error = null;
+        _supported = false; _capacity = 0; _chain = false; _closed = const []; _chains = const [];
+      });
+      if (next == CoreStatus.connected) {
+        Future.microtask(() { if (mounted) _load(); });
+      }
+    });
+    Future.microtask(() { if (mounted && ref.read(coreStatusProvider) == CoreStatus.connected) _load(); });
+    // Poll only the open, visible page; no background network probe is
+    // initiated by the UI. Chain health itself remains owned by the core.
+    _refreshTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (_visible && !_busy && (_capacity > 0 || _chain) &&
+          ref.read(coreStatusProvider) == CoreStatus.connected) {
+        _load();
+      }
+    });
   }
 
   @override
   void dispose() {
+    _generation++;
+    _refreshTimer?.cancel();
     coreEventManager.removeListener(this);
     super.dispose();
   }
 
   @override
   void onClosedFlowChanged() {
-    if (mounted && !_busy && _capacity > 0 &&
-        ModalRoute.of(context)?.isCurrent != false) {
+    if (_visible && !_busy && _capacity > 0 &&
+        ref.read(coreStatusProvider) == CoreStatus.connected) {
       _load();
     }
   }
 
   Future<void> _load({int? capacity, bool? chain}) async {
     if (!mounted || _busy) return;
+    final generation = _generation;
     setState(() { _busy = true; _error = null; });
     try {
       if (ref.read(coreStatusProvider) != CoreStatus.connected) {
@@ -57,13 +90,15 @@ class _EngineDiagnosticsViewState extends ConsumerState<EngineDiagnosticsView> w
       }
       final core = ref.read(coreHandlerProvider);
       final capabilities = await core.getCoreCapabilities();
-      if (!mounted) return;
+      if (!_isCurrent(generation)) return;
       final supported = capabilities.containsAll(const {
         'closed-flow-history-v1', 'chain-diagnostics-v1',
       });
       if (!supported) {
         setState(() {
           _supported = false;
+          _capacity = 0;
+          _chain = false;
           _closed = const [];
           _chains = const [];
         });
@@ -75,8 +110,9 @@ class _EngineDiagnosticsViewState extends ConsumerState<EngineDiagnosticsView> w
           chainDiagnostics: chain ?? _chain,
         );
       }
+      if (!_isCurrent(generation)) return;
       final snapshot = await core.getEngineDiagnostics();
-      if (!mounted) return;
+      if (!_isCurrent(generation)) return;
       final settings = snapshot['settings'] as Map;
       List<Map<String, dynamic>> rows(String key) => [
         for (final item in (snapshot[key] as List? ?? const []).whereType<Map>())
@@ -90,9 +126,12 @@ class _EngineDiagnosticsViewState extends ConsumerState<EngineDiagnosticsView> w
         _chains = rows('chains');
       });
     } catch (error) {
-      if (mounted) setState(() { _error = '$error'; _supported = false; _closed = const []; _chains = const []; });
+      if (_isCurrent(generation)) setState(() {
+        _error = '$error'; _supported = false;
+        _capacity = 0; _chain = false; _closed = const []; _chains = const [];
+      });
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted && generation == _generation) setState(() => _busy = false);
     }
   }
 

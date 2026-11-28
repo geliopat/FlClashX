@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/ui/icons/icons.dart';
@@ -13,6 +15,15 @@ class ChainHealthView extends ConsumerStatefulWidget {
 
 class _ChainHealthViewState extends ConsumerState<ChainHealthView> {
   bool _busy = false;
+  int _generation = 0;
+  Timer? _refreshTimer;
+
+  bool _isCurrent(int generation) => mounted &&
+      generation == _generation &&
+      ref.read(coreStatusProvider) == CoreStatus.connected;
+
+  bool get _visible => mounted && ModalRoute.of(context)?.isCurrent != false &&
+      TickerMode.of(context);
   bool _available = false;
   String? _error;
   List<Map<String, dynamic>> _owners = const [];
@@ -24,7 +35,33 @@ class _ChainHealthViewState extends ConsumerState<ChainHealthView> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(() { if (mounted) _refresh(); });
+    ref.listenManual(coreStatusProvider, (previous, next) {
+      if (previous == next || !mounted) return;
+      _generation++;
+      setState(() {
+        _busy = false; _error = null;
+        _available = false; _owners = const []; _jobs = const [];
+      });
+      if (next == CoreStatus.connected) {
+        Future.microtask(() { if (mounted) _refresh(); });
+      }
+    });
+    Future.microtask(() { if (mounted && ref.read(coreStatusProvider) == CoreStatus.connected) _refresh(); });
+    // Poll only the open, visible page; no background network probe is
+    // initiated by the UI. Chain health itself remains owned by the core.
+    _refreshTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (_visible && !_busy && true &&
+          ref.read(coreStatusProvider) == CoreStatus.connected) {
+        _refresh();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _generation++;
+    _refreshTimer?.cancel();
+    super.dispose();
   }
 
   List<Map<String, dynamic>> _rows(Object? value) => [
@@ -34,6 +71,7 @@ class _ChainHealthViewState extends ConsumerState<ChainHealthView> {
 
   Future<void> _refresh({Map<String, dynamic>? owner, bool? enabled}) async {
     if (_busy || !mounted) return;
+    final generation = _generation;
     setState(() { _busy = true; _error = null; });
     try {
       if (ref.read(coreStatusProvider) != CoreStatus.connected) {
@@ -41,7 +79,7 @@ class _ChainHealthViewState extends ConsumerState<ChainHealthView> {
       }
       final core = ref.read(coreHandlerProvider);
       final capabilities = await core.getCoreCapabilities();
-      if (!mounted) return;
+      if (!_isCurrent(generation)) return;
       if (!capabilities.contains('chain-health-v1')) {
         setState(() { _available = false; _owners = const []; _jobs = const []; });
         return;
@@ -54,17 +92,20 @@ class _ChainHealthViewState extends ConsumerState<ChainHealthView> {
           enabled: enabled,
         );
       }
+      if (!_isCurrent(generation)) return;
       final state = await core.getChainHealth();
-      if (!mounted) return;
+      if (!_isCurrent(generation)) return;
       setState(() {
         _available = state['available'] == true;
         _owners = _rows(state['owners']);
         _jobs = _rows(state['jobs']);
       });
     } catch (error) {
-      if (mounted) setState(() { _error = '$error'; _available = false; });
+      if (_isCurrent(generation)) setState(() {
+        _error = '$error'; _available = false; _owners = const []; _jobs = const [];
+      });
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted && generation == _generation) setState(() => _busy = false);
     }
   }
 
