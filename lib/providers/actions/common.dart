@@ -1,5 +1,8 @@
 part of '../action.dart';
 
+final updatePlatformResolverProvider = Provider<Future<UpdatePlatform> Function(ExitApp)>((ref) =>
+    (exitApp) => resolveUpdatePlatform(exitApp: exitApp));
+
 @Riverpod(keepAlive: true)
 class CommonAction extends _$CommonAction {
   CoreController get _core => ref.read(coreHandlerProvider);
@@ -263,8 +266,8 @@ class CommonAction extends _$CommonAction {
 
   Future<UpdatePlatform> _updatePlatform() async {
     try {
-      return await resolveUpdatePlatform(
-        exitApp: () => ref.read(systemActionProvider.notifier).handleExit(),
+      return await ref.read(updatePlatformResolverProvider)(
+        () => ref.read(systemActionProvider.notifier).handleExit(),
       );
     } catch (error) {
       commonPrint.log(

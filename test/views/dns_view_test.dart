@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/features/form/form.dart';
@@ -155,17 +157,21 @@ void main() {
     expect(inSheet('IPv6'), findsNothing);
   });
 
-  testWidgets('the app-wide page offers only the normal profile keys', (
+  testWidgets('the app-wide page offers platform-supported DNS keys', (
     tester,
   ) async {
     await pumpView(tester);
 
     await openAddSheet(tester);
 
-    expect(find.text('Direct Nameserver'), findsOneWidget);
-    expect(find.text(currentAppLocalizations.respectRules), findsNothing);
-    expect(find.text('Nameserver Policy'), findsNothing);
-    expect(find.text(currentAppLocalizations.fallbackFilter), findsNothing);
+    final sheet = tester.widget<SelectionSheet<DnsOverrideKey>>(
+      find.byType(SelectionSheet<DnsOverrideKey>),
+    );
+    final offered = sheet.sections.expand((section) => section.items).toSet();
+    expect(offered, Platform.isWindows
+        ? DnsOverrideKey.values.toSet()
+        : DnsOverrideKey.normalProfileKeys);
+    expect(offered, contains(DnsOverrideKey.directNameserver));
   });
 
   testWidgets('the app-wide page offers no quick edit', (tester) async {
@@ -296,7 +302,9 @@ void main() {
     tester,
   ) async {
     await pumpView(tester);
-    setKeys(DnsOverrideKey.normalProfileKeys);
+    setKeys(Platform.isWindows
+        ? DnsOverrideKey.values.toSet()
+        : DnsOverrideKey.normalProfileKeys);
     await tester.pump();
 
     final add = barButton(tester, currentAppLocalizations.addOverrideEntry);

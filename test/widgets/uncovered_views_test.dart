@@ -201,7 +201,17 @@ void main() {
     await tester.pump();
 
     expect(find.byType(AboutView), findsOneWidget);
-    expect(find.text('Telegram'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('github.com/geliopat/FlClashZ'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('github.com/geliopat/FlClashZ'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byWidgetPredicate((widget) => widget.runtimeType.toString() == '_AboutHero'),
+      -300,
+      scrollable: find.byType(Scrollable).first,
+    );
     final hero = find.byWidgetPredicate(
       (widget) => widget.runtimeType.toString() == '_AboutHero',
     );

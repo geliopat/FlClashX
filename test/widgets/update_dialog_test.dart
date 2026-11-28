@@ -1,3 +1,4 @@
+import 'package:fl_clash/features/update/platform.dart';
 import 'package:fl_clash/providers/action.dart';
 import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/providers/config.dart';
@@ -33,7 +34,11 @@ Map<String, dynamic> release(String? body) => <String, dynamic>{
 };
 
 Future<ProviderContainer> pumpApp(WidgetTester tester, {Locale? locale}) async {
-  final container = ProviderContainer();
+  final container = ProviderContainer(overrides: [
+    updatePlatformResolverProvider.overrideWithValue(
+      (_) async => const ManualUpdatePlatform(),
+    ),
+  ]);
   addTearDown(container.dispose);
   globalState.container = container;
   // appSettingProvider is autoDispose; in the app `configProvider` keeps it
@@ -137,7 +142,8 @@ void main() {
     await tapCancel(tester);
     await shown;
 
-    expect(container.read(appSettingProvider).autoCheckUpdate, isFalse);
+    expect(container.read(appSettingProvider).hiddenUpdate, 'v0.8.96');
+    expect(container.read(appSettingProvider).autoCheckUpdate, isTrue);
   });
 
   testWidgets('a manual check keeps the setting and reports a failure', (

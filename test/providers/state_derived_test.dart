@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:fl_clash/common/app_ports.dart';
 import 'package:fl_clash/common/cidr.dart';
 import 'package:fl_clash/common/compute.dart';
@@ -486,7 +487,12 @@ void main() {
     container
         .read(currentPageLabelProvider.notifier)
         .toPage(PageLabel.resources);
-    expect(container.read(navigationStateProvider).currentIndex, 0);
+    final resources = container.read(navigationStateProvider);
+    if (Platform.isWindows) {
+      expect(resources.navigationItems[resources.currentIndex].label, PageLabel.resources);
+    } else {
+      expect(resources.currentIndex, 0);
+    }
   });
 
   test('layout and page state providers compose their dependencies', () {

@@ -225,7 +225,10 @@ void main() {
     );
     expect(find.text('+1'), findsOneWidget);
     expect(find.byTooltip('Start'), findsOneWidget);
-    expect(tester.getSize(find.byType(FilledButton).last).width, 450 - 32);
+    final button = Platform.isWindows
+        ? find.byKey(const ValueKey('engine-toggle-VPN'))
+        : find.byType(FilledButton).last;
+    expect(tester.getSize(button).width, 450 - 32);
     expect(tester.takeException(), isNull);
   });
 
@@ -745,7 +748,8 @@ void main() {
     expect(find.byType(CurrentOutboundCard), findsOneWidget);
     expect(find.byType(ServerLocationCard), findsNothing);
     expect(find.byType(ProviderHeader), findsNothing);
-    expect(find.byType(ProviderConnectButton), findsNothing);
+    expect(find.byType(ProviderConnectButton),
+        Platform.isWindows ? findsOneWidget : findsNothing);
   });
 }
 

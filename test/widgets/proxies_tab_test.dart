@@ -145,14 +145,14 @@ void main() {
   ) async {
     await pumpTabView(tester);
 
-    expect(find.byGlyph(AppGlyphs.chevronDown), findsNothing);
+    expect(find.byGlyph(AppGlyphs.listChecks), findsNothing);
 
     globalContainer
         .read(_tabStateProvider.notifier)
         .set(_tabState([for (var i = 0; i < 12; i++) _group('Group $i')]));
     await tester.pumpAndSettle();
 
-    expect(find.byGlyph(AppGlyphs.chevronDown), findsOneWidget);
+    expect(find.byGlyph(AppGlyphs.listChecks), findsOneWidget);
   });
 
   testWidgets('opens with the current tab in view beside the more button', (
@@ -170,7 +170,7 @@ void main() {
     await tester.pump();
 
     final current = tester.getRect(tabOf('Group 11'));
-    final more = tester.getRect(find.byGlyph(AppGlyphs.chevronDown));
+    final more = tester.getRect(find.byGlyph(AppGlyphs.listChecks));
     expect(isTabSelected(tester, 'Group 11'), isTrue);
     expect(current.right, lessThan(more.left));
   });
@@ -191,7 +191,7 @@ void main() {
     await tester.pump();
 
     final last = tester.getRect(tabOf('Group 11'));
-    final more = tester.getRect(find.byGlyph(AppGlyphs.chevronDown));
+    final more = tester.getRect(find.byGlyph(AppGlyphs.listChecks));
     expect(last.right, lessThan(more.left));
   });
 
@@ -211,7 +211,7 @@ void main() {
     final key = await pumpTabView(tester);
     await tester.pump();
 
-    await tester.tap(find.byGlyph(AppGlyphs.chevronDown));
+    await tester.tap(find.byGlyph(AppGlyphs.listChecks));
     await tester.pumpAndSettle();
 
     final menu = find.byType(CommonPopupMenu);
@@ -244,7 +244,7 @@ void main() {
     expect(key.currentState?.currentGroup?.name, 'Group 15');
     expect(isTabSelected(tester, 'Group 15'), isTrue);
     final picked = tester.getRect(tabOf('Group 15'));
-    final more = tester.getRect(find.byGlyph(AppGlyphs.chevronDown));
+    final more = tester.getRect(find.byGlyph(AppGlyphs.listChecks));
     expect(picked.left, greaterThanOrEqualTo(0));
     expect(picked.right, lessThan(more.left));
   });
@@ -535,7 +535,7 @@ void main() {
       lessThan(30),
     );
     final current = tester.getRect(tabOf('Group 180'));
-    final more = tester.getRect(find.byGlyph(AppGlyphs.chevronDown));
+    final more = tester.getRect(find.byGlyph(AppGlyphs.listChecks));
     expect(isTabSelected(tester, 'Group 180'), isTrue);
     expect(current.left, greaterThanOrEqualTo(0));
     expect(current.right, lessThan(more.left));

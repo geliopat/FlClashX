@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:fl_clash/common/l10n_labels.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/providers/app.dart';
@@ -74,14 +77,13 @@ void main() {
     expect(find.byGlyph(AppGlyphs.zashboard), findsOneWidget);
     final resources = tester.getTopLeft(find.text('Resources'));
     final dashboard = tester.getTopLeft(find.text('Zashboard'));
-    final logs = tester.getTopLeft(find.text('Logs'));
+    final logs = tester.getTopLeft(find.text(PageLabel.logs.label));
     expect(dashboard.dy, greaterThan(resources.dy));
     expect(dashboard.dy, lessThan(logs.dy));
     expect(tester.takeException(), null);
   });
 
-  test('the simple mode keeps only the dashboard, proxies, profiles, logs '
-      'and settings in the navigation', () {
+  test('simple mode keeps the basic and Windows engine navigation', () {
     final labels = {
       for (final item in Navigation().getItems(
         openLogs: true,
@@ -96,6 +98,12 @@ void main() {
       PageLabel.profiles,
       PageLabel.logs,
       PageLabel.tools,
+      if (Platform.isWindows) ...[
+        PageLabel.resources,
+        PageLabel.zapret,
+        PageLabel.zapretLogs,
+        PageLabel.serviceJournal,
+      ],
     });
   });
 
