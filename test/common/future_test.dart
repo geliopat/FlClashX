@@ -4,6 +4,23 @@ import 'package:fl_clash/common/future.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('ResolveOnce retries failure then coalesces successful callers', () async {
+    var attempts = 0;
+    final pending = Completer<int>();
+    final once = ResolveOnce<int>(() {
+      attempts++;
+      if (attempts == 1) return Future<int>.error(StateError('temporary'));
+      return pending.future;
+    });
+    await expectLater(once.value, throwsStateError);
+    final first = once.value;
+    final second = once.value;
+    pending.complete(42);
+    expect(await Future.wait([first, second]), [42, 42]);
+    expect(await once.value, 42);
+    expect(attempts, 2);
+  });
+
   group('FutureExt.withTimeout', () {
     test('returns the value when it completes before the timeout', () async {
       final result = await Future<int>.value(

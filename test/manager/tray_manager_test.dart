@@ -14,6 +14,7 @@ import 'package:intl/intl.dart';
 import 'package:tray/tray.dart';
 
 import '../helpers/test_profiles.dart';
+import '../helpers/idle_zapret.dart';
 
 const _trayChannel = MethodChannel('tray');
 const _windowChannel = MethodChannel('window');
@@ -95,7 +96,7 @@ void main() {
     SystemAction Function()? systemAction,
   }) async {
     container = ProviderContainer(
-      overrides: [
+      overrides: [zapretControllerProvider.overrideWith(IdleZapret.new), 
         profilesProvider.overrideWith(TestProfiles.new),
         systemActionProvider.overrideWith(
           systemAction ?? _RecordingSystemAction.new,
@@ -233,7 +234,7 @@ void main() {
   ) async {
     addTearDown(() => AppLocalizations.load(const Locale('en')));
     container = ProviderContainer(
-      overrides: [
+      overrides: [zapretControllerProvider.overrideWith(IdleZapret.new), 
         profilesProvider.overrideWith(TestProfiles.new),
         systemActionProvider.overrideWith(_RecordingSystemAction.new),
       ],
@@ -253,7 +254,7 @@ void main() {
     tester,
   ) async {
     container = ProviderContainer(
-      overrides: [
+      overrides: [zapretControllerProvider.overrideWith(IdleZapret.new), 
         profilesProvider.overrideWith(TestProfiles.new),
         systemActionProvider.overrideWith(_RecordingSystemAction.new),
       ],

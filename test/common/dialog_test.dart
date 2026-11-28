@@ -295,7 +295,7 @@ void main() {
 
       final agreed = requestDisclaimerConsent();
       await tester.pumpAndSettle();
-      expect(find.text('Your data'), findsOneWidget);
+      expect(find.text(AppLocalizations().disclaimerPrivacyTitle), findsOneWidget);
       await _agree(tester);
       expect(await agreed, isTrue);
 

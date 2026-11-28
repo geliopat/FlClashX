@@ -3,6 +3,7 @@ import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/providers/database.dart';
 import 'package:fl_clash/providers/state.dart';
+import 'package:fl_clash/providers/zapret.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/ui/switch.dart';
 import 'package:fl_clash/views/config/general.dart';
@@ -12,6 +13,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../helpers/test_app.dart';
 import '../helpers/test_profiles.dart';
+import '../helpers/idle_zapret.dart';
 
 const _secretLabel = 'External controller secret';
 
@@ -27,7 +29,7 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     container = ProviderContainer(
-      overrides: [profilesProvider.overrideWith(TestProfiles.new)],
+      overrides: [zapretControllerProvider.overrideWith(IdleZapret.new), profilesProvider.overrideWith(TestProfiles.new)],
     );
     addTearDown(container.dispose);
     globalState.container = container;
@@ -76,7 +78,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     container = ProviderContainer(
-      overrides: [
+      overrides: [zapretControllerProvider.overrideWith(IdleZapret.new), 
         profilesProvider.overrideWith(TestProfiles.new),
         androidSecureProvider.overrideWithValue(true),
       ],

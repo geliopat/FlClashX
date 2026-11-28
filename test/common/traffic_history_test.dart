@@ -4,6 +4,16 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   final start = DateTime.utc(2026, 11, 26, 12);
+  test('disposal rejects a sample awaiting initialization without notifying', () async {
+    final history = TrafficHistory(persist: false);
+    final pending = history.record(generation: history.generation,
+      all: const Traffic(up: 1, down: 2));
+    history.dispose();
+    await expectLater(pending, completes);
+    await expectLater(history.record(generation: history.generation,
+      all: const Traffic(up: 1, down: 2)), completes);
+    history.dispose();
+  });
   test('independent counters, resets, rolling expiration and restore', () {
     final history = RollingTrafficWindow();
     history.resetBaseline();

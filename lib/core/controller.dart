@@ -17,7 +17,7 @@ class CoreController {
   static CoreController? _instance;
   late CoreHandlerInterface _interface;
 
-  CoreController._internal() {
+  CoreController._internal() : _snapshotMaxAge = const Duration(milliseconds: 900) {
     if (system.isAndroid) {
       _interface = coreLib!;
     } else {
@@ -26,7 +26,7 @@ class CoreController {
   }
 
   @visibleForTesting
-  CoreController.test(this._interface) {
+  CoreController.test(this._interface) : _snapshotMaxAge = const Duration(milliseconds: 900) {
     _instance = this;
   }
 
@@ -44,7 +44,7 @@ class CoreController {
     return _instance!;
   }
 
-  Duration _snapshotMaxAge = const Duration(milliseconds: 900);
+  final Duration _snapshotMaxAge;
   late final _connectionSnapshots = ConnectionSnapshotReader(_interface.getConnections, maxAge: _snapshotMaxAge);
 
   Future<ConnectionSnapshot> getConnectionSnapshot() => _connectionSnapshots.read();

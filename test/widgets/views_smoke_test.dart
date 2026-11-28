@@ -6,6 +6,7 @@ import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/providers/config.dart';
 import 'package:fl_clash/providers/database.dart';
 import 'package:fl_clash/providers/state.dart';
+import 'package:fl_clash/providers/zapret.dart';
 import 'package:fl_clash/state.dart';
 import 'package:fl_clash/ui/paged_sheet.dart';
 import 'package:fl_clash/ui/popup.dart';
@@ -36,6 +37,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../helpers/test_app.dart';
 import '../helpers/test_database_providers.dart';
 import '../helpers/test_profiles.dart';
+import '../helpers/idle_zapret.dart';
 
 Finder _portField(String label) => find.descendant(
   of: find.widgetWithText(FormRow, label),
@@ -78,7 +80,7 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
 
       final container = ProviderContainer(
-        overrides: [
+        overrides: [zapretControllerProvider.overrideWith(IdleZapret.new), 
           profilesProvider.overrideWith(TestProfiles.new),
           scriptsProvider.overrideWith(TestScripts.new),
           globalRulesProvider.overrideWith(TestGlobalRules.new),
@@ -130,7 +132,7 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
 
       final container = ProviderContainer(
-        overrides: [profilesProvider.overrideWith(TestProfiles.new)],
+        overrides: [zapretControllerProvider.overrideWith(IdleZapret.new), profilesProvider.overrideWith(TestProfiles.new)],
       );
       addTearDown(container.dispose);
       globalState.container = container;
@@ -167,7 +169,7 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     final container = ProviderContainer(
-      overrides: [profilesProvider.overrideWith(TestProfiles.new)],
+      overrides: [zapretControllerProvider.overrideWith(IdleZapret.new), profilesProvider.overrideWith(TestProfiles.new)],
     );
     addTearDown(container.dispose);
     globalState.container = container;
@@ -222,7 +224,7 @@ void main() {
       all: proxies,
     );
     final container = ProviderContainer(
-      overrides: [
+      overrides: [zapretControllerProvider.overrideWith(IdleZapret.new), 
         profilesProvider.overrideWith(() => TestProfiles([profile])),
         currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
         currentGroupsStateProvider.overrideWithValue(
@@ -310,7 +312,7 @@ void main() {
       ),
     );
     final container = ProviderContainer(
-      overrides: [
+      overrides: [zapretControllerProvider.overrideWith(IdleZapret.new), 
         profilesProvider.overrideWith(() => TestProfiles([profile])),
         currentProfileIdProvider.overrideWithBuild((_, _) => profile.id),
         profileRulesProvider.overrideWith2((_) => _TestProfileRules(rules)),

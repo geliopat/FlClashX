@@ -13,6 +13,7 @@ import 'package:fl_clash/common/request.dart';
 import 'package:fl_clash/l10n/l10n.dart';
 import 'package:fl_clash/state.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fl_clash/common/file_logger.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 class _StalledHttpClient extends Fake implements HttpClient {
@@ -67,8 +68,19 @@ class _HostAdapter implements HttpClientAdapter {
   void close({bool force = false}) {}
 }
 
+import '../helpers/app_paths.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  late Directory logRoot;
+  setUpAll(() async {
+    logRoot = await Directory.systemTemp.createTemp('client-log-test-');
+    await useAppPaths(logRoot);
+  });
+  tearDownAll(() async {
+    await appFileLogger.flush();
+    if (await logRoot.exists()) await logRoot.delete(recursive: true);
+  });
 
   test('getTextResponseForUrl propagates the typed DioException', () async {
     // flutter_test's mocked HttpClient answers every request with HTTP 400,

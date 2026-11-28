@@ -106,7 +106,8 @@ void main() {
     await useAppPaths(root);
   });
 
-  tearDownAll(() {
+  tearDownAll(() async {
+    await appFileLogger.flush();
     // The shared system temp dir is not exclusively ours; another suite running
     // alongside this one can take the tree out from under the teardown.
     if (root.existsSync()) {

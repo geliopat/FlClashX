@@ -113,12 +113,14 @@ Future<_HeldDownload> _holdDownload() async {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late Directory testHome;
+  setUpAll(() async {
+    testHome = await Directory.systemTemp.createTemp('client-action-');
+  });
   setUp(() async {
     await mockPreferences();
-    testHome = await Directory.systemTemp.createTemp('client-action-');
     await useAppPaths(testHome);
   });
-  tearDown(() async {
+  tearDownAll(() async {
     await appFileLogger.flush();
     await crashFileLogger.flush();
     await recoveryJournal.flush();

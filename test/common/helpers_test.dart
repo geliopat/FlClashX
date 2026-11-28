@@ -205,8 +205,8 @@ void main() {
   });
 
   group('getProxiesColumns', () {
-    test('minimum 2 columns', () {
-      expect(getProxiesColumns(100, ProxiesLayout.standard), 2);
+    test('a narrow standard grid keeps one readable column', () {
+      expect(getProxiesColumns(100, ProxiesLayout.standard), 1);
     });
 
     test('scales with width', () {

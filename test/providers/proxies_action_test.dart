@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:async';
 
 import 'package:drift/native.dart';
@@ -94,8 +95,19 @@ ExternalProvider _provider(String name, {int count = 1}) => ExternalProvider(
   updateAt: DateTime.utc(2026),
 );
 
+import '../helpers/app_paths.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  late Directory logRoot;
+  setUpAll(() async {
+    logRoot = await Directory.systemTemp.createTemp('client-log-test-');
+    await useAppPaths(logRoot);
+  });
+  tearDownAll(() async {
+    await appFileLogger.flush();
+    if (await logRoot.exists()) await logRoot.delete(recursive: true);
+  });
 
   late MockCoreHandlerInterface core;
 
