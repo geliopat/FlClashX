@@ -1,6 +1,7 @@
 package core
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"testing"
@@ -73,5 +74,51 @@ func TestChainHealthReportsIgnoreReplacedJobs(t *testing.T) {
 		active.status.Results[0].Member != "current" || active.status.Error != "" ||
 		len(old.status.Results) != 0 {
 		t.Fatal("stale job or caller-owned results altered the active snapshot")
+	}
+}
+
+type testRetiringChainGroup struct {
+	nativeChainHealthGroup
+	enabled bool
+}
+
+func (g *testRetiringChainGroup) SetChainHealthEnabled(enabled bool) {
+	g.enabled = enabled
+}
+
+func TestChainHealthRetainsCancelledSchedulerSlot(t *testing.T) {
+	const name = "retiring-test-chain"
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	group := &testRetiringChainGroup{enabled: true}
+	job := &chainHealthJob{group: group, cancel: cancel}
+	chainHealthJobs.Lock()
+	chainHealthJobs.jobs[name] = job
+	stopChainHealthLocked(name)
+	retiring := chainHealthJobs.retiring[name]
+	active := chainHealthJobs.jobs[name]
+	chainHealthJobs.Unlock()
+	t.Cleanup(func() {
+		chainHealthJobs.Lock()
+		defer chainHealthJobs.Unlock()
+		delete(chainHealthJobs.jobs, name)
+		delete(chainHealthJobs.retiring, name)
+	})
+	if active != nil || retiring != job || ctx.Err() == nil || group.enabled {
+		t.Fatal("cancelled job released native scheduler ownership before exit")
+	}
+	finishChainHealth(name, &chainHealthJob{})
+	chainHealthJobs.Lock()
+	retiring = chainHealthJobs.retiring[name]
+	chainHealthJobs.Unlock()
+	if retiring != job {
+		t.Fatal("stale completion released another worker's slot")
+	}
+	finishChainHealth(name, job)
+	chainHealthJobs.Lock()
+	retiring = chainHealthJobs.retiring[name]
+	chainHealthJobs.Unlock()
+	if retiring != nil {
+		t.Fatal("completed worker retained scheduler ownership")
 	}
 }

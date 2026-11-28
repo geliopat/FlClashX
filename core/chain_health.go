@@ -67,7 +67,8 @@ type chainHealthJob struct {
 var chainHealthJobs = struct{
 	sync.Mutex
 	jobs map[string]*chainHealthJob
-}{jobs:make(map[string]*chainHealthJob)}
+	retiring map[string]*chainHealthJob
+}{jobs:make(map[string]*chainHealthJob), retiring:make(map[string]*chainHealthJob)}
 
 func describeChainHealthOwner(proxy C.Proxy) (chainHealthOwner,C.Dialer,outboundgroup.ChainProbeOwnerFactory,bool) {
 	if proxy==nil { return chainHealthOwner{},nil,nil,false }
@@ -112,6 +113,8 @@ func handleGetChainHealth() map[string]any {
 func stopChainHealthLocked(group string) {
 	if job:=chainHealthJobs.jobs[group];job!=nil {
 		delete(chainHealthJobs.jobs,group)
+		// A cancelled worker still owns the native scheduler slot until it exits.
+		chainHealthJobs.retiring[group] = job
 		job.cancel()
 		job.group.SetChainHealthEnabled(false)
 	}
@@ -124,6 +127,9 @@ func finishChainHealth(group string, job *chainHealthJob) {
 	defer chainHealthJobs.Unlock()
 	if chainHealthJobs.jobs[group] == job {
 		stopChainHealthLocked(group)
+	}
+	if chainHealthJobs.retiring[group] == job {
+		delete(chainHealthJobs.retiring, group)
 	}
 }
 
@@ -159,7 +165,8 @@ func handleSetChainHealth(request chainHealthRequest) (bool,error) {
 	}
 	if !chainHealthAvailable() {return false,errors.New("active chain health is unavailable in this engine")}
 	if !isRunning.Load() {return false,errors.New("core listeners are stopped")}
-	if len(chainHealthJobs.jobs)>=maxChainHealthJobs {return false,errors.New("active chain health group limit reached")}
+	if chainHealthJobs.retiring[request.Group] != nil {return false,errors.New("previous chain health job is stopping; retry")}
+	if len(chainHealthJobs.jobs)+len(chainHealthJobs.retiring)>=maxChainHealthJobs {return false,errors.New("active chain health group limit reached")}
 	if chainHealthJobs.jobs[request.Group]!=nil {return false,errors.New("a probe owner is already selected for this group")}
 	proxies:=allProxies()
 	owner:=proxies[request.Name]
