@@ -130,10 +130,13 @@ void main() {
     await shown;
   });
 
-  testWidgets('stops reminding when an automatic check is dismissed', (
+  testWidgets('hides only the dismissed release and keeps automatic checks', (
     tester,
   ) async {
     final container = await pumpApp(tester);
+    container.read(appSettingProvider.notifier).update(
+      (state) => state.copyWith(autoCheckUpdate: true),
+    );
 
     final shown = container
         .read(commonActionProvider.notifier)
