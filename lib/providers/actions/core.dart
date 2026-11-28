@@ -3,6 +3,7 @@ part of '../action.dart';
 @Riverpod(keepAlive: true)
 class CoreAction extends _$CoreAction {
   CoreController get _core => ref.read(coreHandlerProvider);
+  bool get _exiting => !ref.mounted || ref.read(systemActionProvider.notifier).isExiting;
 
   static const crashRestartLimit = 3;
   static const crashRestartWindow = Duration(seconds: 5);
@@ -45,14 +46,17 @@ class CoreAction extends _$CoreAction {
   }
 
   Future<void> startCore() async {
+    if (_exiting) return;
     final restartsBegun = _restartsBegun;
     ref.read(coreStatusProvider.notifier).value = CoreStatus.connecting;
     try {
       final result = await startLifecycle();
-      await _applyLifecycleResult(result);
+      if (!_exiting && restartsBegun == _restartsBegun) {
+        await _applyLifecycleResult(result);
+      }
     } catch (error) {
       // A restart begun since, such as one answering a crash in init, owns it.
-      if (restartsBegun != _restartsBegun) {
+      if (_exiting || restartsBegun != _restartsBegun) {
         return;
       }
       ref.read(coreStatusProvider.notifier).value = CoreStatus.disconnected;
@@ -103,10 +107,12 @@ class CoreAction extends _$CoreAction {
     if (result.outcome == CoreLifecycleOutcome.superseded) {
       return false;
     }
+    if (_exiting) return false;
     await verifyRunningCore();
+    if (_exiting) return false;
     ref.read(coreStatusProvider.notifier).value = CoreStatus.connected;
     await initCore();
-    return true;
+    return !_exiting;
   }
 
   Future<void> clearDnsCacheOnNetworkChange() async {
@@ -129,6 +135,7 @@ class CoreAction extends _$CoreAction {
 
   /// Restarting a Core that keeps falling would only hide why it falls.
   Future<void> restartAfterCrash(String reason) async {
+    if (_exiting) return;
     crashFileLogger.enable();
     crashFileLogger.write(Log.app('[Mihomo] $reason').copyWith(logLevel: LogLevel.error));
     // The activation transaction owns recovery during a candidate trial.
@@ -160,6 +167,7 @@ class CoreAction extends _$CoreAction {
         crash = _unansweredCrash
       ) {
         _unansweredCrash = null;
+        if (_exiting) return;
         if (_failedRestarts >= crashRestartLimit) {
           if (system.isWindows) {
             final id = recoveryJournal.begin('Mihomo', 'watchdog-limit');
@@ -178,6 +186,7 @@ class CoreAction extends _$CoreAction {
         );
         // restartCore() joins a restart under way instead of relaunching.
         await _restartOperation?.catchError((_) => false);
+        if (_exiting) return;
         final running = ref.read(setupActionProvider.notifier).requestedRunning;
         _restartingAfterCrash = true;
         try {
@@ -206,6 +215,7 @@ class CoreAction extends _$CoreAction {
 
   /// [running] stands in for a run that a crash rolled back.
   Future<bool> restartCore({bool? running, bool repairHelper = false}) {
+    if (_exiting) return Future.value(false);
     final update = _coreReleaseOperation;
     if (update != null) {
       // A Helper repair must follow the exclusive core trial, not interrupt it.
@@ -217,6 +227,7 @@ class CoreAction extends _$CoreAction {
   }
 
   Future<bool> _restartCore({bool? running, bool repairHelper = false}) {
+    if (_exiting) return Future.value(false);
     _requestedRestartRevision++;
     final activeOperation = _restartOperation;
     if (activeOperation != null) {
@@ -267,6 +278,7 @@ class CoreAction extends _$CoreAction {
   }) async {
     // Wait out an earlier restart before the first trial selection is visible.
     await _restartOperation?.catchError((_) => false);
+    if (_exiting) return false;
     final setup = ref.read(setupActionProvider.notifier);
     final running = setup.requestedRunning ?? ref.read(isStartProvider);
     final id = recoveryJournal.begin('Mihomo', restore ? 'core-rollback' : 'core-update');
@@ -297,12 +309,12 @@ class CoreAction extends _$CoreAction {
       }
       // Detect immediate crashes after successful configuration/listener setup.
       await Future<void>.delayed(const Duration(seconds: 2));
-      return !_coreReleaseCrashed &&
+      return !_exiting && !_coreReleaseCrashed &&
           ref.read(coreStatusProvider) == CoreStatus.connected &&
           await _core.isInit;
     }
 
-    bool healthy() => !_coreReleaseCrashed &&
+    bool healthy() => !_exiting && !_coreReleaseCrashed &&
         ref.read(coreStatusProvider) == CoreStatus.connected;
 
     try {
@@ -355,6 +367,7 @@ class CoreAction extends _$CoreAction {
           rethrow;
         }
       }
+      if (_exiting) return false;
       lifecycleStarted = true;
       ref.read(coreStatusProvider.notifier).value = CoreStatus.connecting;
       final stopping = coreIsEmbedded && wasRunning
@@ -367,6 +380,7 @@ class CoreAction extends _$CoreAction {
       }
       var applied = true;
       do {
+        if (_exiting) return false;
         _relaunchRequested = false;
         ref.read(coreStatusProvider.notifier).value = CoreStatus.connecting;
         final result = await restartLifecycle();
@@ -377,6 +391,7 @@ class CoreAction extends _$CoreAction {
         var appliedRevision = 0;
         while (appliedRevision < _requestedRestartRevision &&
             !_relaunchRequested) {
+          if (_exiting) return false;
           final revision = _requestedRestartRevision;
           applied = await _restoreRunning(
             setupAction,
@@ -387,6 +402,7 @@ class CoreAction extends _$CoreAction {
           appliedRevision = revision;
         }
       } while (_relaunchRequested);
+      if (_exiting) return false;
       zapret?.endCoreRestart();
       if (applied && zapret != null && ref.read(isStartProvider) && !ref.read(safeModeProvider)) {
         await zapret.startAlongsideMihomo(force: restartZapret).catchError((Object error) {

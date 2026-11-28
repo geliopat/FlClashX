@@ -42,6 +42,7 @@ class _CoreContainerState extends ConsumerState<CoreManager>
     ref.listenManual(currentProfileIdProvider, (prev, next) {
       if (prev == next) return;
       runAfterFrame(() {
+        if (!mounted || ref.read(systemActionProvider.notifier).isExiting) return;
         unawaited(ref.read(setupActionProvider.notifier).fullSetup());
       });
     });
@@ -103,6 +104,8 @@ class _CoreContainerState extends ConsumerState<CoreManager>
   @override
   void dispose() {
     coreEventManager.removeListener(this);
+    debouncer.cancel((FunctionTag.updateDelay, this));
+    debouncer.cancel((FunctionTag.loadedProvider, this));
     super.dispose();
   }
 
@@ -111,7 +114,8 @@ class _CoreContainerState extends ConsumerState<CoreManager>
     super.onDelay(delay);
     final proxiesAction = ref.read(proxiesActionProvider.notifier);
     proxiesAction.setDelay(delay);
-    debouncer.call(FunctionTag.updateDelay, () async {
+    debouncer.call((FunctionTag.updateDelay, this), () async {
+      if (!mounted || ref.read(systemActionProvider.notifier).isExiting) return;
       proxiesAction.updateGroupsDebounce();
     }, duration: const Duration(milliseconds: 5000));
   }
@@ -177,7 +181,7 @@ class _CoreContainerState extends ConsumerState<CoreManager>
       return;
     }
     ref.read(providersProvider.notifier).setProvider(provider);
-    debouncer.call(FunctionTag.loadedProvider, () async {
+    debouncer.call((FunctionTag.loadedProvider, this), () async {
       if (!mounted) {
         return;
       }
@@ -188,6 +192,7 @@ class _CoreContainerState extends ConsumerState<CoreManager>
 
   @override
   Future<void> onCrash(String message) async {
+    if (!mounted || ref.read(systemActionProvider.notifier).isExiting) return;
     if (ref.read(coreStatusProvider) != CoreStatus.connected) {
       return;
     }

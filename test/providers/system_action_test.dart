@@ -249,6 +249,8 @@ void main() {
 
       final first = notifier().handleExit();
       final second = notifier().handleExit(true);
+      expect(notifier().isExiting, isTrue);
+      expect(await container.read(coreActionProvider.notifier).restartCore(), isFalse);
       await Future<void>.delayed(Duration.zero);
 
       expect(action.calls, ['cleanup', 'window', 'core']);

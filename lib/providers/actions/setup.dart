@@ -56,6 +56,18 @@ class SetupAction extends _$SetupAction {
   var _configRequests = 0;
   var _setupAfterInit = false;
   Completer<void>? _initialized;
+  bool get _exiting => !ref.mounted || ref.read(systemActionProvider.notifier).isExiting;
+
+  void quiesceForExit() {
+    _stopRuntimeTicker();
+    debouncer.cancel(FunctionTag.applyProfile);
+    debouncer.cancel(FunctionTag.updateConfig);
+    debouncer.cancel(FunctionTag.suspend);
+    _pendingForceApply = false;
+    _setupAfterInit = false;
+    _initialized?.complete();
+    _initialized = null;
+  }
 
   /// Moves as each config push starts and again once the Core answers it.
   int get pushes => _pushes;
@@ -146,7 +158,7 @@ class SetupAction extends _$SetupAction {
   }
 
   void _syncRuntimeTicker() {
-    if (_startTime == null || !_isTrafficShown) {
+    if (_exiting || _startTime == null || !_isTrafficShown) {
       _stopRuntimeTicker();
       return;
     }
@@ -206,12 +218,14 @@ class SetupAction extends _$SetupAction {
   }
 
   Future<bool> setRunning(bool running, {bool initialize = false}) async {
+    if (_exiting) return false;
     if (running && !initialize && !ref.read(initProvider)) {
       // A start from Quick Settings, automation or Always-on can arrive while
       // startup is still deciding the run; it waits for that, and yields to
       // whatever command startup or the user gave since.
       final before = _latestRunRequest;
       await (_initialized ??= Completer<void>()).future;
+      if (_exiting) return false;
       if (!identical(_latestRunRequest, before)) {
         return true;
       }
@@ -242,6 +256,7 @@ class SetupAction extends _$SetupAction {
     bool forceZapret = false,
     void Function(Object)? onZapretStopError,
   }) {
+    if (_exiting) return Future.value(false);
     final request = _RunRequest(
       running: running,
       initialize: initialize,
@@ -414,6 +429,7 @@ class SetupAction extends _$SetupAction {
   }
 
   Future<void> restartVpn() async {
+    if (_exiting) return;
     if (!ref.read(isStartProvider)) {
       return;
     }
@@ -485,7 +501,7 @@ class SetupAction extends _$SetupAction {
     _setLocalRunning(!request.running);
   }
 
-  bool _isCurrent(_RunRequest request) => identical(_latestRunRequest, request);
+  bool _isCurrent(_RunRequest request) => !_exiting && identical(_latestRunRequest, request);
 
   /// Identity of the latest run request, answered or rolled back alike.
   Object? get runIntent => _latestRunRequest;
@@ -499,6 +515,7 @@ class SetupAction extends _$SetupAction {
   }
 
   Future<void> updateConfigDebounce() async {
+    if (_exiting) return;
     _configRequests++;
     debouncer.call(FunctionTag.updateConfig, updateConfig);
   }
@@ -516,6 +533,7 @@ class SetupAction extends _$SetupAction {
 
   @visibleForTesting
   Future<void> updateConfig() async {
+    if (_exiting) return;
     _configRequests++;
     await globalState.safeRun(() async {
       final patchConfig = ref.read(patchClashConfigProvider);
@@ -527,6 +545,7 @@ class SetupAction extends _$SetupAction {
       // Behind the apply in flight: until its push lands the Core has no
       // config to update and answers "config is not applied".
       final message = await _setupScheduler.run(() {
+        if (_exiting) return Future.value('');
         final networkSetting = ref.read(networkSettingProvider);
         return _core.updateConfig(
           _effectivePatchConfig(
@@ -551,6 +570,7 @@ class SetupAction extends _$SetupAction {
   Duration get maxApplyDebounce => const Duration(seconds: 10);
 
   void applyProfileDebounce({bool silence = false, bool force = false}) {
+    if (_exiting) return;
     _configRequests++;
     _pendingForceApply |= force;
     debouncer.call(
@@ -662,6 +682,7 @@ class SetupAction extends _$SetupAction {
   }) async {
     _configRequests++;
     final result = await _setupScheduler.run(() {
+      if (_exiting) return Future.value(_SetupTaskResult.failed);
       return _setupConfig(
         force: force,
         silence: silence,
@@ -682,6 +703,7 @@ class SetupAction extends _$SetupAction {
   }
 
   Future<bool> _restartCoreAfterAuthorization() async {
+    if (_exiting) return false;
     _tunMissed = false;
     final coreAction = ref.read(coreActionProvider.notifier);
     // Awaited from inside its own restore, the restart would wait on itself.
@@ -707,6 +729,7 @@ class SetupAction extends _$SetupAction {
   /// authorizes again, as the authorization the Core ran under did not hold.
   Future<void> tunFailed() async {
     while (true) {
+      if (_exiting) return;
       final tun = ref.read(patchClashConfigProvider).tun;
       final profileId = ref.read(currentProfileIdProvider);
       final requests = _configRequests;
@@ -717,7 +740,7 @@ class SetupAction extends _$SetupAction {
         await Future<void>.delayed(tunRecheckDelay);
         continue;
       }
-      if (!await confirmTunFailed()) return;
+      if (!await confirmTunFailed() || _exiting) return;
       // A config asked for meanwhile may sit behind the answer, unpushed.
       if (!_pushWaiting &&
           requests == _configRequests &&
@@ -1098,6 +1121,7 @@ class SetupAction extends _$SetupAction {
       setupState = state;
       return getProfile(setupState: state, patchConfig: realPatchConfig);
     }, title: 'build profile');
+    if (_exiting) return _SetupTaskResult.failed;
     final profileFailed = realProfile == null;
     if (system.isWindows && profileFailed) {
       // No empty/default replacement and no listener start after build error.
@@ -1182,6 +1206,7 @@ class SetupAction extends _$SetupAction {
             if (profileId != null) {
               await appPath.ensureProviderDirs(profileId);
             }
+            if (_exiting) throw StateError('Application is exiting');
             final String message;
             try {
               message = await _core.setupConfig(
@@ -1220,6 +1245,7 @@ class SetupAction extends _$SetupAction {
               }
             }
           }
+          if (_exiting) { setupFailed = true; return; }
           globalState.lastConfigMd5 = yamlMd5;
           globalState.lastConfigCounts =
               realProfile?.counts ?? configCountsOf(const {});

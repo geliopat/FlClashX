@@ -5,6 +5,7 @@ class SystemAction extends _$SystemAction {
   CoreController get _core => ref.read(coreHandlerProvider);
 
   SystemExitCoordinator? _exitCoordinator;
+  bool get isExiting => _exitCoordinator != null;
 
   @override
   void build() {}
@@ -34,6 +35,7 @@ class SystemAction extends _$SystemAction {
 
   /// The new copy waits for this one to quit, as only one may run.
   Future<void> handleRestart() async {
+    if (isExiting) return;
     try {
       await relaunchSelf();
     } catch (error) {
@@ -55,6 +57,7 @@ class SystemAction extends _$SystemAction {
 
   @protected
   Future<void> cleanupExitResources(bool needSave) async {
+    ref.read(setupActionProvider.notifier).quiesceForExit();
     if (system.isWindows) {
       try {
         await ref.read(zapretControllerProvider.notifier).stopAlongsideMihomo();
