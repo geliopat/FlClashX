@@ -87,6 +87,8 @@ class GoBuilder {
     config.goLdflags,
     if (config.coreVersion.isNotEmpty)
       '-X $_versionSymbol=${config.coreVersion}',
+    if (_engineRevision() case final revision?)
+      '-X main.engineRevision=$revision',
   ].join(' ');
 
   List<String> _buildArguments(Target target, {String? outFile}) => [
