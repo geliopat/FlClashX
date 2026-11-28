@@ -1056,7 +1056,7 @@ extension SnifferOverrideExt on Sniffer {
   }
 
   Map<String, Object?> overrideJson(Set<SnifferOverrideKey> keys, {bool keepEmpty = false}) =>
-      _overrideJson(_json, SnifferOverrideKey.values, keys, keepEmpty: keepEmpty ? keys : const {});
+      _overrideJson(_json, SnifferOverrideKey.values, keys, keepEmpty: keepEmpty ? keys : const <SnifferOverrideKey>{});
 
   String overrideYaml(Set<SnifferOverrideKey> keys, {bool keepEmpty = false}) =>
       yaml.encode(overrideJson(keys, keepEmpty: keepEmpty));
