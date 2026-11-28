@@ -1,0 +1,115 @@
+name: Full z3 client and signed candidate system tests (no publication)
+on:
+  push:
+    branches: [candidate/z3-refactor-adapter]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: z3-complete-client-audit
+  cancel-in-progress: true
+env:
+  ENGINE_SHA: '3e8de1205af9e4fb7cb6a1d56f8bd36b4ada5d67'
+  HOST_SHA: 'e57f5bdcff7c7a9df4df0f22957da4073f2b6249'
+  CORE_VERSION: 'v1.19.34-z.3'
+  GOWORK: 'off'
+  CGO_ENABLED: '0'
+  # Public fixture key for seed bytes 0..31. Never trust it in releases.
+  FLCLASHZ_UPDATE_PUBLIC_KEY: 'A6EHv/POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg='
+jobs:
+  windows-client:
+    runs-on: windows-2022
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+          submodules: true
+      - name: Verify client uses exact audited host source
+        shell: pwsh
+        run: |
+          git diff --exit-code $env:HOST_SHA HEAD -- core build_config.yaml
+          if ($LASTEXITCODE -ne 0) { throw 'Client differs from audited host' }
+          if ((git rev-parse HEAD:core/third_party/mihomo).Trim() -cne $env:ENGINE_SHA) { throw 'Gitlink mismatch' }
+          if ((git -C core/third_party/mihomo rev-parse HEAD).Trim() -cne $env:ENGINE_SHA) { throw 'Engine mismatch' }
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.HOST_SHA }}
+          path: audited-host
+          persist-credentials: false
+          submodules: true
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.27.1'
+          cache-dependency-path: audited-host/core/go.sum
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.47.6'
+          cache: true
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build exact reviewed candidate
+        working-directory: audited-host/core
+        shell: pwsh
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP 'z3-candidate'
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          $exe = Join-Path $dir 'FlClashCore.exe'
+          $env:GOOS = 'windows'; $env:GOARCH = 'amd64'; $env:GOAMD64 = 'v1'
+          $flags = "-w -s -X github.com/metacubex/mihomo/constant.Version=v1.19.34 -X main.releaseVersion=$env:CORE_VERSION -X main.engineRevision=$env:ENGINE_SHA -X main.hostRevision=$env:HOST_SHA"
+          go build -mod=readonly -trimpath -tags with_gvisor "-ldflags=$flags" -o $exe ./cmd/core
+          if ($LASTEXITCODE -ne 0) { throw 'Core build failed' }
+          $info = & $exe --core-info
+          if ($LASTEXITCODE -ne 0) { throw 'Core identity failed' }
+          $info | Set-Content -Encoding utf8NoBOM (Join-Path $dir 'core-info.json')
+          "FLCLASHZ_TEST_SIGNED_CORE_DIR=$dir" >> $env:GITHUB_ENV
+      - name: Sign isolated fixture (public test key only)
+        shell: pwsh
+        run: |
+          $env:GO111MODULE = 'off'
+          $env:CORE_SIGNING_KEY = [Convert]::ToBase64String([byte[]](0..31))
+          $env:CORE_PUBLIC_KEY = $env:FLCLASHZ_UPDATE_PUBLIC_KEY
+          go run .github/scripts/sign-core-manifest.go -dir $env:FLCLASHZ_TEST_SIGNED_CORE_DIR -version $env:CORE_VERSION -engine $env:ENGINE_SHA -host $env:HOST_SHA
+          if ($LASTEXITCODE -ne 0) { throw 'Fixture signing failed' }
+      - name: Full Go adapter suite
+        working-directory: core
+        shell: pwsh
+        run: |
+          go test -mod=readonly -count=1 -tags with_gvisor -timeout 15m ./...
+          if ($LASTEXITCODE -ne 0) { throw 'Adapter tests failed' }
+      - name: Full Rust Helper and Zapret tests
+        shell: pwsh
+        run: |
+          cargo test --locked --manifest-path services/helper/Cargo.toml --features windows-service
+          if ($LASTEXITCODE -ne 0) { throw 'Helper or Zapret tests failed' }
+      - name: Privileged staging, tamper rejection and live IPC
+        shell: pwsh
+        run: |
+          & .github/scripts/test-signed-core-system.ps1
+      - name: Install Flutter dependencies
+        run: flutter pub get
+      - name: Full Flutter test suite
+        shell: pwsh
+        run: |
+          flutter test "--dart-define=FLCLASHZ_UPDATE_PUBLIC_KEY=$env:FLCLASHZ_UPDATE_PUBLIC_KEY"
+          if ($LASTEXITCODE -ne 0) { throw 'Flutter tests failed' }
+      - name: Analyze all Dart sources
+        run: flutter analyze --no-fatal-infos
+      - name: Prepare audited unsigned binary only
+        shell: pwsh
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP 'audited-release-input'
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          $exe = Join-Path $env:FLCLASHZ_TEST_SIGNED_CORE_DIR 'FlClashCore.exe'
+          $manifest = Get-Content (Join-Path $env:FLCLASHZ_TEST_SIGNED_CORE_DIR 'core-manifest.json') -Raw | ConvertFrom-Json
+          if ((Get-FileHash $exe -Algorithm SHA256).Hash.ToLowerInvariant() -cne $manifest.sha256) { throw 'Tested bytes changed' }
+          Copy-Item $exe $dir
+          Copy-Item (Join-Path $env:FLCLASHZ_TEST_SIGNED_CORE_DIR 'core-info.json') $dir
+          "AUDITED_CORE_DIR=$dir" >> $env:GITHUB_ENV
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: z3-client-audit-only
+          path: ${{ env.AUDITED_CORE_DIR }}
+          if-no-files-found: error
