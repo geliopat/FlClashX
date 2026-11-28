@@ -257,6 +257,14 @@ func mergeProfileBase(base *SetupBase) (*yaml.Node, error) {
 	if err := yaml.Unmarshal([]byte(base.Overlay), &overlayDocument); err != nil {
 		return nil, err
 	}
+	// Node-only decoding permits recursive aliases that a typed decode rejects.
+	// Reject them before traversing merge keys or expanding aliases.
+	if err := validateProfileAliases(&profileDocument); err != nil {
+		return nil, err
+	}
+	if err := validateProfileAliases(&overlayDocument); err != nil {
+		return nil, err
+	}
 	// Before the merge drops the sections an alias may still point into.
 	if retag {
 		retagShortIDs(&profileDocument)
@@ -315,6 +323,46 @@ func preserveUnknownProfileKeys(profile, overlay *yaml.Node) {
 			setMappingValue(overlay, key, value)
 		}
 	}
+}
+
+// YAML alias targets are anchored nodes. Memoize only those targets, rather
+// than allocating a graph entry for every scalar in a large subscription.
+func validateProfileAliases(root *yaml.Node) error {
+	const (
+		visiting = 1
+		done = 2
+	)
+	states := map[*yaml.Node]uint8{}
+	var walk func(*yaml.Node) error
+	walk = func(node *yaml.Node) error {
+		if node == nil {
+			return errors.New("invalid YAML alias target")
+		}
+		if node.Anchor != "" {
+			switch states[node] {
+			case visiting:
+				return fmt.Errorf("line %d: recursive YAML alias", node.Line)
+			case done:
+				return nil
+			}
+			states[node] = visiting
+		}
+		if node.Kind == yaml.AliasNode {
+			if err := walk(node.Alias); err != nil {
+				return err
+			}
+		}
+		for _, child := range node.Content {
+			if err := walk(child); err != nil {
+				return err
+			}
+		}
+		if node.Anchor != "" {
+			states[node] = done
+		}
+		return nil
+	}
+	return walk(root)
 }
 
 func documentMapping(document *yaml.Node) (*yaml.Node, error) {

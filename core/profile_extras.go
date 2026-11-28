@@ -91,16 +91,17 @@ func dialerLoopsOf(raw *config.RawConfig) []string {
 	const (
 		unseen = iota
 		visiting
-		done
+		acyclic
+		reachesCycle
 	)
 	state := map[string]int{}
 	var loops []string
 	var visit func(name string) bool
 	visit = func(name string) bool {
 		switch state[name] {
-		case visiting:
+		case visiting, reachesCycle:
 			return true
-		case done:
+		case acyclic:
 			return false
 		}
 		state[name] = visiting
@@ -110,7 +111,11 @@ func dialerLoopsOf(raw *config.RawConfig) []string {
 				looped = true
 			}
 		}
-		state[name] = done
+		if looped {
+			state[name] = reachesCycle
+		} else {
+			state[name] = acyclic
+		}
 		return looped
 	}
 	for _, item := range raw.Proxy {

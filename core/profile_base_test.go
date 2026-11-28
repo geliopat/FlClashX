@@ -653,3 +653,24 @@ rules: []
         t.Fatal("written config does not match effective values")
     }
 }
+
+func TestMergeProfileBaseRejectsRecursiveAliases(t *testing.T) {
+	path := writeBaseProfile(t, "x-loop: &loop {<<: *loop}\nproxies: []\n")
+	if _, err := mergeProfileBase(&SetupBase{Path: path, Overlay: "{}"}); err == nil {
+		t.Fatal("recursive source alias accepted")
+	}
+	path = writeBaseProfile(t, "proxies: []\n")
+	if _, err := mergeProfileBase(&SetupBase{Path: path, Overlay: "x-loop: &loop {<<: *loop}\n"}); err == nil {
+		t.Fatal("recursive overlay alias accepted")
+	}
+}
+
+func TestValidateProfileAliasesAllowsRepeatedAnchors(t *testing.T) {
+	var document yaml.Node
+	if err := yaml.Unmarshal([]byte("x: &x {port: 80}\na: {<<: *x}\nb: {<<: *x}\n"), &document); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateProfileAliases(&document); err != nil {
+		t.Fatal(err)
+	}
+}

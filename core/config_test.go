@@ -1174,3 +1174,20 @@ func TestProfileProbeSettingsRestoreExactState(t *testing.T) {
 		}
 	}
 }
+
+func TestDialerLoopsOfRetainsCycleReachabilityForEachProxy(t *testing.T) {
+	raw := config.DefaultRawConfig()
+	raw.Proxy = []map[string]any{
+		{"name": "a", "dialer-proxy": "group"},
+		{"name": "b", "dialer-proxy": "group"},
+		{"name": "c", "dialer-proxy": "direct-leaf"},
+		{"name": "direct-leaf"},
+	}
+	raw.ProxyGroup = []map[string]any{
+		{"name": "group", "type": "select", "proxies": []any{"a", "direct-leaf"}},
+	}
+	got := dialerLoopsOf(raw)
+	if len(got) != 2 || got[0] != "a" || got[1] != "b" {
+		t.Fatalf("loops = %v, want a and b", got)
+	}
+}

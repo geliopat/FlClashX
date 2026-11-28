@@ -154,7 +154,7 @@ func loadConfig(path string) (*config.Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	raw, err := config.UnmarshalRawConfig(buf)
+	raw, err := unmarshalRawConfig(buf)
 	if err != nil {
 		return nil, err
 	}
