@@ -58,7 +58,7 @@ ThemeData watchAppTheme(WidgetRef ref, Brightness brightness) {
       : WindowEffect.none;
   final appearance = system.isWindows && !safeModeBuild
       ? ref.watch(materialAppearanceProvider) : defaultMaterialAppearance;
-  final alpha = windowOverlayOpacity(material, appearance);
+  final alpha = windowOverlayOpacity(paneEffect(material.name), appearance);
   Color overlay(Color base) => Color.lerp(base, baseScheme.primary,
       appearance.windowTint * .15)!.withValues(alpha: alpha);
   final colorScheme = material == WindowEffect.none

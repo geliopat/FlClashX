@@ -150,11 +150,13 @@ class _SurfaceAppearanceItem extends ConsumerWidget {
     final ru = Localizations.localeOf(context).languageCode == 'ru';
     final stored = surface == AppearanceSurface.card ? settings.card : settings.button;
     final pane = stored ?? defaultPaneAppearance;
-    final native = window ? ref.watch(windowMaterialPreferenceProvider).value ?? WindowEffect.none : pane.effect;
-    String label(WindowEffect e) => switch (e) {
-      WindowEffect.mica => 'Mica',
-      WindowEffect.micaAlt => 'Mica Alt',
-      WindowEffect.acrylic => 'Acrylic',
+    final native = window
+        ? paneEffect(ref.watch(windowMaterialPreferenceProvider).value?.name)
+        : pane.effect;
+    String label(MaterialEffect e) => switch (e) {
+      MaterialEffect.mica => 'Mica',
+      MaterialEffect.micaAlt => 'Mica Alt',
+      MaterialEffect.acrylic => 'Acrylic',
       _ => ru ? 'Без прозрачности' : 'Opaque',
     };
     MaterialAppearance updatePane(PaneAppearance? value) => (
@@ -202,15 +204,15 @@ class _SurfaceAppearanceItem extends ConsumerWidget {
           ))),
         ]),
         if (!window)
-          ListItem<WindowEffect>.options(
+          ListItem<MaterialEffect>.options(
             title: Text(ru ? 'Материал' : 'Material'),
             subtitle: stored == null ? Text(ru ? 'Исходное оформление' : 'Original appearance') : null,
-            options: windowMaterials, value: pane.effect, textBuilder: label,
+            options: MaterialEffect.values, value: pane.effect, textBuilder: label,
             onChanged: (effect) => unawaited(save(updatePane((
               effect: effect, opacity: pane.opacity, blur: pane.blur, tint: pane.tint,
             )))),
           ),
-        if (native != WindowEffect.none) ...[
+        if (native != MaterialEffect.none) ...[
           control(ru ? 'Непрозрачность' : 'Opacity',
             window ? windowOverlayOpacity(native, settings) : pane.opacity, 1,
             (v) => window ? updateWindow(opacity: v) : updatePane((
@@ -221,7 +223,7 @@ class _SurfaceAppearanceItem extends ConsumerWidget {
             (v) => window ? updateWindow(tint: v) : updatePane((
               effect: pane.effect, opacity: pane.opacity, blur: pane.blur, tint: v,
             ))),
-          if (!window && native == WindowEffect.acrylic)
+          if (!window && native == MaterialEffect.acrylic)
             control(ru ? 'Размытие' : 'Blur', pane.blur, 24,
               (v) => updatePane((
                 effect: pane.effect, opacity: pane.opacity, blur: v, tint: pane.tint,

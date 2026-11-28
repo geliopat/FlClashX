@@ -1,12 +1,14 @@
 import 'dart:ui' show ImageFilter;
 
 import 'package:material_ui/material_ui.dart';
-import 'package:window/window.dart' show WindowEffect;
+
+/// Visual material requested by the Flutter scene, independent of native DWM.
+enum MaterialEffect { none, mica, micaAlt, acrylic }
 
 enum AppearanceSurface { window, card, button }
 
 typedef PaneAppearance = ({
-  WindowEffect effect,
+  MaterialEffect effect,
   double opacity,
   double blur,
   double tint,
@@ -27,7 +29,7 @@ const MaterialAppearance defaultMaterialAppearance = (
 );
 
 const PaneAppearance defaultPaneAppearance = (
-  effect: WindowEffect.none,
+  effect: MaterialEffect.none,
   opacity: .85,
   blur: 12.0,
   tint: .12,
@@ -36,11 +38,11 @@ const PaneAppearance defaultPaneAppearance = (
 double appearanceNumber(Object? raw, double fallback, double max) =>
     raw is num && raw.isFinite ? raw.toDouble().clamp(0.0, max).toDouble() : fallback;
 
-WindowEffect paneEffect(Object? raw) => switch (raw) {
-  'mica' => WindowEffect.mica,
-  'micaAlt' => WindowEffect.micaAlt,
-  'acrylic' => WindowEffect.acrylic,
-  _ => WindowEffect.none,
+MaterialEffect paneEffect(Object? raw) => switch (raw) {
+  'mica' => MaterialEffect.mica,
+  'micaAlt' => MaterialEffect.micaAlt,
+  'acrylic' => MaterialEffect.acrylic,
+  _ => MaterialEffect.none,
 };
 
 PaneAppearance? decodePane(Object? raw) {
@@ -73,16 +75,16 @@ Map<String, Object?> encodeMaterialAppearance(MaterialAppearance value) {
   };
 }
 
-double windowOverlayOpacity(WindowEffect effect, MaterialAppearance settings) =>
-    effect == WindowEffect.none ? 1 : settings.windowOpacity ??
-        (effect == WindowEffect.acrylic ? .32 : .20);
+double windowOverlayOpacity(MaterialEffect effect, MaterialAppearance settings) =>
+    effect == MaterialEffect.none ? 1 : settings.windowOpacity ??
+        (effect == MaterialEffect.acrylic ? .32 : .20);
 
 /// Local panes emulate the selected material within the Flutter scene. They
 /// are not separate DWM backdrops and cannot sample the desktop independently.
 Color paneColor(Color base, ColorScheme scheme, PaneAppearance appearance) {
-  if (appearance.effect == WindowEffect.none) return base.withValues(alpha: 1);
+  if (appearance.effect == MaterialEffect.none) return base.withValues(alpha: 1);
   final tintStrength = appearance.tint *
-      (appearance.effect == WindowEffect.micaAlt ? .30 : .15);
+      (appearance.effect == MaterialEffect.micaAlt ? .30 : .15);
   return Color.lerp(base.withValues(alpha: 1), scheme.primary, tintStrength)!
       .withValues(alpha: appearance.opacity);
 }
@@ -158,7 +160,7 @@ class LocalMaterialPane extends StatelessWidget {
     );
     // Avoid a backdrop filter for Mica-like layers, fully opaque panes or
     // zero blur. BackdropFilter is clipped to the pane, not the whole window.
-    if (appearance.effect != WindowEffect.acrylic ||
+    if (appearance.effect != MaterialEffect.acrylic ||
         appearance.blur == 0 || fill.a == 1) return content;
     return ClipPath(
       clipper: ShapeBorderClipper(shape: shape, textDirection: Directionality.of(context)),
