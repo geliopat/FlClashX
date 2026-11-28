@@ -9,12 +9,11 @@ import (
 
 // What the core keeps of a profile beyond what mihomo parses out of it:
 // the order its proxies came in, what it says about them, and the dialer
-// chains that would loop. The test URL goes in the other way, onto every
-// group and provider that names none, which is where mihomo reads it.
+// chains that would loop. Only call after successful parsing (and any
+// required persistence); URL defaults are injected before parsing.
 func captureProfileExtras(raw *config.RawConfig) {
 	captureDescriptions(raw)
 	captureProxyOrder(raw)
-	injectTestURL(raw)
 	for _, name := range dialerLoopsOf(raw) {
 		reportDialerLoop(name)
 	}

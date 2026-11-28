@@ -15,6 +15,13 @@ import (
 	C "github.com/metacubex/mihomo/constant"
 )
 
+const (
+	maxChainHealthOwners = 256
+	maxChainHealthJobs = 8
+	chainHealthInterval = 15 * time.Second
+	chainHealthExpectedStatus = 204
+)
+
 // Optional source contract. A released older engine has no implementation;
 // the adapter compiles against it without ever faking a live dialer identity.
 type chainProbeSource interface {
@@ -87,7 +94,7 @@ func handleGetChainHealth() map[string]any {
 			if !ok {continue}
 			if _,ok:=adapterAs[nativeChainHealthGroup](proxies[owner.Group]);!ok {continue}
 			owners=append(owners,owner)
-			if len(owners)>=256 {break}
+			if len(owners)>=maxChainHealthOwners {break}
 		}
 	}
 	chainHealthJobs.Lock()
@@ -110,6 +117,29 @@ func stopChainHealthLocked(group string) {
 	}
 }
 
+// finishChainHealth and reportChainHealth ignore stale jobs even if a group
+// with the same name has already been started again.
+func finishChainHealth(group string, job *chainHealthJob) {
+	chainHealthJobs.Lock()
+	defer chainHealthJobs.Unlock()
+	if chainHealthJobs.jobs[group] == job {
+		stopChainHealthLocked(group)
+	}
+}
+
+func reportChainHealth(group string, job *chainHealthJob, results []outboundgroup.ChainProbeResult, err error) {
+	chainHealthJobs.Lock()
+	defer chainHealthJobs.Unlock()
+	if chainHealthJobs.jobs[group] != job {
+		return
+	}
+	job.status.Results = append([]outboundgroup.ChainProbeResult(nil), results...)
+	job.status.Error = ""
+	if err != nil {
+		job.status.Error = err.Error()
+	}
+}
+
 func stopAllChainHealth() {
 	chainHealthJobs.Lock()
 	defer chainHealthJobs.Unlock()
@@ -129,7 +159,7 @@ func handleSetChainHealth(request chainHealthRequest) (bool,error) {
 	}
 	if !chainHealthAvailable() {return false,errors.New("active chain health is unavailable in this engine")}
 	if !isRunning.Load() {return false,errors.New("core listeners are stopped")}
-	if len(chainHealthJobs.jobs)>=8 {return false,errors.New("active chain health group limit reached")}
+	if len(chainHealthJobs.jobs)>=maxChainHealthJobs {return false,errors.New("active chain health group limit reached")}
 	if chainHealthJobs.jobs[request.Group]!=nil {return false,errors.New("a probe owner is already selected for this group")}
 	proxies:=allProxies()
 	owner:=proxies[request.Name]
@@ -159,23 +189,17 @@ func handleSetChainHealth(request chainHealthRequest) (bool,error) {
 		if !valid(){cancel();return nil,errors.New("chain owner or group replaced")}
 		return factory(bind)
 	}
-	go func(){
-		defer func(){
-			chainHealthJobs.Lock()
-			defer chainHealthJobs.Unlock()
-			if chainHealthJobs.jobs[request.Group]==job {stopChainHealthLocked(request.Group)}
-		}()
+	safeGo("chain health", func() {
+		defer finishChainHealth(request.Group, job)
 		// The native scheduler serializes rounds and respects all-fail,
 		// manual choices, expiration and verified TCP-only alternatives.
-		_ = group.RunChainHealth(ctx,owner,dialer,scoped,testURL,204,15*time.Second,func(results []outboundgroup.ChainProbeResult,err error){
-			if !valid(){cancel();return}
-			chainHealthJobs.Lock()
-			defer chainHealthJobs.Unlock()
-			if chainHealthJobs.jobs[request.Group]!=job{return}
-			job.status.Results=append([]outboundgroup.ChainProbeResult(nil),results...)
-			job.status.Error=""
-			if err!=nil{job.status.Error=err.Error()}
+		_ = group.RunChainHealth(ctx, owner, dialer, scoped, testURL, chainHealthExpectedStatus, chainHealthInterval, func(results []outboundgroup.ChainProbeResult, err error) {
+			if !valid() {
+				cancel()
+				return
+			}
+			reportChainHealth(request.Group, job, results, err)
 		})
-	}()
+	})
 	return true,nil
 }

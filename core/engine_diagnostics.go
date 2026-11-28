@@ -49,19 +49,36 @@ func handleCoreCapabilities() []string {
 	return capabilities
 }
 
+const closedFlowNotificationCapacity = 128
+
+// The native manager owns both the bounded history and its event stream.
+func configureClosedFlowDiagnostics(historyCapacity int) error {
+	manager := statistic.DefaultManager
+	if err := manager.SetClosedFlowHistoryCapacity(historyCapacity); err != nil {
+		return err
+	}
+	eventCapacity := 0
+	if historyCapacity > 0 {
+		eventCapacity = closedFlowNotificationCapacity
+	}
+	subscription, err := manager.SubscribeClosedFlows(eventCapacity)
+	if err != nil {
+		return err
+	}
+	if subscription != nil {
+		safeGo("closed flow notifications", func() { watchClosedFlowChanges(subscription) })
+	}
+	return nil
+}
+
 func handleSetEngineDiagnostics(settings engineDiagnosticsSettings) (engineDiagnosticsSettings, error) {
 	engineDiagnostics.Lock()
 	defer engineDiagnostics.Unlock()
 	old := engineDiagnostics.settings
 	if settings.ClosedFlowCapacity != old.ClosedFlowCapacity {
-		if err := statistic.DefaultManager.SetClosedFlowHistoryCapacity(settings.ClosedFlowCapacity); err != nil {
+		if err := configureClosedFlowDiagnostics(settings.ClosedFlowCapacity); err != nil {
 			return old, err
 		}
-		capacity := 0
-		if settings.ClosedFlowCapacity > 0 { capacity = 128 }
-		subscription, err := statistic.DefaultManager.SubscribeClosedFlows(capacity)
-		if err != nil { return old, err }
-		if subscription != nil { go watchClosedFlowChanges(subscription) }
 	}
 	if settings.ChainDiagnostics != old.ChainDiagnostics {
 		proxydialer.EnableChainDiagnostics(settings.ChainDiagnostics)

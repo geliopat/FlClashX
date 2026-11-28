@@ -158,12 +158,22 @@ func loadConfig(path string) (*config.Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	cfg, err := parseProfileConfig(raw)
+	if err != nil {
+		return nil, err
+	}
+	captureProfileExtras(raw)
+	return cfg, nil
+}
+
+// Both profile loading paths prepare the same native config before publishing
+// any profile metadata. The merged profile must also be persisted first.
+func parseProfileConfig(raw *config.RawConfig) (*config.Config, error) {
 	injectTestURL(raw)
 	cfg, err := config.ParseRawConfig(raw)
 	if err != nil {
 		return nil, err
 	}
-	captureProfileExtras(raw)
 	return withPlatformLimits(cfg), nil
 }
 
@@ -187,22 +197,40 @@ func loadSetupConfig(params *SetupParams) (*config.Config, error) {
 	return loadConfig(path)
 }
 
+// Profile-scoped probe settings share the configuration transaction. Keep the
+// original pointer, including nil (the built-in default), for exact rollback.
+type profileProbeSettings struct {
+	url *string
+	skipCertificateVerification bool
+}
+
+func applyProfileProbeSettings(params *SetupParams) profileProbeSettings {
+	previous := profileProbeSettings{
+		url: testURL.Load(),
+		skipCertificateVerification: skipCertVerify.Load(),
+	}
+	setTestURL(params.TestURL)
+	skipCertVerify.Store(params.SkipCertVerify)
+	return previous
+}
+
+func (s profileProbeSettings) restore() {
+	testURL.Store(s.url)
+	skipCertVerify.Store(s.skipCertificateVerification)
+}
+
 func applyConfig(params *SetupParams) error {
 	runtime.GC()
 	configMu.Lock()
 	defer configMu.Unlock()
 
-	previousTestURL := testURL.Load()
-	previousSkipCertVerify := skipCertVerify.Load()
-	setTestURL(params.TestURL)
-	skipCertVerify.Store(params.SkipCertVerify)
+	previous := applyProfileProbeSettings(params)
 	cfg, err := loadSetupConfig(params)
 	if err != nil {
 		if runtime.GOOS == "windows" {
 			// A rejected profile must never replace the last applied routes
 			// with DIRECT/defaults. On cold start there is no applied config.
-			testURL.Store(previousTestURL)
-			skipCertVerify.Store(previousSkipCertVerify)
+			previous.restore()
 			logError("config apply rejected; previous configuration retained: %v", err)
 			return err
 		}

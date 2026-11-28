@@ -230,8 +230,7 @@ func loadConfigWithBase(base *SetupBase, configPath string) (*config.Config, err
 	if err := document.Decode(raw); err != nil {
 		return nil, err
 	}
-	injectTestURL(raw)
-	cfg, err := config.ParseRawConfig(raw)
+	cfg, err := parseProfileConfig(raw)
 	if err != nil {
 		return nil, err
 	}
@@ -239,7 +238,7 @@ func loadConfigWithBase(base *SetupBase, configPath string) (*config.Config, err
 		return nil, err
 	}
 	captureProfileExtras(raw)
-	return withPlatformLimits(cfg), nil
+	return cfg, nil
 }
 
 func mergeProfileBase(base *SetupBase) (*yaml.Node, error) {
