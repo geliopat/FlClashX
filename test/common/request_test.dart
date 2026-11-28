@@ -15,6 +15,7 @@ import 'package:fl_clash/state.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fl_clash/common/file_logger.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import '../helpers/app_paths.dart';
 
 class _StalledHttpClient extends Fake implements HttpClient {
   @override
@@ -67,8 +68,6 @@ class _HostAdapter implements HttpClientAdapter {
   @override
   void close({bool force = false}) {}
 }
-
-import '../helpers/app_paths.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

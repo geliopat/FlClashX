@@ -23,6 +23,7 @@ import 'package:riverpod/riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../helpers/test_profiles.dart';
+import '../helpers/app_paths.dart';
 
 class MockCoreHandlerInterface extends Mock implements CoreHandlerInterface {}
 
@@ -94,8 +95,6 @@ ExternalProvider _provider(String name, {int count = 1}) => ExternalProvider(
   vehicleType: 'HTTP',
   updateAt: DateTime.utc(2026),
 );
-
-import '../helpers/app_paths.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
