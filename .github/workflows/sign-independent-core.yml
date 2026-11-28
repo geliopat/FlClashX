@@ -45,21 +45,14 @@ jobs:
           fi
           tmp=$(mktemp -d)
           artifact_name=core-release-request
-          if [[ "$GITHUB_EVENT_NAME" == push ]]; then
-            # Bootstrap only from the exact independently validated stage-two
-            # artifact. Subsequent pushes cannot overwrite the published tag.
-            artifact_name=stage2-core-validation
-            gh api "repos/$SOURCE_REPO/actions/runs/46077612549" | jq -er 'select(.conclusion == "success" and .event == "push" and .head_branch == "candidate/stage2-release" and .head_repository.full_name == "geliopat/Clash.Meta" and .head_sha == "5da6ffcdcd8b86882018752701f13fe4d0db5018") | .id' > "$tmp/runs"
-            gh api "repos/$SOURCE_REPO/actions/runs/46077612549/jobs?per_page=100" | jq -e '[.jobs[] | select(.conclusion == "success") | .name] | sort == ["race","replay","windows"]' >/dev/null
-          else
-            for workflow in flclashz-core-auto.yml flclashz-core-release.yml; do
-              # Only the trusted automatic workflow may request publication on
-              # push. The manual workflow remains explicit-dispatch only.
-              gh api "repos/$SOURCE_REPO/actions/workflows/$workflow/runs?branch=FlClashZ&status=success&per_page=30" |
-                jq -r --arg workflow "$workflow" '.workflow_runs[] | select(.conclusion == "success" and .head_branch == "FlClashZ" and .head_repository.full_name == "geliopat/Clash.Meta" and (.event == "schedule" or .event == "workflow_dispatch" or ($workflow == "flclashz-core-auto.yml" and (.event == "push" or .event == "workflow_run")))) | .id' > "$tmp/$workflow"
-            done
-            sort -urn "$tmp/"*.yml > "$tmp/runs"
-          fi
+          # All trigger types use the same release-request discovery.
+          # The one-time z.1 bootstrap is complete. Never sign a candidate
+          # validation artifact merely because this workflow was edited.
+          for workflow in flclashz-core-auto.yml flclashz-core-release.yml; do
+            gh api "repos/$SOURCE_REPO/actions/workflows/$workflow/runs?branch=FlClashZ&status=success&per_page=30" |
+              jq -r --arg workflow "$workflow" '.workflow_runs[] | select(.conclusion == "success" and .head_branch == "FlClashZ" and .head_repository.full_name == "geliopat/Clash.Meta" and (.event == "schedule" or .event == "workflow_dispatch" or ($workflow == "flclashz-core-auto.yml" and (.event == "push" or .event == "workflow_run")))) | .id' > "$tmp/$workflow"
+          done
+          sort -urn "$tmp/"*.yml > "$tmp/runs"
           run_id=""
           artifact_id=""
           while IFS= read -r candidate; do
@@ -70,12 +63,18 @@ jobs:
               continue
             fi
             [[ "$(jq length <<< "$matches")" == 1 ]]
+            # An automatic build must have passed every required job, not
+            # only uploaded a binary before another parallel test failed.
+            if grep -Fxq "$candidate" "$tmp/flclashz-core-auto.yml"; then
+              gh api "repos/$SOURCE_REPO/actions/runs/$candidate/jobs?per_page=100" |
+                jq -e '[.jobs[] | select(.conclusion == "success") | .name] | sort == ["prepare","race","windows"]' >/dev/null
+            else
+              gh api "repos/$SOURCE_REPO/actions/runs/$candidate/jobs?per_page=100" |
+                jq -e '[.jobs[] | select(.conclusion == "success") | .name] | sort == ["windows"]' >/dev/null
+            fi
             artifact_id=$(jq -er '.[0].id' <<< "$matches")
             size=$(jq -er '.[0].size_in_bytes' <<< "$matches")
             digest=$(jq -er '.[0].digest' <<< "$matches")
-            if [[ "$GITHUB_EVENT_NAME" == push ]]; then
-              [[ "$artifact_id" == 15235408457 && "$digest" == sha256:1628905396b9ae2fd5293d9aae4f79b325ac79bb0043f9de4db6fcafeca82d4e ]]
-            fi
             [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
             [[ "$artifact_id" =~ ^[0-9]+$ && "$size" =~ ^[0-9]+$ ]]
             (( size > 0 && size <= 300*1024*1024 ))
@@ -122,9 +121,6 @@ jobs:
           jq -e --arg v "$version" '.product == "FlClashZ-core" and .mihomoVersion == ($v | split("-")[0]) and .ipcRevision == 1 and .os == "windows" and .arch == "amd64"' "$info" >/dev/null
           [[ "$(gh api "repos/$SOURCE_REPO/commits/$engine" --jq .sha)" == "$engine" ]]
           [[ "$(gh api "repos/geliopat/FlClashZ/commits/$host" --jq .sha)" == "$host" ]]
-          if [[ "$GITHUB_EVENT_NAME" == push ]]; then
-            [[ "$version" == v1.19.34-z.1 && "$engine" == 53d2f4fc1cb56aaeba947a1a557eeafd48050737 && "$host" == d3899829a60962c0f1fe9d8d59017529b03b984a ]]
-          fi
           tag="flclashz-core-$version"
           # Skip the already published request; never overwrite a release or tag.
           gh api --paginate "repos/$SOURCE_REPO/releases?per_page=100" --jq '.[] | [.tag_name, .draft] | @tsv' > "$tmp/releases"
