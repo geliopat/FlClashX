@@ -449,6 +449,8 @@ void main() {
 
         expect(config.themeProps, defaultThemeProps);
         expect(store.savedConfig?.themeProps, defaultThemeProps);
+        expect(hasYamlSourceVersion(config.appSettingProps.panelSetSettings), isTrue);
+        expect(hasYamlSourceVersion(store.savedConfig!.appSettingProps.panelSetSettings), isTrue);
         expect(store.upgradeVersion, Migration.upgradeVersion);
         expect(
           store.events.where((event) => event == 'saveConfig'),

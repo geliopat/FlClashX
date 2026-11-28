@@ -55,6 +55,8 @@ void main() {
     );
     globalState.container = container;
     addTearDown(container.dispose);
+    container.listen(appSettingProvider, (_, _) {});
+    container.listen(networkSettingProvider, (_, _) {});
     container.listen(currentProfileIdProvider, (_, _) {});
     container.listen(patchClashConfigProvider, (_, _) {});
     container.listen(profileSettingsActionProvider, (_, _) {});
@@ -89,6 +91,17 @@ void main() {
       expect(settings().allowLan, isTrue);
     },
   );
+
+  test('legacy migration preserves ambiguous edits and exposes subscription reference', () async {
+    container.read(appSettingProvider.notifier).update(
+      (state) => state.copyWith(panelSetSettings: const {}),
+    );
+    answer({'mixed-port': 7000}, ['mixed-port']);
+    await select(_profile(1));
+    expect(settings().mixedPort, const PatchClashConfig().mixedPort);
+    expect(container.read(appSettingProvider).ownedSettings, contains('clash.mixed-port'));
+    expect(container.read(yamlSettingReferencesProvider)?['clash.mixed-port'], 7000);
+  });
 
   test('a key no file names keeps what the user set', () async {
     container

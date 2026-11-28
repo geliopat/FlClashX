@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:fl_clash/common/print.dart';
+import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -42,15 +44,22 @@ bool autoDelayDue({
 final autoDelayProvider = NotifierProvider<AutoDelayController, AutoDelayIntervals>(AutoDelayController.new);
 class AutoDelayController extends Notifier<AutoDelayIntervals> {
   static const values = [0, 5, 10, 15, 30, 60, 120];
+  int _revision = 0;
+  Future<void> _writes = Future.value();
   @override
   AutoDelayIntervals build() {
+    final revision = _revision;
     scheduleMicrotask(() async {
-      final prefs = await SharedPreferences.getInstance();
-      final active = prefs.getInt('delay.activeInterval');
-      final others = prefs.getInt('delay.otherInterval');
-      if (ref.mounted) {
-        state = (active: values.contains(active) ? active! : 15,
-            others: values.contains(others) ? others! : 60);
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final active = prefs.getInt('delay.activeInterval');
+        final others = prefs.getInt('delay.otherInterval');
+        if (ref.mounted && revision == _revision) {
+          state = (active: values.contains(active) ? active! : 15,
+              others: values.contains(others) ? others! : 60);
+        }
+      } catch (_) {
+        commonPrint.log('Automatic delay settings unavailable', logLevel: LogLevel.warning);
       }
     });
     return (active: 15, others: 60);
@@ -58,9 +67,18 @@ class AutoDelayController extends Notifier<AutoDelayIntervals> {
 
   Future<void> set({int? active, int? others}) async {
     if (active != null && !values.contains(active) || others != null && !values.contains(others)) return;
-    state = (active: active ?? state.active, others: others ?? state.others);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('delay.activeInterval', state.active);
-    await prefs.setInt('delay.otherInterval', state.others);
+    ++_revision;
+    final snapshot = (active: active ?? state.active, others: others ?? state.others);
+    state = snapshot;
+    final operation = _writes.catchError((_) {}).then((_) async {
+      final prefs = await SharedPreferences.getInstance();
+      final activeSaved = await prefs.setInt('delay.activeInterval', snapshot.active);
+      final othersSaved = await prefs.setInt('delay.otherInterval', snapshot.others);
+      if (!activeSaved || !othersSaved) {
+        throw StateError('Automatic delay settings save failed');
+      }
+    });
+    _writes = operation;
+    await operation;
   }
 }

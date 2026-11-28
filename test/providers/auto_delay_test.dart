@@ -26,6 +26,23 @@ void main() {
     expect(prefs.getInt('delay.otherInterval'), 30);
   });
 
+  test('pending preference load cannot undo an explicit interval change', () async {
+    SharedPreferences.setMockInitialValues({
+      'delay.activeInterval': 10,
+      'delay.otherInterval': 120,
+    });
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    final controller = container.read(autoDelayProvider.notifier);
+    final first = controller.set(active: 30, others: 60);
+    final last = controller.set(active: 0, others: 5);
+    await Future.wait([first, last]);
+    expect(container.read(autoDelayProvider), (active: 0, others: 5));
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getInt('delay.activeInterval'), 0);
+    expect(prefs.getInt('delay.otherInterval'), 5);
+  });
+
   test('automatic ping includes DIRECT, provider nodes and all group types', () {
     const server = Proxy(name: 'node', type: 'Vless', providerName: 'remote');
     const other = Proxy(name: 'other', type: 'Vless');

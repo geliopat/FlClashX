@@ -255,6 +255,13 @@ class Migration {
     config = data.configMap == null
         ? Config.realFromJson(null)
         : Config.realFromJson(data.configMap);
+    // A genuinely empty installation has no legacy manual edits to recover.
+    // Preserve conservative migration for existing or imported settings.
+    if (oldVersion == 0 && data.configMap == null && !await _store.hasProfiles()) {
+      config = config.copyWith.appSettingProps(
+        panelSetSettings: withYamlSources(config.appSettingProps.panelSetSettings, const {}),
+      );
+    }
     await _store.restore(data);
     if (!await _store.saveConfig(config)) {
       // An unopenable store is reported later by the corrupt-cache dialog,
