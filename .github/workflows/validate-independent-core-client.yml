@@ -9,6 +9,9 @@ on:
       - 'plugins/setup/**'
       - 'setup.dart'
       - 'services/helper/src/service/core_release.rs'
+      - 'services/helper/src/service/core_store.rs'
+      - 'services/helper/src/service/hub.rs'
+      - '.github/scripts/test-signed-core-system.ps1'
       - 'core/third_party/mihomo'
       - 'core/**'
       - 'test/features/update/core_release*'
@@ -85,12 +88,13 @@ jobs:
         run: |
           $dir = Join-Path $env:RUNNER_TEMP 'signed-core'
           New-Item -ItemType Directory -Force $dir | Out-Null
-          $base = 'https://github.com/geliopat/Clash.Meta/releases/download/flclashz-core-v1.19.34-z.1'
+          $base = 'https://github.com/geliopat/Clash.Meta/releases/download/flclashz-core-v1.19.34-z.2'
           foreach ($name in @('core-manifest.json', 'FlClashCore.exe')) {
             curl.exe --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --output (Join-Path $dir $name) "$base/$name"
             if ($LASTEXITCODE -ne 0) { throw "Download failed: $name" }
           }
-          if ((Get-FileHash (Join-Path $dir 'FlClashCore.exe') -Algorithm SHA256).Hash.ToLowerInvariant() -cne 'd5e224231c9bc7f48fb9d8b5feebbff62f64439552ce00f4cf328c9be7c1ce79') { throw 'Published core differs from verified release' }
+          if ((Get-FileHash (Join-Path $dir 'FlClashCore.exe') -Algorithm SHA256).Hash.ToLowerInvariant() -cne 'e504d2c5b2503057a8fc55e3665fe5a4c93852dc702a322d787d1df89e5b7c82') { throw 'Published core differs from verified release' }
+          if ((Get-FileHash (Join-Path $dir 'core-manifest.json') -Algorithm SHA256).Hash.ToLowerInvariant() -cne 'acd3bd2b729e96492b91ecde7fa019358fe2e546cb8a159bef02ba44fd1938df') { throw 'Published manifest differs from verified release' }
           "FLCLASHZ_TEST_SIGNED_CORE_DIR=$dir" >> $env:GITHUB_ENV
       - name: Validate core adapter
         working-directory: core
@@ -99,13 +103,17 @@ jobs:
         run: |
           cargo test --locked --manifest-path services/helper/Cargo.toml --features windows-service 'core_release::'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Actual privileged Helper staging and managed network smoke
+        shell: pwsh
+        run: |
+          & .github/scripts/test-signed-core-system.ps1
       - name: Install Flutter dependencies
         id: pub_get
         run: flutter pub get
       - name: Verify generated model contract and actual release, rollback and UI
         shell: pwsh
         run: |
-          flutter test "--dart-define=FLCLASHZ_UPDATE_PUBLIC_KEY=$env:FLCLASHZ_UPDATE_PUBLIC_KEY" test/features/update/core_release_manifest_test.dart test/core/desktop/core_release_selection_test.dart test/core/desktop/helper_client_test.dart test/views/about_test.dart test/setup_test.dart test/views/dns_queries_view_test.dart test/models/profile_settings_test.dart test/models/config_test.dart test/core/protocol_contract_test.dart test/common/path_test.dart test/common/file_logger_test.dart
+          flutter test "--dart-define=FLCLASHZ_UPDATE_PUBLIC_KEY=$env:FLCLASHZ_UPDATE_PUBLIC_KEY" test/features/update/core_release_manifest_test.dart test/core/desktop/core_release_selection_test.dart test/core/desktop/helper_client_test.dart test/views/about_test.dart test/setup_test.dart test/views/dns_queries_view_test.dart test/models/profile_settings_test.dart test/models/config_test.dart test/core/protocol_contract_test.dart test/common/path_test.dart test/common/file_logger_test.dart test/common/service_probe_test.dart test/providers/network_probe_settings_test.dart
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Analyze Dart sources
         if: always() && steps.pub_get.outcome == 'success'

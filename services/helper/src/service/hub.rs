@@ -2726,6 +2726,115 @@ mod tests {
             Some(ManagedCore::adopt(session_id.to_string(), spawn_running_core()).unwrap());
     }
 
+    // Executed separately as LocalSystem on an ephemeral Windows CI runner.
+    // The normal suite skips the privileged case rather than weakening ACLs.
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn published_z2_system_stage_launch_and_loopback() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        use tokio::net::{windows::named_pipe::{NamedPipeServer, ServerOptions}, TcpListener, TcpStream};
+        use serde_json::{json, Value};
+        let Some(directory) = std::env::var_os("FLCLASHZ_SYSTEM_CORE_TEST_DIR") else { return; };
+        let directory = PathBuf::from(directory);
+        let manifest = std::fs::read(directory.join("core-manifest.json")).unwrap();
+        let binary = std::fs::read(directory.join("FlClashCore.exe")).unwrap();
+        let mut package = Vec::with_capacity(4 + manifest.len() + binary.len());
+        package.extend_from_slice(&(manifest.len() as u32).to_be_bytes());
+        package.extend_from_slice(&manifest);
+        package.extend_from_slice(&binary);
+        let hash = "e504d2c5b2503057a8fc55e3665fe5a4c93852dc702a322d787d1df89e5b7c82";
+        assert_eq!(super::super::core_store::stage(&package).unwrap(), hash);
+        assert_eq!(super::super::core_store::stage(&package).unwrap(), hash);
+        let last = package.len() - 1;
+        package[last] ^= 1;
+        assert!(super::super::core_store::stage(&package).is_err());
+        drop(package);
+        drop(binary);
+        let id = "fdce123456789abcdef0123456789abc";
+        let address = format!(r"\\.\pipe\FlClashCore_{id}");
+        let mut pipe = ServerOptions::new().first_pipe_instance(true).create(&address).unwrap();
+        let response = start_selected(StartParams {
+            address: address.clone(), session_id: id.to_owned(),
+        }, Some(hash.to_owned()));
+        assert_eq!(response.status(), StatusCode::OK);
+        struct Cleanup(String);
+        impl Drop for Cleanup {
+            fn drop(&mut self) {
+                let _ = stop_core(StopParams { session_id: self.0.clone() });
+            }
+        }
+        let _cleanup = Cleanup(id.to_owned());
+        tokio::time::timeout(Duration::from_secs(15), pipe.connect()).await.unwrap().unwrap();
+
+        async fn rpc(pipe: &mut NamedPipeServer, id: u32, method: &str, args: Value) -> Value {
+            tokio::time::timeout(Duration::from_secs(30), async {
+                let request_id = id.to_string();
+                let body = serde_json::to_vec(&json!({"id": request_id, "method": method, "arguments": args})).unwrap();
+                pipe.write_all(&(body.len() as u32).to_le_bytes()).await.unwrap();
+                pipe.write_all(&body).await.unwrap();
+                for _ in 0..100 {
+                    let size = pipe.read_u32_le().await.unwrap() as usize;
+                    assert!(size > 0 && size <= 8 * 1024 * 1024);
+                    let mut body = vec![0; size];
+                    pipe.read_exact(&mut body).await.unwrap();
+                    let value: Value = serde_json::from_slice(&body).unwrap();
+                    if value["method"] == "message" { continue; }
+                    assert_eq!(value["id"], request_id);
+                    assert!(value["error"].is_null(), "{method}: {value}");
+                    return value["result"].clone();
+                }
+                panic!("No response to {method}");
+            }).await.unwrap()
+        }
+        let identity = rpc(&mut pipe, 1, "getCoreIdentity", Value::Null).await;
+        assert_eq!(identity["version"], "v1.19.34-z.2");
+        assert_eq!(identity["engineRevision"], "88b3bc4604b0008ce08a8c5634b8f9ddd573d533");
+        let capabilities = rpc(&mut pipe, 2, "getCoreCapabilities", Value::Null).await;
+        assert!(capabilities.as_array().unwrap().contains(&json!("chain-health-v1")));
+        // An invalid slot must never interrupt the already running signed core.
+        let rejected = start_selected(StartParams { address, session_id: id.to_owned() },
+            Some("0".repeat(64)));
+        assert_eq!(rejected.status(), StatusCode::CONFLICT);
+        assert_eq!(rpc(&mut pipe, 3, "getCoreIdentity", Value::Null).await, identity);
+
+        let home = directory.join("runtime");
+        std::fs::create_dir_all(&home).unwrap();
+        let target = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let target_port = target.local_addr().unwrap().port();
+        let reservation = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let mixed_port = reservation.local_addr().unwrap().port();
+        drop(reservation);
+        std::fs::write(home.join("config.yaml"), format!(
+            "mixed-port: {mixed_port}\nallow-lan: false\nmode: rule\nlog-level: error\ngeo-auto-update: false\ndns:\n  enable: false\ntun:\n  enable: false\nrules:\n  - MATCH,DIRECT\n"
+        )).unwrap();
+        assert_eq!(rpc(&mut pipe, 4, "initClash", json!({"home-dir":home.to_str().unwrap(),"version":1})).await, true);
+        assert_eq!(rpc(&mut pipe, 5, "setupConfig", json!({"selected-map":{},"test-url":"https://example.com","skip-cert-verify":false})).await, "");
+        assert_eq!(rpc(&mut pipe, 6, "startListener", Value::Null).await, true);
+        let origin = tokio::spawn(async move {
+            let (mut peer, _) = target.accept().await.unwrap();
+            let mut request = Vec::new();
+            while !request.ends_with(b"\r\n\r\n") {
+                assert!(request.len() < 16384);
+                request.push(peer.read_u8().await.unwrap());
+            }
+            assert!(String::from_utf8_lossy(&request).starts_with("GET /core-smoke "));
+            peer.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 7\r\nConnection: close\r\n\r\nz2-pass").await.unwrap();
+        });
+        tokio::time::timeout(Duration::from_secs(15), async {
+            let mut client = TcpStream::connect(("127.0.0.1", mixed_port)).await.unwrap();
+            client.write_all(format!("GET http://127.0.0.1:{target_port}/core-smoke HTTP/1.1\r\nHost: 127.0.0.1:{target_port}\r\nConnection: close\r\n\r\n").as_bytes()).await.unwrap();
+            let mut reply = Vec::new();
+            client.read_to_end(&mut reply).await.unwrap();
+            assert!(String::from_utf8_lossy(&reply).contains("z2-pass"));
+            origin.await.unwrap();
+        }).await.unwrap();
+        assert_eq!(rpc(&mut pipe, 7, "stopListener", Value::Null).await, true);
+        assert_eq!(rpc(&mut pipe, 8, "shutdown", Value::Null).await, true);
+        drop(pipe);
+        assert_eq!(stop_core(StopParams { session_id: id.to_owned() }).status(), StatusCode::OK);
+        println!("SYSTEM protected slot, tamper rejection, managed launch, live IPC and loopback proxy passed.");
+    }
+
     #[test]
     fn zapret_diagnostics_distinguish_capture_filters_from_processing_lists() {
         let args = vec![

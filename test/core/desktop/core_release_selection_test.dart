@@ -87,6 +87,26 @@ void main() {
     expect(await file.exists(), isFalse);
   });
 
+  test('incompatible z1 selection does not replace compatible bundled core', () async {
+    final old = {'hash': List.filled(64, 'a').join(), 'version': 'v1.19.34-z.1'};
+    final current = CoreReleaseRef.fromManifest(manifest).toJson();
+    final guarded = CoreReleaseSelectionStore(() async => file,
+        minimumVersion: CoreReleaseVersion.parse('v1.19.34-z.2'));
+    await file.writeAsString(jsonEncode({
+      'schema': 1, 'current': old, 'previous': null, 'hasPrevious': true, 'pending': false,
+    }));
+    expect(await guarded.selectedForLaunch(), isNull);
+    // Retain the old signed slot, but never select it as a rollback target.
+    await file.writeAsString(jsonEncode({
+      'schema': 1, 'current': current, 'previous': old, 'hasPrevious': true, 'pending': false,
+    }));
+    expect((await guarded.read()).previous, isNull);
+    expect(await guarded.restorePrevious(restart: () async {
+      expect(await guarded.selectedForLaunch(), isNull);
+      return true;
+    }), isTrue);
+  });
+
   test('does not accept malformed selected paths', () async {
     await file.writeAsString('{"schema":1,"current":{"hash":"../evil.exe","version":"v1.19.34-z.2"},"hasPrevious":false,"pending":false}');
     expect(await store.selectedForLaunch(), isNull);

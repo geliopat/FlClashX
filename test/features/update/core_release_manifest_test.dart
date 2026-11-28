@@ -3,6 +3,9 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:fl_clash/features/update/core_release_manifest.dart';
+import 'package:fl_clash/features/update/core_release_updater.dart';
+import 'package:fl_clash/features/update/download.dart';
+import 'package:fl_clash/core/desktop/helper_client.dart';
 import 'package:fl_clash/features/update/manifest_signature.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -84,13 +87,38 @@ void main() {
     if (directory == null) return;
     final bytes = await File('$directory/core-manifest.json').readAsBytes();
     final verified = await CoreReleaseManifest.verify(bytes);
-    expect(verified.version.value, 'v1.19.34-z.1');
-    expect(verified.engineRevision, '53d2f4fc1cb56aaeba947a1a557eeafd48050737');
+    expect(verified.version.value, 'v1.19.34-z.2');
+    expect(verified.engineRevision, '88b3bc4604b0008ce08a8c5634b8f9ddd573d533');
+    expect(verified.hostRevision, '8640948576d11e707a9306c17ac432ae29a125c4');
     await verified.verifyBinary(File('$directory/FlClashCore.exe'));
     final modified = jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
-    modified['version'] = 'v1.19.34-z.2';
+    modified['version'] = 'v1.19.34-z.3';
     await expectLater(CoreReleaseManifest.verify(utf8.encode(jsonEncode(modified))), throwsFormatException);
   });
+
+  test('downloads the published signed z2 using the actual client downloader', () async {
+    if (Platform.environment['FLCLASHZ_TEST_SIGNED_CORE_DIR'] == null) return;
+    final root = await Directory.systemTemp.createTemp('core_release_download_');
+    try {
+      final updater = CoreReleaseUpdater(
+        downloader: UpdateDownloader(root: () async => root),
+        helper: HelperClient(),
+      );
+      final offer = await updater.check(url:
+        'https://github.com/geliopat/Clash.Meta/releases/download/flclashz-core-v1.19.34-z.2/core-manifest.json');
+      expect(offer.manifest.version.value, 'v1.19.34-z.2');
+      expect(offer.manifest.hash, 'e504d2c5b2503057a8fc55e3665fe5a4c93852dc702a322d787d1df89e5b7c82');
+      final downloaded = await updater.downloadOffer(offer);
+      try {
+        await downloaded.manifest.verifyBinary(downloaded.binary);
+        expect(await downloaded.binary.length(), 71178240);
+      } finally {
+        await downloaded.dispose();
+      }
+    } finally {
+      if (await root.exists()) await root.delete(recursive: true);
+    }
+  }, timeout: const Timeout(Duration(minutes: 4)));
 
   test('orders independent revisions numerically', () {
     final a = CoreReleaseVersion.parse('v1.19.34-z.9');
