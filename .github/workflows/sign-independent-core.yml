@@ -23,7 +23,8 @@ env:
 
 jobs:
   release:
-    if: github.repository == 'geliopat/FlClashZ' && github.ref == 'refs/heads/fix/zapret2-stability'
+    # Temporary release freeze: remove only after the core refactor and independent audit.
+    if: github.repository == 'geliopat/FlClashZ' && github.ref == 'refs/heads/fix/zapret2-stability' && false
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
