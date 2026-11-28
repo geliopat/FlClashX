@@ -51,6 +51,7 @@ const (
 	getMemoryStatsMethod           CoreMethod = "getMemoryStats"
 	getCoreVersionMethod           CoreMethod = "getCoreVersion"
 	getCoreCapabilitiesMethod      CoreMethod = "getCoreCapabilities"
+	getCoreIdentityMethod          CoreMethod = "getCoreIdentity"
 	getEngineDiagnosticsMethod     CoreMethod = "getEngineDiagnostics"
 	setEngineDiagnosticsMethod     CoreMethod = "setEngineDiagnostics"
 	updateGeoDataMethod            CoreMethod = "updateGeoData"
