@@ -5,6 +5,7 @@ class SystemAction extends _$SystemAction {
   CoreController get _core => ref.read(coreHandlerProvider);
 
   SystemExitCoordinator? _exitCoordinator;
+  Future<void>? _restartRequest;
   bool get isExiting => _exitCoordinator != null;
 
   @override
@@ -36,8 +37,14 @@ class SystemAction extends _$SystemAction {
   }
 
   /// The new copy waits for this one to quit, as only one may run.
-  Future<void> handleRestart() async {
-    if (isExiting) return;
+  Future<void> handleRestart() {
+    if (isExiting) return Future.value();
+    return _restartRequest ??= _scheduleRestart().whenComplete(() {
+      _restartRequest = null;
+    });
+  }
+
+  Future<void> _scheduleRestart() async {
     try {
       await relaunchSelf();
     } catch (error) {
@@ -142,7 +149,9 @@ class SystemAction extends _$SystemAction {
         );
       }
     }
-    await preferences.saveConfig(ref.read(configProvider));
+    if (!await preferences.saveConfig(ref.read(configProvider))) {
+      throw StateError('Unable to save application preferences');
+    }
     if (savesSharedState) {
       // The save AndroidManager debounces would die with the engine.
       debouncer.cancel(FunctionTag.saveSharedFile);

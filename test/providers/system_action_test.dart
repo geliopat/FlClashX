@@ -24,6 +24,7 @@ class TestSystemAction extends SystemAction {
   final List<String> calls = [];
   final List<bool> cleanupNeedSave = [];
   Completer<void>? closeCoreGate;
+  Completer<void>? relaunchGate;
   Object? cleanupError;
   Duration watchdog = const Duration(hours: 1);
   Error? relaunchError;
@@ -36,6 +37,7 @@ class TestSystemAction extends SystemAction {
     calls.add('relaunch');
     final error = relaunchError;
     if (error != null) throw error;
+    await relaunchGate?.future;
   }
 
   @override
@@ -138,6 +140,26 @@ void main() {
     expect(calls, ['cleanup', 'window', 'core', 'exit']);
   });
 
+  test('a synchronous exit reentry joins the existing shutdown', () async {
+    late SystemExitCoordinator coordinator;
+    Future<void>? nested;
+    var exits = 0;
+    coordinator = SystemExitCoordinator(
+      watchdogDuration: const Duration(hours: 1),
+      closeWindow: () async {},
+      closeCore: () async {},
+      exitApplication: () async { exits++; },
+    );
+    final first = coordinator.exit(cleanup: () async {
+      nested = coordinator.exit(cleanup: () async {
+        fail('reentrant cleanup must not run');
+      });
+    });
+    await first;
+    expect(identical(first, nested), isTrue);
+    expect(exits, 1);
+  });
+
   test('watchdog and normal completion share one application exit', () async {
     final closeCoreCompleter = Completer<void>();
     var exitCount = 0;
@@ -236,6 +258,17 @@ void main() {
     test('a restart schedules the new copy, then exits as usual', () async {
       await notifier().handleRestart();
 
+      expect(action.calls, ['relaunch', 'cleanup', 'window', 'core', 'exit']);
+    });
+
+    test('concurrent restart requests schedule only one replacement process', () async {
+      action.relaunchGate = Completer<void>();
+      final first = notifier().handleRestart();
+      final second = notifier().handleRestart();
+      await Future<void>.delayed(Duration.zero);
+      expect(action.calls, ['relaunch']);
+      action.relaunchGate!.complete();
+      await Future.wait([first, second]);
       expect(action.calls, ['relaunch', 'cleanup', 'window', 'core', 'exit']);
     });
 

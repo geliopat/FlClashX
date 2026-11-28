@@ -27,9 +27,13 @@ final class SystemExitCoordinator {
     if (activeOperation != null) {
       return activeOperation;
     }
-    final operation = _run(cleanup);
-    _operation = operation;
-    return operation;
+    final completion = Completer<void>();
+    _operation = completion.future;
+    unawaited(_run(cleanup).then<void>(
+      (_) => completion.complete(),
+      onError: (Object error, StackTrace stack) => completion.completeError(error, stack),
+    ));
+    return completion.future;
   }
 
   Future<void> _run(ExitStep cleanup) async {
@@ -69,8 +73,12 @@ final class SystemExitCoordinator {
     if (activeOperation != null) {
       return activeOperation;
     }
-    final operation = Future<void>.sync(exitApplication);
-    _applicationExitOperation = operation;
-    return operation;
+    final completion = Completer<void>();
+    _applicationExitOperation = completion.future;
+    unawaited(Future<void>.sync(exitApplication).then<void>(
+      (_) => completion.complete(),
+      onError: (Object error, StackTrace stack) => completion.completeError(error, stack),
+    ));
+    return completion.future;
   }
 }
