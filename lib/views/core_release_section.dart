@@ -65,6 +65,12 @@ class _CoreReleaseSectionState extends ConsumerState<CoreReleaseSection> {
     final bundled = _bundledVersion.startsWith('v') ? _bundledVersion : 'v$_bundledVersion';
     final minimum = CoreReleaseVersion.parse('$bundled-z.1');
     final version = offer.manifest.version;
+    // The first published package predates the new adapter RPCs. Its
+    // engine is identical, but installing it would remove client features.
+    if (offer.manifest.hostRevision == 'd3899829a60962c0f1fe9d8d59017529b03b984a') {
+      setState(() => _status = _tr('Для этой версии клиента требуется новый адаптер ядра', 'This client requires a newer core adapter'));
+      return;
+    }
     if (version.compareTo(minimum) < 0 ||
         (journal.current != null && version.compareTo(journal.current!.version) <= 0)) {
       setState(() => _status = _tr('Обновлений ядра нет', 'No core updates'));
