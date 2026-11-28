@@ -88,6 +88,34 @@ void main() {
     await stderr.close();
   });
 
+  test('direct lease handles split UTF-8 and malformed stderr before EOF', () async {
+    final stderr = StreamController<List<int>>();
+    final process = _FakeProcess(
+      pid: 42, exitCode: Future.value(0), stderr: stderr.stream,
+    );
+    final launcher = DirectCoreLauncher(
+      startProcess: (_, _) async => process, corePath: 'FlClashCore',
+    );
+    final lease = await launcher.start(
+      sessionId: '0123456789abcdef0123456789abcdef', address: 'test-address',
+    );
+    final bytes = utf8.encode('panic: ошибка');
+    stderr.add([0xff, 10]);
+    stderr.add(bytes.sublist(0, 8));
+    stderr.add(bytes.sublist(8));
+    await stderr.close();
+    await pumpEventQueue();
+    expect(lease.crashHeadline, 'panic: ошибка');
+  });
+
+  test('direct lease can retry a failed kill', () async {
+    final process = _FakeProcess(pid: 42, exitCode: Future.value(0))
+      ..killError = StateError('kill failed');
+    final lease = DirectCoreLease(sessionId: 'session', process: process);
+    await expectLater(lease.stop(const Duration(seconds: 1)), throwsStateError);
+    expect((await lease.stop(const Duration(seconds: 1))).exitConfirmed, isTrue);
+  });
+
   test('direct lease rechecks exit after an unconfirmed timeout', () async {
     final exitCode = Completer<int>();
     final process = _FakeProcess(pid: 42, exitCode: exitCode.future);
@@ -123,6 +151,7 @@ class _FakeProcess implements Process {
   final Stream<List<int>> stderr;
 
   bool killed = false;
+  Object? killError;
 
   _FakeProcess({
     required this.pid,
@@ -132,6 +161,9 @@ class _FakeProcess implements Process {
 
   @override
   bool kill([ProcessSignal signal = ProcessSignal.sigterm]) {
+    final error = killError;
+    killError = null;
+    if (error != null) throw error;
     killed = true;
     return true;
   }

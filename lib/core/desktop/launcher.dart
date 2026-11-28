@@ -38,14 +38,22 @@ final class DirectCoreLauncher implements CoreProcessLauncher {
   }) async {
     final process = await _startProcess(await _corePath(), [address]);
     final lease = DirectCoreLease(sessionId: sessionId, process: process);
-    process.stdout.listen((_) {});
-    process.stderr.listen((data) {
-      final error = utf8.decode(data);
-      if (error.isNotEmpty) {
-        lease._noteOutput(error);
-        commonPrint.log(error, logLevel: LogLevel.warning);
-      }
+    process.stdout.listen((_) {}, onError: (Object error) {
+      commonPrint.log('Core stdout: $error', logLevel: LogLevel.warning);
     });
+    // A pipe chunk need not end at a UTF-8 character boundary. Keep the
+    // decoder across chunks and tolerate malformed native diagnostic bytes.
+    process.stderr.transform(const Utf8Decoder(allowMalformed: true)).listen(
+      (output) {
+        if (output.isEmpty) return;
+        lease._noteOutput(output);
+        commonPrint.log(output, logLevel: LogLevel.warning);
+      },
+      onError: (Object error) {
+        commonPrint.log('Core stderr: $error', logLevel: LogLevel.warning);
+      },
+      onDone: lease._finishOutput,
+    );
     return lease;
   }
 }
@@ -81,10 +89,21 @@ final class DirectCoreLease implements CoreProcessLease {
         ? partial.substring(0, _longestLine)
         : partial;
     for (final line in lines) {
-      if (_goCrashHeadline.hasMatch(line)) {
-        _crashHeadline = line.trim();
-      }
+      _noteLine(line);
     }
+  }
+
+  void _noteLine(String line) {
+    if (_goCrashHeadline.hasMatch(line)) {
+      _crashHeadline = line.length > _longestLine
+          ? line.substring(0, _longestLine).trim()
+          : line.trim();
+    }
+  }
+
+  void _finishOutput() {
+    _noteLine(_partialLine);
+    _partialLine = '';
   }
 
   @override
@@ -98,6 +117,10 @@ final class DirectCoreLease implements CoreProcessLease {
         _stopOperation = null;
       }
       return result;
+    }, onError: (Object error, StackTrace stackTrace) {
+      // A failed kill must not permanently cache a rejected stop future.
+      _stopOperation = null;
+      Error.throwWithStackTrace(error, stackTrace);
     });
     _stopOperation = nextOperation;
     return nextOperation;
