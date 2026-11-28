@@ -83,6 +83,130 @@ class GoBuilder {
   // linker can set it for every reader.
   static const _versionSymbol = 'github.com/metacubex/mihomo/constant.Version';
 
+  String? _engineRevision() {
+    final directory = p.join(_corePath, 'third_party', 'mihomo');
+    try {
+      final result = Process.runSync('git', ['rev-parse', 'HEAD'],
+          workingDirectory: directory);
+      final revision = result.stdout.toString().trim();
+      if (result.exitCode == 0 &&
+          RegExp(r'^[0-9a-f]{40}
+    config.goLdflags,
+    if (config.coreVersion.isNotEmpty)
+      '-X $_versionSymbol=${config.coreVersion}',
+    if (_engineRevision() case final revision?)
+      '-X main.engineRevision=$revision',
+  ].join(' ');
+
+  List<String> _buildArguments(Target target, {String? outFile}) => [
+    'build',
+    '-ldflags=${_ldflags()}',
+    '-tags=${config.tags}',
+    if (outFile != null) ...['-o', outFile],
+    _mainPackage,
+  ];
+
+  Future<Fingerprint> _calculateFingerprint(Target target) async {
+    final env = _buildEnvironment(target);
+    final builder = FingerprintBuilder(rootDir: rootDir)
+      ..addValue('cache_schema', BuildCache.schemaVersion)
+      ..addValue('kind', 'go-core')
+      ..addValue('target', {'goos': target.goos, 'goarch': target.goarch})
+      ..addValue('config', config.toFingerprintMap())
+      ..addValue('environment', env)
+      ..addValue('arguments', _buildArguments(target));
+
+    final goEnvResult = runCommand(
+      'go',
+      [
+        'env',
+        '-json',
+        'GOVERSION',
+        'GOTOOLCHAIN',
+        'GOFLAGS',
+        'GOEXPERIMENT',
+        'GOAMD64',
+        'GOARM',
+        'GO386',
+        'GOMIPS',
+        'GOMIPS64',
+        'CGO_CFLAGS',
+        'CGO_CPPFLAGS',
+        'CGO_CXXFLAGS',
+        'CGO_LDFLAGS',
+        'GOWORK',
+        'GOENV',
+      ],
+      workingDirectory: _corePath,
+      environment: env,
+    );
+    final goEnv = jsonDecode((goEnvResult.stdout as String).trim());
+    builder.addValue('go_env', goEnv);
+
+    final inputs = _resolveGoInputs(env);
+    final goWork = (goEnv as Map<String, dynamic>)['GOWORK'];
+    if (goWork is String && goWork.isNotEmpty && goWork != 'off') {
+      inputs.add(goWork);
+      final goWorkSum = p.join(p.dirname(goWork), 'go.work.sum');
+      if (File(goWorkSum).existsSync()) inputs.add(goWorkSum);
+    }
+    inputs.addAll(harnessInputs);
+
+    builder.addFiles(inputs);
+    return builder.finishWithInputs();
+  }
+
+  Set<String> _resolveGoInputs(Map<String, String> environment) {
+    const template =
+        r'''{{range .GoFiles}}{{$.Dir}}/{{.}}{{"\n"}}{{end}}{{range .CgoFiles}}{{$.Dir}}/{{.}}{{"\n"}}{{end}}{{range .CFiles}}{{$.Dir}}/{{.}}{{"\n"}}{{end}}{{range .CXXFiles}}{{$.Dir}}/{{.}}{{"\n"}}{{end}}{{range .MFiles}}{{$.Dir}}/{{.}}{{"\n"}}{{end}}{{range .HFiles}}{{$.Dir}}/{{.}}{{"\n"}}{{end}}{{range .FFiles}}{{$.Dir}}/{{.}}{{"\n"}}{{end}}{{range .SFiles}}{{$.Dir}}/{{.}}{{"\n"}}{{end}}{{range .SwigFiles}}{{$.Dir}}/{{.}}{{"\n"}}{{end}}{{range .SwigCXXFiles}}{{$.Dir}}/{{.}}{{"\n"}}{{end}}{{range .SysoFiles}}{{$.Dir}}/{{.}}{{"\n"}}{{end}}{{range .EmbedFiles}}{{$.Dir}}/{{.}}{{"\n"}}{{end}}{{with .Module}}{{if .GoMod}}{{.GoMod}}{{"\n"}}{{end}}{{end}}''';
+    final result = runCommand(
+      'go',
+      ['list', '-deps', '-tags=${config.tags}', '-f', template, _mainPackage],
+      workingDirectory: _corePath,
+      environment: environment,
+    );
+    final corePath = p.normalize(p.absolute(_corePath));
+    final inputs = <String>{};
+    for (final line in (result.stdout as String).split('\n')) {
+      final value = line.trim();
+      if (value.isEmpty) continue;
+      final filePath = p.normalize(
+        p.absolute(p.isAbsolute(value) ? value : p.join(_corePath, value)),
+      );
+      if (!p.isWithin(corePath, filePath) && !p.equals(corePath, filePath)) {
+        continue;
+      }
+      if (!File(filePath).existsSync()) continue;
+      inputs.add(filePath);
+      if (p.basename(filePath) == 'go.mod') {
+        final goSum = p.join(p.dirname(filePath), 'go.sum');
+        if (File(goSum).existsSync()) inputs.add(goSum);
+      }
+    }
+
+    for (final name in const ['go.mod', 'go.sum']) {
+      final filePath = p.join(_corePath, name);
+      if (File(filePath).existsSync()) inputs.add(filePath);
+    }
+    return inputs;
+  }
+}
+).hasMatch(revision)) {
+        // Do not stamp the enclosing client's revision when the engine was
+        // unpacked without its own Git metadata.
+        final top = Process.runSync('git', ['rev-parse', '--show-toplevel'],
+            workingDirectory: directory);
+        if (top.exitCode == 0 &&
+            p.equals(p.normalize(top.stdout.toString().trim()), p.normalize(directory))) {
+          return revision;
+        }
+      }
+    } on ProcessException {
+      return null;
+    }
+    return null;
+  }
+
   String _ldflags() => [
     config.goLdflags,
     if (config.coreVersion.isNotEmpty)
