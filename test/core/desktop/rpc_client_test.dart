@@ -359,6 +359,40 @@ void main() {
     await transport.close();
   });
 
+  for (final frames in [true, false]) {
+    test('a ${frames ? 'frame' : 'event'} stream error fails pending RPCs', () async {
+      final transport = FakeDesktopCoreTransport.connected();
+      final client = CoreRpcClient(transport);
+      final invocation = client.invoke<bool>(method: CoreMethod.getIsInit);
+      final failure = expectLater(invocation, throwsA(
+        isA<CoreMethodException>().having((e) => e.code, 'code', 'transport_error'),
+      ));
+      await _sentRequest(transport);
+      transport.addStreamError(StateError('stream failed'), frames: frames);
+      await failure;
+      expect(client.pendingCount, 0);
+      await client.close();
+      await transport.close();
+    });
+  }
+
+  test('closed transport streams reject pending and subsequent requests', () async {
+    final transport = FakeDesktopCoreTransport.connected();
+    final client = CoreRpcClient(transport);
+    final invocation = client.invoke<bool>(method: CoreMethod.getIsInit);
+    final disconnected = throwsA(isA<CoreMethodException>().having(
+      (e) => e.code, 'code', 'transport_disconnected',
+    ));
+    final failure = expectLater(invocation, disconnected);
+    await _sentRequest(transport);
+    await transport.close();
+    await failure;
+    expect(client.pendingCount, 0);
+    await expectLater(client.invoke<bool>(method: CoreMethod.getIsInit), disconnected);
+    expect(transport.sentMessages, hasLength(1));
+    await client.close();
+  });
+
   test('transport failure before connection fails without waiting', () async {
     final transport = FakeDesktopCoreTransport();
     final client = CoreRpcClient(transport);

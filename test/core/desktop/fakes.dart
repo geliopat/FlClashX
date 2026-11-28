@@ -96,6 +96,14 @@ final class FakeDesktopCoreTransport implements DesktopCoreTransport {
     _frameController.add(value);
   }
 
+  void addStreamError(Object error, {required bool frames}) {
+    if (frames) {
+      _frameController.addError(error);
+    } else {
+      _eventController.addError(error);
+    }
+  }
+
   void fail(Object error, [StackTrace? stackTrace]) {
     state = DesktopTransportState.failed;
     _failure = TransportFailed(error, stackTrace ?? StackTrace.current);

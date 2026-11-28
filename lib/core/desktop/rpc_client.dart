@@ -44,6 +44,7 @@ final class CoreRpcClient implements CoreRpcChannel {
 
   int _methodCallId = 0;
   Future<void>? _closeOperation;
+  bool _streamEnded = false;
 
   /// Time since Core last answered any request. A method timeout is a liveness
   /// guard for a stalled link (a restart mid-flight, a stream that stopped
@@ -59,9 +60,14 @@ final class CoreRpcClient implements CoreRpcChannel {
   }) : _resolveSpill = resolveSpill ?? resolveSpilledResponse {
     _frameSubscription = transport.frames.listen(
       _handleFrame,
-      onError: _handleFrameError,
+      onError: _handleStreamError,
+      onDone: _handleStreamDone,
     );
-    _eventSubscription = transport.events.listen(_handleTransportEvent);
+    _eventSubscription = transport.events.listen(
+      _handleTransportEvent,
+      onError: _handleStreamError,
+      onDone: _handleStreamDone,
+    );
   }
 
   int get pendingCount => _pending.length;
@@ -72,7 +78,7 @@ final class CoreRpcClient implements CoreRpcChannel {
     Object? arguments,
     Duration? timeout,
   }) async {
-    if (_closeOperation != null) {
+    if (_closeOperation != null || _streamEnded) {
       throw const CoreMethodException(
         code: 'transport_disconnected',
         message: 'Core RPC client is closed',
@@ -284,11 +290,24 @@ final class CoreRpcClient implements CoreRpcChannel {
     completer.complete(response.result);
   }
 
-  void _handleFrameError(Object error, StackTrace stackTrace) {
+  void _handleStreamError(Object error, StackTrace stackTrace) {
     commonPrint.log(
-      'Transport data stream error: $error',
+      'Transport stream error: $error',
       logLevel: LogLevel.debug,
     );
+    _failPending(CoreMethodException(
+      code: 'transport_error',
+      message: 'Core transport stream failed',
+      details: error.toString(),
+    ));
+  }
+
+  void _handleStreamDone() {
+    _streamEnded = true;
+    _failPending(const CoreMethodException(
+      code: 'transport_disconnected',
+      message: 'Core transport stream ended',
+    ));
   }
 
   void _handleTransportEvent(DesktopTransportEvent event) {
