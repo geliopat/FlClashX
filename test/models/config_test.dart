@@ -520,7 +520,7 @@ void main() {
     UpdateParams liveParams(PatchClashConfig config) =>
         config.toUpdateParams(authentication: const [], skipCertVerify: false);
 
-    test('drops every field the update params patch live', () {
+    test('drops only fields the host really patches live', () {
       final live = defaultClashConfig.copyWith(
         tun: const Tun(enable: false, stack: TunStack.gvisor, mtu: 1500),
         mixedPort: 8899,
@@ -545,9 +545,24 @@ void main() {
       expect(liveKeys, isNotEmpty);
       for (final key in liveKeys) {
         expect(live.toJson()[key], isNot(defaults[key]), reason: key);
-        expect(live.setupOnly.toJson()[key], defaults[key], reason: key);
+        expect(live.setupOnly.toJson()[key],
+            Platform.isWindows && key == 'geox-url' ? live.toJson()[key] : defaults[key], reason: key);
       }
-      expect(live.setupOnly, defaultClashConfig.setupOnly);
+      final expected = Platform.isWindows
+          ? defaultClashConfig.setupOnly.copyWith(geoXUrl: live.geoXUrl)
+          : defaultClashConfig.setupOnly;
+      expect(live.setupOnly, expected);
+    });
+
+    test('Windows resource URL changes require full setup', () {
+      final changed = defaultClashConfig.copyWith(
+        geoXUrl: {...defaultGeoXUrl, GeoResource.MMDB: 'https://profile.test/mmdb'},
+      );
+      expect(changed.setupOnly.geoXUrl, Platform.isWindows
+          ? changed.geoXUrl : defaultClashConfig.geoXUrl);
+      if (Platform.isWindows) {
+        expect(changed.setupOnly, isNot(defaultClashConfig.setupOnly));
+      }
     });
 
     test('keeps each field only a full setup carries', () {

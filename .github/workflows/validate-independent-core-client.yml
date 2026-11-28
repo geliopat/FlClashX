@@ -100,13 +100,15 @@ jobs:
           cargo test --locked --manifest-path services/helper/Cargo.toml --features windows-service 'core_release::'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Install Flutter dependencies
+        id: pub_get
         run: flutter pub get
       - name: Verify generated model contract and actual release, rollback and UI
         shell: pwsh
         run: |
-          flutter test "--dart-define=FLCLASHZ_UPDATE_PUBLIC_KEY=$env:FLCLASHZ_UPDATE_PUBLIC_KEY" test/features/update/core_release_manifest_test.dart test/core/desktop/core_release_selection_test.dart test/core/desktop/helper_client_test.dart test/views/about_test.dart test/setup_test.dart test/views/dns_queries_view_test.dart test/models/profile_settings_test.dart test/models/config_test.dart test/core/protocol_contract_test.dart
+          flutter test "--dart-define=FLCLASHZ_UPDATE_PUBLIC_KEY=$env:FLCLASHZ_UPDATE_PUBLIC_KEY" test/features/update/core_release_manifest_test.dart test/core/desktop/core_release_selection_test.dart test/core/desktop/helper_client_test.dart test/views/about_test.dart test/setup_test.dart test/views/dns_queries_view_test.dart test/models/profile_settings_test.dart test/models/config_test.dart test/core/protocol_contract_test.dart test/common/path_test.dart test/common/file_logger_test.dart
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Analyze Dart sources
+        if: always() && steps.pub_get.outcome == 'success'
         run: flutter analyze --no-fatal-infos
 
   native-chain-api:

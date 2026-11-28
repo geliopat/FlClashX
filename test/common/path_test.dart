@@ -24,6 +24,27 @@ void main() {
     }
   });
 
+  test('home paths do not resolve the cache and a failed cache lookup can retry', () async {
+    final original = AppPath.cacheDirectory;
+    var calls = 0;
+    AppPath.cacheDirectory = () async {
+      calls++;
+      if (calls == 1) throw StateError('cache temporarily unavailable');
+      return root;
+    };
+    try {
+      await appPath.rebind();
+      expect(await appPath.homeDirPath, root.path);
+      expect(calls, 0);
+      await expectLater(appPath.cacheDir.future, throwsStateError);
+      expect((await appPath.cacheDir.future).path, root.path);
+      expect(calls, 2);
+    } finally {
+      AppPath.cacheDirectory = original;
+      await appPath.rebind();
+    }
+  });
+
   test('disclaimer consent is stored alongside settings', () async {
     expect(
       await appPath.disclaimerConsentPath,

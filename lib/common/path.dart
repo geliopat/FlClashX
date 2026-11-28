@@ -12,7 +12,27 @@ class AppPath {
   late ResolveOnce<Directory> _dataDir;
   late ResolveOnce<Directory?> _downloadDir;
   late ResolveOnce<Directory> _tempDir;
-  Completer<Directory> cacheDir = Completer();
+  Completer<Directory>? _cacheDir;
+
+  // Resolving home/log paths must not start an unrelated cache-directory
+  // plugin call. Its failure previously escaped as an unhandled future.
+  Completer<Directory> get cacheDir {
+    if (_cacheDir case final current?) return current;
+    final pending = Completer<Directory>();
+    _cacheDir = pending;
+    // Consumers can still observe a failure via .future; the independent
+    // listener prevents a failure before their first await from escaping.
+    unawaited(pending.future.then<void>((_) {},
+        onError: (Object _, StackTrace __) {}));
+    unawaited(Future<Directory>.sync(cacheDirectory).then<void>(
+      pending.complete,
+      onError: (Object error, StackTrace stack) {
+        if (identical(_cacheDir, pending)) _cacheDir = null;
+        pending.completeError(error, stack);
+      },
+    ));
+    return pending;
+  }
 
   @visibleForTesting
   static Future<Directory> Function() supportDirectory =
@@ -36,7 +56,7 @@ class AppPath {
 
   @visibleForTesting
   Future<void> rebind() async {
-    cacheDir = Completer();
+    _cacheDir = null;
     _bind();
     await Future.wait([_dataDir.value, _downloadDir.value, _tempDir.value]);
   }
@@ -45,7 +65,6 @@ class AppPath {
     _dataDir = ResolveOnce(supportDirectory);
     _downloadDir = ResolveOnce(downloadDirectory);
     _tempDir = ResolveOnce(temporaryDirectory);
-    cacheDirectory().then(cacheDir.complete);
   }
 
   factory AppPath() {
