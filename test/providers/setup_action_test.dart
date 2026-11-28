@@ -1886,7 +1886,7 @@ void main() {
     });
 
     test(
-      'a profile that fails to build still pushes the empty config to core',
+      'a profile that fails to build does not replace Windows config',
       () async {
         final profile = Profile.normal(label: 'p');
         final core = _MockCoreHandlerInterface();
@@ -1922,7 +1922,12 @@ void main() {
             .applyProfile(force: true);
 
         expect(succeeded, isFalse);
-        expect(pushedConfig, isEmpty);
+        if (Platform.isWindows) {
+          expect(pushedConfig, isNull);
+          verifyNever(() => core.setupConfig(any()));
+        } else {
+          expect(pushedConfig, isEmpty);
+        }
         expect(scoped.read(currentProfileIdProvider), profile.id);
       },
     );

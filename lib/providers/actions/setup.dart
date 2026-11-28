@@ -639,8 +639,8 @@ class SetupAction extends _$SetupAction {
   }
 
   // False means building the profile, the config write, or the Core setup
-  // step failed; a profile that fails to build is still pushed to the Core
-  // as the empty config so it never keeps serving the previous one.
+  // step failed. Windows retains the last accepted profile on build failure;
+  // the old non-Windows fallback is kept for its existing service contract.
   // authorizeCore failures still throw.
   Future<bool> applyProfile({
     bool silence = false,
@@ -1099,7 +1099,11 @@ class SetupAction extends _$SetupAction {
       return getProfile(setupState: state, patchConfig: realPatchConfig);
     }, title: 'build profile');
     final profileFailed = realProfile == null;
-    final setupParams = _setupParams.copyWith(base: realProfile?.base);
+    if (system.isWindows && profileFailed) {
+      // No empty/default replacement and no listener start after build error.
+      return _SetupTaskResult.failed;
+    }
+    var setupParams = _setupParams.copyWith(base: realProfile?.base);
     final inputs = switch (setupState) {
       final state? when !profileFailed => (
         state,
@@ -1123,8 +1127,7 @@ class SetupAction extends _$SetupAction {
       }
       return _SetupTaskResult.completed;
     }
-    // Go answers a config it rejects by running its built-in default, which
-    // has no proxies, so until this push succeeds no applied config is known.
+    // Until the push succeeds do not report the new profile as applied.
     _appliedInputs = null;
     if (system.isWindows) {
       unawaited(ref.read(resourcesActionProvider.notifier).profileApplied(null));
@@ -1150,6 +1153,7 @@ class SetupAction extends _$SetupAction {
         ({int revision, bool restore, bool wasStopping, bool changed})? transition;
         var protectionYaml = '';
         var accepted = false;
+        Directory? stagedBase;
         try {
           if (system.isWindows && !ref.read(safeModeProvider)) {
             protectionYaml = await _zapretEffectiveYaml(realProfile);
@@ -1158,8 +1162,20 @@ class SetupAction extends _$SetupAction {
             transition = await controller.beginProfileApply(protectionYaml, profile?.id);
           }
           if (setupParams.base == null) {
-            final configFilePath = await appPath.configFilePath;
-            await File(configFilePath).writeAsStringAtomically(yamlString);
+            if (system.isWindows) {
+              // Send the complete overlay through the native parse-then-write
+              // path. The empty base adds no routes, proxies or resources.
+              stagedBase = await Directory(await appPath.homeDirPath)
+                  .createTemp('profile-apply-');
+              final empty = File(join(stagedBase.path, 'base.yaml'));
+              await empty.writeAsString('{}', flush: true);
+              setupParams = setupParams.copyWith(base: SetupBase(
+                path: empty.path, overlay: yamlString.isEmpty ? '{}' : yamlString,
+              ));
+            } else {
+              final configFilePath = await appPath.configFilePath;
+              await File(configFilePath).writeAsStringAtomically(yamlString);
+            }
           }
           final profileId = profile?.id;
           if (profileId != null) {
@@ -1188,6 +1204,9 @@ class SetupAction extends _$SetupAction {
           }
           rethrow;
         } finally {
+          if (stagedBase != null) {
+            try { await stagedBase.delete(recursive: true); } on FileSystemException {}
+          }
           if (zapret != null && transition != null) {
             try {
               await zapret.finishProfileApply(transition,

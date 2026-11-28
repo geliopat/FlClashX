@@ -107,6 +107,15 @@ void main() {
     }), isTrue);
   });
 
+  test('journal retains exact signed engine and adapter identity', () async {
+    final selected = CoreReleaseRef.fromManifest(manifest);
+    final restored = CoreReleaseRef.fromJson(selected.toJson());
+    expect(restored.engineRevision, manifest.engineRevision);
+    expect(restored.hostRevision, manifest.hostRevision);
+    expect(() => CoreReleaseRef.fromJson({...selected.toJson(),
+      'hostRevision': 'invalid'}), throwsFormatException);
+  });
+
   test('does not accept malformed selected paths', () async {
     await file.writeAsString('{"schema":1,"current":{"hash":"../evil.exe","version":"v1.19.34-z.2"},"hasPrevious":false,"pending":false}');
     expect(await store.selectedForLaunch(), isNull);

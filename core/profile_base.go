@@ -230,7 +230,7 @@ func loadConfigWithBase(base *SetupBase, configPath string) (*config.Config, err
 	if err := document.Decode(raw); err != nil {
 		return nil, err
 	}
-	captureProfileExtras(raw)
+	injectTestURL(raw)
 	cfg, err := config.ParseRawConfig(raw)
 	if err != nil {
 		return nil, err
@@ -238,6 +238,7 @@ func loadConfigWithBase(base *SetupBase, configPath string) (*config.Config, err
 	if err := writeConfigDocument(configPath, document); err != nil {
 		return nil, err
 	}
+	captureProfileExtras(raw)
 	return withPlatformLimits(cfg), nil
 }
 
@@ -249,7 +250,7 @@ func mergeProfileBase(base *SetupBase) (*yaml.Node, error) {
 	if buf, err = age.DecryptBytes(buf); err != nil {
 		return nil, fmt.Errorf("decrypt config error: %w", err)
 	}
-	retag := bytes.Contains(buf, []byte("short-id"))
+	retag := bytes.Contains(buf, []byte("short-id")) || strings.Contains(base.Overlay, "short-id")
 	var profileDocument, overlayDocument yaml.Node
 	if err := yaml.Unmarshal(buf, &profileDocument); err != nil {
 		return nil, err

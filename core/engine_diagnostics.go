@@ -1,6 +1,7 @@
 package core
 
 import (
+	"runtime"
 	"sync"
 	"time"
 
@@ -43,6 +44,7 @@ var engineDiagnostics struct {
 
 func handleCoreCapabilities() []string {
 	capabilities := []string{"closed-flow-history-v1", "chain-diagnostics-v1", "dns-stages-v1", "core-identity-v1", "adaptive-balance-v1"}
+	if runtime.GOOS == "windows" { capabilities = append(capabilities, "atomic-profile-apply-v1") }
 	if chainHealthAvailable() { capabilities = append(capabilities, "chain-health-v1") }
 	return capabilities
 }

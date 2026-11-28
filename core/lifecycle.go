@@ -50,6 +50,9 @@ func handleGetCoreVersion() string {
 func handleStartListener() bool {
 	configMu.Lock()
 	defer configMu.Unlock()
+	if runtime.GOOS == "windows" && currentConfig == nil {
+		return false
+	}
 	stopAllChainHealth()
 	isRunning.Store(true)
 	updateListeners(currentConfig)

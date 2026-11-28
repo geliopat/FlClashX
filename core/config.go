@@ -158,11 +158,12 @@ func loadConfig(path string) (*config.Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	captureProfileExtras(raw)
+	injectTestURL(raw)
 	cfg, err := config.ParseRawConfig(raw)
 	if err != nil {
 		return nil, err
 	}
+	captureProfileExtras(raw)
 	return withPlatformLimits(cfg), nil
 }
 
@@ -191,10 +192,20 @@ func applyConfig(params *SetupParams) error {
 	configMu.Lock()
 	defer configMu.Unlock()
 
+	previousTestURL := testURL.Load()
+	previousSkipCertVerify := skipCertVerify.Load()
 	setTestURL(params.TestURL)
 	skipCertVerify.Store(params.SkipCertVerify)
 	cfg, err := loadSetupConfig(params)
 	if err != nil {
+		if runtime.GOOS == "windows" {
+			// A rejected profile must never replace the last applied routes
+			// with DIRECT/defaults. On cold start there is no applied config.
+			testURL.Store(previousTestURL)
+			skipCertVerify.Store(previousSkipCertVerify)
+			logError("config apply rejected; previous configuration retained: %v", err)
+			return err
+		}
 		// The fallback is what keeps the listeners serving while the host
 		// reports the error, but it applies a config with no proxies in it.
 		// From the UI that is indistinguishable from a subscription that went

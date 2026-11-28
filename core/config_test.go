@@ -830,9 +830,36 @@ func withSetupConfig(t *testing.T, apply func(*SetupParams) error) {
 	})
 }
 
-// applyConfig rolls back to the default config when the profile fails to parse.
-// That rollback is the whole recovery: the error reaches the host and the
-// listeners keep serving while the user picks another profile.
+func TestWindowsRejectedConfigKeepsAppliedProfile(t *testing.T) {
+	if runtime.GOOS != "windows" { t.Skip("Windows profile transaction") }
+	home := t.TempDir()
+	previousHome := constant.Path.HomeDir()
+	constant.SetHomeDir(home)
+	t.Cleanup(func(){ constant.SetHomeDir(previousHome) })
+	previous := &config.Config{}
+	withCurrentConfig(t, previous)
+	oldURL := currentTestURL()
+	oldSkip := skipCertVerify.Load()
+	if err := os.WriteFile(filepath.Join(home, "config.yaml"), []byte("proxies: ["), 0600); err != nil { t.Fatal(err) }
+	params := defaultSetupParams()
+	params.TestURL = "https://rejected.example/generate_204"
+	params.SkipCertVerify = !oldSkip
+	if err := applyConfig(params); err == nil { t.Fatal("accepted invalid profile") }
+	if currentConfig != previous || currentTestURL() != oldURL || skipCertVerify.Load() != oldSkip {
+		t.Fatal("rejected profile replaced active state")
+	}
+}
+
+func TestWindowsColdStartNeedsAcceptedProfile(t *testing.T) {
+	if runtime.GOOS != "windows" { t.Skip("Windows profile transaction") }
+	withCurrentConfig(t, nil)
+	old := isRunning.Load()
+	isRunning.Store(false)
+	t.Cleanup(func(){ isRunning.Store(old) })
+	if handleStartListener() || isRunning.Load() { t.Fatal("started without accepted profile") }
+}
+
+// A failed apply must be reported without disrupting the accepted profile.
 func TestHandleSetupConfigKeepsTheListenerWhenTheProfileFails(t *testing.T) {
 	withSetupConfig(t, func(*SetupParams) error { return errors.New("bad profile") })
 

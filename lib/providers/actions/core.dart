@@ -32,6 +32,7 @@ class CoreAction extends _$CoreAction {
     final version = ref.read(versionProvider);
     if (!isInit) {
       final res = await _core.init(version);
+      if (!res) throw StateError('Core initialization refused');
       commonPrint.log('init result: $res');
     } else {
       await ref.read(proxiesActionProvider.notifier).updateGroups();
@@ -69,13 +70,40 @@ class CoreAction extends _$CoreAction {
     return _core.restart();
   }
 
-  // Nothing in lib/ calls CoreController.stop(); only close() (app exit)
-  // supersedes a start/restart. Connected first lets onCrash catch a crash
-  // during initCore itself (it early-returns unless status is connected).
+  // Authenticate the running adapter before exposing a connected state or
+  // applying a profile. The same gate covers launch, restart and rollback.
+  @protected
+  Future<void> verifyRunningCore() async {
+    if (!system.isWindows || safeModeBuild || ref.read(safeModeProvider)) return;
+    final selected = await coreReleaseSelection.selectedForLaunch();
+    final capabilities = await _core.getCoreCapabilities();
+    final identity = await _core.getCoreIdentity();
+    final missing = requiredWindowsCoreCapabilities.difference(capabilities);
+    if (missing.isNotEmpty || identity == null) {
+      throw StateError('Incompatible core adapter: missing ${missing.join(', ')}');
+    }
+    final actual = await _core.getCoreVersion();
+    String normalize(String v) => v.startsWith('v') ? v : 'v$v';
+    final expected = selected?.version.mihomoVersion ?? coreVersionDefine;
+    if (expected.isNotEmpty && normalize(actual) != normalize(expected)) {
+      throw StateError('Unexpected running Mihomo version: $actual');
+    }
+    if (selected != null &&
+        (selected.engineRevision == null || selected.hostRevision == null ||
+        identity['version'] != selected.version.value ||
+        identity['engineRevision'] != selected.engineRevision ||
+        identity['hostRevision'] != selected.hostRevision)) {
+      throw StateError('Running independent core identity differs from selected signed release');
+    }
+  }
+
+  // During initialization, connected allows the existing crash monitor to
+  // notice failure. No incompatible adapter can reach this point.
   Future<bool> _applyLifecycleResult(CoreLifecycleResult result) async {
     if (result.outcome == CoreLifecycleOutcome.superseded) {
       return false;
     }
+    await verifyRunningCore();
     ref.read(coreStatusProvider.notifier).value = CoreStatus.connected;
     await initCore();
     return true;
@@ -265,10 +293,7 @@ class CoreAction extends _$CoreAction {
             identity?['engineRevision'] != manifest.engineRevision ||
             identity?['hostRevision'] != manifest.hostRevision) return false;
         final capabilities = await _core.getCoreCapabilities();
-        if (!capabilities.containsAll(const {
-          'core-identity-v1', 'closed-flow-history-v1',
-          'chain-diagnostics-v1', 'dns-stages-v1', 'adaptive-balance-v1', 'chain-health-v1',
-        })) return false;
+        if (!capabilities.containsAll(requiredWindowsCoreCapabilities)) return false;
       }
       // Detect immediate crashes after successful configuration/listener setup.
       await Future<void>.delayed(const Duration(seconds: 2));

@@ -200,6 +200,12 @@ class CoreController {
     if (preloadInvoke == null) {
       return _interface.setupConfig(params);
     }
+    if (system.isWindows) {
+      // Do not open listeners until the exact profile was accepted.
+      final result = await _interface.setupConfig(params);
+      if (result.isEmpty) await preloadInvoke();
+      return result;
+    }
     final (result, _) = await (
       _interface.setupConfig(params),
       preloadInvoke(),
