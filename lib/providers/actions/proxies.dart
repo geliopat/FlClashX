@@ -101,7 +101,7 @@ class ProxiesAction extends _$ProxiesAction {
       ref.listen(safeModeProvider, (_, _) => _syncAutoDelayTimer());
       ref.listen(selectedMapProvider, (_, _) => unawaited(_autoDelayTick()));
       ref.listen(initProvider, (_, _) => _syncAutoDelayTimer());
-      ref.listen(groupsProvider, (_, _) => unawaited(_autoDelayTick()));
+      ref.listen(groupsProvider, (_, _) => _syncAutoDelayTimer());
       ref.listen(currentProfileIdProvider, (_, _) {
         cancelDelayTests();
       });
@@ -129,6 +129,7 @@ class ProxiesAction extends _$ProxiesAction {
     final enabled = ref.read(initProvider) &&
         ref.read(coreStatusProvider) == CoreStatus.connected &&
         !ref.read(safeModeProvider) &&
+        ref.read(groupsProvider).isNotEmpty &&
         (intervals.active > 0 || intervals.others > 0);
     if (!enabled) {
       _autoDelayTimer?.cancel();

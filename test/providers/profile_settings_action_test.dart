@@ -49,6 +49,9 @@ void main() {
     core = _MockCore();
     container = ProviderContainer(
       overrides: [
+        appSettingProvider.overrideWithBuild((_, _) => AppSettingProps(
+          panelSetSettings: withYamlSources(const {}, const {}),
+        )),
         profilesProvider.overrideWith(() => TestProfiles([])),
         coreHandlerProvider.overrideWithValue(CoreController.scoped(core)),
       ],

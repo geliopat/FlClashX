@@ -33,7 +33,9 @@ class ProfileSettingsAction extends _$ProfileSettingsAction {
   void build() {
     ref.listen(
       currentProfileProvider.select(profileSettingsSourceOf),
-      (_, next) => scheduleMicrotask(() => unawaited(apply(next))),
+      (_, next) => scheduleMicrotask(() {
+        if (ref.mounted) unawaited(apply(next));
+      }),
     );
     ref.listen(coreStatusProvider, (prev, next) {
       if (_unread &&
@@ -44,14 +46,15 @@ class ProfileSettingsAction extends _$ProfileSettingsAction {
         );
       }
     });
-    scheduleMicrotask(
-      () => unawaited(
-        apply(profileSettingsSourceOf(ref.read(currentProfileProvider))),
-      ),
-    );
+    scheduleMicrotask(() {
+      if (ref.mounted) {
+        unawaited(apply(profileSettingsSourceOf(ref.read(currentProfileProvider))));
+      }
+    });
   }
 
   Future<void> apply(ProfileSettingsSource source, {Set<String> released = const {}}) async {
+    if (!ref.mounted) return;
     _released.addAll(released.where(isClashOwnershipKey));
     final id = source.id;
     final generation = ++_generation;

@@ -132,7 +132,13 @@ void main() {
       ),
     );
 
-    verifyNever(() => core.getProfileBase(any()));
+    if (Platform.isWindows) {
+      // The native base supplies explicit YAML ownership metadata on Windows.
+      verify(() => core.getProfileBase(any())).called(1);
+    } else {
+      verifyNever(() => core.getProfileBase(any()));
+    }
+    verify(() => core.getConfig(any())).called(1);
     expect(built.base, isNull);
     final config = loadYaml(built.yaml) as YamlMap;
     final groups = (config['proxy-groups'] as YamlList).cast<YamlMap>();

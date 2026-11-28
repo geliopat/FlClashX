@@ -23,6 +23,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../helpers/app_paths.dart';
+import '../helpers/preferences.dart';
 import '../helpers/test_database_providers.dart';
 import '../helpers/test_profiles.dart';
 
@@ -158,6 +159,10 @@ Future<void> _waitForSetupToSettle(
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  setUp(() async {
+    await mockPreferences();
+  });
   late Directory profileSwitchTempDir;
 
   setUpAll(() async {

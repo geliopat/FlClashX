@@ -21,6 +21,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:yaml/yaml.dart';
 
 import '../helpers/app_paths.dart';
+import '../helpers/preferences.dart';
 import '../helpers/setup_actions.dart';
 import '../helpers/test_app.dart';
 import '../helpers/test_profiles.dart';
@@ -89,7 +90,8 @@ void main() {
     if (home.existsSync()) home.deleteSync(recursive: true);
   });
 
-  setUp(() {
+  setUp(() async {
+    await mockPreferences();
     core = _MockCoreHandlerInterface();
     when(() => core.validateConfig(any())).thenAnswer((_) async => '');
     container = ProviderContainer(
