@@ -37,6 +37,7 @@ func TestNewDnsQueryFlattensAnswers(t *testing.T) {
 		Initiator: initiatorApp,
 		Upstream:  "tls://1.1.1.1:853",
 		Cached:    true,
+		Stages:    []string{"cache"},
 		Start:     start,
 	})
 
@@ -52,6 +53,9 @@ func TestNewDnsQueryFlattensAnswers(t *testing.T) {
 	want := []string{"edge.example.net", "93.184.216.34", "2606:2800:220:1::248", `"v=spf1 -all"`}
 	if !reflect.DeepEqual(query.Answers, want) {
 		t.Fatalf("answers = %q, want %q", query.Answers, want)
+	}
+	if !reflect.DeepEqual(query.Stages, []string{"cache"}) {
+		t.Fatalf("stages = %v", query.Stages)
 	}
 	if !query.Time.Equal(start) {
 		t.Fatalf("time = %v, want %v", query.Time, start)
