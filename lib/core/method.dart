@@ -53,6 +53,7 @@ enum CoreMethod {
   getMemoryStats,
   getCoreVersion,
   getCoreCapabilities,
+  getCoreIdentity,
   getEngineDiagnostics,
   setEngineDiagnostics,
   crash,
